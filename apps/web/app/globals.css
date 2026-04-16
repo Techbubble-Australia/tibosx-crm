@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --primary: #0a0a0a;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #0a0a0a;
+  --muted: #f5f5f5;
+  --muted-foreground: #737373;
+  --accent: #f5f5f5;
+  --accent-foreground: #0a0a0a;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #0a0a0a;
+  --radius: 0.5rem;
+  /* Align with Figma handoff: Inter + fallbacks */
+  --font-sans: var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+  /* Common frame: max content width 1280px, horizontal padding 24–32 */
+  --tb-container-max: 80rem;
+  --tb-section-y: 5rem;
+  --tb-section-y-lg: 6rem;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+  --card: #0a0a0a;
+  --card-foreground: #fafafa;
+  --popover: #0a0a0a;
+  --popover-foreground: #fafafa;
+  --primary: #fafafa;
+  --primary-foreground: #171717;
+  --secondary: #262626;
+  --secondary-foreground: #fafafa;
+  --muted: #262626;
+  --muted-foreground: #a3a3a3;
+  --accent: #262626;
+  --accent-foreground: #fafafa;
+  --destructive: #7f1d1d;
+  --destructive-foreground: #fafafa;
+  --border: #262626;
+  --input: #262626;
+  --ring: #d4d4d4;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "liga" 1, "kern" 1;
+  }
+}
+
+/* Figma-aligned layout primitives (tune against Dev Mode spacing) */
+@layer components {
+  .tb-container {
+    @apply mx-auto w-full max-w-[var(--tb-container-max)] px-4 sm:px-6 lg:px-8;
+  }
+  .tb-section-y {
+    @apply py-16 md:py-20 lg:py-[var(--tb-section-y-lg)];
+  }
+  .tb-section-y-tight {
+    @apply py-12 md:py-16;
+  }
+  .tb-heading-xl {
+    @apply text-4xl font-bold tracking-tight text-[#0a0a0a] md:text-5xl lg:text-6xl;
+  }
+  .tb-heading-lg {
+    @apply text-2xl font-bold tracking-tight text-[#0a0a0a] md:text-3xl;
+  }
+  .tb-body-muted {
+    @apply text-base leading-relaxed text-neutral-600;
+  }
+  .tb-btn-primary {
+    @apply inline-flex items-center gap-2 rounded-full bg-black px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-neutral-900;
+  }
+  .tb-btn-ghost {
+    @apply inline-flex items-center gap-2 rounded-full border border-neutral-300 bg-white px-6 py-3 text-sm font-semibold text-neutral-900 transition-colors hover:bg-neutral-50;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}

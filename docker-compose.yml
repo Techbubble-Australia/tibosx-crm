@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: techbubble-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: techbubble
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    container_name: techbubble-api
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/techbubble
+      - JWT_SECRET=your-secret-key-change-in-production
+      - ADMIN_EMAIL=admin@techbubble.com
+      - ADMIN_PASSWORD=admin123
+      - PORT=3001
+      - UPLOAD_DIR=/app/uploads
+      - UPLOAD_URL=http://localhost:3001/uploads
+    ports:
+      - "3001:3001"
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["node", "packages/api/dist/index.js"]
+
+  # Website
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: techbubble-web
+    environment:
+      - NODE_ENV=production
+      - API_URL=http://api:3001
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+  # Admin Panel
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.admin
+    container_name: techbubble-admin
+    environment:
+      - NODE_ENV=production
+      - API_URL=http://api:3001
+    ports:
+      - "3002:3000"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  uploads:

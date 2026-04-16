@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 58" role="img" aria-labelledby="title">
+  <title id="title">Techbubble</title>
+  <defs>
+    <style type="text/css">
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@800&amp;display=swap");
+    </style>
+  </defs>
+  <g fill="#ffffff" stroke="#ffffff" stroke-width="0.25" stroke-linejoin="round">
+    <polygon points="100.00,7.30 105.37,10.40 105.37,16.60 100.00,19.70 94.63,16.60 94.63,10.40" />
+    <polygon points="89.50,25.49 94.87,28.59 94.87,34.79 89.50,37.89 84.13,34.79 84.13,28.59" />
+    <polygon points="110.50,25.49 115.87,28.59 115.87,34.79 110.50,37.89 105.13,34.79 105.13,28.59" />
+  </g>
+  <text
+    x="100"
+    y="52"
+    text-anchor="middle"
+    fill="#ffffff"
+    font-family="Inter, system-ui, sans-serif"
+    font-size="12.5"
+    font-weight="800"
+    letter-spacing="0.14em"
+    textLength="168"
+    lengthAdjust="spacingAndGlyphs"
+  >TECHBUBBLE</text>
+</svg>

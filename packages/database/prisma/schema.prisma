@@ -1,0 +1,162 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model CaseStudy {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  subtitle    String
+  category    String   // ServiceNow, Salesforce, MuleSoft, SharePoint, Staffing
+  clientName  String
+  
+  // Hero stats
+  heroStat1Value    String
+  heroStat1Label    String
+  heroStat2Value    String
+  heroStat2Label    String
+  heroStat3Value    String
+  heroStat3Label    String
+  
+  // Main image
+  featuredImage     String
+  
+  // Background section
+  backgroundTitle   String
+  backgroundContent String
+  
+  // Challenge section
+  challengeTitle    String
+  challengeContent  String
+  
+  // Challenge stats (the three big numbers)
+  challengeStat1Value String
+  challengeStat1Label String
+  challengeStat2Value String
+  challengeStat2Label String
+  challengeStat3Value String
+  challengeStat3Label String
+  
+  // Challenge problems (4 items)
+  problem1Title     String
+  problem1Content   String
+  problem2Title     String
+  problem2Content   String
+  problem3Title     String
+  problem3Content   String
+  problem4Title     String
+  problem4Content   String
+  
+  // Solution section
+  solutionTitle     String
+  solutionContent   String
+  
+  // Solution phases (3-4 phases)
+  phase1Title       String
+  phase1Duration    String
+  phase1Content     String
+  phase1Tags        String[]
+  
+  phase2Title       String
+  phase2Duration    String
+  phase2Content     String
+  phase2Tags        String[]
+  
+  phase3Title       String
+  phase3Duration    String
+  phase3Content     String
+  phase3Tags        String[]
+  
+  phase4Title       String?
+  phase4Duration    String?
+  phase4Content     String?
+  phase4Tags        String[]
+  
+  // Technology Stack
+  techStackTitle    String
+  techStackIntro    String
+  
+  // Technologies (6 items)
+  tech1Name         String
+  tech1Description  String
+  tech1Icon         String
+  
+  tech2Name         String
+  tech2Description  String
+  tech2Icon         String
+  
+  tech3Name         String
+  tech3Description  String
+  tech3Icon         String
+  
+  tech4Name         String
+  tech4Description  String
+  tech4Icon         String
+  
+  tech5Name         String
+  tech5Description  String
+  tech5Icon         String
+  
+  tech6Name         String
+  tech6Description  String
+  tech6Icon         String
+  
+  // Testimonial
+  testimonialQuote  String
+  testimonialAuthorName     String
+  testimonialAuthorTitle    String
+  testimonialAuthorCompany  String
+  testimonialAuthorInitials String
+  
+  // Results section
+  resultsTitle      String
+  resultsContent    String
+  
+  // Results stats
+  resultStat1Value  String
+  resultStat1Label  String
+  resultStat2Value  String
+  resultStat2Label  String
+  resultStat3Value  String
+  resultStat3Label  String
+  
+  // Meta
+  published         Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([category])
+  @@index([published])
+  @@index([createdAt])
+}
+
+model ContactSubmission {
+  id          String   @id @default(cuid())
+  firstName   String
+  lastName    String
+  email       String
+  phone       String?
+  company     String?
+  interest    String?
+  country     String?
+  message     String
+  createdAt   DateTime @default(now())
+}
+
+model CareerApplication {
+  id          String   @id @default(cuid())
+  firstName   String
+  lastName    String
+  email       String
+  phone       String?
+  position    String
+  company     String?
+  resumeUrl   String?
+  message     String?
+  createdAt   DateTime @default(now())
+}

@@ -1,0 +1,53 @@
+# Dockerfile for TechBubble Admin Panel
+FROM node:20-alpine AS base
+
+# Install dependencies
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+COPY packages/database/package.json ./packages/database/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/config/package.json ./packages/config/
+COPY apps/admin/package.json ./apps/admin/
+
+RUN npm ci
+
+# Build
+FROM deps AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate --schema=./packages/database/prisma/schema.prisma
+
+# Build packages
+RUN npm run build --workspace=@techbubble/ui
+RUN npm run build --workspace=@techbubble/database
+
+# Build the admin app
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build --workspace=@techbubble/admin
+
+# Production
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+COPY --from=builder --chown=nextjs:nodejs /app/apps/admin/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/admin/.next/static ./.next/static
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT=3000
+
+CMD ["node", "server.js"]
