@@ -25,6 +25,10 @@ coverage
 dist
 build
 *.tsbuildinfo
+**/.next/
+**/out/
+**/.turbo/
+**/.cache/
 
 # IDE
 .idea
@@ -41,6 +45,7 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
 # Database
 *.db
