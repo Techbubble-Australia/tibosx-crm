@@ -1,6 +1,7 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.web"
+watchPatterns = ["apps/web/**", "packages/ui/**", "packages/database/**", "packages/config/**", "pnpm-lock.yaml", "pnpm-workspace.yaml", "package.json", "Dockerfile.web"]
 
 [deploy]
 startCommand = "node server.js"

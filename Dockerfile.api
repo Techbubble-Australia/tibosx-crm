@@ -6,12 +6,13 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/database/package.json ./packages/database/
 COPY packages/api/package.json ./packages/api/
 COPY packages/config/package.json ./packages/config/
 
-RUN npm ci
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+RUN pnpm install --frozen-lockfile
 
 # Build
 FROM deps AS builder
@@ -20,11 +21,11 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Generate Prisma client
-RUN npx prisma generate --schema=./packages/database/prisma/schema.prisma
+RUN pnpm exec prisma generate --schema=./packages/database/prisma/schema.prisma
 
 # Build packages
-RUN npm run build --workspace=@techbubble/database
-RUN npm run build --workspace=@techbubble/api
+RUN pnpm --filter @techbubble/database build
+RUN pnpm --filter @techbubble/api build
 
 # Production
 FROM base AS runner

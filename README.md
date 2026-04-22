@@ -94,6 +94,14 @@ Create the following services in Railway:
 3. **Web** - Deploy from `Dockerfile.web`
 4. **Admin** - Deploy from `Dockerfile.admin`
 
+Enable monorepo auto-deploy by setting each service to use the matching config file:
+
+- API service config: `railway.api.toml`
+- Web service config: `railway.web.toml`
+- Admin service config: `railway.admin.toml`
+
+These configs include `watchPatterns` so each service deploys only when relevant files change.
+
 ### 3. Environment Variables
 
 Set the following environment variables for each service:

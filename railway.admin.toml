@@ -1,6 +1,7 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.admin"
+watchPatterns = ["apps/admin/**", "packages/ui/**", "packages/database/**", "packages/config/**", "pnpm-lock.yaml", "pnpm-workspace.yaml", "package.json", "Dockerfile.admin"]
 
 [deploy]
 startCommand = "node server.js"

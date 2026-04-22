@@ -1,6 +1,7 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.api"
+watchPatterns = ["packages/api/**", "packages/database/**", "packages/config/**", "pnpm-lock.yaml", "pnpm-workspace.yaml", "package.json", "Dockerfile.api"]
 
 [deploy]
 startCommand = "node packages/api/dist/index.js"

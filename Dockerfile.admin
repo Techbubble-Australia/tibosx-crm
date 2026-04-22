@@ -6,13 +6,14 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/database/package.json ./packages/database/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/config/package.json ./packages/config/
 COPY apps/admin/package.json ./apps/admin/
 
-RUN npm ci
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+RUN pnpm install --frozen-lockfile
 
 # Build
 FROM deps AS builder
@@ -21,15 +22,15 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Generate Prisma client
-RUN npx prisma generate --schema=./packages/database/prisma/schema.prisma
+RUN pnpm exec prisma generate --schema=./packages/database/prisma/schema.prisma
 
 # Build packages
-RUN npm run build --workspace=@techbubble/ui
-RUN npm run build --workspace=@techbubble/database
+RUN pnpm --filter @techbubble/ui build
+RUN pnpm --filter @techbubble/database build
 
 # Build the admin app
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build --workspace=@techbubble/admin
+RUN pnpm --filter @techbubble/admin build
 
 # Production
 FROM base AS runner
