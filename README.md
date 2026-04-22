@@ -112,14 +112,13 @@ Set the following environment variables for each service:
 ### 4. Deploy
 
 ```bash
-# Deploy API
-railway up --service api
+# Deploy all services (API, Web, Admin) from the repo root
+npm run deploy:railway
 
-# Deploy Web
-railway up --service web
-
-# Deploy Admin
-railway up --service admin
+# Optional: deploy a single service
+npm run deploy:railway:api
+npm run deploy:railway:web
+npm run deploy:railway:admin
 ```
 
 Or deploy automatically via GitHub integration.
