@@ -7,8 +7,7 @@
       "@icons/*": ["./src/icons/*"],
       "@image/*": ["./src/image/*"],
       "@/*": ["./*"],
-      "@techbubble/ui": ["../../packages/ui/src"],
-      "@techbubble/database": ["../../packages/database/src"]
+      "@techbubble/ui": ["../../packages/ui/src"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "**/*.d.ts", ".next/types/**/*.ts"],

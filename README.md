@@ -100,6 +100,9 @@ Enable monorepo auto-deploy by setting each service to use the matching config f
 - Web service config: `railway.web.toml`
 - Admin service config: `railway.admin.toml`
 
+Important for monorepo workspaces: each Railway service must use the repository root as the service Root Directory (not `apps/web`, `apps/admin`, or `packages/api`).
+If the Root Directory points to a subfolder, Railway will not have workspace package context and deploys fail with `ERR_PNPM_WORKSPACE_PKG_NOT_FOUND`.
+
 These configs include `watchPatterns` so each service deploys only when relevant files change.
 
 ### 3. Environment Variables

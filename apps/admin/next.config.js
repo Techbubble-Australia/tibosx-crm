@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  transpilePackages: ["@techbubble/ui", "@techbubble/database"],
+  transpilePackages: ["@techbubble/ui"],
   async rewrites() {
     const apiUrl = process.env.API_URL || "http://localhost:3001";
     return [

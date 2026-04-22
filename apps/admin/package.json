@@ -10,7 +10,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@techbubble/database": "workspace:*",
     "@techbubble/ui": "workspace:*",
     "lucide-react": "^0.344.0",
     "next": "14.2.35",

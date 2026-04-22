@@ -7,7 +7,6 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY packages/database/package.json ./packages/database/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/config/package.json ./packages/config/
 COPY apps/admin/package.json ./apps/admin/
@@ -21,12 +20,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma client
-RUN pnpm exec prisma generate --schema=./packages/database/prisma/schema.prisma
-
 # Build packages
 RUN pnpm --filter @techbubble/ui build
-RUN pnpm --filter @techbubble/database build
 
 # Build the admin app
 ENV NEXT_TELEMETRY_DISABLED=1

@@ -3,7 +3,7 @@ const path = require("path");
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  transpilePackages: ["@techbubble/ui", "@techbubble/database"],
+  transpilePackages: ["@techbubble/ui"],
   images: {
     domains: ["localhost"],
     remotePatterns: [
