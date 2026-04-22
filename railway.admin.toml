@@ -4,7 +4,7 @@ dockerfilePath = "Dockerfile.admin"
 watchPatterns = ["apps/admin/**", "packages/ui/**", "packages/database/**", "packages/config/**", "pnpm-lock.yaml", "pnpm-workspace.yaml", "package.json", "Dockerfile.admin"]
 
 [deploy]
-startCommand = "node server.js"
+startCommand = "node apps/admin/server.js"
 healthcheckPath = "/login"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
