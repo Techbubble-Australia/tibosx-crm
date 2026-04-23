@@ -18,6 +18,7 @@ const navLinks = [
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const pathname = usePathname();
+  const isHome = pathname === "/";
   const isDark = pathname === "/about";
 
   const isActive = (href: string) =>
@@ -25,18 +26,27 @@ export function Header() {
 
   return (
     <header
-      className={`sticky top-0 z-50 border-b shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] ${
-        isDark ? "border-neutral-800 bg-black shadow-[0_4px_12px_-2px_rgba(0,0,0,0.45)]" : "border-neutral-200 bg-white"
+      className={`z-50 ${
+        isDark
+          ? "sticky top-0 border-b border-neutral-800 bg-black shadow-[0_4px_12px_-2px_rgba(0,0,0,0.45)]"
+          : isHome
+            ? "sticky top-0 border-b border-[#e5e5e5] bg-white"
+            : "sticky top-0 border-b border-neutral-200 bg-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)]"
       }`}
     >
       <div className="tb-container">
-        <div className="flex min-h-[4.25rem] items-center gap-4 py-2.5">
-          <Link href="/" className="shrink-0">
-            <BrandLogo variant={isDark ? "onDark" : "onLight"} priority />
+        <div
+          className={`flex min-h-[68px] items-center gap-4 py-2.5 md:grid md:grid-cols-[1fr_auto_1fr] md:gap-6`}
+        >
+          <Link href="/" className="shrink-0 md:justify-self-start">
+            <BrandLogo
+              variant={isDark ? "onDark" : "onLight"}
+              priority
+            />
           </Link>
 
           <nav
-            className="hidden flex-1 items-center justify-center gap-8 md:flex lg:gap-10"
+            className="hidden items-center justify-center gap-1 md:flex"
             aria-label="Main navigation"
           >
             {navLinks.map((link) => {
@@ -45,46 +55,39 @@ export function Header() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`relative inline-block pb-2.5 text-sm transition-colors ${
+                  className={`inline-block px-[13px] py-[5.5px] text-sm font-semibold transition-colors ${
                     isDark
                       ? active
-                        ? "font-semibold text-white"
-                        : "font-medium text-neutral-400 hover:text-white"
+                        ? "rounded-b-[4px] border-b-2 border-white text-white"
+                        : "text-neutral-400 hover:text-white"
                       : active
-                        ? "font-semibold text-neutral-900"
-                        : "font-medium text-neutral-600 hover:text-neutral-900"
+                        ? "rounded-b-[4px] border-b-2 border-[#111111] text-[#111111]"
+                        : "text-[#666666] hover:text-[#111111]"
                   }`}
                 >
                   {link.label}
-                  {/* Slightly wider than label — reference extends past first/last letter */}
-                  <span
-                    className={`absolute bottom-0 left-1/2 h-[3px] w-[calc(100%+12px)] max-w-none -translate-x-1/2 rounded-full ${
-                      active ? (isDark ? "bg-white opacity-100" : "bg-neutral-900 opacity-100") : "opacity-0"
-                    }`}
-                    aria-hidden
-                  />
                 </Link>
               );
             })}
           </nav>
 
-          <div className="hidden shrink-0 items-center gap-3 md:flex">
+          <div className="hidden shrink-0 items-center justify-end gap-3 md:flex md:justify-self-end">
             <Link
               href="/contact"
-              className={`rounded-full border px-5 py-2.5 text-sm font-medium transition-colors ${
+              className={`rounded-[14px] border px-5 py-2.5 text-sm font-semibold transition-colors ${
                 isDark
                   ? "border-neutral-500 text-white hover:border-neutral-300"
-                  : "border-neutral-200 bg-transparent text-neutral-900 hover:border-neutral-300 hover:bg-neutral-50/80"
+                  : "border-[#e5e5e5] bg-white text-[#111111] hover:border-neutral-300"
               }`}
             >
               Contact
             </Link>
             <Link
               href="/contact"
-              className={`inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-colors ${
+              className={`inline-flex items-center gap-2 rounded-[14px] px-5 py-2.5 text-sm font-semibold transition-colors ${
                 isDark
                   ? "bg-white text-neutral-900 hover:bg-neutral-100"
-                  : "bg-black text-white hover:bg-neutral-900"
+                  : "bg-[#111111] text-white hover:bg-neutral-800"
               }`}
             >
               Get Started

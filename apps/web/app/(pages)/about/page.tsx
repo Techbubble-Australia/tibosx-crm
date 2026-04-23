@@ -1,272 +1,261 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Gauge, Shield, Clock, Award } from "lucide-react";
-import { IconCircle } from "@/components/ui/IconCircle";
+import { ArrowRight, Check, ChevronLeft, ChevronRight, Mail } from "lucide-react";
+import aboutUs1 from "@image/techbubble_-_about_us_1.jpg";
+import aboutUs2 from "@image/techbubble_-_about_us_2.jpg";
+import aboutUs3 from "@image/techbubble_-_about_us_3.jpg";
+import aboutUs4 from "@image/techbubble_-_about_us_4.png";
+import aboutUs5 from "@image/techbubble_-_about_us_5.jpg";
+import aboutUs6 from "@image/techbubble_-_about_us_6.png";
+import aboutUs7 from "@image/techbubble_-_about_us_7.png";
+import aboutUs8 from "@image/techbubble_-_about_us_8.png";
+import aboutUs9 from "@image/techbubble_-_about_us_9.jpg";
 
-const valueCards = [
+const missionCards = [
   {
-    Icon: Gauge,
     title: "Speed First",
-    text: "From first call to vetted shortlist in hours — not weeks.",
+    text: "AI-matched specialists deployed in under 24 hours — no waiting, no ramp-up.",
   },
   {
-    Icon: Shield,
     title: "Top 1% Only",
-    text: "Every profile is scored, interviewed, and reference-checked.",
+    text: "Every consultant passes rigorous multi-stage vetting before we put them forward.",
   },
   {
-    Icon: Clock,
     title: "Timezone Aligned",
-    text: "Overlap hours that work for your teams — globally.",
+    text: "Resources matched to your working hours — real-time collaboration guaranteed.",
   },
   {
-    Icon: Award,
     title: "SLA-Backed",
-    text: "Clear runbooks for delivery, support, and escalation.",
+    text: "Contractual guarantees, 24/7 support, and dedicated governance on every engagement.",
+  },
+  {
+    title: "AI-Infused",
+    text: "Our AI-matching engine reduces time-to-hire by 70% versus traditional models.",
+  },
+  {
+    title: "Innovation-Led",
+    text: "Continuous upskilling ensures our talent stays ahead of every platform curve.",
   },
 ];
 
-const leaders = [
-  { name: "Nikita T.", role: "Founder & Director", loc: "Australia", img: "/images/avatar.jpg" },
-  { name: "Leadership Name", role: "Chief Delivery Officer", loc: "USA", img: "/images/avatar.jpg" },
-  { name: "Dhruv Bhatt", role: "Head of Engineering", loc: "India", img: "/images/avatar.jpg" },
+const leadershipCards = [
+  { name: "Nikita T", role: "Founder & Director, Australia", image: aboutUs1 },
+  { name: "Jeet Bhatt", role: "Founder & Director, Australia", image: aboutUs2 },
+  { name: "Dhruv Bhatt", role: "Head of Product, Australia", image: aboutUs3 },
+];
+
+const workforceTabs = [
+  { label: "Management Team (5)", width: 215, active: true },
+  { label: "Sales Team (4)", width: 157, active: false },
+  { label: "Recruitment Team (4)", width: 209, active: false },
+  { label: "ServiceNow Developers (16)", width: 260, active: false },
+  { label: "Salesforce Developers (8)", width: 243, active: false },
+  { label: "MuleSoft Developers (8)", width: 232, active: false },
+  { label: "Workday Team (5)", width: 183, active: false },
+  { label: "Product Team (8)", width: 176, active: false },
+  { label: "Other Techstack Developers (12)", width: 295, active: false },
+];
+
+const managementTeam = [
+  { name: "Yogesh Panchal", role: "Delivery Manager, USA", image: aboutUs4 },
+  { name: "Lakshminarayanan", role: "Sr. Manager - Talent Acquisition, India", image: aboutUs6 },
+  { name: "Dinky Rajpal", role: "Sr. Manager - Business Development, India", image: aboutUs7 },
+  { name: "Kamal Rajput", role: "Sr. Account Manager, APAC & UK", image: aboutUs8 },
 ];
 
 export default function AboutPage() {
   return (
     <>
-      <section className="relative bg-[#0a0a0a] text-white pb-24 pt-8">
-        <div className="tb-container text-center">
-          <h1 className="font-serif text-4xl md:text-5xl lg:text-[3.25rem] font-bold leading-tight max-w-4xl mx-auto">
-            Trusted Technology Partner Not Just a Vendor
-          </h1>
-          <p className="mt-6 text-gray-300 max-w-3xl mx-auto text-lg">
-            Founded by engineers, powered by AI. We connect the world&apos;s most ambitious enterprises with top 1% tech talent — fast, transparent, and ridiculously better.
-          </p>
+      <section className="bg-[#111111] pb-[149px] pt-[109px] text-white">
+        <div className="tb-container">
+          <div className="mx-auto max-w-[1136px]">
+            <h1 className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px]">
+              Trusted Technology Partner
+              <br />
+              Not Just a Vendor
+            </h1>
+            <p className="mt-[4px] max-w-[890px] text-[18px] leading-7 text-[#e5e5e5]">
+              Founded by engineers, powered by AI. We connect the world&apos;s most ambitious enterprises with top 1% tech talent — fast, transparent, and measurably better.
+            </p>
+          </div>
         </div>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 -mb-20 relative z-10 mt-14">
-          <div className="grid grid-cols-2 gap-6 rounded-2xl bg-[#f7f7f5] p-8 text-black shadow-xl md:grid-cols-4 md:gap-0 md:divide-x md:divide-gray-200 md:p-10">
+      </section>
+
+      <section className="relative z-10 -mt-[85px] bg-transparent">
+        <div className="tb-container">
+          <div className="mx-auto flex h-[170px] max-w-[1136px] items-center rounded-[30px] bg-white px-8 shadow-[0_24px_48px_-26px_rgba(0,0,0,0.38)]">
             {[
-              { n: "150+", l: "Expert Developers" },
-              { n: "50+", l: "Enterprise Clients" },
-              { n: "24/7", l: "Support Available" },
-              { n: "98%", l: "Client Satisfaction Rate" },
-            ].map((s) => (
-              <div key={s.l} className="flex flex-col items-center justify-center px-2 text-center md:px-6">
-                <div className="text-3xl font-bold tabular-nums md:text-4xl">{s.n}</div>
-                <div className="mt-1 text-sm text-gray-600">{s.l}</div>
+              { n: "150+", l: "Expert Technicians", labelClass: "text-[12px] font-medium leading-4" },
+              { n: "50+", l: "Enterprise Clients", labelClass: "text-[12px] font-medium leading-4" },
+              { n: "24/7", l: "Support Available", labelClass: "text-[12px] font-medium leading-4" },
+              { n: "98%", l: "Client Satisfaction Rate", labelClass: "text-[14px] font-normal leading-5 tracking-[0.035px]" },
+            ].map((stat, idx) => (
+              <div key={stat.l} className="flex h-[104px] flex-1 items-center justify-center">
+                <div className="w-[250px] text-center">
+                  <p className="text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">{stat.n}</p>
+                  <p className={`${stat.labelClass} text-[#666666]`}>{stat.l}</p>
+                </div>
+                {idx < 3 ? <span className="h-[78px] w-px bg-[#e5e5e5]" aria-hidden /> : null}
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="pt-28 pb-20 bg-white">
-        <div className="tb-container">
-          <div className="grid lg:grid-cols-2 gap-14 items-start">
-            <div>
-              <p className="text-xs font-semibold tracking-widest text-gray-500 uppercase mb-3">Our Story</p>
-              <h2 className="text-3xl md:text-4xl font-bold text-[#0a0a0a] mb-6">
+      <section className="relative h-[862px] bg-white">
+        <div className="tb-container h-full">
+          <div className="relative mx-auto grid max-w-[1139px] grid-cols-[557px_504px] gap-[131px] pt-[197px]">
+            <div className="pt-1">
+              <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
+                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
+                <p className="text-[12px] font-medium leading-4 text-[#666666]">Our Mission</p>
+              </div>
+              <h2 className="mt-4 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">
                 Empowering enterprises with world-class technology talent
               </h2>
-              <p className="text-gray-600 mb-4 leading-relaxed">
-                Efficiency, security, and innovation are non-negotiable. We help CIOs and programme leads ship on the platforms that run their business — with teams that integrate cleanly and communicate clearly.
-              </p>
-              <p className="text-gray-600 mb-8 leading-relaxed">
-                From ServiceNow and Salesforce to cloud, data, and custom engineering, TechBubble is structured for enterprise reality: governance, documentation, and outcomes you can defend in any steering committee.
+              <p className="mt-2 max-w-[532px] whitespace-pre-line text-[18px] leading-7 text-[#666666]">
+                {"At TechBubble, we provide tailored AI-powered IT solutions and digital strategies to help Australian and global enterprises thrive. Our focus is on efficiency, security, and innovation.\nPartner with TechBubble to unlock tailored, innovative solutions that drive success and position your business for long-term growth."}
               </p>
               <Link
                 href="/services"
-                className="inline-flex items-center gap-2 bg-black text-white px-6 py-3 rounded-full text-sm font-medium hover:bg-gray-900"
+                className="mt-4 inline-flex h-[52px] w-[182px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold text-white"
               >
                 Explore Services
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
               </Link>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {valueCards.map((c) => (
-                <div key={c.title} className="rounded-xl border border-gray-200 bg-white p-5">
-                  <IconCircle icon={c.Icon} className="mb-3 border-sky-100 bg-sky-50 text-sky-600" />
-                  <h3 className="mb-2 font-semibold">{c.title}</h3>
-                  <p className="text-sm text-gray-600">{c.text}</p>
-                </div>
-              ))}
+
+            <div className="relative -mt-[54px] h-[656px]">
+              <div className="mt-8 h-[602px] overflow-y-auto pr-2 [scrollbar-width:thin] [scrollbar-color:#c1c1c1_#f1f1f1] [&::-webkit-scrollbar]:w-[7px] [&::-webkit-scrollbar-track]:bg-[#f1f1f1] [&::-webkit-scrollbar-thumb]:bg-[#c1c1c1] space-y-4">
+                {missionCards.map((card) => (
+                  <div key={card.title} className="h-[150px] rounded-[24px] border border-[#e5e5e5] bg-white px-4 py-[15px]">
+                    <div className="flex items-start gap-5">
+                      <span className="mt-9 flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] border border-[#e5e5e5] bg-[#f7f7f7]">
+                        <span className="h-3 w-3 rounded-[3px] bg-[#111111]" aria-hidden />
+                      </span>
+                      <div>
+                        <h3 className="text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">{card.title}</h3>
+                        <p className="mt-0.5 max-w-[392px] text-[16px] leading-6 text-[#838383]">{card.text}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
+
           </div>
         </div>
       </section>
 
       <section
-        className="py-20 bg-[#f0f0f0]"
+        className="bg-[#fafafa] py-[120px]"
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23d4d4d4' stroke-width='0.5'%3E%3Cpath d='M40 0 L80 20 L80 60 L40 80 L0 60 L0 20 Z'/%3E%3C/g%3E%3C/svg%3E")`,
           backgroundSize: "120px",
         }}
       >
-        <div className="tb-container text-center mb-12">
-          <p className="text-xs font-semibold tracking-widest text-gray-500 uppercase mb-3">The Team</p>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Meet The Leadership</h2>
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            The visionaries driving TechBubble&apos;s mission to transform businesses through technology.
-          </p>
-        </div>
-        <div className="tb-container grid md:grid-cols-3 gap-6">
-          {leaders.map((l, i) => (
-            <div
-              key={l.name}
-              className={`rounded-2xl bg-[#1a1a1a] text-white p-6 pt-0 overflow-hidden relative ${
-                i === 2 ? "ring-2 ring-sky-400/40" : ""
-              }`}
-            >
-              <div className="relative -mt-4 mb-4 mx-auto w-32 h-40 rounded-lg overflow-hidden border-4 border-[#1a1a1a] bg-gray-700">
-                <Image src={l.img} alt={l.name} fill className="object-cover" sizes="128px" />
-              </div>
-              <h3 className="font-bold text-lg">{l.name}</h3>
-              <p className="text-sm text-gray-400 mb-3">
-                {l.role}, {l.loc}
-              </p>
-              <p className="text-sm text-gray-400 leading-relaxed">
-                Hands-on leaders who stay close to delivery — setting the bar for quality and accountability across every engagement.
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="py-20 bg-white">
-        <div className="tb-container text-center mb-10">
-          <p className="text-xs font-semibold tracking-widest text-gray-500 uppercase mb-3">Team Members</p>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Meet Our Entire Workforce</h2>
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            A diverse team of engineers, consultants, and delivery leaders — organised into specialised practices.
-          </p>
-        </div>
         <div className="tb-container">
-          <div className="rounded-2xl bg-[#1a1a1a] text-white p-8 grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-            {[
-              { n: "150+", l: "Talent Pool Members" },
-              { n: "9", l: "Specialized Departments" },
-              { n: "5", l: "Global Offices" },
-              { n: "10+", l: "Years Experience" },
-            ].map((s) => (
-              <div key={s.l} className="text-center">
-                <div className="text-2xl md:text-3xl font-bold">{s.n}</div>
-                <div className="text-xs text-gray-400 mt-1">{s.l}</div>
-              </div>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-2 justify-center mb-10">
-            {["Management Team (4)", "Sales Team (4)", "Recruitment Team (4)", "Service Delivery Developers (15)", "Salesforce Developers (5)"].map(
-              (t, i) => (
-                <span
-                  key={t}
-                  className={`px-4 py-2 rounded-full text-sm font-medium border ${
-                    i === 0 ? "bg-black text-white border-black" : "bg-white border-gray-200 text-gray-700"
-                  }`}
-                >
-                  {t}
-                </span>
-              )
-            )}
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {["Yogesh Panchal", "Sarah Mitchell", "James Okonkwo", "Priya Desai"].map((name, i) => (
-              <div key={name} className="text-center">
-                <div className="relative w-full aspect-square max-w-[200px] mx-auto rounded-xl overflow-hidden bg-gray-200 mb-3">
-                  <Image src="/images/avatar.jpg" alt={name} fill className="object-cover" sizes="200px" />
-                </div>
-                <div className="font-semibold">{name}</div>
-                <div className="text-sm text-gray-500">{i % 2 === 0 ? "Senior Manager, USA" : "Director, Australia"}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="py-20 bg-white border-t border-gray-100">
-        <div className="tb-container">
-          <p className="text-xs font-semibold tracking-widest text-gray-500 uppercase mb-3">Our USP</p>
-          <h2 className="text-3xl font-bold mb-4">Our Unique Selling Points</h2>
-          <p className="text-gray-600 mb-12 max-w-2xl">What enterprises get when they partner with TechBubble — beyond “extra hands on deck”.</p>
-          <div className="grid md:grid-cols-3 gap-10">
-            <div>
-              <h3 className="font-semibold text-lg mb-3">Technical Expertise That Spans Industries</h3>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                Health, public sector, financial services, manufacturing — we speak stakeholder and engineer fluently.
-              </p>
+          <div className="mx-auto mb-16 max-w-[1139px] text-center">
+            <div className="mx-auto inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
+              <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
+              <p className="text-[12px] font-medium leading-4 text-[#666666]">Our Team</p>
             </div>
-            <div>
-              <h3 className="font-semibold text-lg mb-3">World-Class Talent, Available When You Need It</h3>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                Surge for a milestone or sustain a platform — engagement models flex without losing quality.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg mb-3">24/7 Support &amp; Governance — At No Extra Cost</h3>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                Runbooks, reporting, and escalation paths included — so operations never fall through the cracks.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-20 bg-[#f5f5f5]">
-        <div className="tb-container grid lg:grid-cols-2 gap-12">
-          <div>
-            <p className="text-xs font-semibold tracking-widest text-gray-500 uppercase mb-3">Our Vision</p>
-            <h2 className="text-3xl font-bold mb-4">What Drives Us Forward</h2>
-            <p className="text-gray-600 mb-8">Principles we hire for, deliver against, and measure ourselves on.</p>
-            <ul className="space-y-3">
-              {["Innovation", "Excellence", "Partnership", "Integrity"].map((x) => (
-                <li key={x} className="flex items-center gap-2 font-semibold text-[#0a0a0a]">
-                  <span className="w-2 h-2 bg-black rounded-full" />
-                  {x}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-            <div className="bg-black text-white px-6 py-3 text-sm font-semibold">Our Mission</div>
-            <div className="p-6">
-              <p className="text-gray-600 text-sm leading-relaxed mb-8">
-                Empower businesses with technology that is secure, scalable, and measurable — delivered by teams who treat your outcomes as their own.
-              </p>
-              <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-6">
-                <div>
-                  <div className="text-2xl font-bold">10+</div>
-                  <div className="text-xs text-gray-500">Years Experience</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">5</div>
-                  <div className="text-xs text-gray-500">Global Offices</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-20 bg-white">
-        <div className="tb-container">
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-10">Trusted by people who know technology best</h2>
-          <div className="max-w-3xl mx-auto">
-            <p className="text-xl text-gray-700 leading-relaxed text-center">
-              &ldquo;TechBubble has been an absolute game-changer for our business unit. From the initial consultation to the final delivery, their team showed unmatched professionalism, creativity, and technical expertise.&rdquo;
+            <h2 className="mt-2 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">Meet The Leadership</h2>
+            <p className="mt-1 text-[18px] leading-7 text-[#666666]">
+              The visionaries driving TechBubble&apos;s mission to transform businesses through technology.
             </p>
-            <div className="flex items-center gap-4 mt-8">
-              <div className="relative w-12 h-12 rounded-full overflow-hidden bg-gray-200">
-                <Image src="/images/avatar.jpg" alt="Haima Prakash" fill className="object-cover" sizes="48px" />
+          </div>
+
+          <div className="mx-auto grid max-w-[1558px] grid-cols-3 gap-10">
+            {leadershipCards.map((leader) => (
+              <div key={leader.name} className="rounded-[21px] bg-[#111111] px-[30px] pb-9 text-white">
+                <div className="mx-auto mb-5 mt-[-45px] h-[241px] w-[241px] overflow-hidden rounded-[14px] border border-[#f7f7f7] bg-neutral-700">
+                  <Image src={leader.image} alt={leader.name} width={241} height={241} className="h-full w-full object-cover" />
+                </div>
+                <h3 className="text-[35px] font-semibold leading-[42px] tracking-[-0.09px]">{leader.name}</h3>
+                <p className="mt-[3px] text-[14px] font-bold leading-[21px] text-white">{leader.role}</p>
+                <p className="mt-3 text-[12px] leading-[17.6px] text-white">
+                  Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry&apos;s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book.
+                </p>
               </div>
-              <div className="flex-1">
-                <div className="font-semibold">Haima Prakash</div>
-                <div className="text-sm text-gray-500">Sr. Manager, Chief Technology Office — University of Sydney</div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white py-[120px]">
+        <div className="tb-container">
+          <div className="mx-auto max-w-[1136px]">
+            <div className="text-center">
+              <div className="mx-auto inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
+                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
+                <p className="text-[12px] font-medium leading-4 text-[#666666]">Our Complete Team</p>
               </div>
-              <div className="flex gap-0.5">
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <span key={s} className="text-amber-400">
-                    ★
+              <h2 className="mt-2 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">Meet Our Entire Workforce</h2>
+              <p className="mx-auto mt-1 max-w-[923px] text-[18px] leading-7 text-[#666666]">
+                With 150+ expert technicians across multiple specializations and global offices, we bring world-class expertise to every project. Our diverse team ensures excellence across every technology stack.
+              </p>
+            </div>
+
+            <div className="mx-auto mt-8 flex h-[110px] w-[944px] items-center rounded-[21px] bg-[#111111] px-[79px]">
+              {[
+                { n: "150+", l: "Expert Team Members" },
+                { n: "9", l: "Specialized Departments" },
+                { n: "5", l: "Global Offices" },
+                { n: "10+", l: "Years Experience" },
+              ].map((s, idx) => (
+                <div key={s.l} className="flex items-center">
+                  <div className="w-[150px] text-center">
+                    <p className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-white">{s.n}</p>
+                    <p className="text-[12px] font-medium leading-4 text-[#f7f7f7]">{s.l}</p>
+                  </div>
+                  {idx < 3 ? <span className="mx-[30px] h-[78px] w-px bg-white/[0.17]" aria-hidden /> : null}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-16">
+              <div className="ml-[10px] flex items-center gap-2">
+                {workforceTabs.slice(0, 5).map((tab) => (
+                  <span
+                    key={tab.label}
+                    className={`inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-[35px] border px-[23px] text-[16px] font-semibold leading-6 ${
+                      tab.active ? "border-[#111111] bg-[#111111] text-white" : "border-[#e5e5e5] bg-white text-[#666666]"
+                    }`}
+                    style={{ width: `${tab.width}px` }}
+                  >
+                    {tab.label}
                   </span>
+                ))}
+              </div>
+              <div className="ml-[113px] mt-4 flex items-center gap-2">
+                {workforceTabs.slice(5).map((tab) => (
+                  <span
+                    key={tab.label}
+                    className="inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-[35px] border border-[#e5e5e5] bg-white px-[23px] text-[16px] font-semibold leading-6 text-[#666666]"
+                    style={{ width: `${tab.width}px` }}
+                  >
+                    {tab.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-12">
+              <div className="border-b border-[#e5e5e5] pb-2">
+              <h3 className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#0e0f11]">Management Team</h3>
+              <p className="mt-1 text-[14px] leading-5 tracking-[0.035px] text-[#666666]">5 members</p>
+              </div>
+
+              <div className="mt-8 grid grid-cols-4 gap-6">
+                {managementTeam.map((person) => (
+                  <div key={person.name} className="text-center">
+                    <div className="mx-auto h-[145px] w-[145px] overflow-hidden rounded-[14px] border border-[#f7f7f7] bg-neutral-200">
+                      <Image src={person.image} alt={person.name} width={145} height={145} className="h-full w-full object-cover" />
+                    </div>
+                    <p className="mt-2 text-[16px] font-bold leading-6 text-[#111111]">{person.name}</p>
+                    <p className="mx-auto mt-0.5 max-w-[190px] text-[14px] leading-5 tracking-[0.035px] text-[#666666]">{person.role}</p>
+                  </div>
                 ))}
               </div>
             </div>
@@ -274,37 +263,181 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="py-20 bg-[#f0f0f0]">
-        <div className="tb-container grid lg:grid-cols-2 gap-12 items-center">
-          <div>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to build something remarkable?</h2>
-            <p className="text-gray-600 mb-8">Talk to our team about your next programme — we respond within hours.</p>
-            <div className="flex flex-wrap gap-3">
-              <Link href="/contact" className="inline-flex items-center gap-2 bg-black text-white px-6 py-3 rounded-full text-sm font-medium">
-                Get Started
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-              <Link href="/services" className="inline-flex items-center gap-2 border border-gray-400 bg-white px-6 py-3 rounded-full text-sm font-medium">
-                Explore Services
-              </Link>
+      <section className="bg-white py-[120px]">
+        <div className="tb-container">
+          <div className="mx-auto max-w-[1139px]">
+            <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
+              <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
+              <p className="text-[12px] font-medium leading-4 text-[#666666]">Why Choose Us</p>
+            </div>
+            <div className="mt-2 max-w-[898px]">
+              <h2 className="text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">Our Unique Selling Points</h2>
+              <p className="mt-1 text-[18px] leading-7 text-[#666666]">Discover what makes TechBubble the preferred partner for businesses worldwide.</p>
             </div>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
-            <div className="flex rounded-full bg-gray-100 p-1 mb-6">
-              <span className="flex-1 text-center py-2 text-sm font-medium bg-black text-white rounded-full">Email Us</span>
-              <span className="flex-1 text-center py-2 text-sm text-gray-600">Call 1800-856-918</span>
+          <div className="mx-auto mt-8 grid max-w-[1139px] grid-cols-3 gap-12">
+            <div>
+              <h3 className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#0e0f11]">Technical Expertise That Spans Industries</h3>
+              <p className="mt-2 text-[16px] leading-6 text-[#838383]">
+                Our team is proficient across a wide spectrum of technologies, including SaaS platforms like ServiceNow, Salesforce, and MuleSoft, and programming languages such as Java, Ruby, and Laravel. Whether your business requires IT solutions for small projects or complex, large-scale initiatives, our experience and skills make us your go-to partner for any technology stack.
+              </p>
             </div>
-            <ul className="space-y-3 text-sm text-gray-600">
-              <li className="flex items-center gap-2">
-                <span className="text-emerald-600">✓</span> No commitment required
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-emerald-600">✓</span> Response within 2 hours
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-emerald-600">✓</span> Free consultation
-              </li>
-            </ul>
+            <div>
+              <h3 className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#0e0f11]">World-Class Talent, Available When You Need It</h3>
+              <p className="mt-2 text-[16px] leading-6 text-[#838383]">
+                We connect you with a vast network of skilled professionals experienced in handling international projects of all complexities. Our resources work within your time zone, ensuring seamless collaboration during your business hours. By outsourcing your IT needs to us, you can focus on what you do best&mdash;running your business&mdash;while we handle the technical details.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#0e0f11]">24/7 Support & Governance&mdash;At No Extra Cost</h3>
+              <p className="mt-2 text-[16px] leading-6 text-[#838383]">
+                At TechBubble, customer satisfaction is our priority. We deliver tailored solutions, regardless of your budget, while providing round-the-clock professional support and governance at no additional charge. From start to finish, we ensure a smooth, worry-free experience and guarantee exceptional service at every stage of the engagement.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[#fafafa] py-[120px]">
+        <div className="tb-container">
+          <div className="mx-auto grid max-w-[1139px] grid-cols-[526px_532px] items-center gap-[81px]">
+            <div>
+              <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
+                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
+                <p className="text-[12px] font-medium leading-4 text-[#111111]">Our Values</p>
+              </div>
+              <h2 className="mt-2 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">What Drives Us Forward</h2>
+              <p className="mt-2 text-[16px] leading-6 text-[#666666]">
+                <strong>At TechBubble,</strong> we&apos;re passionate about innovation and committed to empowering businesses with cutting-edge technology solutions. We believe in fostering a culture that celebrates creativity, collaboration, and continuous growth.
+              </p>
+
+              <div className="mt-8 space-y-2">
+                {[
+                  { t: "Innovation", s: "Constantly pushing boundaries with cutting-edge solutions" },
+                  { t: "Excellence", s: "Delivering exceptional quality in every project" },
+                  { t: "Partnership", s: "Building lasting relationships with our clients" },
+                  { t: "Integrity", s: "Operating with transparency and honesty" },
+                ].map((item) => (
+                  <div key={item.t} className="rounded-[15px] border border-[#e5e5e5] bg-white px-4 py-4">
+                    <div className="flex items-center gap-3">
+                      <span className="h-2 w-2 rounded-[4px] bg-[#666666]" aria-hidden />
+                      <span className="text-[16px] font-semibold leading-6 text-[#06091a]">{item.t}</span>
+                    </div>
+                    <p className="mt-1 pl-5 text-[12px] font-medium leading-4 text-[#666666]">{item.s}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-[36px] border border-[#e2e7f4] bg-white">
+              <div className="bg-[#111111] px-[30px] py-[31px]">
+                <h3 className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-white">Our Mission</h3>
+              </div>
+              <p className="px-[27px] pb-[37px] pt-6 text-[18px] leading-7 text-[#666666]">
+                To empower businesses worldwide with innovative technology solutions that drive growth, efficiency, and success in an ever-evolving digital landscape.
+              </p>
+              <div className="flex gap-[18px] px-[27px] pb-[39px]">
+                <div className="flex h-[85px] w-[228px] flex-col justify-center rounded-[10px] border border-[#e5e5e5] bg-[#fafafa] px-[27px]">
+                  <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">10+</p>
+                  <p className="text-[12px] font-medium leading-4 text-[#666666]">Years Experience</p>
+                </div>
+                <div className="flex h-[85px] w-[228px] flex-col justify-center rounded-[10px] border border-[#e5e5e5] bg-[#fafafa] px-[27px]">
+                  <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">5</p>
+                  <p className="text-[12px] font-medium leading-4 text-[#666666]">Global Offices</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white py-[120px]">
+        <div className="tb-container">
+          <div className="mx-auto max-w-[1139px]">
+            <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
+              <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
+              <p className="text-[12px] font-medium leading-4 text-[#111111]">Client Stories</p>
+            </div>
+            <h2 className="mt-4 whitespace-pre-line text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">
+              {"Trusted by people\nwho know technology best"}
+            </h2>
+
+            <p className="mt-14 whitespace-pre-line text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#666666]">
+              {"\"TechBubble has been an absolute game-changer for our business unit. From the initial consultation to the final delivery, their team showed unmatched professionalism,\ncreativity, and technical expertise. What impressed us most was their ability to adapt\nto unforeseen challenges without compromising timelines or quality.\""}
+            </p>
+
+            <div className="mt-12 h-px w-full bg-[#e5e5e5]" />
+
+            <div className="mt-12 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="h-[62px] w-[62px] overflow-hidden rounded-full bg-neutral-200">
+                  <Image src={aboutUs9} alt="Haima Prakash" width={62} height={62} className="h-full w-full object-cover" />
+                </div>
+                <div>
+                  <p className="text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">Haima Prakash</p>
+                  <p className="text-[16px] leading-6 text-[#838383]">Sr. Manager, Chief Technology Office · University of Sydney</p>
+                  <p className="mt-1 text-[13.6px] tracking-[2px] text-[#f59e0b]">★★★★★</p>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <button className="flex h-10 w-14 items-center justify-center rounded-full border border-[#585858]" aria-label="Previous testimonial">
+                  <ChevronLeft className="h-6 w-6 text-[#585858]" strokeWidth={1.5} aria-hidden />
+                </button>
+                <button className="flex h-10 w-14 items-center justify-center rounded-full border border-[#585858]" aria-label="Next testimonial">
+                  <ChevronRight className="h-6 w-6 text-[#585858]" strokeWidth={1.5} aria-hidden />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[#f7f7f7] py-[120px]">
+        <div className="tb-container">
+          <div className="mx-auto grid max-w-[1136px] grid-cols-[751px_353px] gap-8">
+            <div>
+              <h2 className="text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">Ready to build something remarkable?</h2>
+              <p className="mt-2 max-w-[751px] text-[18px] leading-7 text-[#666666]">
+                Join 50+ enterprises who trust TechBubble to power their most critical technology initiatives.
+              </p>
+              <div className="mt-8 flex items-center gap-3">
+                <Link href="/contact" className="inline-flex h-[52px] w-[229px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold text-white">
+                  Book a Free Consultation
+                  <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+                </Link>
+                <Link href="/services" className="inline-flex h-[52px] w-[161px] items-center justify-center rounded-[18px] border border-[#e5e5e5] bg-white text-[16px] font-semibold text-[#111111]">
+                  Explore Services
+                </Link>
+              </div>
+            </div>
+
+            <div>
+              <div className="ml-8 flex w-[289px] items-center gap-3">
+                <Link href="/contact" className="inline-flex h-[51px] w-[118px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold text-white">
+                  <Mail className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+                  Email Us
+                </Link>
+                <a href="tel:+611300934031" className="inline-flex h-[51px] w-[159px] items-center justify-center rounded-[18px] border border-[#e5e5e5] bg-[#e5e5e5] text-[14px] font-semibold text-[#111111]">
+                  (+61) 1300 934 031
+                </a>
+              </div>
+
+              <div className="ml-8 mt-8 space-y-4">
+                {[
+                  "No commitment required",
+                  "Response within 2 hours",
+                  "Free consultation",
+                ].map((item) => (
+                  <div key={item} className="flex items-center gap-2">
+                    <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-[#e5e5e5] bg-[#fafafa]">
+                      <Check className="h-[10px] w-[10px] text-[#111111]" strokeWidth={2.5} aria-hidden />
+                    </span>
+                    <span className="text-[14px] font-semibold leading-5 text-[#666666]">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>

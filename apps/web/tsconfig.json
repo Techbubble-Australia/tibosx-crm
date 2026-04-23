@@ -2,6 +2,7 @@
   "extends": "@techbubble/config/typescript/nextjs.json",
   "compilerOptions": {
     "plugins": [{ "name": "next" }],
+    "ignoreDeprecations": "5.0",
     "baseUrl": ".",
     "paths": {
       "@icons/*": ["./src/icons/*"],
