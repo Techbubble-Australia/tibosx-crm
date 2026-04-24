@@ -7,97 +7,136 @@ import {
   User,
   Heart,
   Layers,
-  Target,
-  Shield,
-  Users,
   Settings,
   Lightbulb,
   Cpu,
   Rocket,
 } from "lucide-react";
-import { IconCircle } from "@/components/ui/IconCircle";
 
 const techPills = ["ServiceNow", "Salesforce", "MuleSoft", "SharePoint", "Power BI", "Snowflake", "Oracle", "Microsoft", "Azure", "AWS", "Java", "Informatica"];
 
-const heroPillars = [
-  { Icon: Phone, t: "Rapid Deployment", d: "From signed SOW to kickoff in days." },
-  { Icon: Target, t: "Timezone Aligned", d: "Overlap that matches your ceremonies." },
-  { Icon: Shield, t: "Quality Assured", d: "Reviews, docs, and handover you can audit." },
-  { Icon: Users, t: "Global Reach", d: "APAC, North America, UK & EU coverage." },
+const serviceHighlights = [
+  {
+    title: "Rapid Deployment",
+    description: "Get started in under 24 hours with our streamlined onboarding process.",
+    bodyWidth: "w-[213px]",
+  },
+  {
+    title: "Timezone Aligned",
+    description: "Our teams work in your timezone for seamless real-time collaboration.",
+    bodyWidth: "w-[213px]",
+  },
+  {
+    title: "Quality Assured",
+    description: "Rigorous quality standards and governance at no additional cost.",
+    bodyWidth: "w-[204px]",
+  },
+  {
+    title: "Global Reach",
+    description: "Offices in USA, Australia, India, and Philippines for local support.",
+    bodyWidth: "w-[196px]",
+  },
 ];
 
 export default function ServicesPage() {
   return (
     <>
-      <section className="relative bg-black text-white pb-28 pt-10">
-        <div className="tb-container text-center">
-          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold max-w-4xl mx-auto leading-tight">
-            Your Trusted Partner at Every Step of the Journey
-          </h1>
-          <p className="mt-6 text-gray-300 max-w-3xl mx-auto">
-            AI-accelerated staff augmentation, fixed-fee programmes, and managed delivery — structured for enterprise governance and speed.
-          </p>
+      <section className="bg-[#111111] pb-[149px] pt-[109px] text-white">
+        <div className="tb-container">
+          <div className="mx-auto max-w-[1136px]">
+            <h1 className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px]">Your Trusted Partner at Every Step of the Journey</h1>
+            <p className="mt-1 max-w-[1031px] text-[18px] leading-7 text-[#e5e5e5]">
+              From AI-powered staff augmentation to fixed-fee project delivery and custom product engineering — we have the expertise and talent to accelerate your enterprise.
+            </p>
+          </div>
         </div>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 -mb-24 relative z-10 mt-14">
-          <div className="bg-white text-black rounded-2xl shadow-xl grid grid-cols-2 md:grid-cols-4 gap-8 p-8 md:p-10">
-            {heroPillars.map(({ Icon, t, d }) => (
-              <div key={t} className="flex flex-col items-center text-center gap-3 px-2 md:px-4 first:pl-2 last:pr-2">
-                <IconCircle icon={Icon} size="lg" className="border-gray-200 bg-gray-50 shadow-none" />
-                <h3 className="font-semibold text-sm md:text-base leading-snug">{t}</h3>
-                <p className="text-xs md:text-sm text-gray-600 leading-relaxed">{d}</p>
+      </section>
+
+      <section className="relative z-10 -mt-[85px] bg-transparent">
+        <div className="tb-container">
+          <div className="mx-auto flex h-[170px] max-w-[1136px] items-center rounded-[30px] bg-white px-8 shadow-[0_24px_48px_-26px_rgba(0,0,0,0.38)]">
+            {serviceHighlights.map((item, idx) => (
+              <div key={item.title} className="flex h-[108px] items-center">
+                <div className={`${item.bodyWidth} px-2`}>
+                  <h3 className="text-[18px] font-bold leading-7 text-[#111111]">{item.title}</h3>
+                  <p className="mt-1 text-[14px] font-normal leading-5 tracking-[0.035px] text-[#666666]">{item.description}</p>
+                </div>
+                {idx < serviceHighlights.length - 1 ? <span className="mx-[30px] h-[78px] w-px bg-[#e5e5e5]" aria-hidden /> : null}
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="pt-32 pb-20 bg-white">
-        <div className="tb-container grid lg:grid-cols-2 gap-14 items-start">
-          <div>
-            <p className="text-sm font-semibold text-sky-600 mb-2 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-sky-500" />
-              Project Delivery
-            </p>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Project Services</h2>
-            <p className="text-gray-600 mb-6">
-              Fixed-fee, outcome-based delivery for implementations, migrations, and modernisation — with clear milestones and governance.
-            </p>
-            <ul className="space-y-2 mb-6">
-              {["ServiceNow programmes", "Salesforce & CRM", "Integration & APIs", "Automation & AI"].map((x) => (
-                <li key={x} className="flex items-center gap-2 text-sm text-gray-700">
-                  <Check className="w-4 h-4 text-sky-600" />
-                  {x}
-                </li>
-              ))}
-            </ul>
-            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Technologies</p>
-            <div className="flex flex-wrap gap-2 mb-6">
-              {techPills.slice(0, 8).map((t) => (
-                <span key={t} className="text-xs px-3 py-1 rounded-full bg-gray-100 text-gray-700">
-                  {t}
-                </span>
-              ))}
-            </div>
-            <Link href="/contact" className="inline-flex items-center gap-2 bg-black text-white px-6 py-3 rounded-full text-sm font-medium">
-              Request a Quote
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-            <p className="text-xs text-gray-500 mt-4">Response within 4 hours, guaranteed.</p>
-          </div>
-          <div className="rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-            <div className="bg-black text-white px-6 py-4 text-sm font-semibold">Our Mission</div>
-            <div className="p-6 bg-white">
-              <p className="text-gray-600 text-sm leading-relaxed mb-8">
-                Help enterprises ship measurable outcomes — not just artefacts — with teams accountable end-to-end.
+      <section className="bg-white pb-[120px] pt-[140px]">
+        <div className="tb-container">
+          <div className="mx-auto grid max-w-[1139px] grid-cols-[567px_532px] gap-10">
+            <div>
+              <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
+                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
+                <p className="text-[12px] font-medium leading-4 text-[#666666]">Project Delivery</p>
+              </div>
+
+              <h2 className="mt-2 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">Project Services</h2>
+              <p className="mt-0 text-[16px] font-semibold leading-6 text-[#111111]">Fixed-fee, Outcome-based Solutions</p>
+              <p className="mt-2 text-[16px] leading-6 text-[#666666]">
+                Our fixed-fee, outcome-based solutions are designed to cater to your unique business needs. We offer bespoke services across ServiceNow, Salesforce, and more. With expertise in AI-driven, cloud-based mobility solutions, our team ensures you achieve your goals with innovative, scalable strategies.
               </p>
-              <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-6 text-center">
-                <div>
-                  <div className="text-2xl font-bold">10+</div>
-                  <div className="text-xs text-gray-500">Years Experience</div>
+
+              <div className="mt-8 space-y-1">
+                {[
+                  "ServiceNow: ITSM, ITOM, GRC, HRSD, CSM, Legal, Procurement",
+                  "Fixed-fee pricing with clear deliverables",
+                  "Salesforce: Service, Sales, Marketing, Commerce, Health Cloud",
+                  "AI-driven automation and optimization",
+                ].map((item) => (
+                  <div key={item} className="flex h-[42px] items-center rounded-[11px] border border-[#e5e5e5] bg-white px-[11px]">
+                    <span className="h-2 w-2 rounded-[4px] border border-[#666666] bg-white" aria-hidden />
+                    <span className="ml-4 text-[16px] font-semibold leading-6 text-[#06091a]">{item}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-8">
+                <p className="text-[16px] font-semibold leading-6 text-black">Technologies</p>
+                <div className="mt-[15px] flex items-center gap-2">
+                  {["ServiceNow", "Salesforce", "AI/ML", "Cloud", "Portal", "Custom Apps"].map((tech) => (
+                    <span key={tech} className="inline-flex h-8 items-center rounded-[35px] border border-[#e5e5e5] bg-white px-4 text-[12px] font-bold leading-4 text-[#666666]">
+                      {tech}
+                    </span>
+                  ))}
                 </div>
-                <div>
-                  <div className="text-2xl font-bold">5</div>
-                  <div className="text-xs text-gray-500">Global Offices</div>
+              </div>
+
+              <div className="mt-8 h-[78px] w-[460px] pt-[13px]">
+                <div className="flex items-center gap-6">
+                  <Link href="/contact" className="inline-flex h-[52px] w-[172px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold text-white">
+                    Request a Quote
+                    <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+                  </Link>
+                  <div className="inline-flex items-center gap-1 text-[14px] leading-5 tracking-[0.035px] text-[#666666]">
+                    <span>Response within 4 hours, guaranteed</span>
+                    <Check className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-[146px] overflow-hidden rounded-[36px] border border-[#e2e7f4] bg-white shadow-[0_12px_28px_-20px_rgba(0,0,0,0.35)]">
+              <div className="bg-[#111111] px-[30px] py-[31px]">
+                <h3 className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-white">Our Mission</h3>
+              </div>
+              <p className="px-[27px] pb-[37px] pt-6 text-[18px] leading-7 text-[#666666]">
+                To empower businesses worldwide with innovative technology solutions that drive growth, efficiency, and success in an ever-evolving digital landscape.
+              </p>
+              <div className="flex gap-[18px] px-[27px] pb-[39px]">
+                <div className="flex h-[85px] w-[228px] flex-col justify-center rounded-[10px] border border-[#e5e5e5] bg-[#fafafa] px-[27px]">
+                  <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">10+</p>
+                  <p className="text-[12px] font-medium leading-4 text-[#666666]">Years Experience</p>
+                </div>
+                <div className="flex h-[85px] w-[228px] flex-col justify-center rounded-[10px] border border-[#e5e5e5] bg-[#fafafa] px-[27px]">
+                  <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">5</p>
+                  <p className="text-[12px] font-medium leading-4 text-[#666666]">Global Offices</p>
                 </div>
               </div>
             </div>

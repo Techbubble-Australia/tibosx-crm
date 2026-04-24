@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Check, ChevronLeft, ChevronRight, Mail } from "lucide-react";
+import { ArrowRight, Check, Mail } from "lucide-react";
+import { ClientStoriesSection } from "@/components/ClientStoriesSection";
 import aboutUs1 from "@image/techbubble_-_about_us_1.jpg";
 import aboutUs2 from "@image/techbubble_-_about_us_2.jpg";
 import aboutUs3 from "@image/techbubble_-_about_us_3.jpg";
@@ -9,7 +10,6 @@ import aboutUs5 from "@image/techbubble_-_about_us_5.jpg";
 import aboutUs6 from "@image/techbubble_-_about_us_6.png";
 import aboutUs7 from "@image/techbubble_-_about_us_7.png";
 import aboutUs8 from "@image/techbubble_-_about_us_8.png";
-import aboutUs9 from "@image/techbubble_-_about_us_9.jpg";
 
 const missionCards = [
   {
@@ -351,47 +351,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="bg-white py-[120px]">
-        <div className="tb-container">
-          <div className="mx-auto max-w-[1139px]">
-            <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-              <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-              <p className="text-[12px] font-medium leading-4 text-[#111111]">Client Stories</p>
-            </div>
-            <h2 className="mt-4 whitespace-pre-line text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">
-              {"Trusted by people\nwho know technology best"}
-            </h2>
-
-            <p className="mt-14 whitespace-pre-line text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#666666]">
-              {"\"TechBubble has been an absolute game-changer for our business unit. From the initial consultation to the final delivery, their team showed unmatched professionalism,\ncreativity, and technical expertise. What impressed us most was their ability to adapt\nto unforeseen challenges without compromising timelines or quality.\""}
-            </p>
-
-            <div className="mt-12 h-px w-full bg-[#e5e5e5]" />
-
-            <div className="mt-12 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="h-[62px] w-[62px] overflow-hidden rounded-full bg-neutral-200">
-                  <Image src={aboutUs9} alt="Haima Prakash" width={62} height={62} className="h-full w-full object-cover" />
-                </div>
-                <div>
-                  <p className="text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">Haima Prakash</p>
-                  <p className="text-[16px] leading-6 text-[#838383]">Sr. Manager, Chief Technology Office · University of Sydney</p>
-                  <p className="mt-1 text-[13.6px] tracking-[2px] text-[#f59e0b]">★★★★★</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <button className="flex h-10 w-14 items-center justify-center rounded-full border border-[#585858]" aria-label="Previous testimonial">
-                  <ChevronLeft className="h-6 w-6 text-[#585858]" strokeWidth={1.5} aria-hidden />
-                </button>
-                <button className="flex h-10 w-14 items-center justify-center rounded-full border border-[#585858]" aria-label="Next testimonial">
-                  <ChevronRight className="h-6 w-6 text-[#585858]" strokeWidth={1.5} aria-hidden />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <ClientStoriesSection />
 
       <section className="bg-[#f7f7f7] py-[120px]">
         <div className="tb-container">
@@ -401,14 +361,16 @@ export default function AboutPage() {
               <p className="mt-2 max-w-[751px] text-[18px] leading-7 text-[#666666]">
                 Join 50+ enterprises who trust TechBubble to power their most critical technology initiatives.
               </p>
-              <div className="mt-8 flex items-center gap-3">
-                <Link href="/contact" className="inline-flex h-[52px] w-[229px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold text-white">
-                  Book a Free Consultation
-                  <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
-                </Link>
-                <Link href="/services" className="inline-flex h-[52px] w-[161px] items-center justify-center rounded-[18px] border border-[#e5e5e5] bg-white text-[16px] font-semibold text-[#111111]">
-                  Explore Services
-                </Link>
+              <div className="mt-2 h-[84px] w-[412px] pt-4">
+                <div className="flex items-center gap-[22px]">
+                  <Link href="/contact" className="inline-flex h-[52px] w-[229px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold text-white">
+                    Book a Free Consultation
+                    <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+                  </Link>
+                  <Link href="/services" className="inline-flex h-[52px] w-[161px] items-center justify-center rounded-[18px] border border-[#e5e5e5] bg-white text-[16px] font-semibold text-[#111111]">
+                    Explore Services
+                  </Link>
+                </div>
               </div>
             </div>
 
@@ -430,7 +392,7 @@ export default function AboutPage() {
                   "Free consultation",
                 ].map((item) => (
                   <div key={item} className="flex items-center gap-2">
-                    <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-[#e5e5e5] bg-[#fafafa]">
+                    <span className="flex h-[18px] w-[18px] items-center justify-center rounded-[9px] border border-[#e5e5e5] bg-[#fafafa]">
                       <Check className="h-[10px] w-[10px] text-[#111111]" strokeWidth={2.5} aria-hidden />
                     </span>
                     <span className="text-[14px] font-semibold leading-5 text-[#666666]">{item}</span>
