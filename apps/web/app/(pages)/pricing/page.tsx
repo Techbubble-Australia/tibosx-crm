@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowRight, Check, FileText, Clock, RefreshCw, BarChart3, Globe2 } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Minus, Plus } from "lucide-react";
+import { RemarkableCtaSection } from "@/components/RemarkableCtaSection";
 
 const models = [
   {
@@ -55,14 +56,6 @@ const models = [
   },
 ];
 
-const benefits: { Icon: typeof FileText; text: string }[] = [
-  { Icon: FileText, text: "Rapid No lock-in contracts" },
-  { Icon: Clock, text: "Response within 24 hours" },
-  { Icon: RefreshCw, text: "48-hour Replacement guarantee" },
-  { Icon: BarChart3, text: "Transparent weekly reporting" },
-  { Icon: Globe2, text: "Timezone-aligned delivery" },
-];
-
 const faqs = [
   {
     question: "How quickly can you onboard a resource?",
@@ -93,23 +86,36 @@ const faqs = [
 export default function PricingPage() {
   return (
     <>
-      {/* Hero — off-white, centered (PDF p8) */}
-      <section className="bg-[#f7f7f6] py-16 md:py-20">
-        <div className="tb-container text-center">
-          <h1 className="text-4xl md:text-5xl font-bold text-[#0a0a0a] mb-6">Flexible Pricing for Every Enterprise</h1>
-          <p className="text-gray-600 max-w-2xl mx-auto mb-10">
-            No rate cards on the shelf — every engagement is tailored to your exact requirements. Tell us what you need and we&apos;ll price it competitively within 24 hours.
-          </p>
-          <div className="flex flex-wrap justify-center gap-3">
-            {benefits.map(({ Icon, text }, index) => (
-              <div
-                key={index}
-                className="flex max-w-[200px] flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-4 text-center leading-snug"
-              >
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600 [&>svg]:stroke-[1.5]">
-                  <Icon className="h-5 w-5" aria-hidden />
-                </span>
-                <span className="text-xs font-medium text-[#0a0a0a] md:text-sm">{text}</span>
+      {/* Hero — matched to selected services dark header node 205:3850 */}
+      <section className="bg-[#111111] pb-[149px] pt-[109px] text-white">
+        <div className="tb-container">
+          <div className="mx-auto max-w-[1136px]">
+            <h1 className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px]">
+              Flexible Pricing for Every Enterprise
+            </h1>
+            <p className="mt-[4px] text-[18px] font-normal leading-[28px] text-[#e5e5e5]">
+              No rate cards on the shelf — every engagement is tailored to your exact requirements. Tell us what you need and we&apos;ll price it competitively within 24 hours.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Value highlights strip — selected node 205:3855 */}
+      <section className="relative z-10 -mt-[84px] bg-transparent">
+        <div className="tb-container">
+          <div className="mx-auto flex h-[170px] max-w-[1136px] items-center rounded-[30px] bg-white px-8 shadow-[0_24px_48px_-26px_rgba(0,0,0,0.38)]">
+            {[
+              { text: "Rapid No lock-in contracts", width: "w-[162px]" },
+              { text: "Response within 24 hours", width: "w-[152px]" },
+              { text: "48-hour Replacement guarantee", width: "w-[227px]" },
+              { text: "Transparent weekly reporting", width: "w-[193px]" },
+              { text: "Timezone-aligned delivery", width: "w-[161px]" },
+            ].map((item, idx) => (
+              <div key={item.text} className="flex h-[72px] items-center">
+                <div className={`${item.width} text-center`}>
+                  <p className="text-[18px] font-bold leading-7 text-[#111111]">{item.text}</p>
+                </div>
+                {idx < 4 ? <span className="mx-[22.625px] h-[78px] w-px bg-[#e5e5e5]" aria-hidden /> : null}
               </div>
             ))}
           </div>
@@ -185,84 +191,108 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* Rate Card CTA */}
-      <section className="py-20 bg-[#0a0a0a] text-white">
-        <div className="tb-container">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
+      {/* CTA + demo form — selected node 205:3546 */}
+      <section className="relative overflow-hidden py-[162px] text-white" style={{ background: "linear-gradient(160deg, #000000 0%, #202020 55%, #101112 100%)" }}>
+        <div className="pointer-events-none absolute -left-[120px] bottom-[-120px] h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle,rgba(76,76,76,0.12)_0%,rgba(56,56,56,0)_65%)]" />
+        <div className="pointer-events-none absolute -right-[120px] top-[-100px] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle,rgba(127,127,127,0.1)_0%,rgba(142,142,142,0)_65%)]" />
+
+        <div className="tb-container relative">
+          <div className="mx-auto grid max-w-[1136px] grid-cols-[604px_489px] gap-[43px]">
             <div>
-              <span className="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-xs font-medium mb-4">
-                Rate Card
-              </span>
-              <h2 className="text-3xl font-bold mb-4">Request a Detailed Rate Card</h2>
-              <p className="text-gray-400 mb-6">
+              <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
+                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
+                <p className="text-[12px] font-medium leading-4 text-[#111111]">Rate Card</p>
+              </div>
+
+              <h2 className="mt-4 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-white">Request a Detailed Rate Card</h2>
+              <p className="mt-1 text-[18px] font-normal leading-7 text-[#e5e5e5]">
                 Help us understand your requirements, so that we can offer you our best price. Our team will get back to you within 24 hours with a customized quote.
               </p>
-              <ul className="space-y-3 mb-8">
+
+              <div className="mt-4 space-y-[10px]">
                 {[
                   "150+ skilled professionals across technologies",
                   "Personalized consultation with our experts",
                   "AI-powered resource matching for best fit",
-                ].map((item, index) => (
-                  <li key={index} className="flex items-center gap-3 text-sm">
-                    <Check className="w-4 h-4 text-green-400" />
-                    {item}
-                  </li>
+                ].map((item) => (
+                  <div key={item} className="flex items-center gap-[10px]">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-[10px] bg-white/12">
+                      <span className="h-[10px] w-[10px] rounded-[2px] bg-white" />
+                    </span>
+                    <span className="text-[14px] font-normal leading-[23.1px] text-[#e5e5e5]" style={{ fontFamily: "Figtree, Geist, sans-serif" }}>
+                      {item}
+                    </span>
+                  </div>
                 ))}
-              </ul>
-              <div className="flex flex-wrap gap-4 text-sm text-gray-400">
-                <span className="flex items-center gap-2">
-                  <Check className="w-4 h-4" /> Response within 24 hours
-                </span>
-                <span className="flex items-center gap-2">
-                  <Check className="w-4 h-4" /> Free consultation call
-                </span>
-                <span className="flex items-center gap-2">
-                  <Check className="w-4 h-4" /> Zero obligation
-                </span>
+              </div>
+
+              <div className="mt-[54px] flex items-center gap-[26px]">
+                {[
+                  "Response within 24 hours",
+                  "Free consultation call",
+                  "Zero obligation",
+                ].map((item) => (
+                  <div key={item} className="flex items-center gap-2">
+                    <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-[9px] border border-[#e5e5e5] bg-[#fafafa]">
+                      <span className="h-[10px] w-[10px] rounded-[2px] bg-[#111111]" />
+                    </span>
+                    <span className="text-[12px] font-medium leading-4 text-[#e5e5e5]">{item}</span>
+                  </div>
+                ))}
               </div>
             </div>
-            <div className="bg-gray-900 p-8 rounded-2xl">
-              <h3 className="font-semibold mb-2">Get Your Custom Quote</h3>
-              <p className="text-gray-400 text-sm mb-6">Fill out the form and we&apos;ll be in touch within 24 hours.</p>
-              <form className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+
+            <div className="rounded-[28px] bg-white/[0.06] px-[37px] py-8">
+              <h3 className="text-[28px] font-bold leading-9 tracking-[-0.07px] text-white">Get Your Custom Quote</h3>
+              <p className="mt-1 text-[14px] font-normal leading-5 tracking-[0.035px] text-[#e5e5e5]">
+                Fill out the form and we&apos;ll be in touch within 24 hours.
+              </p>
+
+              <form className="mt-8 space-y-[14px]">
+                <div className="grid grid-cols-2 gap-3">
                   <input
                     type="text"
                     placeholder="First Name"
-                    className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gray-500"
+                    className="h-[46px] rounded-[14px] border border-white/15 bg-white/[0.08] px-4 text-[14px] text-white placeholder:text-white/35 focus:outline-none"
                   />
                   <input
                     type="text"
                     placeholder="Last Name"
-                    className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gray-500"
+                    className="h-[46px] rounded-[14px] border border-white/15 bg-white/[0.08] px-4 text-[14px] text-white placeholder:text-white/35 focus:outline-none"
                   />
                 </div>
+
                 <input
                   type="email"
-                  placeholder="Work Email *"
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gray-500"
+                  placeholder="Work Email"
+                  className="h-[46px] w-full rounded-[14px] border border-white/15 bg-white/[0.08] px-4 text-[14px] text-white placeholder:text-white/35 focus:outline-none"
                 />
                 <input
                   type="tel"
                   placeholder="Phone Number"
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gray-500"
+                  className="h-[46px] w-full rounded-[14px] border border-white/15 bg-white/[0.08] px-4 text-[14px] text-white placeholder:text-white/35 focus:outline-none"
                 />
                 <input
                   type="text"
                   placeholder="Company Name"
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gray-500"
+                  className="h-[46px] w-full rounded-[14px] border border-white/15 bg-white/[0.08] px-4 text-[14px] text-white placeholder:text-white/35 focus:outline-none"
                 />
-                <select className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gray-500 text-gray-400">
-                  <option>Select service type</option>
-                  <option>Staff Augmentation</option>
-                  <option>Project Delivery</option>
-                  <option>Product Engineering</option>
-                </select>
+                <div className="relative">
+                  <select className="h-[46px] w-full appearance-none rounded-[14px] border border-white/15 bg-white/[0.08] px-4 pr-10 text-[14px] text-white/65 focus:outline-none">
+                    <option value="">Select service type</option>
+                    <option>Staff Augmentation</option>
+                    <option>Project Delivery</option>
+                    <option>Product Engineering</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/65" aria-hidden />
+                </div>
+
                 <button
                   type="submit"
-                  className="w-full bg-white text-black py-3 rounded-full font-medium hover:bg-gray-100 transition-colors"
+                  className="mt-[18px] inline-flex h-12 w-full items-center justify-center gap-2 rounded-[18px] bg-white text-[16px] font-semibold leading-6 text-[#111111]"
                 >
-                  Request Rate Card <ArrowRight className="w-4 h-4 inline ml-2" />
+                  Request Rate Card
+                  <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
                 </button>
               </form>
             </div>
@@ -270,33 +300,53 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* FAQ */}
-      <section className="py-20">
+      {/* FAQ — selected node 205:3618 */}
+      <section className="bg-white py-[112px]">
         <div className="tb-container">
-          <div className="grid md:grid-cols-2 gap-12">
+          <div className="mx-auto grid max-w-[1136px] grid-cols-[360px_704px] gap-[72px]">
             <div>
-              <span className="inline-flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600 mb-4">
-                FAQ
-              </span>
-              <h2 className="text-3xl font-bold mb-4">Questions we hear all the time</h2>
-              <p className="text-gray-500 mb-8">
+              <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
+                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
+                <p className="text-[12px] font-medium leading-4 text-[#111111]">FAQ</p>
+              </div>
+
+              <h2 className="mt-[6px] whitespace-pre-line text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">
+                {"Questions we\nhear all the\ntime"}
+              </h2>
+
+              <p className="mt-4 text-[18px] font-normal leading-7 text-[#666666]">
                 Can&apos;t find what you&apos;re looking for? Our team is happy to answer any questions directly.
               </p>
+
               <Link
                 href="/contact"
-                className="inline-flex items-center gap-2 bg-black text-white px-6 py-3 rounded-full font-medium hover:bg-gray-800 transition-colors"
+                className="mt-8 inline-flex h-[43px] w-[125px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold leading-5 text-white"
               >
-                Talk to us <ArrowRight className="w-4 h-4" />
+                Talk to us
+                <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
               </Link>
             </div>
-            <div className="space-y-4">
-              {faqs.map((faq, index) => (
-                <div key={index} className="border border-gray-200 rounded-xl p-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <h3 className="font-medium">{faq.question}</h3>
-                    <button className="flex-shrink-0 w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center">
-                      <span className="text-lg">+</span>
-                    </button>
+
+            <div className="space-y-2">
+              <div className="rounded-[16px] border border-[#f7f7f7] bg-[#fafafa]">
+                <div className="flex h-16 items-center justify-between px-[22px]">
+                  <h3 className="text-[16px] font-bold leading-6 text-[#111111]">{faqs[0]?.question}</h3>
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-[14px] border border-[#111111] bg-[#111111] text-white">
+                    <Minus className="h-5 w-5" strokeWidth={2.25} aria-hidden />
+                  </span>
+                </div>
+                <div className="px-[22px] pb-5">
+                  <p className="text-[16px] font-normal leading-6 text-[#666666]">{faqs[0]?.answer}</p>
+                </div>
+              </div>
+
+              {faqs.slice(1).map((faq, index) => (
+                <div key={faq.question} className="rounded-[16px] border border-[#f7f7f7] bg-[#fafafa]">
+                  <div className="flex h-16 items-center justify-between px-[22px]">
+                    <h3 className="text-[16px] font-bold leading-6 text-[#666666]">{faq.question}</h3>
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-[14px] border border-[#e5e5e5] bg-[#fafafa] text-[#666666]">
+                      <Plus className="h-[14px] w-[14px]" strokeWidth={2.25} aria-hidden />
+                    </span>
                   </div>
                 </div>
               ))}
@@ -305,39 +355,14 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-20 bg-gray-50">
-        <div className="tb-container">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Transform Your<br />Business?</h2>
-              <p className="text-gray-500">
-                Let us tailor a package that meets your unique needs. Whether you&apos;re exploring staff<br />augmentation, managed services, or custom solutions, we&apos;re here to help you succeed.
-              </p>
-            </div>
-            <div className="flex flex-col gap-4">
-              <Link
-                href="/contact"
-                className="inline-flex items-center justify-center gap-2 bg-black text-white px-8 py-3 rounded-full font-medium hover:bg-gray-800 transition-colors"
-              >
-                Get in Touch
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-              <div className="flex flex-col gap-2 text-sm text-gray-500">
-                <span className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-green-500" /> Free consultation
-                </span>
-                <span className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-green-500" /> No commitment
-                </span>
-                <span className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-green-500" /> 24hr response
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <RemarkableCtaSection
+        title="Ready to Transform Your Business?"
+        description="Join 50+ enterprises who trust TechBubble to power their most critical technology initiatives."
+        primaryLabel="Request a Free Consultation"
+        primaryHref="/contact"
+        secondaryLabel="View Pricing"
+        secondaryHref="/pricing"
+      />
     </>
   );
 }

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Zap, Workflow, Share2, FileStack, Braces, Handshake } from "lucide-react";
 import { notFound } from "next/navigation";
+import caseStudyHeaderImage from "@/src/image/frame_1_2.jpg";
 
 // This would normally fetch from the database
 async function getCaseStudy(slug: string) {
@@ -154,6 +155,23 @@ export default async function CaseStudyPage({ params }: { params: { slug: string
                 <div className="text-sm text-gray-500">{stat.label}</div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Header media section — node 205:5085 */}
+      <section className="bg-white pb-[60px] pt-[30px]">
+        <div className="tb-container">
+          <div className="mx-auto max-w-[1136px]">
+            <div className="relative h-[307px] overflow-hidden rounded-[8px]">
+              <Image
+                src={caseStudyHeaderImage}
+                alt="University of Sydney campus"
+                fill
+                className="object-cover"
+                sizes="(max-width: 1200px) 100vw, 1136px"
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -323,6 +341,70 @@ export default async function CaseStudyPage({ params }: { params: { slug: string
                     {caseStudy.testimonial.author.company}
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Practice Areas — node 205:2669 */}
+      <section className="bg-white py-[120px]">
+        <div className="tb-container">
+          <div className="mx-auto max-w-[1139px]">
+            <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
+              <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
+              <p className="text-[12px] font-medium leading-4 text-[#666666]">Our Practice Areas</p>
+            </div>
+
+            <h2 className="mt-2 max-w-[898px] text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">
+              Deep Expertise Across 5 Platform
+              <br />
+              Practices
+            </h2>
+            <p className="mt-1 max-w-[898px] text-[18px] leading-7 text-[#666666]">
+              We&apos;ve built a culture where talented people do the best work of their careers — and have fun doing it.
+            </p>
+
+            <div className="mt-8 grid grid-cols-3 gap-4">
+              {[
+                { title: "ServiceNow", description: "Cross-functional teams working across geographies, sharing knowledge and lifting each other up.", icon: <Zap className="h-6 w-6 text-[#111111]" /> },
+                { title: "Salesforce", description: "Comprehensive implementation across Sales, Service, Marketing, Commerce, Health & Education Cloud — plus Omnistudio and Vlocity.", icon: <Workflow className="h-6 w-6 text-[#111111]" /> },
+                { title: "MuleSoft", description: "Expert API-led integration services covering Anypoint Platform, API management, cloud-based solutions, and B2B integrations.", icon: <Share2 className="h-6 w-6 text-[#111111]" /> },
+                { title: "SharePoint", description: "SharePoint Online, Server & Power Platform integrations — collaboration, document management, and workflow automation.", icon: <FileStack className="h-6 w-6 text-[#111111]" /> },
+                { title: "Custom & AI Apps", description: "Java, D365, React, Mobile (iOS/Android), AI/ML, Python — custom solutions built to your exact requirements.", icon: <Braces className="h-6 w-6 text-[#111111]" /> },
+              ].map((item) => (
+                <div key={item.title} className="h-[305px] rounded-[15px] border border-[#e5e5e5] bg-[#f7f7f7] px-[22px] pt-8">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-[14px] border border-[#e5e5e5] bg-white">{item.icon}</div>
+
+                  <h3 className="mt-4 text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">{item.title}</h3>
+                  <p className="mt-1 text-[16px] leading-6 text-[#666666]">{item.description}</p>
+
+                  <button className="mt-4 inline-flex h-[29px] items-center gap-[10px] rounded-[18px] text-[14px] font-semibold leading-5 text-[#666666]">
+                    Explore Practice
+                    <ArrowRight className="h-[18px] w-[18px]" />
+                  </button>
+                </div>
+              ))}
+
+              <div className="h-[305px] rounded-[15px] border border-[#e5e5e5] bg-[#111111] px-[22px] pt-8 text-white">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-[72px] w-[72px] items-center justify-center">
+                    <Handshake className="h-10 w-10 text-white" />
+                  </div>
+                  <h3 className="max-w-[235px] text-[28px] font-bold leading-9 tracking-[-0.07px]">Ready to be our next success story?</h3>
+                </div>
+
+                <p className="mt-3 text-[16px] leading-6 text-[#e5e5e5]">
+                  Let&apos;s discuss your requirements and how we can deliver measurable results for your enterprise.
+                </p>
+
+                <Link
+                  href="/contact"
+                  className="mt-3 inline-flex h-[43px] w-[208px] items-center justify-center gap-2 rounded-[18px] bg-white text-[14px] font-semibold leading-5 text-[#111111]"
+                >
+                  Talk to Us
+                  <ArrowRight className="h-[18px] w-[18px]" />
+                </Link>
               </div>
             </div>
           </div>

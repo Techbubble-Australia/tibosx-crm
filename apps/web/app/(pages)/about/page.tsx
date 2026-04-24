@@ -1,7 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Check, Mail } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { ClientStoriesSection } from "@/components/ClientStoriesSection";
+import { RemarkableCtaSection } from "@/components/RemarkableCtaSection";
 import aboutUs1 from "@image/techbubble_-_about_us_1.jpg";
 import aboutUs2 from "@image/techbubble_-_about_us_2.jpg";
 import aboutUs3 from "@image/techbubble_-_about_us_3.jpg";
@@ -353,56 +354,14 @@ export default function AboutPage() {
 
       <ClientStoriesSection />
 
-      <section className="bg-[#f7f7f7] py-[120px]">
-        <div className="tb-container">
-          <div className="mx-auto grid max-w-[1136px] grid-cols-[751px_353px] gap-8">
-            <div>
-              <h2 className="text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">Ready to build something remarkable?</h2>
-              <p className="mt-2 max-w-[751px] text-[18px] leading-7 text-[#666666]">
-                Join 50+ enterprises who trust TechBubble to power their most critical technology initiatives.
-              </p>
-              <div className="mt-2 h-[84px] w-[412px] pt-4">
-                <div className="flex items-center gap-[22px]">
-                  <Link href="/contact" className="inline-flex h-[52px] w-[229px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold text-white">
-                    Book a Free Consultation
-                    <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
-                  </Link>
-                  <Link href="/services" className="inline-flex h-[52px] w-[161px] items-center justify-center rounded-[18px] border border-[#e5e5e5] bg-white text-[16px] font-semibold text-[#111111]">
-                    Explore Services
-                  </Link>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <div className="ml-8 flex w-[289px] items-center gap-3">
-                <Link href="/contact" className="inline-flex h-[51px] w-[118px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold text-white">
-                  <Mail className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
-                  Email Us
-                </Link>
-                <a href="tel:+611300934031" className="inline-flex h-[51px] w-[159px] items-center justify-center rounded-[18px] border border-[#e5e5e5] bg-[#e5e5e5] text-[14px] font-semibold text-[#111111]">
-                  (+61) 1300 934 031
-                </a>
-              </div>
-
-              <div className="ml-8 mt-8 space-y-4">
-                {[
-                  "No commitment required",
-                  "Response within 2 hours",
-                  "Free consultation",
-                ].map((item) => (
-                  <div key={item} className="flex items-center gap-2">
-                    <span className="flex h-[18px] w-[18px] items-center justify-center rounded-[9px] border border-[#e5e5e5] bg-[#fafafa]">
-                      <Check className="h-[10px] w-[10px] text-[#111111]" strokeWidth={2.5} aria-hidden />
-                    </span>
-                    <span className="text-[14px] font-semibold leading-5 text-[#666666]">{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <RemarkableCtaSection
+        title="Ready to build something remarkable?"
+        description="Join 50+ enterprises who trust TechBubble to power their most critical technology initiatives."
+        primaryLabel="Book a Free Consultation"
+        primaryHref="/contact"
+        secondaryLabel="Explore Services"
+        secondaryHref="/services"
+      />
     </>
   );
 }

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Zap, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, Zap, Workflow, Share2, FileStack, Braces, Handshake } from "lucide-react";
+import caseStudyFeaturedImage from "@/src/image/frame_1_2.jpg";
+import { ClientStoriesSection } from "@/components/ClientStoriesSection";
 
 const categories = ["All", "ServiceNow", "Salesforce", "MuleSoft", "SharePoint", "Staffing"];
 
@@ -101,314 +103,299 @@ const practices = [
 export default function CaseStudiesPage() {
   const featuredStudy = caseStudies.find(s => s.featured);
   const regularStudies = caseStudies.filter(s => !s.featured);
+  const topRightStudy = regularStudies[0];
+  const lowerStudies = regularStudies.slice(1, 4);
 
   return (
     <>
       {/* Hero */}
-      <section className="bg-[#0a0a0a] text-white py-16">
+      <section className="bg-[#111111] pb-[149px] pt-[109px] text-white">
         <div className="tb-container">
-          <h1 className="text-3xl md:text-4xl font-bold mb-4">Real Results for Real Enterprises</h1>
-          <p className="text-gray-400 max-w-2xl">
-            From government-scale ServiceNow transformations to Salesforce CRM overhauls — see how TechBubble delivers measurable outcomes across industries and platforms.
-          </p>
-        </div>
-      </section>
-
-      {/* Stats */}
-      <section className="bg-[#0a0a0a] text-white pb-12">
-        <div className="tb-container">
-          <div className="bg-white text-black rounded-2xl p-6 grid md:grid-cols-4 gap-6">
-            <div className="md:col-span-1">
-              <p className="text-sm text-gray-600">
-                Deep-dives into how TechBubble has helped enterprises across Asia-Pacific and North America transform their technology operations — with measurable outcomes.
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold">200+</div>
-              <div className="text-sm text-gray-500">Clients served</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold">500+</div>
-              <div className="text-sm text-gray-500">Projects delivered</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold">98%</div>
-              <div className="text-sm text-gray-500">Satisfaction rate</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Case Studies Grid */}
-      <section className="py-16 bg-gray-50">
-        <div className="tb-container">
-          <div className="mb-8">
-            <span className="inline-flex items-center gap-2 bg-white px-3 py-1 rounded-full text-sm text-gray-600 mb-4 border">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-              Our Work
-            </span>
-            <h2 className="text-3xl font-bold mb-2">Case Studies by Practice</h2>
-            <p className="text-gray-500">Explore how we&apos;ve helped leading enterprises transform operations, reduce costs, and accelerate growth.</p>
-          </div>
-
-          {/* Category Filter */}
-          <div className="flex flex-wrap gap-2 mb-8">
-            {categories.map((cat, index) => (
-              <button
-                key={cat}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  index === 0
-                    ? "bg-black text-white"
-                    : "bg-white text-gray-600 hover:bg-gray-100 border"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-
-          {/* Case Studies Grid - First Row with Featured + Sidebar */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-            {/* Featured Case Study with Sidebar */}
-            {featuredStudy && (
-              <>
-                <Link
-                  href={`/case-studies/${featuredStudy.slug}`}
-                  className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group md:col-span-1"
-                >
-                  <div className="aspect-video bg-gray-200 relative">
-                    <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-medium">
-                      {featuredStudy.category.toUpperCase()}
-                    </div>
-                    <div className="absolute top-4 right-4 text-xs text-gray-500">
-                      • {featuredStudy.date}
-                    </div>
-                    {/* Placeholder for image */}
-                    <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
-                      <span className="text-gray-400">Case Study Image</span>
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <h3 className="font-semibold text-lg mb-2 group-hover:text-gray-600 transition-colors">
-                      {featuredStudy.title}
-                    </h3>
-                    <p className="text-gray-500 text-sm mb-4 line-clamp-3">
-                      {featuredStudy.description}
-                    </p>
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                      <div className="flex gap-4">
-                        <div>
-                          <div className="font-bold text-lg">{featuredStudy.stat1.value}</div>
-                          <div className="text-xs text-gray-500">{featuredStudy.stat1.label}</div>
-                        </div>
-                        <div>
-                          <div className="font-bold text-lg">{featuredStudy.stat2.value}</div>
-                          <div className="text-xs text-gray-500">{featuredStudy.stat2.label}</div>
-                        </div>
-                      </div>
-                      <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center group-hover:bg-gray-800 transition-colors">
-                        <ArrowRight className="w-4 h-4" />
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-                
-                {/* Sidebar Navigation Card */}
-                <div className="bg-[#1a1a1a] text-white rounded-xl p-6 hidden md:block">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">ON THIS CASE STUDY</p>
-                  <nav className="space-y-3">
-                    {featuredStudy.sidebar?.map((item: any) => (
-                      <a
-                        key={item.href}
-                        href={item.href}
-                        className="block text-sm text-gray-300 hover:text-white transition-colors py-1 border-b border-gray-800 pb-2"
-                      >
-                        {item.label}
-                      </a>
-                    ))}
-                  </nav>
-                </div>
-              </>
-            )}
-
-            {/* Regular Case Studies */}
-            {regularStudies.slice(0, 1).map((study) => (
-              <Link
-                key={study.slug}
-                href={`/case-studies/${study.slug}`}
-                className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group"
-              >
-                <div className="aspect-video bg-gray-200 relative">
-                  <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-medium">
-                    {study.category.toUpperCase()}
-                  </div>
-                  <div className="absolute top-4 right-4 text-xs text-gray-500">
-                    • {study.date}
-                  </div>
-                  <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
-                    <span className="text-gray-400">Case Study Image</span>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <h3 className="font-semibold text-lg mb-2 group-hover:text-gray-600 transition-colors">
-                    {study.title}
-                  </h3>
-                  <p className="text-gray-500 text-sm mb-4 line-clamp-3">
-                    {study.description}
-                  </p>
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                    <div className="flex gap-4">
-                      <div>
-                        <div className="font-bold text-lg">{study.stat1.value}</div>
-                        <div className="text-xs text-gray-500">{study.stat1.label}</div>
-                      </div>
-                      <div>
-                        <div className="font-bold text-lg">{study.stat2.value}</div>
-                        <div className="text-xs text-gray-500">{study.stat2.label}</div>
-                      </div>
-                    </div>
-                    <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center group-hover:bg-gray-800 transition-colors">
-                      <ArrowRight className="w-4 h-4" />
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-
-          {/* More Case Studies Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {regularStudies.slice(1).map((study) => (
-              <Link
-                key={study.slug}
-                href={`/case-studies/${study.slug}`}
-                className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group"
-              >
-                <div className="aspect-video bg-gray-200 relative">
-                  <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-medium">
-                    {study.category.toUpperCase()}
-                  </div>
-                  <div className="absolute top-4 right-4 text-xs text-gray-500">
-                    • {study.date}
-                  </div>
-                  <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
-                    <span className="text-gray-400">Case Study Image</span>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <h3 className="font-semibold text-lg mb-2 group-hover:text-gray-600 transition-colors">
-                    {study.title}
-                  </h3>
-                  <p className="text-gray-500 text-sm mb-4 line-clamp-3">
-                    {study.description}
-                  </p>
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                    <div className="flex gap-4">
-                      <div>
-                        <div className="font-bold text-lg">{study.stat1.value}</div>
-                        <div className="text-xs text-gray-500">{study.stat1.label}</div>
-                      </div>
-                      <div>
-                        <div className="font-bold text-lg">{study.stat2.value}</div>
-                        <div className="text-xs text-gray-500">{study.stat2.label}</div>
-                      </div>
-                    </div>
-                    <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center group-hover:bg-gray-800 transition-colors">
-                      <ArrowRight className="w-4 h-4" />
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Deep Expertise Section */}
-      <section className="py-20">
-        <div className="tb-container">
-          <div className="mb-12">
-            <span className="inline-flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600 mb-4">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-              Our Practice Areas
-            </span>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Deep Expertise Across 5<br />Platform Practices</h2>
-            <p className="text-gray-500 max-w-2xl">
-              Deep expertise across ServiceNow, Salesforce, integration, and custom engineering — with measurable outcomes you can trace to board-level metrics.
+          <div className="mx-auto max-w-[1136px]">
+            <h1 className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-white">Real Results for Real Enterprises</h1>
+            <p className="mt-1 max-w-[976px] text-[18px] leading-7 text-[#e5e5e5]">
+              From government-scale ServiceNow transformations to Salesforce CRM overhauls — see how TechBubble delivers measurable outcomes across industries and platforms.
             </p>
           </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {practices.map((practice, index) => (
-              <div key={index} className="bg-white border border-gray-100 p-6 rounded-xl hover:shadow-md transition-shadow">
-                <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center mb-4">
-                  {practice.icon}
-                </div>
-                <h3 className="font-semibold text-lg mb-2">{practice.title}</h3>
-                <p className="text-gray-500 text-sm">{practice.description}</p>
-                <button className="mt-4 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all">
-                  Explore Practice <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-            <div className="bg-[#0a0a0a] text-white p-6 rounded-xl flex flex-col justify-center">
-              <div className="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center mb-4">
-                <Zap className="w-6 h-6" />
-              </div>
-              <h3 className="font-semibold text-lg mb-2">Ready to be our<br />next success<br />story?</h3>
-              <p className="text-gray-400 text-sm mb-4">
-                Let&apos;s discuss your requirements and how we can deliver measurable results for your enterprise.
-              </p>
-              <Link
-                href="/contact"
-                className="inline-flex items-center justify-center gap-2 bg-white text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-gray-100 transition-colors"
-              >
-                Talk to Us <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-          </div>
         </div>
       </section>
 
-      {/* Testimonial Section */}
-      <section className="py-20 bg-white">
+      {/* Stats strip — node 205:2838 */}
+      <section className="relative z-10 -mt-[85px] bg-transparent">
         <div className="tb-container">
-          <div className="mb-8">
-            <span className="inline-flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600 mb-4">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-              Client Stories
-            </span>
-            <h2 className="text-3xl md:text-4xl font-bold">Trusted by people<br />who know technology best</h2>
-          </div>
-          
-          <div className="max-w-4xl">
-            <div className="text-2xl md:text-3xl font-medium text-gray-800 leading-relaxed mb-8">
-              &ldquo;TechBubble has been an absolute game-changer for our business unit. From the initial consultation to the final delivery, their team showed unmatched professionalism, creativity, and technical expertise. What impressed us most was their ability to adapt to unforeseen challenges without compromising timelines or quality.&rdquo;
+          <div className="mx-auto flex h-[170px] max-w-[1136px] items-center rounded-[30px] bg-white px-8 shadow-[0_24px_48px_-26px_rgba(0,0,0,0.38)]">
+            <div className="w-[530px] px-2">
+              <p className="text-[16px] font-bold leading-6 text-[#111111]">
+                Deep-dives into how TechBubble has helped enterprises across Asia Pacific and North America transform their technology operations — with measurable outcomes.
+              </p>
             </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-                  <span className="text-gray-500 font-semibold">HP</span>
+
+            <span className="mx-[6px] h-[78px] w-px bg-[#e5e5e5]" aria-hidden />
+
+            <div className="w-[169px] text-center">
+              <p className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#111111]">200+</p>
+              <p className="text-[12px] font-medium leading-4 text-[#666666]">Clients served</p>
+            </div>
+
+            <span className="mx-[6px] h-[78px] w-px bg-[#e5e5e5]" aria-hidden />
+
+            <div className="w-[169px] text-center">
+              <p className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#111111]">500+</p>
+              <p className="text-[12px] font-medium leading-4 text-[#666666]">Projects delivered</p>
+            </div>
+
+            <span className="mx-[6px] h-[78px] w-px bg-[#e5e5e5]" aria-hidden />
+
+            <div className="w-[169px] text-center">
+              <p className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#111111]">98%</p>
+              <p className="text-[12px] font-medium leading-4 text-[#666666]">Satisfaction rate</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Case Studies by Practice — node 205:2573 */}
+      <section className="py-[100px]">
+        <div className="tb-container">
+          <div className="mx-auto max-w-[1136px]">
+            <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
+              <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
+              <p className="text-[12px] font-medium leading-4 text-[#666666]">Our Work</p>
+            </div>
+            <h2 className="mt-2 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">Case Studies by Practice</h2>
+            <p className="mt-1 max-w-[898px] text-[18px] leading-7 text-[#666666]">
+              Explore how we&apos;ve helped leading enterprises transform operations, reduce costs, and accelerate growth.
+            </p>
+
+            <div className="mt-8 flex flex-wrap gap-2">
+              {categories.map((cat, index) => (
+                <button
+                  key={cat}
+                  className={`inline-flex h-10 items-center rounded-[35px] border border-[#e5e5e5] px-[23px] text-[16px] font-semibold leading-6 transition-colors ${
+                    index === 0 ? "bg-[#111111] text-white" : "bg-white text-[#666666] hover:bg-[#f7f7f7]"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {featuredStudy && topRightStudy ? (
+              <div className="mt-8">
+                <div className="grid grid-cols-[746px_377px] gap-4">
+                  <Link
+                    href={`/case-studies/${featuredStudy.slug}`}
+                    className="group flex h-[547px] overflow-hidden rounded-[24px] border border-[#e5e5e5] bg-white"
+                  >
+                    <div className="flex h-full w-[518px] flex-col px-[33px] pb-6 pt-[26px]">
+                      <div className="flex w-[451px] items-center justify-between">
+                        <div className="inline-flex h-7 items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
+                          SERVICENOW
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
+                          <span className="text-[12px] font-medium leading-4 text-[#666666]">Wednesday, 8 April 2026</span>
+                        </div>
+                      </div>
+
+                      <div className="relative mt-[14px] h-[150px] w-[451px] overflow-hidden rounded-[8px]">
+                        <Image
+                          src={caseStudyFeaturedImage}
+                          alt="University of Sydney campus"
+                          fill
+                          className="object-cover object-center"
+                          sizes="(max-width: 1200px) 100vw, 451px"
+                        />
+                      </div>
+
+                      <h3 className="mt-[18px] w-[446px] line-clamp-3 text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">
+                        University of Sydney — Rapid IT Talent Deployment Across CTO Office
+                      </h3>
+                      <p className="mt-[6px] w-[446px] line-clamp-5 text-[16px] leading-6 text-[#666666]">
+                        The University&apos;s CTO Office needed specialized ServiceNow and SharePoint professionals on short notice to support a critical digital transformation initiative. TechBubble leveraged its AI-matching process to deliver pre-vetted, senior-level engineers within days — fully aligned to the University&apos;s working hours and internal delivery standards.
+                      </p>
+
+                      <div className="mt-auto flex items-end justify-between border-t border-[#e5e5e5] pt-[21px]">
+                        <div>
+                          <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">40%</p>
+                          <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">Efficiency gains</p>
+                        </div>
+                        <div>
+                          <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">3</p>
+                          <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">Domains delivered</p>
+                        </div>
+                        <span className="inline-flex h-[43px] w-[95px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold leading-5 text-white">
+                          Read
+                          <ArrowRight className="h-[18px] w-[18px]" />
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="w-[228px] bg-[#111111] px-[25px] pt-[49px] text-white">
+                      <p className="text-[12px] font-bold leading-4">ON THIS CASE STUDY</p>
+                      <div className="mt-[15px]">
+                        {featuredStudy.sidebar?.map((item, idx) => (
+                          <div key={item.label} className={`flex h-[42px] items-center border-[#e5e5e5] ${idx < 5 ? "border-b" : ""}`}>
+                            <span className={`mr-[10px] h-[14px] w-[3px] rounded-[2px] ${idx === featuredStudy.sidebar.length - 1 ? "bg-[#086eff]" : "bg-white"}`} />
+                            <span className="text-[12px] font-medium leading-4 text-white">{item.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </Link>
+
+                  <Link
+                    href={`/case-studies/${topRightStudy.slug}`}
+                    className="group flex h-[547px] flex-col rounded-[24px] border border-[#e5e5e5] bg-white px-[30px] pb-[30px] pt-9"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="inline-flex h-[28px] items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
+                        {topRightStudy.category.toUpperCase()}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
+                        <span className="text-[12px] font-medium leading-4 text-[#666666]">Wednesday, 8 April 2026</span>
+                      </div>
+                    </div>
+
+                    <h3 className="mt-[13px] w-[317px] line-clamp-3 text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">
+                      {topRightStudy.title}
+                    </h3>
+                    <p className="mt-4 w-[319px] line-clamp-6 text-[16px] leading-6 text-[#666666]">
+                      {topRightStudy.description}
+                    </p>
+
+                    <div className="mt-auto flex items-end justify-between border-t border-[#e5e5e5] pt-[21px]">
+                      <div>
+                        <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">{topRightStudy.stat1.value}</p>
+                        <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">{topRightStudy.stat1.label}</p>
+                      </div>
+                      <div>
+                        <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">{topRightStudy.stat2.value}</p>
+                        <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">{topRightStudy.stat2.label}</p>
+                      </div>
+                      <span className="inline-flex h-[43px] w-[95px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold leading-5 text-white">
+                        Read
+                        <ArrowRight className="h-[18px] w-[18px]" />
+                      </span>
+                    </div>
+                  </Link>
                 </div>
-                <div>
-                  <div className="font-semibold">Haima Prakash</div>
-                  <div className="text-sm text-gray-500">Sr. Manager, Chief Technology Office - University of Sydney</div>
+
+                <div className="mt-4 grid grid-cols-3 gap-4">
+                  {lowerStudies.map((study, index) => (
+                    <Link
+                      key={study.slug}
+                      href={`/case-studies/${study.slug}`}
+                      className="group flex h-[494px] flex-col rounded-[24px] border border-[#e2e7f4] bg-white px-9 pb-6 pt-9"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="inline-flex h-[28px] items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
+                          {study.category.toUpperCase()}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
+                          <span className="text-[12px] font-medium leading-4 text-[#666666]">Wednesday, 8 April 2026</span>
+                        </div>
+                      </div>
+
+                      <h3 className="mt-[12px] line-clamp-3 text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">
+                        {study.title}
+                      </h3>
+                      <p className="mt-[12px] line-clamp-6 text-[16px] leading-6 text-[#666666]">
+                        {study.description}
+                      </p>
+
+                      <span className="mt-[21px] block h-px w-full bg-[#e5e5e5]" aria-hidden />
+
+                      <div className="mt-auto flex items-end justify-between pt-[21px]">
+                        <div>
+                          <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">{study.stat1.value}</p>
+                          <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">{study.stat1.label}</p>
+                        </div>
+                        <div>
+                          <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">{study.stat2.value}</p>
+                          <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">{study.stat2.label}</p>
+                        </div>
+                        <span className="inline-flex h-[43px] w-[95px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold leading-5 text-white">
+                          Read
+                          <ArrowRight className="h-[18px] w-[18px]" />
+                        </span>
+                      </div>
+                    </Link>
+                  ))}
                 </div>
               </div>
-              
-              <div className="flex gap-2">
-                <button className="w-10 h-10 border border-gray-200 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors">
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <button className="w-10 h-10 border border-gray-200 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors">
-                  <ChevronRight className="w-5 h-5" />
-                </button>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
+      {/* Deep Expertise Section — node 205:2669 */}
+      <section className="bg-[#e5e5e5] py-[100px]">
+        <div className="tb-container">
+          <div className="mx-auto max-w-[1139px]">
+            <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
+              <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
+              <p className="text-[12px] font-medium leading-4 text-[#666666]">Our Practice Areas</p>
+            </div>
+
+            <h2 className="mt-2 max-w-[898px] text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">
+              Deep Expertise Across 5 Platform
+              <br />
+              Practices
+            </h2>
+            <p className="mt-1 max-w-[898px] text-[18px] leading-7 text-[#666666]">
+              We&apos;ve built a culture where talented people do the best work of their careers — and have fun doing it.
+            </p>
+
+            <div className="mt-8 grid grid-cols-3 gap-4">
+              {[
+                { title: "ServiceNow", description: "Cross-functional teams working across geographies, sharing knowledge and lifting each other up.", icon: <Zap className="h-6 w-6 text-[#111111]" /> },
+                { title: "Salesforce", description: "Comprehensive implementation across Sales, Service, Marketing, Commerce, Health & Education Cloud — plus Omnistudio and Vlocity.", icon: <Workflow className="h-6 w-6 text-[#111111]" /> },
+                { title: "MuleSoft", description: "Expert API-led integration services covering Anypoint Platform, API management, cloud-based solutions, and B2B integrations.", icon: <Share2 className="h-6 w-6 text-[#111111]" /> },
+                { title: "SharePoint", description: "SharePoint Online, Server & Power Platform integrations — collaboration, document management, and workflow automation.", icon: <FileStack className="h-6 w-6 text-[#111111]" /> },
+                { title: "Custom & AI Apps", description: "Java, D365, React, Mobile (iOS/Android), AI/ML, Python — custom solutions built to your exact requirements.", icon: <Braces className="h-6 w-6 text-[#111111]" /> },
+              ].map((item) => (
+                <div key={item.title} className="h-[305px] rounded-[15px] border border-[#e5e5e5] bg-[#f7f7f7] px-[22px] pt-8">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-[14px] border border-[#e5e5e5] bg-white">{item.icon}</div>
+
+                  <h3 className="mt-4 text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">{item.title}</h3>
+                  <p className="mt-1 text-[16px] leading-6 text-[#666666]">{item.description}</p>
+
+                  <button className="mt-4 inline-flex h-[29px] items-center gap-[10px] rounded-[18px] text-[14px] font-semibold leading-5 text-[#666666]">
+                    Explore Practice
+                    <ArrowRight className="h-[18px] w-[18px]" />
+                  </button>
+                </div>
+              ))}
+
+              <div className="h-[305px] rounded-[15px] border border-[#e5e5e5] bg-[#111111] px-[22px] pt-8 text-white">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-[72px] w-[72px] items-center justify-center">
+                    <Handshake className="h-10 w-10 text-white" />
+                  </div>
+                  <h3 className="max-w-[235px] text-[28px] font-bold leading-9 tracking-[-0.07px]">Ready to be our next success story?</h3>
+                </div>
+
+                <p className="mt-3 text-[16px] leading-6 text-[#e5e5e5]">
+                  Let&apos;s discuss your requirements and how we can deliver measurable results for your enterprise.
+                </p>
+
+                <Link
+                  href="/contact"
+                  className="mt-3 inline-flex h-[43px] w-[208px] items-center justify-center gap-2 rounded-[18px] bg-white text-[14px] font-semibold leading-5 text-[#111111]"
+                >
+                  Talk to Us
+                  <ArrowRight className="h-[18px] w-[18px]" />
+                </Link>
               </div>
             </div>
           </div>
         </div>
       </section>
+
+      <ClientStoriesSection />
 
       {/* CTA */}
       <section className="py-20 bg-gray-50">
