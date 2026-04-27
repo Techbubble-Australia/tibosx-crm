@@ -77,6 +77,8 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 API server running on port ${PORT}`);
+const HOST = process.env.HOST || "0.0.0.0";
+
+app.listen(Number(PORT), HOST, () => {
+  console.log(`🚀 API server listening on http://${HOST}:${PORT}`);
 });
