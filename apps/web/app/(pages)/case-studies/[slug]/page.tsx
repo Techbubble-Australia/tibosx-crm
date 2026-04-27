@@ -52,7 +52,7 @@ export default async function CaseStudyPage({
       </section>
 
       {/* Header media section — node 205:5085 */}
-      <section className="bg-white pb-[60px] pt-[30px] dark:bg-neutral-950">
+      <section className="bg-white pb-[60px] pt-[30px]">
         <div className="tb-container">
           <div className="mx-auto max-w-[1136px]">
             <CaseStudyBannerGallery images={caseStudy.bannerImages} title={caseStudy.title} />
@@ -61,7 +61,7 @@ export default async function CaseStudyPage({
       </section>
 
       {/* Main Content */}
-      <section className="py-12 dark:bg-neutral-950">
+      <section className="bg-white py-12">
         <div className="tb-container">
           <div className="flex flex-col lg:flex-row gap-12">
             {/* Sidebar */}
@@ -73,7 +73,7 @@ export default async function CaseStudyPage({
                     <a
                       key={item.href}
                       href={item.href}
-                      className="block text-sm text-gray-600 hover:text-black dark:text-neutral-400 dark:hover:text-white transition-colors py-1"
+                      className="block text-sm text-gray-600 hover:text-black transition-colors py-1"
                     >
                       {item.label}
                     </a>
@@ -86,20 +86,20 @@ export default async function CaseStudyPage({
             <div className="flex-1 max-w-3xl">
               {/* Background */}
               <div id="background" className="mb-16">
-                <span className="inline-flex items-center gap-2 bg-gray-100 dark:bg-neutral-800 px-3 py-1 rounded-full text-xs font-medium mb-6 dark:text-neutral-200">
-                  <span className="w-1.5 h-1.5 bg-black dark:bg-white rounded-full"></span>
+                <span className="inline-flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full text-xs font-medium mb-6 text-gray-900">
+                  <span className="w-1.5 h-1.5 bg-black rounded-full"></span>
                   Background
                 </span>
-                <h2 className="text-2xl md:text-3xl font-bold mb-4 dark:text-white">{caseStudy.background.title}</h2>
-                <div className="prose prose-gray dark:prose-invert max-w-none">
+                <h2 className="text-2xl md:text-3xl font-bold mb-4 text-gray-900">{caseStudy.background.title}</h2>
+                <div className="prose prose-gray max-w-none">
                   {caseStudy.background.content.split('\n\n').map((paragraph: string, index: number) => (
-                    <p key={index} className="text-gray-600 dark:text-neutral-400 mb-4 leading-relaxed">
+                    <p key={index} className="text-gray-600 mb-4 leading-relaxed">
                       {paragraph}
                     </p>
                   ))}
                 </div>
                 {caseStudy.contentImage ? (
-                  <div className="mt-8 aspect-video relative rounded-xl overflow-hidden dark:ring-1 dark:ring-white/10">
+                  <div className="mt-8 aspect-video relative rounded-xl overflow-hidden ring-1 ring-black/5">
                     <Image
                       src={caseStudy.contentImage}
                       alt={caseStudy.background.title}
@@ -109,9 +109,9 @@ export default async function CaseStudyPage({
                     />
                   </div>
                 ) : (
-                  <div className="mt-8 aspect-video bg-neutral-200 dark:bg-neutral-800 rounded-xl overflow-hidden">
-                    <div className="w-full h-full bg-gradient-to-br from-neutral-200 to-neutral-300 dark:from-neutral-800 dark:to-neutral-900 flex items-center justify-center">
-                      <span className="text-neutral-500 dark:text-neutral-500 text-sm">No case study image</span>
+                  <div className="mt-8 aspect-video bg-neutral-200 rounded-xl overflow-hidden">
+                    <div className="w-full h-full bg-gradient-to-br from-neutral-200 to-neutral-300 flex items-center justify-center">
+                      <span className="text-neutral-500 text-sm">No case study image</span>
                     </div>
                   </div>
                 )}

@@ -41,8 +41,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 dark:bg-gray-950">
-      <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-lg dark:bg-gray-900 dark:border dark:border-gray-800">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-lg">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-4">
             <div className="grid grid-cols-2 gap-0.5">
@@ -51,10 +51,10 @@ export default function LoginPage() {
               <div className="w-2 h-2 bg-black rounded-full"></div>
               <div className="w-2 h-2 bg-black rounded-full"></div>
             </div>
-            <span className="font-semibold text-lg tracking-tight dark:text-white">TECHBUBBLE</span>
+            <span className="font-semibold text-lg tracking-tight text-gray-900">TECHBUBBLE</span>
           </div>
-          <h1 className="text-2xl font-bold dark:text-white">Admin Login</h1>
-          <p className="text-gray-500 mt-2 dark:text-gray-400">Sign in to manage content</p>
+          <h1 className="text-2xl font-bold text-gray-900">Admin Login</h1>
+          <p className="text-gray-500 mt-2">Sign in to manage content</p>
         </div>
 
         {error && (
@@ -65,7 +65,7 @@ export default function LoginPage() {
 
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-2 dark:text-gray-200">Email</label>
+            <label className="block text-sm font-medium mb-2 text-gray-900">Email</label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -73,14 +73,14 @@ export default function LoginPage() {
                 type="email"
                 required
                 autoComplete="email"
-                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
                 placeholder="you@company.com"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2 dark:text-gray-200">Password</label>
+            <label className="block text-sm font-medium mb-2 text-gray-900">Password</label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -88,7 +88,7 @@ export default function LoginPage() {
                 type="password"
                 required
                 autoComplete="current-password"
-                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
                 placeholder="••••••••"
               />
             </div>

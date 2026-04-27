@@ -71,6 +71,7 @@
 }
 
 html {
+  color-scheme: light;
   font-size: 15px;
   scroll-behavior: smooth;
 }

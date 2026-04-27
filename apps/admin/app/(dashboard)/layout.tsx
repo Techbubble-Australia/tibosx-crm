@@ -30,21 +30,21 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-gray-900 text-white flex flex-col">
+      <aside className="flex w-64 flex-col border-r border-gray-200 bg-white">
         <div className="p-6">
           <Link href="/" className="flex items-center gap-2">
             <div className="grid grid-cols-2 gap-0.5">
-              <div className="w-2 h-2 bg-white rounded-full"></div>
-              <div className="w-2 h-2 bg-white rounded-full"></div>
-              <div className="w-2 h-2 bg-white rounded-full"></div>
-              <div className="w-2 h-2 bg-white rounded-full"></div>
+              <div className="h-2 w-2 rounded-full bg-black" />
+              <div className="h-2 w-2 rounded-full bg-black" />
+              <div className="h-2 w-2 rounded-full bg-black" />
+              <div className="h-2 w-2 rounded-full bg-black" />
             </div>
-            <span className="font-semibold text-lg tracking-tight">TECHBUBBLE</span>
+            <span className="text-lg font-semibold tracking-tight text-gray-900">TECHBUBBLE</span>
           </Link>
-          <p className="text-gray-400 text-xs mt-1">Admin Panel</p>
+          <p className="mt-1 text-xs text-gray-500">Admin Panel</p>
         </div>
 
-        <nav className="flex-1 px-4">
+        <nav className="flex-1 px-3">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname.startsWith(item.href);
@@ -52,20 +52,20 @@ export default function DashboardLayout({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition-colors ${
+                className={`mb-1 flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
                   isActive
-                    ? "bg-white text-black"
-                    : "text-gray-300 hover:bg-gray-800"
+                    ? "bg-gray-100 text-gray-900"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`}
               >
-                <Icon className="w-4 h-4" />
-                <span className="text-sm font-medium">{item.label}</span>
+                <Icon className="h-4 w-4 shrink-0" />
+                <span>{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-gray-800">
+        <div className="border-t border-gray-200 p-4">
           <button
             type="button"
             onClick={() => {
@@ -73,10 +73,10 @@ export default function DashboardLayout({
                 window.location.href = "/login";
               });
             }}
-            className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:text-white transition-colors w-full"
+            className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
           >
-            <LogOut className="w-4 h-4" />
-            <span className="text-sm font-medium">Logout</span>
+            <LogOut className="h-4 w-4 shrink-0" />
+            <span>Logout</span>
           </button>
         </div>
       </aside>

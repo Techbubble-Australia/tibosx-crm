@@ -20,7 +20,7 @@ export function CaseStudyBannerGallery({ images, title }: Props) {
 
   if (!main) {
     return (
-      <div className="flex h-[307px] items-center justify-center rounded-[8px] bg-neutral-200 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-500">
+      <div className="flex h-[307px] items-center justify-center rounded-[8px] bg-neutral-200 text-neutral-500">
         No banner image
       </div>
     );
@@ -28,7 +28,7 @@ export function CaseStudyBannerGallery({ images, title }: Props) {
 
   return (
     <div>
-      <div className="relative h-[307px] overflow-hidden rounded-[8px] dark:ring-1 dark:ring-white/10">
+      <div className="relative h-[307px] overflow-hidden rounded-[8px] ring-1 ring-black/5">
         <Image
           key={main}
           src={main}
@@ -55,8 +55,8 @@ export function CaseStudyBannerGallery({ images, title }: Props) {
               onClick={() => setIdx(i)}
               className={`relative h-14 w-24 shrink-0 overflow-hidden rounded-md border-2 transition-colors sm:h-16 sm:w-28 ${
                 i === idx
-                  ? "border-black ring-2 ring-black/20 dark:border-white dark:ring-white/30"
-                  : "border-transparent opacity-80 hover:opacity-100 dark:opacity-70"
+                  ? "border-black ring-2 ring-black/20"
+                  : "border-transparent opacity-80 hover:opacity-100"
               }`}
             >
               <Image src={src} alt="" fill className="object-cover" sizes="120px" />
