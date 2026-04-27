@@ -19,19 +19,8 @@ const nextConfig = {
       },
     ],
   },
-  async rewrites() {
-    const apiUrl = process.env.API_URL || "http://localhost:3001";
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${apiUrl}/api/:path*`,
-      },
-      {
-        source: "/uploads/:path*",
-        destination: `${apiUrl}/uploads/:path*`,
-      },
-    ];
-  },
+  // /api/* and /uploads/* are proxied at request time (see app/api and app/uploads routes)
+  // so production works when API_URL is only set at container runtime, not at `next build`.
   webpack(config) {
     config.module.rules.push({
       test: /\.svg$/i,
