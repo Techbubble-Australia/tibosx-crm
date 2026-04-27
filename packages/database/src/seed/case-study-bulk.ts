@@ -94,25 +94,28 @@ const SHARED_BODY: Omit<
   resultStat3Label: "Confidence",
 };
 
-function mini(
-  fields: Pick<
-    Prisma.CaseStudyCreateInput,
-    | "slug"
-    | "title"
-    | "subtitle"
-    | "category"
-    | "clientName"
-    | "featuredImage"
-    | "heroStat1Value"
-    | "heroStat1Label"
-    | "heroStat2Value"
-    | "heroStat2Label"
-    | "heroStat3Value"
-    | "heroStat3Label"
-    | "featured"
-  > &
-    Partial<Pick<Prisma.CaseStudyCreateInput, "bannerImages" | "contentImage">>
-): Prisma.CaseStudyCreateInput {
+type MiniFields = Pick<
+  Prisma.CaseStudyCreateInput,
+  | "slug"
+  | "title"
+  | "subtitle"
+  | "category"
+  | "clientName"
+  | "featuredImage"
+  | "heroStat1Value"
+  | "heroStat1Label"
+  | "heroStat2Value"
+  | "heroStat2Label"
+  | "heroStat3Value"
+  | "heroStat3Label"
+  | "featured"
+> & {
+  /** Scalar list only; Prisma also allows set/connect objects on CreateInput — seeds use arrays. */
+  bannerImages?: string[];
+  contentImage?: string;
+};
+
+function mini(fields: MiniFields): Prisma.CaseStudyCreateInput {
   const { bannerImages, contentImage, ...rest } = fields;
   const featured = rest.featuredImage;
   const banners =
