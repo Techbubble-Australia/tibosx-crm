@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { SiteChrome } from "@/components/SiteChrome";
+import { fetchSiteContentPayload } from "@/lib/fetch-site-content";
+import type { AnnouncementBarContent } from "@/components/AnnouncementBar";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -15,15 +17,29 @@ export const metadata: Metadata = {
   description: "AI-driven digital transformation across Asia Pacific and North America. Top 1% tech talent, deployed fast.",
 };
 
-export default function RootLayout({
+function isAnnouncementPayload(v: unknown): v is AnnouncementBarContent {
+  if (!v || typeof v !== "object") return false;
+  const o = v as Record<string, unknown>;
+  return (
+    typeof o.badge === "string" &&
+    typeof o.message === "string" &&
+    typeof o.linkText === "string" &&
+    typeof o.linkHref === "string"
+  );
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const raw = await fetchSiteContentPayload<unknown>("announcement_bar");
+  const announcement = isAnnouncementPayload(raw) ? raw : null;
+
   return (
     <html lang="en" className={inter.variable}>
       <body className={`${inter.className} antialiased`}>
-        <SiteChrome>{children}</SiteChrome>
+        <SiteChrome announcement={announcement}>{children}</SiteChrome>
       </body>
     </html>
   );

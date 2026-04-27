@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Edit, Trash2, Eye } from "lucide-react";
+import { adminFetch } from "@/lib/admin-api";
 
 interface CaseStudy {
   id: string;
@@ -14,6 +15,11 @@ interface CaseStudy {
   createdAt: string;
 }
 
+const marketingSiteBase =
+  typeof process.env.NEXT_PUBLIC_WEB_URL === "string" && process.env.NEXT_PUBLIC_WEB_URL.length > 0
+    ? process.env.NEXT_PUBLIC_WEB_URL.replace(/\/$/, "")
+    : "http://localhost:3000";
+
 export default function CaseStudiesPage() {
   const [caseStudies, setCaseStudies] = useState<CaseStudy[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -24,10 +30,7 @@ export default function CaseStudiesPage() {
 
   async function fetchCaseStudies() {
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("/api/admin/case-studies", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await adminFetch("/api/admin/case-studies");
       const data = await res.json();
       setCaseStudies(data.data || []);
     } catch (error) {
@@ -37,14 +40,51 @@ export default function CaseStudiesPage() {
     }
   }
 
+  async function openCaseStudyOnSite(cs: CaseStudy) {
+    if (cs.published) {
+      window.open(
+        `${marketingSiteBase}/case-studies/${encodeURIComponent(cs.slug)}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+      return;
+    }
+    try {
+      const res = await adminFetch("/api/admin/case-studies/preview-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: cs.slug }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(
+          (payload as { error?: string }).error ||
+            "Could not open preview. Ensure the API has CASE_STUDY_PREVIEW_SECRET or JWT_SECRET (non-production).",
+        );
+        return;
+      }
+      const previewToken = (payload as { data?: { token?: string } }).data?.token;
+      if (!previewToken) {
+        alert("Preview token missing from API response.");
+        return;
+      }
+      window.open(
+        `${marketingSiteBase}/case-studies/${encodeURIComponent(cs.slug)}?preview=${encodeURIComponent(previewToken)}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+    } catch (e) {
+      console.error(e);
+      alert("Failed to open preview.");
+    }
+  }
+
   async function deleteCaseStudy(id: string) {
     if (!confirm("Are you sure you want to delete this case study?")) return;
 
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`/api/admin/case-studies/${id}`, {
+      const res = await adminFetch(`/api/admin/case-studies/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (res.ok) {
@@ -127,14 +167,18 @@ export default function CaseStudiesPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-2">
-                      <a
-                        href={`/case-studies/${cs.slug}`}
-                        target="_blank"
+                      <button
+                        type="button"
+                        onClick={() => void openCaseStudyOnSite(cs)}
                         className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                        title="View"
+                        title={
+                          cs.published
+                            ? "View on marketing site"
+                            : "Preview draft on marketing site (signed link)"
+                        }
                       >
                         <Eye className="w-4 h-4" />
-                      </a>
+                      </button>
                       <Link
                         href={`/case-studies/${cs.id}`}
                         className="p-2 text-gray-400 hover:text-gray-600 transition-colors"

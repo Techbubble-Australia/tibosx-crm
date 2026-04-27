@@ -11,264 +11,19 @@ import {
   ChevronDown,
   Mail,
   Minus,
-  PhoneCall,
-  FileText,
   Plus,
-  Rocket,
-  ShieldCheck,
   Zap,
   Shield,
   Clock,
   DollarSign,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { MarketingHomePayload } from "@/lib/data/marketing-home-payload";
+import { buildMarketingHomeViewModel } from "@/lib/marketing-home-view";
 import heroNetworkPattern from "@image/home-hero-network.svg";
-import featuredVicLogo from "@image/techbubble_-_home_1.png";
-import featuredQldLogo from "@image/techbubble_-_home_2.png";
-import featuredServiceNowLogo from "@image/techbubble_-_home_3.png";
-import featuredMuleSoftLogo from "@image/techbubble_-_home_4.png";
-import featuredSalesforceLogo from "@image/techbubble_-_home_5.png";
-import crmitLogo from "@image/techbubble_-_home_11.png";
-import endeavourLogo from "@image/techbubble_-_home_15.png";
-import finxlLogo from "@image/techbubble_-_home_14.png";
-import hdfcBankLogo from "@image/techbubble_-_home_12.png";
-import standardCharteredLogo from "@image/techbubble_-_home_6.png";
-import techMahindraLogo from "@image/techbubble_-_home_13.png";
-import toyotaLogo from "@image/techbubble_-_home_9.png";
-import usFoodsLogo from "@image/techbubble_-_home_8.png";
-import universityOfSydneyLogo from "@image/techbubble_-_home_10.png";
-import vhaLogo from "@image/techbubble_-_home_7.png";
 import caseStudyCampusImage from "@image/techbubble_-_home_34.jpg";
 import caseStudyCampusImageAlt from "@image/techbubble_-_home_35.jpg";
-import techOracleLogo from "@image/techbubble_-_home_23.png";
 import innovationImage from "@image/Innovation_Cutting_Edge_Tech.png";
-
-const featuredPartnerCard = [
-  {
-    id: "vic",
-    image: featuredVicLogo,
-    imageClass: "w-[193px]",
-  },
-  {
-    id: "qld",
-    image: featuredQldLogo,
-    imageClass: "w-[220px]",
-  },
-  {
-    id: "sn",
-    image: featuredServiceNowLogo,
-    imageClass: "w-[208px]",
-  },
-  {
-    id: "mule",
-    image: featuredMuleSoftLogo,
-    imageClass: "w-[204px]",
-  },
-  {
-    id: "sfdc",
-    image: featuredSalesforceLogo,
-    imageClass: "w-[177px]",
-  },
-];
-
-const trustedLogoStrip = [
-  { name: "Standard Chartered", image: standardCharteredLogo, width: 174, height: 68 },
-  { name: "VHA Home HealthCare", image: vhaLogo, width: 160, height: 68 },
-  { name: "US Foods", image: usFoodsLogo, width: 72, height: 78 },
-  { name: "Toyota", image: toyotaLogo, width: 150, height: 40 },
-  { name: "University of Sydney", image: universityOfSydneyLogo, width: 150, height: 60 },
-  { name: "CRMIT", image: crmitLogo, width: 128, height: 55 },
-  { name: "HDFC Bank", image: hdfcBankLogo, width: 224, height: 56 },
-  { name: "Tech Mahindra", image: techMahindraLogo, width: 117, height: 80 },
-  { name: "FINXL", image: finxlLogo, width: 150, height: 56 },
-  { name: "Endeavour Energy", image: endeavourLogo, width: 170, height: 64 },
-  { name: "Oracle", image: techOracleLogo, width: 150, height: 48 },
-];
-
-const engagementModels = [
-  {
-    id: "staff",
-    navLabel: "STAFFING SERVICES",
-    label: "AI-Infused Staff Augmentation",
-    description:
-      "Our Time & Material-based model deploys rigorously vetted specialists directly into your team — within one business day. We use AI to match the exact skill profile, experience level, and timezone to your requirements.",
-    bullets: ["Lightning Onboarding", "Top 1% Talent Only", "Timezone Aligned", "No Lock-in"],
-    tags: ["ServiceNow", "Salesforce", "MuleSoft", "SharePoint", "Snowflake", "Power BI", "React", "Power BI", "Java", "AI/ML", "AWS/Azure"],
-  },
-  {
-    id: "delivery",
-    navLabel: "PROJECT DELIVERY",
-    label: "Project Delivery",
-    description:
-      "Fixed-scope programmes with defined milestones — discovery, build, test, and hypercare — predictable delivery without compromising quality.",
-    bullets: ["Discovery-led", "Milestone billing", "Governance built in", "Knowledge transfer"],
-    tags: ["ITSM", "CSM", "Integrations", "CRM", "Custom apps", "QA", "DevOps"],
-  },
-  {
-    id: "product",
-    navLabel: "PRODUCT ENGINEERING",
-    label: "Product Engineering",
-    description:
-      "Outcome-based product pods — design, build, and run modern applications on your stack with clear ownership from roadmap to production.",
-    bullets: ["Product trio", "CI/CD embedded", "Observability", "Continuous delivery"],
-    tags: ["React", "Node", "Java", "AWS", "Azure", "Kubernetes", "Data", "AI/ML"],
-  },
-];
-
-const deliverySteps = [
-  {
-    title: "Book a Free Call",
-    body: "Zero commitment. Talk through your requirements, timeline, and budget with our solutions team — we'll listen first, advise second.",
-    icon: PhoneCall,
-  },
-  {
-    title: "Get a Tailored Quote",
-    body: "Receive a detailed, fixed-price or T&M proposal within 1–2 business days. No ambiguity — every cost line is explained clearly.",
-    icon: FileText,
-  },
-  {
-    title: "Confirm & Kickoff",
-    body: "AI-matched team assembled in under 24 hours. A smooth, structured kickoff makes sure everyone is aligned from the very first day.",
-    icon: Rocket,
-  },
-  {
-    title: "Deliver & Support",
-    body: "We ship on time, on budget — then stay with you. 24/7 post-launch governance ensures your systems run flawlessly,long-term.",
-    icon: ShieldCheck,
-  },
-];
-
-const platforms = [
-  {
-    id: "servicenow",
-    name: "ServiceNow",
-    headline: "Unlock the full power of\nServiceNow your Enterprise",
-    body: "TechBubble offers end-to-end ServiceNow implementation, testing, and support services to help organisations unlock the full potential of the ServiceNow platform — from IT Service Management to HR Service Delivery, Customer Service Management, and custom applications.",
-    features: [
-      { title: "IT Service Management (ITSM)", sub: "Incident, problem, change, and request management across your enterprise" },
-      { title: "SecOps, GRC & ITOM", sub: "Security operations, risk management, and IT operations in one unified platform" },
-      { title: "HR Service Delivery (HRSD) & CSM", sub: "Streamline HR workflows and deliver world-class customer service experiences" },
-    ],
-    ctaLabel: "Explore ServiceNow Solutions",
-    cardTitle: "ServiceNow Expertise",
-    cardSubtitle: "Certified specialists · All modules",
-    stats: [
-      { value: "35+", label: "Certified engineers" },
-      { value: "20+", label: "Projects delivered" },
-      { value: "100%", label: "Client satisfaction" },
-    ],
-    tags: ["ITSM", "ITOM", "SecOps", "GRC", "HRSD", "CSM", "Portal", "Custom Apps", "CMDB", "ITAM"],
-  },
-  {
-    id: "salesforce",
-    name: "Salesforce",
-    headline: "Sales, Service & Industry Clouds —\nimplemented the right way",
-    body: "TechBubble delivers Salesforce implementations across Sales Cloud, Service Cloud, and Einstein — helping organisations accelerate revenue operations and deliver personalised customer experiences at scale.",
-    features: [
-      { title: "Sales & Service Cloud", sub: "Lead-to-close, case management, and omnichannel service delivery" },
-      { title: "Einstein & Automation", sub: "AI-powered forecasting, scoring, and workflow automation" },
-      { title: "Experience Cloud & CPQ", sub: "Partner portals, self-service, and configure-price-quote solutions" },
-    ],
-    ctaLabel: "Explore Salesforce Solutions",
-    cardTitle: "Salesforce Expertise",
-    cardSubtitle: "Certified specialists · All clouds",
-    stats: [
-      { value: "25+", label: "Certified experts" },
-      { value: "15+", label: "Projects delivered" },
-      { value: "100%", label: "Client satisfaction" },
-    ],
-    tags: ["Sales Cloud", "Service Cloud", "Experience Cloud", "CPQ", "Einstein", "Automation", "Data Cloud"],
-  },
-  {
-    id: "mulesoft",
-    name: "MuleSoft",
-    headline: "Integration, APIs & data —\nconnected and governed",
-    body: "TechBubble architects and delivers MuleSoft integration solutions that connect your enterprise systems, expose governed APIs, and unlock data across your organisation — from ERP to cloud SaaS.",
-    features: [
-      { title: "API-led Connectivity", sub: "Experience, process, and system layer API design and build" },
-      { title: "Enterprise Integration", sub: "ERP, CRM, cloud, and legacy system integration at scale" },
-      { title: "DataWeave & Monitoring", sub: "Advanced transformation, observability, and platform-ops support" },
-    ],
-    ctaLabel: "Explore MuleSoft Solutions",
-    cardTitle: "MuleSoft Expertise",
-    cardSubtitle: "Certified architects · All tiers",
-    stats: [
-      { value: "20+", label: "Certified experts" },
-      { value: "12+", label: "Projects delivered" },
-      { value: "100%", label: "Client satisfaction" },
-    ],
-    tags: ["Anypoint Platform", "API Gateway", "DataWeave", "CloudHub", "RTF", "Event-Driven", "EDI"],
-  },
-  {
-    id: "sharepoint",
-    name: "SharePoint",
-    headline: "Collaboration, intranets &\ncontent management at scale",
-    body: "TechBubble builds and modernises SharePoint environments — from intranet portals and document management to governance frameworks and Microsoft 365 integration — delivering user adoption and measurable collaboration outcomes.",
-    features: [
-      { title: "Intranet & Portals", sub: "Modern communication sites, departmental hubs, and branded intranets" },
-      { title: "Document & Records Management", sub: "Retention policies, metadata taxonomy, and compliance workflows" },
-      { title: "M365 Integration & Governance", sub: "Teams, OneDrive, Power Automate, and enterprise governance frameworks" },
-    ],
-    ctaLabel: "Explore SharePoint Solutions",
-    cardTitle: "SharePoint Expertise",
-    cardSubtitle: "Certified specialists · All versions",
-    stats: [
-      { value: "18+", label: "Certified experts" },
-      { value: "10+", label: "Projects delivered" },
-      { value: "100%", label: "Client satisfaction" },
-    ],
-    tags: ["Modern SharePoint", "SPFx", "Power Automate", "Teams", "OneDrive", "M365", "Governance"],
-  },
-  {
-    id: "sharepoint2",
-    name: "SharePoint",
-    headline: "Collaboration, intranets &\ncontent management at scale",
-    body: "TechBubble builds and modernises SharePoint environments — from intranet portals and document management to governance frameworks and Microsoft 365 integration — delivering user adoption and measurable collaboration outcomes.",
-    features: [
-      { title: "Intranet & Portals", sub: "Modern communication sites, departmental hubs, and branded intranets" },
-      { title: "Document & Records Management", sub: "Retention policies, metadata taxonomy, and compliance workflows" },
-      { title: "M365 Integration & Governance", sub: "Teams, OneDrive, Power Automate, and enterprise governance frameworks" },
-    ],
-    ctaLabel: "Explore SharePoint Solutions",
-    cardTitle: "SharePoint Expertise",
-    cardSubtitle: "Certified specialists · All versions",
-    stats: [
-      { value: "18+", label: "Certified experts" },
-      { value: "10+", label: "Projects delivered" },
-      { value: "100%", label: "Client satisfaction" },
-    ],
-    tags: ["Modern SharePoint", "SPFx", "Power Automate", "Teams", "OneDrive", "M365", "Governance"],
-  },
-  {
-    id: "other",
-    name: "Other Technologies",
-    headline: "More platforms, one trusted\ndelivery partner",
-    body: "Beyond specialised platforms, TechBubble delivers outcomes across a wide range of enterprise technologies — cloud infrastructure, data & analytics, custom development, and QA automation.",
-    features: [
-      { title: "Cloud Infrastructure", sub: "AWS, Azure, and GCP — architecture, migration, and managed operations" },
-      { title: "Data & Analytics", sub: "Snowflake, Power BI, and modern data warehousing for actionable insight" },
-      { title: "Custom Development & QA", sub: "React, Java, Node, Kubernetes, and automated testing frameworks" },
-    ],
-    ctaLabel: "Explore All Solutions",
-    cardTitle: "Full-Stack Expertise",
-    cardSubtitle: "Certified specialists · All technologies",
-    stats: [
-      { value: "100+", label: "Certified experts" },
-      { value: "400+", label: "Projects delivered" },
-      { value: "100%", label: "Client satisfaction" },
-    ],
-    tags: ["AWS", "Azure", "Snowflake", "Power BI", "React", "Java", "Kubernetes", "QA", "DevOps"],
-  },
-];
-
-const testimonialItems = [
-  {
-    quote:
-      "The Techbubble team helped us transform our ServiceNow implementation in weeks, not months. Their delivery quality and governance discipline were exceptional.",
-    name: "Vandana K",
-    role: "Director, Digital Programs",
-  },
-];
 
 const caseStudyItems = [
   {
@@ -304,50 +59,30 @@ const caseStudyItems = [
   },
 ];
 
-const faqItems = [
-  {
-    question: "How quickly can you onboard a resource?",
-    answer:
-      "Our AI-matching engine can identify and propose a vetted candidate within hours of your request. Full onboarding — contracts signed, tools set up, team introductions — typically completes within one business day. For very specialised roles, allow up to 48 hours.",
-  },
-  {
-    question: "Do you work with startups or only enterprises?",
-    answer: "",
-  },
-  {
-    question: "What happens if a placed resource doesn't work out?",
-    answer: "",
-  },
-  {
-    question: "How does your pricing work?",
-    answer: "",
-  },
-  {
-    question: "Do your resources work in my timezone?",
-    answer: "",
-  },
-  {
-    question: "What industries do you serve?",
-    answer: "",
-  },
-];
+export type HomePreviewJob = { slug: string; title: string; meta: string; href: string };
+export type HomeClientStory = {
+  quote: string;
+  authorName: string;
+  authorTitle: string;
+  authorCompany: string;
+  authorInitials: string;
+  authorImageUrl?: string;
+};
 
-const openRoles = [
-  "Senior ServiceNow Consultant",
-  "Salesforce Technical Architect",
-  "MuleSoft Integration Lead",
-  "Data Engineer (Azure/AWS)",
-  "Senior React Developer",
-];
+type MarketingHomeProps = {
+  content: MarketingHomePayload;
+  testimonials: HomeClientStory[];
+  previewJobs: HomePreviewJob[];
+};
 
-export function MarketingHome() {
-  const [engagementId, setEngagementId] = useState<string>(engagementModels[0]!.id);
-  const [platformId, setPlatformId] = useState<string>(platforms[0]!.id);
+export function MarketingHome({ content, testimonials, previewJobs }: MarketingHomeProps) {
+  const vm = useMemo(() => buildMarketingHomeViewModel(content), [content]);
+  const [engagementId, setEngagementId] = useState<string>(vm.engagementModels[0]!.id);
+  const [platformId, setPlatformId] = useState<string>(vm.platforms[0]!.id);
   const [faqOpenIndex, setFaqOpenIndex] = useState<number>(0);
-  const [roleOpenIndex, setRoleOpenIndex] = useState<number>(0);
 
-  const engagement = engagementModels.find((m) => m.id === engagementId) ?? engagementModels[0]!;
-  const platform = platforms.find((p) => p.id === platformId) ?? platforms[0]!;
+  const engagement = vm.engagementModels.find((m) => m.id === engagementId) ?? vm.engagementModels[0]!;
+  const platform = vm.platforms.find((p) => p.id === platformId) ?? vm.platforms[0]!;
 
   return (
     <>
@@ -359,17 +94,17 @@ export function MarketingHome() {
         />
         <div className="relative tb-container py-16 text-center md:py-24 lg:py-28">
           <div className="mb-8 inline-flex overflow-hidden rounded-full border border-neutral-200 bg-white shadow-sm">
-            <span className="bg-black px-3 py-2 text-xs font-bold uppercase tracking-wide text-white">NEW</span>
+            <span className="bg-black px-3 py-2 text-xs font-bold uppercase tracking-wide text-white">{vm.hero.pillLeft}</span>
             <span className="flex items-center gap-1 px-4 py-2 text-xs font-medium text-neutral-700">
-              AI-matched talent placement in 24–48 hrs
+              {vm.hero.pillRight}
               <ArrowRight className="h-3.5 w-3.5" aria-hidden />
             </span>
           </div>
           <h1 className="mx-auto max-w-4xl text-4xl font-bold tracking-tight text-[#0a0a0a] md:text-5xl lg:text-[3.25rem] lg:leading-[1.1]">
-            We Deliver World-Class Digital Transformations powered by AI
+            {vm.hero.title}
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-neutral-600">
-            AI-driven digital transformation across Asia Pacific and North America — connecting ambitious enterprises with the top 1% of platform talent, fast.
+            {vm.hero.subtitle}
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
             <Link href="/contact" className="tb-btn-primary px-8 shadow-md shadow-black/10">
@@ -384,12 +119,7 @@ export function MarketingHome() {
             </Link>
           </div>
           <div className="mx-auto mt-10 flex max-w-3xl flex-wrap items-center justify-center gap-2 sm:gap-3">
-            {[
-              "No lock-in contracts",
-              "Onboard in <24 hours",
-              "Best-any-quote guarantee",
-              "24/7 support included",
-            ].map((label) => (
+            {vm.hero.trustChips.map((label) => (
               <span
                 key={label}
                 className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-2 text-left text-xs font-medium text-neutral-800 shadow-sm"
@@ -403,7 +133,7 @@ export function MarketingHome() {
           </div>
           <div className="mx-auto mt-14 flex max-w-2xl flex-wrap items-center justify-center gap-4 text-sm">
             <div className="flex -space-x-2">
-              {["TY", "SC", "TL", "DF", "MK"].map((initials) => (
+              {vm.hero.socialProof.initials.map((initials) => (
                 <span
                   key={initials}
                   className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-neutral-200 text-xs font-semibold text-neutral-700"
@@ -412,18 +142,18 @@ export function MarketingHome() {
                 </span>
               ))}
             </div>
-            <span className="font-semibold text-neutral-800">50+ enterprise clients</span>
+            <span className="font-semibold text-neutral-800">{vm.hero.socialProof.clientLabel}</span>
             <span className="hidden h-4 w-px bg-neutral-300 sm:block" aria-hidden />
             <span className="flex items-center gap-1">
               {[0, 1, 2, 3, 4].map((i) => (
                 <Star key={i} className="h-4 w-4 fill-amber-400 text-amber-400" aria-hidden />
               ))}
             </span>
-            <span className="font-medium text-neutral-700">5.0 avg. rating</span>
+            <span className="font-medium text-neutral-700">{vm.hero.socialProof.ratingLabel}</span>
             <span className="hidden h-4 w-px bg-neutral-300 sm:block" aria-hidden />
             <span className="inline-flex items-center gap-2 text-neutral-700">
               <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
-              Available now
+              {vm.hero.socialProof.availableLabel}
             </span>
           </div>
         </div>
@@ -435,7 +165,7 @@ export function MarketingHome() {
           <div className="relative z-0">
             <div className="rounded-[24px] border border-[#e5e5e5] bg-white px-6 py-12 shadow-[0_20px_60px_-36px_rgba(0,0,0,0.22)] md:px-8">
               <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-5">
-                {featuredPartnerCard.map((p) => (
+                {vm.featuredPartnerCard.map((p) => (
                   <div
                     key={p.id}
                     className="flex min-h-[71px] items-center justify-center"
@@ -454,7 +184,7 @@ export function MarketingHome() {
 
           <div className="mt-14 w-full overflow-hidden">
             <div className="flex w-max animate-[marquee_30s_linear_infinite] items-center gap-[18px]">
-              {[...trustedLogoStrip, ...trustedLogoStrip].map((logo, i) => (
+              {[...vm.trustedLogoStrip, ...vm.trustedLogoStrip].map((logo, i) => (
                 <div key={`${logo.name}-${i}`} className="flex shrink-0 items-center justify-center" style={{ width: `${logo.width}px`, height: `${logo.height}px` }}>
                   <Image src={logo.image} alt={logo.name} width={logo.width} height={logo.height} className="h-auto w-auto max-h-full max-w-full object-contain" sizes={`${logo.width}px`} />
                 </div>
@@ -470,19 +200,14 @@ export function MarketingHome() {
           <div className="mb-5 inline-flex items-center gap-3 rounded-full bg-transparent px-4 py-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-[#666666]" aria-hidden />
             <p className="text-xs font-medium uppercase tracking-[0.08em] text-[#e5e5e5]">
-              THE RAPIDLY GROWING COMPANY
+              {vm.statsStrip.pill}
             </p>
           </div>
           <h2 className="mx-auto mb-12 max-w-[1139px] text-4xl font-bold leading-[1.1] tracking-[-0.02em] text-white md:text-5xl lg:text-[56px] lg:leading-[64px]">
-            Transforming Today&apos;s Enterprises for Tomorrow&apos;s Innovation
+            {vm.statsStrip.title}
           </h2>
           <div className="mx-auto grid max-w-[1036px] grid-cols-2 gap-y-10 md:grid-cols-4 md:gap-x-[96px] md:gap-y-0">
-            {[
-              { n: "150+", l: "Tech Specialists Globally" },
-              { n: "50+", l: "Enterprise Clients" },
-              { n: "6", l: "Global Offices" },
-              { n: "98%", l: "Client Satisfaction Rate" },
-            ].map((s, i) => (
+            {vm.statsStrip.items.map((s, i) => (
               <div
                 key={s.l}
                 className={`relative px-2 ${i > 0 ? "md:before:absolute md:before:-left-[48px] md:before:top-1 md:before:h-[78px] md:before:w-px md:before:bg-white/20 md:before:content-['']" : ""}`}
@@ -502,20 +227,21 @@ export function MarketingHome() {
             <div className="mb-16">
               <div className="mb-2.5 inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
                 <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
-                <p className="text-xs font-medium uppercase leading-4 text-[#666666]">OUR SERVICES</p>
+                <p className="text-xs font-medium uppercase leading-4 text-[#666666]">{vm.engagementHeader.pill}</p>
               </div>
               <h2 className="mb-1 text-[56px] font-bold leading-[64px] tracking-[-0.005em] text-[#111111]">
-                End-to-end delivery, <br />
-                every engagement model
+                {vm.engagementHeader.titleLine1}
+                <br />
+                {vm.engagementHeader.titleLine2}
               </h2>
               <p className="max-w-[898px] text-[18px] leading-7 text-[#666666]">
-                Whether you need a single specialist or an entire product team, we have the model that fits - AI-matched, timezone-aligned, and ready in hours.
+                {vm.engagementHeader.subtitle}
               </p>
             </div>
 
             <div className="grid gap-10 lg:grid-cols-[300px_776px] lg:gap-[63px]">
               <div className="w-full">
-                {engagementModels.map((m, index) => (
+                {vm.engagementModels.map((m, index) => (
                   <div key={m.id}>
                     <button
                       type="button"
@@ -532,15 +258,15 @@ export function MarketingHome() {
                 ))}
 
                 <div className="mt-6 rounded-[16px] border border-[#e5e5e5] px-[21px] py-[22px]">
-                  <p className="text-sm font-semibold leading-5 text-[#06091a]">Not sure which fits?</p>
+                  <p className="text-sm font-semibold leading-5 text-[#06091a]">{vm.engagementHelp.title}</p>
                   <p className="mt-3 whitespace-pre-line text-xs font-medium leading-4 text-[#666666]">
-                    {"Talk to our solutions team - we'll find the\nright engagement model for your needs."}
+                    {vm.engagementHelp.body}
                   </p>
                   <Link
                     href="/contact"
                     className="mt-[17px] inline-flex h-[42px] w-[258px] items-center justify-center rounded-full bg-[#111111] text-sm font-semibold text-white transition-colors hover:bg-black"
                   >
-                    Book a Free Call
+                    {vm.engagementHelp.ctaLabel}
                   </Link>
                 </div>
               </div>
@@ -590,25 +316,25 @@ export function MarketingHome() {
             <div className="text-center">
               <div className="mx-auto mb-2.5 inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
                 <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
-                <p className="text-xs font-medium leading-4 text-[#666666]">How It Works</p>
+                <p className="text-xs font-medium leading-4 text-[#666666]">{vm.howItWorksHeader.pill}</p>
               </div>
               <h2 className="text-[56px] font-bold leading-[64px] tracking-[-0.005em] text-[#111111]">
-                From first call to go-live in 4 steps
+                {vm.howItWorksHeader.title}
               </h2>
               <p className="mx-auto mt-1 max-w-[898px] text-[18px] leading-7 text-[#666666]">
-                We&apos;ve stripped out every unnecessary step so you can focus on building, not bureaucracy.
+                {vm.howItWorksHeader.subtitle}
               </p>
             </div>
 
             <div className="mt-16 grid gap-6 lg:grid-cols-4 lg:gap-0">
-              {deliverySteps.map((step, idx) => {
+              {vm.deliverySteps.map((step, idx) => {
                 const Icon = step.icon;
                 return (
                   <div key={step.title} className="relative flex w-full flex-col items-center">
                     {/* left half connector: from cell left to icon left edge */}
                     {idx > 0 ? <div className="pointer-events-none absolute top-[28px] left-0 hidden h-px w-[calc(50%-28px)] bg-[#e5e5e5] lg:block" /> : null}
                     {/* right half connector: from icon right edge to cell right */}
-                    {idx < deliverySteps.length - 1 ? <div className="pointer-events-none absolute top-[28px] left-[calc(50%+28px)] hidden h-px w-[calc(50%-28px)] bg-[#e5e5e5] lg:block" /> : null}
+                    {idx < vm.deliverySteps.length - 1 ? <div className="pointer-events-none absolute top-[28px] left-[calc(50%+28px)] hidden h-px w-[calc(50%-28px)] bg-[#e5e5e5] lg:block" /> : null}
                     <div className="mb-8 flex h-14 w-14 items-center justify-center rounded-[28px] border border-[#e5e5e5] bg-white">
                       <Icon className="h-[22px] w-[22px] text-[#111111]" strokeWidth={1.8} aria-hidden />
                     </div>
@@ -633,7 +359,7 @@ export function MarketingHome() {
       </section>
 
       {/* Your journey from request to results — sidebar nav */}
-      <JourneySection />
+      <JourneySection journey={vm.journey} />
 
       {/* Multi-Platform Expertise — Figma node 130:2046 */}
       <section className="bg-[#fafafa] py-[120px]">
@@ -643,19 +369,19 @@ export function MarketingHome() {
             <div className="mb-10">
               <div className="mb-2.5 inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
                 <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                <p className="text-xs font-medium leading-4 text-[#111111]">SOLUTIONS BY TECHNOLOGY</p>
+                <p className="text-xs font-medium leading-4 text-[#111111]">{vm.platformsIntro.pill}</p>
               </div>
               <h2 className="mt-4 text-[56px] font-bold leading-[64px] tracking-[-0.005em] text-[#111111]">
-                Multi-Platform Expertise
+                {vm.platformsIntro.title}
               </h2>
               <p className="mt-4 text-[18px] leading-7 text-[#666666]">
-                Whether you need end-to-end implementation, integration, or specialist talent — we deliver certified expertise across the platforms that power enterprise business.
+                {vm.platformsIntro.subtitle}
               </p>
             </div>
 
             {/* Tab nav */}
             <div className="mb-10 flex flex-wrap gap-3">
-              {platforms.map((p) => (
+              {vm.platforms.map((p) => (
                 <button
                   key={p.id}
                   type="button"
@@ -989,7 +715,7 @@ export function MarketingHome() {
       </section>
 
       {/* Testimonial — Figma node 150:465 */}
-      <ClientStoriesSection />
+      <ClientStoriesSection items={testimonials} />
 
       {/* Case Studies — Figma node 150:622 */}
       <section className="bg-[#fafafa] py-[120px]">
@@ -1222,18 +948,18 @@ export function MarketingHome() {
                 time
               </h2>
               <p className="mt-4 max-w-[369px] text-[18px] leading-7 text-[#666666]">
-                Can&apos;t find what you&apos;re looking for? Our team is happy to answer any questions directly.
+                {vm.faqAside.blurb}
               </p>
               <Link
                 href="/contact"
                 className="mt-[31px] inline-flex h-[43px] w-[125px] items-center justify-center gap-2 whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
               >
-                Talk to us
+                {vm.faqAside.ctaLabel}
                 <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
               </Link>
             </div>
             <div className="space-y-[8.83px]">
-              {faqItems.map((item, idx) => {
+              {vm.faqItems.map((item, idx) => {
                 const open = faqOpenIndex === idx;
                 return (
                   <div
@@ -1284,38 +1010,32 @@ export function MarketingHome() {
             <div className="pt-[67px]">
               <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
                 <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                <p className="text-[12px] font-medium leading-4 text-[#111111]">GET STARTED TODAY</p>
+                <p className="text-[12px] font-medium leading-4 text-[#111111]">{vm.scheduleDemo.pill}</p>
               </div>
-              <h2 className="mt-4 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-white">
-                Schedule a Free Demo
-                <br />
-                with Our Experts
+              <h2 className="mt-4 whitespace-pre-line text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-white">
+                {vm.scheduleDemo.title}
               </h2>
               <p className="mt-1 max-w-[604px] text-[18px] leading-7 text-[#e5e5e5]">
-                Book a no-obligation consultation and discover exactly how TechBubble can accelerate your next initiative — talent, technology, or transformation.
+                {vm.scheduleDemo.subtitle}
               </p>
               <div className="mt-12 flex items-center gap-3">
                 <Link
                   href="/contact"
                   className="inline-flex h-[49px] w-[208px] items-center justify-center gap-[12px] whitespace-nowrap rounded-[18px] bg-white px-5 text-[16px] font-semibold text-[#111111]"
                 >
-                  Book a Free Demo
+                  {vm.scheduleDemo.primaryCta}
                   <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
                 </Link>
                 <Link
                   href="/pricing"
                   className="inline-flex h-[49px] w-[163px] items-center justify-center gap-[12px] whitespace-nowrap rounded-[18px] border border-[#666666] px-5 text-[16px] font-semibold text-[#e5e5e5]"
                 >
-                  View Pricing
+                  {vm.scheduleDemo.secondaryCta}
                   <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
                 </Link>
               </div>
               <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-2">
-                {[
-                  "Response within 24 hours",
-                  "Free consultation call",
-                  "Zero obligation",
-                ].map((item) => (
+                {vm.scheduleDemo.bullets.map((item) => (
                   <div key={item} className="flex items-center gap-2">
                     <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-[#e5e5e5] bg-[#fafafa]">
                       <Check className="h-[10px] w-[10px] text-[#111111]" strokeWidth={2.5} aria-hidden />
@@ -1394,46 +1114,51 @@ export function MarketingHome() {
             <div>
               <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
                 <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                <p className="text-[12px] font-medium leading-4 text-[#111111]">We&apos;re Hiring</p>
+                <p className="text-[12px] font-medium leading-4 text-[#111111]">{vm.careersBand.pill}</p>
               </div>
               <h2 className="mt-2 max-w-[640px] text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">
-                Join Our Global Team of Tech Innovators
+                {vm.careersBand.title}
               </h2>
               <p className="mt-2 max-w-[590px] text-[18px] leading-7 text-[#666666]">
-                Work on enterprise-scale projects alongside world-class engineers and AI specialists. Remote-friendly roles across Australia, India, Philippines, USA and beyond.
+                {vm.careersBand.subtitle}
               </p>
 
               <Link
                 href="/careers"
                 className="mt-10 inline-flex h-[51px] w-[191px] items-center justify-center gap-2 whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
               >
-                Browse Open Roles
+                {vm.careersBand.browseCta}
                 <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
               </Link>
             </div>
 
             <div className="space-y-4">
-              {[
-                { title: "Senior ServiceNow Developer", meta: "🇦🇺 Australia · Full-time · Remote" },
-                { title: "Salesforce Solutions Architect", meta: "🇺🇸 USA · Contract · Remote" },
-                { title: "AI / ML Engineer", meta: "🇮🇳 India · Full-time · Hybrid" },
-                { title: "MuleSoft Integration Specialist", meta: "🇵🇭 Philippines · Contract · Remote" },
-              ].map((role) => (
-                <Link
-                  key={role.title}
-                  href="/careers"
-                  className="flex h-[78px] items-center justify-between rounded-[24px] border border-[#e5e5e5] bg-white px-6"
-                >
-                  <div>
-                    <p className="text-[16px] font-bold leading-6 text-[#111111]">{role.title}</p>
-                    <p className="text-[14px] leading-5 tracking-[0.035px] text-[#7a7f8e]">{role.meta}</p>
-                  </div>
-                  <ArrowRight className="h-[18px] w-[18px] text-[#111111]" strokeWidth={2} aria-hidden />
-                </Link>
-              ))}
+              {previewJobs.length > 0 ? (
+                <>
+                  {previewJobs.map((role) => (
+                    <Link
+                      key={role.slug}
+                      href={role.href}
+                      className="flex h-[78px] items-center justify-between rounded-[24px] border border-[#e5e5e5] bg-white px-6 transition-colors hover:bg-[#fafafa]"
+                    >
+                      <div>
+                        <p className="text-[16px] font-bold leading-6 text-[#111111]">{role.title}</p>
+                        <p className="text-[14px] leading-5 tracking-[0.035px] text-[#7a7f8e]">{role.meta}</p>
+                      </div>
+                      <ArrowRight className="h-[18px] w-[18px] text-[#111111]" strokeWidth={2} aria-hidden />
+                    </Link>
+                  ))}
+                </>
+              ) : (
+                <div className="rounded-[24px] border border-dashed border-[#e5e5e5] bg-[#fafafa] px-6 py-8">
+                  <p className="text-[14px] leading-6 text-[#666666]">
+                    Open roles from the API will appear here. Visit careers for the full list.
+                  </p>
+                </div>
+              )}
 
               <Link href="/careers" className="mt-[2px] inline-flex items-center gap-2 px-[23px] py-[9px]">
-                <span className="text-[16px] font-bold leading-6 text-[#666666]">View all open positions</span>
+                <span className="text-[16px] font-bold leading-6 text-[#666666]">{vm.careersBand.viewAllLabel}</span>
                 <ArrowRight className="h-4 w-4 text-[#666666]" strokeWidth={2} aria-hidden />
               </Link>
             </div>
@@ -1447,10 +1172,10 @@ export function MarketingHome() {
           <div className="mx-auto grid max-w-[1136px] grid-cols-[751px_353px] gap-8">
             <div>
               <h3 className="max-w-[751px] text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">
-                Ready to build your dream team in under 24 hours?
+                {vm.careersCta.title}
               </h3>
               <p className="mt-2 max-w-[751px] whitespace-pre-line text-[18px] leading-7 text-[#666666]">
-                {"Join 50+ enterprises who trust TechBubble to power their most critical\ntechnology initiatives."}
+                {vm.careersCta.subtitle}
               </p>
             </div>
 
@@ -1472,11 +1197,7 @@ export function MarketingHome() {
               </div>
 
               <div className="ml-8 mt-8 space-y-4">
-                {[
-                  "No commitment required",
-                  "Response within 2 hours",
-                  "Free consultation",
-                ].map((item) => (
+                {vm.careersCta.bullets.map((item) => (
                   <div key={item} className="flex items-center gap-2">
                     <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-[#e5e5e5] bg-[#fafafa]">
                       <Check className="h-[10px] w-[10px] text-[#111111]" strokeWidth={2.5} aria-hidden />
@@ -1494,117 +1215,11 @@ export function MarketingHome() {
   );
 }
 
-const journeySteps = [
-  {
-    num: "01",
-    category: "SPEED & SCALE",
-    title: "Submit your request",
-    badgeLabel: "Step 01 — Speed & Scale",
-    heading: "You submit a request.\nWe start matching in hours.",
-    body: "Traditional hiring takes weeks of job posts, screeners, and interviews. Our AI-matching engine identifies the ideal candidate profile within hours of your request — pre-vetted, certified, and timezone-aligned.",
-    stats: [
-      { value: "<4h", label: "First shortlist delivered" },
-      { value: "70%", label: "Faster than traditional hiring" },
-      { value: "150+", label: "Specialists ready now" },
-    ],
-    features: [
-      { title: "AI-powered matching", sub: "Automated skills, timezone & culture fit scoring" },
-      { title: "Pre-vetted only", sub: "Multi-stage technical vetting before any proposal" },
-      { title: "Timezone Aligned", sub: "Resources matched to your exact working hours" },
-      { title: "Scale anytime", sub: "No minimum contract — flex up or down freely" },
-    ],
-    cta: "Submit a request",
-    ctaNote: "Response within 4 hours, guaranteed",
-  },
-  {
-    num: "02",
-    category: "CANDIDATE SELECTION",
-    title: "Choose your specialist",
-    badgeLabel: "Step 02 — Candidate Selection",
-    heading: "Review shortlist.\nPick who you want.",
-    body: "You receive a curated shortlist of pre-vetted specialists who match your exact requirements — skills, experience, timezone, and cultural fit. Review profiles and conduct a quick intro call before you commit.",
-    stats: [
-      { value: "3–5", label: "Candidates per shortlist" },
-      { value: "100%", label: "Pre-vetted profiles" },
-      { value: "48h", label: "Shortlist turnaround" },
-    ],
-    features: [
-      { title: "Curated shortlists", sub: "Only the best-matched profiles for your request" },
-      { title: "Intro calls included", sub: "Meet candidates before you make a decision" },
-      { title: "Skills verified", sub: "Technical assessments completed before proposal" },
-      { title: "No commitment", sub: "Review and decide with zero pressure" },
-    ],
-    cta: "Submit a request",
-    ctaNote: "Response within 4 hours, guaranteed",
-  },
-  {
-    num: "03",
-    category: "ONBOARDING",
-    title: "Productive in 24 hours",
-    badgeLabel: "Step 03 — Onboarding",
-    heading: "Signed today.\nDelivering tomorrow.",
-    body: "Our structured onboarding playbook gets your specialist integrated into your team fast — access provisioned, tools configured, and your first standup completed within 24 hours of contract sign.",
-    stats: [
-      { value: "24h", label: "From sign to first delivery" },
-      { value: "100%", label: "Governance embedded" },
-      { value: "0", label: "Disruption to your team" },
-    ],
-    features: [
-      { title: "Lightning Onboarding", sub: "Access provisioned and tools configured in hours" },
-      { title: "Governance built in", sub: "Delivery standards enforced from day one" },
-      { title: "Team integration", sub: "Standup, docs, and comms channels set up immediately" },
-      { title: "Knowledge transfer", sub: "Structured docs ensure continuity at any time" },
-    ],
-    cta: "Submit a request",
-    ctaNote: "Response within 4 hours, guaranteed",
-  },
-  {
-    num: "04",
-    category: "DELIVERY & GOVERNANCE",
-    title: "On-time. On-budget.",
-    badgeLabel: "Step 04 — Delivery & Governance",
-    heading: "Predictable delivery.\nFull transparency.",
-    body: "Weekly reporting, milestone tracking, and proactive risk management keep your project on track. You get full visibility into progress with no surprises — and a dedicated account manager who genuinely cares.",
-    stats: [
-      { value: "98%", label: "On-time delivery rate" },
-      { value: "Weekly", label: "Progress reports" },
-      { value: "24/7", label: "Support availability" },
-    ],
-    features: [
-      { title: "Weekly reporting", sub: "Progress, risks, and milestones at every step" },
-      { title: "Milestone billing", sub: "You only pay when deliverables are met" },
-      { title: "Dedicated AM", sub: "A single point of accountability throughout" },
-      { title: "Risk management", sub: "Issues flagged and resolved before they escalate" },
-    ],
-    cta: "Submit a request",
-    ctaNote: "Response within 4 hours, guaranteed",
-  },
-  {
-    num: "05",
-    category: "TECHNOLOGY DEPTH",
-    title: "18+ certified platforms",
-    badgeLabel: "Step 05 — Technology Depth",
-    heading: "Deep expertise across\n18+ enterprise platforms.",
-    body: "From ServiceNow to Salesforce, MuleSoft to Azure — our certified specialists bring deep platform knowledge and real-world delivery experience across the full enterprise technology stack.",
-    stats: [
-      { value: "18+", label: "Certified platforms" },
-      { value: "150+", label: "Certified specialists" },
-      { value: "10+", label: "Years of delivery" },
-    ],
-    features: [
-      { title: "Certified specialists", sub: "Platform-certified across every major technology" },
-      { title: "Real-world delivery", sub: "Hands-on project experience, not just certificates" },
-      { title: "Full stack coverage", sub: "Frontend, backend, data, cloud, and integration" },
-      { title: "Continuous learning", sub: "Teams stay current with every platform release" },
-    ],
-    cta: "Submit a request",
-    ctaNote: "Response within 4 hours, guaranteed",
-  },
-];
-
-function JourneySection() {
+function JourneySection({ journey }: { journey: MarketingHomePayload["journey"] }) {
   const [activeStep, setActiveStep] = useState(0);
-  const step = journeySteps[activeStep]!;
+  const steps = journey.steps;
+  const step = steps[activeStep]!;
+  const header = journey.header;
 
   return (
     <section className="bg-white py-[120px]">
@@ -1614,15 +1229,15 @@ function JourneySection() {
           <div className="text-center">
             <div className="mx-auto mb-2.5 inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
               <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
-              <p className="text-xs font-medium leading-4 text-[#666666]">The TechBubble Advantage</p>
+              <p className="text-xs font-medium leading-4 text-[#666666]">{header.pill}</p>
             </div>
             <h2 className="text-[56px] font-bold leading-[64px] tracking-[-0.005em] text-[#111111]">
-              Your journey from request
+              {header.titleLine1}
               <br />
-              to results — broken down
+              {header.titleLine2}
             </h2>
             <p className="mx-auto mt-1 max-w-[923px] text-[18px] leading-7 text-[#666666]">
-              Five steps. One trusted partner. See exactly how TechBubble turns a talent or technology request into measurable outcomes — faster and more transparently than any traditional model.
+              {header.subtitle}
             </p>
           </div>
 
@@ -1631,7 +1246,7 @@ function JourneySection() {
             {/* Left nav */}
             <div className="w-[339px] shrink-0 border-r border-[#e5e5e5] bg-white">
               <div className="pt-[48px] pb-[48px]">
-                {journeySteps.map((s, idx) => (
+                {steps.map((s, idx) => (
                   <div key={s.num}>
                     <button
                       type="button"
@@ -1656,7 +1271,7 @@ function JourneySection() {
                         <p className="text-[16px] font-bold leading-6 text-[#000000]">{s.title}</p>
                       </div>
                     </button>
-                    {idx < journeySteps.length - 1 && (
+                    {idx < steps.length - 1 && (
                       <div className="flex h-[33px] items-center pl-[40px]">
                         <div className="h-[33px] w-[1.5px] bg-[#e2e7f4]" />
                       </div>

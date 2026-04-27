@@ -1,8 +1,9 @@
-import { Router } from "express";
+import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { prisma } from "@techbubble/database";
+import { verifyCaseStudyPreviewToken } from "../lib/caseStudyPreviewToken";
 
-const router = Router();
+const router: IRouter = Router();
 
 // Validation schema for case study
 const caseStudySchema = z.object({
@@ -105,6 +106,23 @@ const caseStudySchema = z.object({
   resultStat3Label: z.string(),
   
   published: z.boolean().default(true),
+  featured: z.boolean().default(false),
+});
+
+// GET categories (public) — register before /:id so "meta" is not captured as an id
+router.get("/meta/categories", async (req, res) => {
+  try {
+    const categories = await prisma.caseStudy.findMany({
+      where: { published: true },
+      select: { category: true },
+      distinct: ["category"],
+    });
+    
+    res.json({ data: categories.map((c: { category: string }) => c.category) });
+  } catch (error) {
+    console.error("Error fetching categories:", error);
+    res.status(500).json({ error: "Failed to fetch categories" });
+  }
 });
 
 // GET all case studies (public)
@@ -122,7 +140,7 @@ router.get("/", async (req, res) => {
     const [caseStudies, total] = await Promise.all([
       prisma.caseStudy.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ featured: "desc" }, { createdAt: "desc" }],
         take: parseInt(limit as string),
         skip,
         select: {
@@ -133,6 +151,7 @@ router.get("/", async (req, res) => {
           category: true,
           clientName: true,
           featuredImage: true,
+          featured: true,
           heroStat1Value: true,
           heroStat1Label: true,
           heroStat2Value: true,
@@ -160,20 +179,25 @@ router.get("/", async (req, res) => {
   }
 });
 
-// GET single case study by slug (public)
+// GET single case study by slug (public). Optional ?preview=<signed-token> shows drafts (admin-issued).
 router.get("/slug/:slug", async (req, res) => {
   try {
     const { slug } = req.params;
-    
-    const caseStudy = await prisma.caseStudy.findUnique({
-      where: { slug, published: true },
-    });
-    
-    if (!caseStudy) {
+    const preview =
+      typeof req.query.preview === "string" && req.query.preview.length > 0
+        ? req.query.preview
+        : undefined;
+    const allowDraft = preview ? verifyCaseStudyPreviewToken(preview, slug) : false;
+
+    const row = await prisma.caseStudy.findUnique({ where: { slug } });
+    if (!row) {
       return res.status(404).json({ error: "Case study not found" });
     }
-    
-    res.json({ data: caseStudy });
+    if (!row.published && !allowDraft) {
+      return res.status(404).json({ error: "Case study not found" });
+    }
+
+    res.json({ data: row });
   } catch (error) {
     console.error("Error fetching case study:", error);
     res.status(500).json({ error: "Failed to fetch case study" });
@@ -253,22 +277,6 @@ router.delete("/:id", async (req, res) => {
   } catch (error) {
     console.error("Error deleting case study:", error);
     res.status(500).json({ error: "Failed to delete case study" });
-  }
-});
-
-// GET categories (public)
-router.get("/meta/categories", async (req, res) => {
-  try {
-    const categories = await prisma.caseStudy.findMany({
-      where: { published: true },
-      select: { category: true },
-      distinct: ["category"],
-    });
-    
-    res.json({ data: categories.map(c => c.category) });
-  } catch (error) {
-    console.error("Error fetching categories:", error);
-    res.status(500).json({ error: "Failed to fetch categories" });
   }
 });
 

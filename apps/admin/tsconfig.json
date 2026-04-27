@@ -6,7 +6,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
-      "@techbubble/ui": ["../../packages/ui/src"]
+      "@techbubble/ui": ["../../packages/ui/src"],
+      "@site-content/defaults": ["../../packages/database/src/seed/data/site-wide-content.ts"],
+      "@site-content/marketing-home": ["../../packages/database/src/seed/data/marketing-home-payload.ts"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

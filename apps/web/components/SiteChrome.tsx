@@ -1,16 +1,22 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { AnnouncementBar } from "@/components/AnnouncementBar";
+import { AnnouncementBar, type AnnouncementBarContent } from "@/components/AnnouncementBar";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
-export function SiteChrome({ children }: { children: React.ReactNode }) {
+export function SiteChrome({
+  children,
+  announcement,
+}: {
+  children: React.ReactNode;
+  announcement?: AnnouncementBarContent | null;
+}) {
   usePathname();
 
   return (
     <>
-      <AnnouncementBar />
+      <AnnouncementBar content={announcement} />
       <Header />
       <main>{children}</main>
       <Footer />

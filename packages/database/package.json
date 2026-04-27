@@ -9,15 +9,21 @@
     "dev": "tsc --watch",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "tsx src/seed.ts"
   },
+  "prisma": {
+    "seed": "tsx src/seed.ts"
+  },
   "dependencies": {
-    "@prisma/client": "^5.10.0"
+    "@prisma/client": "^5.10.0",
+    "bcryptjs": "^2.4.3"
   },
   "devDependencies": {
     "@techbubble/config": "workspace:*",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "prisma": "^5.10.0",
     "tsx": "^4.7.0",

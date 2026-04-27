@@ -1,9 +1,9 @@
-import { Router } from "express";
+import { Router, type IRouter } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
 
-const router = Router();
+const router: IRouter = Router();
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -27,14 +27,18 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    
-    if (extname && mimetype) {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowedExt = /\.(jpe?g|png|gif|webp|pdf|doc|docx)$/i.test(ext);
+    const mt = (file.mimetype || "").toLowerCase();
+    const allowedMt =
+      /^image\/(jpe?g|png|gif|webp)$/.test(mt) ||
+      mt === "application/pdf" ||
+      mt === "application/msword" ||
+      mt === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    if (allowedExt && allowedMt) {
       return cb(null, true);
     }
-    cb(new Error("Only images and documents are allowed"));
+    cb(new Error("Only images (JPEG, PNG, GIF, WebP) and documents are allowed"));
   },
 });
 

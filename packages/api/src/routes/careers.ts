@@ -1,8 +1,8 @@
-import { Router } from "express";
+import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { prisma } from "@techbubble/database";
 
-const router = Router();
+const router: IRouter = Router();
 
 const careerSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -36,6 +36,36 @@ router.post("/apply", async (req, res) => {
     }
     console.error("Error saving career application:", error);
     res.status(500).json({ error: "Failed to submit application. Please try again." });
+  }
+});
+
+// Admin: list all career applications
+router.get("/admin/applications", async (req, res) => {
+  try {
+    const applications = await prisma.careerApplication.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+    res.json({ data: applications });
+  } catch (error) {
+    console.error("Error fetching career applications:", error);
+    res.status(500).json({ error: "Failed to fetch applications" });
+  }
+});
+
+// Admin: delete application
+router.delete("/admin/applications/:id", async (req, res) => {
+  try {
+    await prisma.careerApplication.delete({
+      where: { id: req.params.id },
+    });
+    res.json({ message: "Deleted" });
+  } catch (error: unknown) {
+    const code = error && typeof error === "object" && "code" in error ? (error as { code: string }).code : "";
+    if (code === "P2025") {
+      return res.status(404).json({ error: "Not found" });
+    }
+    console.error("Error deleting career application:", error);
+    res.status(500).json({ error: "Failed to delete application" });
   }
 });
 

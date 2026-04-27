@@ -6,6 +6,8 @@ import footerLogo from "@image/techbubble_-_home_36.png";
 const companyLinks = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About Us" },
+  { href: "/services", label: "Services" },
+  { href: "/pricing", label: "Pricing" },
   { href: "/careers", label: "Careers" },
   { href: "/case-studies", label: "Case Studies" },
   { href: "/contact", label: "Contact" },
@@ -102,9 +104,15 @@ export function Footer() {
           <div className="mt-[28px] flex h-[50px] items-end justify-between border-t border-white/[0.06] pb-[4px]">
             <p className="text-[12px] font-bold leading-4 text-[#666666]">© 2026 TechBubble Pty Ltd · All Rights Reserved</p>
             <div className="flex items-center gap-5">
-              <Link href="#" className="text-[12px] font-bold leading-4 text-[#666666]">Privacy</Link>
-              <Link href="#" className="text-[12px] font-bold leading-4 text-[#666666]">Terms</Link>
-              <Link href="#" className="text-[12px] font-bold leading-4 text-[#666666]">Cookies</Link>
+              <Link href="/privacy" className="text-[12px] font-bold leading-4 text-[#666666] hover:text-white">
+                Privacy
+              </Link>
+              <Link href="/terms" className="text-[12px] font-bold leading-4 text-[#666666] hover:text-white">
+                Terms
+              </Link>
+              <Link href="/cookies" className="text-[12px] font-bold leading-4 text-[#666666] hover:text-white">
+                Cookies
+              </Link>
             </div>
           </div>
         </div>

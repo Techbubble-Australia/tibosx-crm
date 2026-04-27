@@ -2,7 +2,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import { ClientStoriesSection } from "@/components/ClientStoriesSection";
+import { getTestimonials } from "@/lib/api/public";
+import type { ClientStoryItem } from "@/components/ClientStoriesSection";
 import { RemarkableCtaSection } from "@/components/RemarkableCtaSection";
+import { fetchSiteContentPayload } from "@/lib/fetch-site-content";
+import { resolveAboutPage } from "@/lib/site-content/resolve-pages";
 import aboutUs1 from "@image/techbubble_-_about_us_1.jpg";
 import aboutUs2 from "@image/techbubble_-_about_us_2.jpg";
 import aboutUs3 from "@image/techbubble_-_about_us_3.jpg";
@@ -11,33 +15,6 @@ import aboutUs5 from "@image/techbubble_-_about_us_5.jpg";
 import aboutUs6 from "@image/techbubble_-_about_us_6.png";
 import aboutUs7 from "@image/techbubble_-_about_us_7.png";
 import aboutUs8 from "@image/techbubble_-_about_us_8.png";
-
-const missionCards = [
-  {
-    title: "Speed First",
-    text: "AI-matched specialists deployed in under 24 hours — no waiting, no ramp-up.",
-  },
-  {
-    title: "Top 1% Only",
-    text: "Every consultant passes rigorous multi-stage vetting before we put them forward.",
-  },
-  {
-    title: "Timezone Aligned",
-    text: "Resources matched to your working hours — real-time collaboration guaranteed.",
-  },
-  {
-    title: "SLA-Backed",
-    text: "Contractual guarantees, 24/7 support, and dedicated governance on every engagement.",
-  },
-  {
-    title: "AI-Infused",
-    text: "Our AI-matching engine reduces time-to-hire by 70% versus traditional models.",
-  },
-  {
-    title: "Innovation-Led",
-    text: "Continuous upskilling ensures our talent stays ahead of every platform curve.",
-  },
-];
 
 const leadershipCards = [
   { name: "Nikita T", role: "Founder & Director, Australia", image: aboutUs1 },
@@ -64,20 +41,30 @@ const managementTeam = [
   { name: "Kamal Rajput", role: "Sr. Account Manager, APAC & UK", image: aboutUs8 },
 ];
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const rawAbout = await fetchSiteContentPayload<unknown>("about_page");
+  const a = resolveAboutPage(rawAbout ?? {});
+  const testimonialRows = await getTestimonials();
+  const clientStories: ClientStoryItem[] = testimonialRows.map((t) => ({
+    quote: t.quote,
+    authorName: t.authorName,
+    authorTitle: t.authorTitle,
+    authorCompany: t.authorCompany,
+    authorInitials: t.authorInitials,
+    authorImageUrl: t.authorImageUrl || undefined,
+  }));
+
   return (
     <>
       <section className="bg-[#111111] pb-[149px] pt-[109px] text-white">
         <div className="tb-container">
           <div className="mx-auto max-w-[1136px]">
             <h1 className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px]">
-              Trusted Technology Partner
+              {a.hero.titleLine1}
               <br />
-              Not Just a Vendor
+              {a.hero.titleLine2}
             </h1>
-            <p className="mt-[4px] max-w-[890px] text-[18px] leading-7 text-[#e5e5e5]">
-              Founded by engineers, powered by AI. We connect the world&apos;s most ambitious enterprises with top 1% tech talent — fast, transparent, and measurably better.
-            </p>
+            <p className="mt-[4px] max-w-[890px] text-[18px] leading-7 text-[#e5e5e5]">{a.hero.subtitle}</p>
           </div>
         </div>
       </section>
@@ -85,12 +72,7 @@ export default function AboutPage() {
       <section className="relative z-10 -mt-[85px] bg-transparent">
         <div className="tb-container">
           <div className="mx-auto flex h-[170px] max-w-[1136px] items-center rounded-[30px] bg-white px-8 shadow-[0_24px_48px_-26px_rgba(0,0,0,0.38)]">
-            {[
-              { n: "150+", l: "Expert Technicians", labelClass: "text-[12px] font-medium leading-4" },
-              { n: "50+", l: "Enterprise Clients", labelClass: "text-[12px] font-medium leading-4" },
-              { n: "24/7", l: "Support Available", labelClass: "text-[12px] font-medium leading-4" },
-              { n: "98%", l: "Client Satisfaction Rate", labelClass: "text-[14px] font-normal leading-5 tracking-[0.035px]" },
-            ].map((stat, idx) => (
+            {a.statsStrip.map((stat, idx) => (
               <div key={stat.l} className="flex h-[104px] flex-1 items-center justify-center">
                 <div className="w-[250px] text-center">
                   <p className="text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">{stat.n}</p>
@@ -109,14 +91,10 @@ export default function AboutPage() {
             <div className="pt-1">
               <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
                 <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
-                <p className="text-[12px] font-medium leading-4 text-[#666666]">Our Mission</p>
+                <p className="text-[12px] font-medium leading-4 text-[#666666]">{a.mission.eyebrow}</p>
               </div>
-              <h2 className="mt-4 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">
-                Empowering enterprises with world-class technology talent
-              </h2>
-              <p className="mt-2 max-w-[532px] whitespace-pre-line text-[18px] leading-7 text-[#666666]">
-                {"At TechBubble, we provide tailored AI-powered IT solutions and digital strategies to help Australian and global enterprises thrive. Our focus is on efficiency, security, and innovation.\nPartner with TechBubble to unlock tailored, innovative solutions that drive success and position your business for long-term growth."}
-              </p>
+              <h2 className="mt-4 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">{a.mission.title}</h2>
+              <p className="mt-2 max-w-[532px] whitespace-pre-line text-[18px] leading-7 text-[#666666]">{a.mission.body}</p>
               <Link
                 href="/services"
                 className="mt-4 inline-flex h-[52px] w-[182px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold text-white"
@@ -128,7 +106,7 @@ export default function AboutPage() {
 
             <div className="relative -mt-[54px] h-[656px]">
               <div className="mt-8 h-[602px] overflow-y-auto pr-2 [scrollbar-width:thin] [scrollbar-color:#c1c1c1_#f1f1f1] [&::-webkit-scrollbar]:w-[7px] [&::-webkit-scrollbar-track]:bg-[#f1f1f1] [&::-webkit-scrollbar-thumb]:bg-[#c1c1c1] space-y-4">
-                {missionCards.map((card) => (
+                {a.missionCards.map((card) => (
                   <div key={card.title} className="h-[150px] rounded-[24px] border border-[#e5e5e5] bg-white px-4 py-[15px]">
                     <div className="flex items-start gap-5">
                       <span className="mt-9 flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] border border-[#e5e5e5] bg-[#f7f7f7]">
@@ -352,7 +330,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <ClientStoriesSection />
+      <ClientStoriesSection items={clientStories} />
 
       <RemarkableCtaSection
         title="Ready to build something remarkable?"

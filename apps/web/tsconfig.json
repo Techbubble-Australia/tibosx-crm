@@ -8,7 +8,8 @@
       "@icons/*": ["./src/icons/*"],
       "@image/*": ["./src/image/*"],
       "@/*": ["./*"],
-      "@techbubble/ui": ["../../packages/ui/src"]
+      "@techbubble/ui": ["../../packages/ui/src"],
+      "@site-content/defaults": ["../../packages/database/src/seed/data/site-wide-content.ts"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "**/*.d.ts", ".next/types/**/*.ts"],

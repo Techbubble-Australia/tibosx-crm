@@ -2,131 +2,22 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, ArrowRight, Zap, Workflow, Share2, FileStack, Braces, Handshake } from "lucide-react";
 import { notFound } from "next/navigation";
-import caseStudyHeaderImage from "@/src/image/frame_1_2.jpg";
+import { getCaseStudyBySlug } from "@/lib/api/public";
+import { mapCaseStudyApiToPageModel, type CaseStudyPageModel } from "@/lib/case-study-mapper";
 
-// This would normally fetch from the database
-async function getCaseStudy(slug: string) {
-  // Simulated data - replace with actual DB fetch
-  const caseStudies: Record<string, any> = {
-    "university-of-sydney-rapid-it-talent": {
-      slug: "university-of-sydney-rapid-it-talent",
-      title: "University of Sydney — Rapid IT Talent Deployment Across CTO Office",
-      subtitle: "How TechBubble rebuilt NextCare's fragmented Salesforce environment from the ground up — delivering regulatory compliance, 60% faster reporting, and a care worker-first UX within a non-negotiable deadline.",
-      category: "ServiceNow",
-      heroStats: [
-        { value: "SERVICENOW", label: "CATEGORY" },
-        { value: "40%", label: "EFFICIENCY GAINS" },
-        { value: "3", label: "DOMAINS DELIVERED" },
-      ],
-      sidebar: [
-        { label: "Background", href: "#background" },
-        { label: "The Challenge", href: "#challenge" },
-        { label: "Our Solution", href: "#solution" },
-        { label: "Technology Stack", href: "#tech-stack" },
-        { label: "Results", href: "#results" },
-        { label: "Key Takeaways", href: "#takeaways" },
-      ],
-      background: {
-        title: "A Growing Organisation Held Back by Legacy Systems",
-        content: `NextCare Aged Services operates multiple residential care facilities across Australia, providing essential support to elderly residents and their families. As the organisation grew through new facility acquisitions and expanded service offerings, their technology stack — anchored by an aging, heavily customised Salesforce implementation — increasingly became a liability rather than an enabler.
-
-Despite holding significant operational data across sales, intake, and service functions, the existing Salesforce org had been customised piecemeal over several years. The result was a fragile, poorly documented environment that was slow to use, difficult to maintain, and — critically — unable to produce the compliance reports required by the NDIS (National Disability Insurance Scheme) and the Aged Care Quality and Safety Commission.
-
-With a scheduled compliance audit on the horizon and a growing roster of facilities requiring unified visibility, NextCare's leadership made the decision to re-architect entirely — and called on TechBubble to lead the engagement.`,
-      },
-      challenge: {
-        title: "Four Interconnected Problems to Solve Simultaneously",
-        content: "The engagement wasn't a simple configuration project. It required a complete rethinking of NextCare's Salesforce data architecture, user experience, compliance posture, and operational workflow — all while keeping the existing system running and avoiding disruption to front-line care staff.",
-        stats: [
-          { value: "6+", label: "Years of legacy customisations stacked on an unstable data model" },
-          { value: "0", label: "Real-time compliance reports available before the project" },
-          { value: "12+", label: "Weeks until the NDIS compliance audit deadline" },
-        ],
-        problems: [
-          {
-            title: "Fragmented, unmaintainable data architecture",
-            content: "Six years of ad-hoc customisations had created a labyrinthine data model with duplicated objects, broken validation rules, and no documentation. Every change risked breaking something else."
-          },
-          {
-            title: "No compliance-ready reporting",
-            content: "NDIS and Aged Care Quality Commission reporting was being generated manually from Salesforce exports into Excel — a process that took 3-4 days per report cycle, introduced human error, and would not satisfy auditors."
-          },
-          {
-            title: "Care workers refusing to use the system",
-            content: "The Salesforce UI had been designed for sales teams, not care workers. Navigation was counterintuitive, screens were cluttered with irrelevant fields, and mobile access was non-functional — leading to widespread workarounds and incomplete data entry."
-          },
-          {
-            title: "Non-negotiable regulatory deadline",
-            content: "A compliance audit was scheduled within 12 weeks of project kickoff. Any delays would expose NextCare to regulatory penalties and reputational risk with both residents and referral partners."
-          },
-        ],
-      },
-      solution: {
-        title: "A Four-Phase Rebuild Built Around People First",
-        content: `TechBubble's approach began not with code, but with people. Before any technical work commenced, the team ran discovery workshops with care workers, facility managers, and executives at NextCare — building a shared understanding of how the organisation actually operated day-to-day, rather than how the system had been configured to assume it would.
-
-This grounding shaped every design decision that followed. The re-architecture was then executed across four tightly sequenced phases, with compliance reporting as the first deliverable to de-risk the regulatory deadline from the outset.`,
-        phases: [
-          {
-            number: "1",
-            title: "Discovery & Architecture Design",
-            duration: "Weeks 1-2",
-            content: "Comprehensive technical audit of the existing Salesforce org, cataloguing all customisations, data quality issues, and integration dependencies. Stakeholder workshops with care workers, managers, and compliance officers. A full re-architecture blueprint was produced and signed off before any development commenced.",
-            tags: ["Salesforce Org Audit", "Stakeholder Workshops", "Data Model Design", "Architecture Blueprint"],
-          },
-          {
-            number: "2",
-            title: "Compliance Reporting Layer",
-            duration: "Weeks 3-7",
-            content: "NDIS and Aged Care Quality Commission reporting built first — as a standalone priority — to meet the regulatory deadline. Salesforce Reports and Dashboards were configured with Tableau CRM to provide real-time compliance views, replacing the manual Excel process entirely. Audit documentation prepared in parallel.",
-            tags: ["Salesforce Reports", "Tableau CRM", "NDIS Compliance", "Audit Documentation"],
-          },
-          {
-            number: "3",
-            title: "Data Model Rebuild & Migration",
-            duration: "Weeks 8-14",
-            content: "The core Salesforce data model was rebuilt from scratch — removing six years of technical debt, merging duplicate objects, and establishing clean record types for residents, facilities, referrals, and care plans. A full data quality and deduplication exercise migrated 100% of historical records into the new model with no data loss.",
-            tags: ["Data Model Re-architecture", "Deduplication", "Data Cleansing"],
-          },
-        ],
-      },
-      techStack: {
-        title: "Purpose-Selected Tools for the Job",
-        content: "Every platform and tool used in this engagement was selected to serve a specific function — nothing was added for its own sake. The stack prioritises maintainability by NextCare's internal team after project completion.",
-        technologies: [
-          { name: "Salesforce Service Cloud", description: "Core case management, care tracking, and resident records", icon: "S" },
-          { name: "Salesforce Sales Cloud", description: "Referral and intake pipeline management across facilities", icon: "S" },
-          { name: "Tableau CRM", description: "Real-time NDIS and compliance dashboards for executives and auditors", icon: "T" },
-          { name: "Salesforce Flow", description: "All automation — replacing Apex triggers and legacy Process Builder entirely", icon: "F" },
-          { name: "Lightning Web Components", description: "Custom UI components for care plan workflows and mobile ward views", icon: "L" },
-          { name: "Data Loader + Apex", description: "Bulk data migration, deduplication logic, and historical record cleansing", icon: "D" },
-        ],
-      },
-      testimonial: {
-        quote: "Working with TechBubble has been outstanding from start to finish. Their technical expertise, attention to detail, and ability to meet tight deadlines were truly remarkable. The code quality, the design, and the overall user experience reflect their genuine commitment to excellence.",
-        author: {
-          name: "Steven Fan",
-          title: "Head of Technology, Information Technology Services",
-          company: "NextCare Aged Services",
-          initials: "SF",
-        },
-      },
-      cta: {
-        title: "Ready to achieve results like Toyota?",
-        subtitle: "Our ServiceNow team can mobilise within 24 hours. Tell us your challenge and we'll respond with a tailored approach within 4 hours.",
-      },
-    },
-  };
-
-  return caseStudies[slug] || null;
-}
-
-export default async function CaseStudyPage({ params }: { params: { slug: string } }) {
-  const caseStudy = await getCaseStudy(params.slug);
-
-  if (!caseStudy) {
+export default async function CaseStudyPage({
+  params,
+  searchParams,
+}: {
+  params: { slug: string };
+  searchParams: Record<string, string | string[] | undefined>;
+}) {
+  const preview = typeof searchParams.preview === "string" ? searchParams.preview : undefined;
+  const raw = await getCaseStudyBySlug(params.slug, preview);
+  if (!raw) {
     notFound();
   }
+  const caseStudy: CaseStudyPageModel = mapCaseStudyApiToPageModel(raw);
 
   return (
     <>
@@ -149,7 +40,7 @@ export default async function CaseStudyPage({ params }: { params: { slug: string
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-8 pt-8 border-t border-gray-800">
-            {caseStudy.heroStats.map((stat: any, index: number) => (
+            {caseStudy.heroStats.map((stat, index: number) => (
               <div key={index}>
                 <div className="text-2xl md:text-3xl font-bold">{stat.value}</div>
                 <div className="text-sm text-gray-500">{stat.label}</div>
@@ -165,8 +56,8 @@ export default async function CaseStudyPage({ params }: { params: { slug: string
           <div className="mx-auto max-w-[1136px]">
             <div className="relative h-[307px] overflow-hidden rounded-[8px]">
               <Image
-                src={caseStudyHeaderImage}
-                alt="University of Sydney campus"
+                src={caseStudy.featuredImage}
+                alt=""
                 fill
                 className="object-cover"
                 sizes="(max-width: 1200px) 100vw, 1136px"

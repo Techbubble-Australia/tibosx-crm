@@ -2,11 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FileText, Settings, LogOut } from "lucide-react";
+import { FileText, LogOut, Briefcase, Users, MessageSquare, HelpCircle, Mail, UserCheck, FileStack } from "lucide-react";
 
 const navItems = [
+  { href: "/pages", label: "Site pages", icon: FileStack },
   { href: "/case-studies", label: "Case Studies", icon: FileText },
+  { href: "/jobs", label: "Job Listings", icon: Briefcase },
+  { href: "/team", label: "Team Members", icon: Users },
+  { href: "/testimonials", label: "Testimonials", icon: MessageSquare },
+  { href: "/faqs", label: "FAQs", icon: HelpCircle },
+  { href: "/career-applications", label: "Career Applications", icon: UserCheck },
+  { href: "/contact-submissions", label: "Contact Submissions", icon: Mail },
 ];
+
+function headerTitle(pathname: string): string {
+  const hit = navItems.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
+  return hit?.label ?? "Admin";
+}
 
 export default function DashboardLayout({
   children,
@@ -55,9 +67,11 @@ export default function DashboardLayout({
 
         <div className="p-4 border-t border-gray-800">
           <button
+            type="button"
             onClick={() => {
-              localStorage.removeItem("token");
-              window.location.href = "/login";
+              void fetch("/api/auth/logout", { method: "POST", credentials: "include" }).finally(() => {
+                window.location.href = "/login";
+              });
             }}
             className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:text-white transition-colors w-full"
           >
@@ -70,7 +84,7 @@ export default function DashboardLayout({
       {/* Main Content */}
       <main className="flex-1 bg-gray-50">
         <header className="bg-white border-b border-gray-200 px-8 py-4">
-          <h1 className="text-xl font-semibold">Case Studies Management</h1>
+          <h1 className="text-xl font-semibold">{headerTitle(pathname)}</h1>
         </header>
         <div className="p-8">{children}</div>
       </main>

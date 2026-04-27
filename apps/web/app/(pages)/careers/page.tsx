@@ -1,43 +1,35 @@
 import Link from "next/link";
-import { ArrowRight, Check, ChevronDown, Laptop, TrendingUp, Users, Lightbulb, Globe, Clock, Award, Mail, Phone } from "lucide-react";
+import { Fragment } from "react";
+import type { LucideIcon } from "lucide-react";
+import { ArrowRight, Check, Laptop, TrendingUp, Users, Lightbulb, Globe, Clock, Award, Mail } from "lucide-react";
+import { getPublishedJobs } from "@/lib/api/public";
+import { fetchSiteContentPayload } from "@/lib/fetch-site-content";
+import { resolveCareersPage } from "@/lib/site-content/resolve-pages";
+import { CareersPositionsSection } from "@/components/careers/CareersPositionsSection";
 
-const positions = [
-  { title: "Senior ServiceNow Developer", location: "Australia", type: "Full-time", workMode: "Remote", flag: "🇦🇺" },
-  { title: "Salesforce Solutions Architect", location: "USA", type: "Contract", workMode: "Remote", flag: "🇺🇸" },
-  { title: "AI / ML Engineer", location: "India", type: "Full-time", workMode: "Hybrid", flag: "🇮🇳" },
-  { title: "MuleSoft Integration Specialist", location: "Philippines", type: "Contract", workMode: "Remote", flag: "🇵🇭" },
-];
+const CAREERS_ICONS: Record<string, LucideIcon> = {
+  Laptop,
+  TrendingUp,
+  Users,
+  Lightbulb,
+  Globe,
+  Clock,
+  Award,
+};
 
-const benefits = [
-  "Competitive salary and benefits package",
-  "Work with cutting-edge technologies",
-  "Career growth and learning opportunities",
-  "Flexible work arrangements",
-  "Collaborative and inclusive culture",
-];
+export default async function CareersPage() {
+  const rawCareers = await fetchSiteContentPayload<unknown>("careers_page");
+  const c = resolveCareersPage(rawCareers ?? {});
+  const jobs = await getPublishedJobs();
 
-const cultureCards = [
-  { title: "Collaboration First", description: "Cross-functional teams working across geographies, sharing knowledge and lifting each other up.", Icon: Users },
-  { title: "Growth Without Limits", description: "Continuous learning, certification support, and a clear path to leadership for every team member.", Icon: TrendingUp },
-  { title: "Innovation Culture", description: "Your ideas get heard. We actively encourage experimentation, new approaches, and creative problem-solving.", Icon: Lightbulb },
-  { title: "Global Exposure", description: "Work with enterprise clients across Australia, USA, UK, India, Philippines, and Middle East.", Icon: Globe },
-  { title: "Work-Life Balance", description: "Flexible arrangements, remote-friendly roles, and a management team that genuinely respects your time.", Icon: Clock },
-  { title: "Recognition & Rewards", description: "Performance bonuses, spot awards, and a culture that celebrates wins — big and small.", Icon: Award },
-];
-
-export default function CareersPage() {
   return (
     <>
       {/* Hero — node 205:3319 */}
       <section className="bg-[#111111] pb-[149px] pt-[109px] text-white">
         <div className="tb-container">
           <div className="mx-auto max-w-[1136px]">
-            <h1 className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-white">
-              Build the Future of Enterprise Technology With Us
-            </h1>
-            <p className="mt-1 max-w-[968px] text-[18px] leading-7 text-[#e5e5e5]">
-              At TechBubble, we celebrate creativity, collaboration, and continuous growth. Whether you&apos;re a seasoned professional or just starting out — your ideas matter here.
-            </p>
+            <h1 className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-white">{c.hero.title}</h1>
+            <p className="mt-1 max-w-[968px] text-[18px] leading-7 text-[#e5e5e5]">{c.hero.subtitle}</p>
           </div>
         </div>
       </section>
@@ -46,33 +38,40 @@ export default function CareersPage() {
       <section className="relative z-10 -mt-[85px] bg-transparent pb-[120px]">
         <div className="tb-container">
           <div className="mx-auto flex h-[170px] max-w-[1136px] items-center rounded-[30px] bg-white px-8 shadow-[0_24px_48px_-26px_rgba(0,0,0,0.38)]">
-            <div className="flex h-[100px] items-center">
-              <div className="w-[250px] text-center">
-                <p className="text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">6</p>
-                <p className="text-[12px] font-medium leading-4 text-[#666666]">Global Offices</p>
-              </div>
-              <span className="h-[78px] w-px bg-[#e5e5e5]" aria-hidden />
-            </div>
-            <div className="flex h-[100px] items-center">
-              <div className="w-[250px] text-center">
-                <p className="text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">50+</p>
-                <p className="text-[12px] font-medium leading-4 text-[#666666]">Team Members</p>
-              </div>
-              <span className="h-[78px] w-px bg-[#e5e5e5]" aria-hidden />
-            </div>
-            <div className="flex h-[100px] items-center">
-              <div className="flex w-[250px] flex-col items-center justify-center text-center">
-                <Laptop className="h-[56px] w-[56px] text-[#111111] stroke-[1.5]" aria-hidden />
-                <p className="mt-1 text-[12px] font-medium leading-4 text-[#666666]">Remote-Friendly</p>
-              </div>
-              <span className="h-[78px] w-px bg-[#e5e5e5]" aria-hidden />
-            </div>
-            <div className="flex h-[100px] items-center">
-              <div className="flex w-[250px] flex-col items-center justify-center text-center">
-                <TrendingUp className="h-[56px] w-[56px] text-[#111111] stroke-[1.5]" aria-hidden />
-                <p className="mt-1 text-[14px] font-normal leading-5 tracking-[0.035px] text-[#666666]">Fast Growth</p>
-              </div>
-            </div>
+            {c.statsStrip.map((stat, idx) => {
+              const Icon =
+                stat.kind === "icon" && typeof stat.icon === "string"
+                  ? (CAREERS_ICONS[stat.icon] ?? Laptop)
+                  : null;
+              return (
+                <Fragment key={`${stat.kind}-${stat.label}-${idx}`}>
+                  <div className="flex h-[100px] items-center">
+                    <div
+                      className={
+                        stat.kind === "icon"
+                          ? "flex w-[250px] flex-col items-center justify-center text-center"
+                          : "w-[250px] text-center"
+                      }
+                    >
+                      {stat.kind === "number" ? (
+                        <>
+                          <p className="text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">{stat.value}</p>
+                          <p className="text-[12px] font-medium leading-4 text-[#666666]">{stat.label}</p>
+                        </>
+                      ) : (
+                        Icon && (
+                          <>
+                            <Icon className="h-[56px] w-[56px] text-[#111111] stroke-[1.5]" aria-hidden />
+                            <p className="mt-1 text-[12px] font-medium leading-4 text-[#666666]">{stat.label}</p>
+                          </>
+                        )
+                      )}
+                    </div>
+                  </div>
+                  {idx < c.statsStrip.length - 1 ? <span className="h-[78px] w-px bg-[#e5e5e5]" aria-hidden /> : null}
+                </Fragment>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -83,95 +82,46 @@ export default function CareersPage() {
           <div className="mx-auto max-w-[1136px]">
             <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
               <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
-              <p className="text-[12px] font-medium leading-4 text-[#666666]">Life at TechBubble</p>
+              <p className="text-[12px] font-medium leading-4 text-[#666666]">{c.cultureSection.eyebrow}</p>
             </div>
-            <h2 className="mt-2 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">
-              Why People Love Working Here
-            </h2>
-            <p className="mt-1 max-w-[898px] text-[18px] leading-7 text-[#666666]">
-              We&apos;ve built a culture where talented people do the best work of their careers — and have fun doing it.
-            </p>
+            <h2 className="mt-2 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">{c.cultureSection.title}</h2>
+            <p className="mt-1 max-w-[898px] text-[18px] leading-7 text-[#666666]">{c.cultureSection.subtitle}</p>
             <div className="mt-8 grid grid-cols-3 gap-4">
-              {cultureCards.map((item, index) => (
-                <div key={index} className="rounded-[15px] border border-[#e5e5e5] bg-[#f7f7f7] px-[22px] pb-6 pt-8">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-[14px] border border-[#e5e5e5] bg-white">
-                    <item.Icon className="h-6 w-6 text-[#111111] stroke-[1.5]" aria-hidden />
+              {c.cultureCards.map((item, index) => {
+                const Icon =
+                  typeof item.icon === "string" ? (CAREERS_ICONS[item.icon] ?? Users) : Users;
+                return (
+                  <div key={`${item.title}-${index}`} className="rounded-[15px] border border-[#e5e5e5] bg-[#f7f7f7] px-[22px] pb-6 pt-8">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-[14px] border border-[#e5e5e5] bg-white">
+                      <Icon className="h-6 w-6 text-[#111111] stroke-[1.5]" aria-hidden />
+                    </div>
+                    <div className="mt-4">
+                      <h3 className="text-[28px] font-bold leading-[36px] tracking-[-0.07px] text-[#06091a]">{item.title}</h3>
+                      <p className="mt-1 text-[16px] leading-6 text-[#666666]">{item.description}</p>
+                    </div>
                   </div>
-                  <div className="mt-4">
-                    <h3 className="text-[28px] font-bold leading-[36px] tracking-[-0.07px] text-[#06091a]">{item.title}</h3>
-                    <p className="mt-1 text-[16px] leading-6 text-[#666666]">{item.description}</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
       </section>
 
-      {/* Open Positions — node 205:3029 */}
+      {/* Open Positions — API-driven list + filters */}
       <section className="bg-[#e5e5e5] py-[120px]">
         <div className="tb-container">
           <div className="mx-auto max-w-[1136px]">
-            <div className="mb-8">
-              <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                <p className="text-[12px] font-medium leading-4 text-[#111111]">Open Positions</p>
-              </div>
-              <div className="mt-2 flex items-end justify-between">
-                <div>
-                  <h2 className="text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">Current Opportunities</h2>
-                  <p className="mt-1 text-[18px] leading-7 text-[#666666]">Find your perfect role and start your journey with us.</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-4 pb-1">
-                  <div className="relative">
-                    <select className="h-[51px] appearance-none rounded-[18px] border border-[#e5e5e5] bg-white pl-4 pr-10 text-[14px] font-semibold text-[#666666]">
-                      <option>All Locations</option>
-                      <option>Australia</option>
-                      <option>USA</option>
-                      <option>India</option>
-                      <option>Philippines</option>
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#666666]" aria-hidden />
-                  </div>
-                  <div className="relative">
-                    <select className="h-[51px] appearance-none rounded-[18px] border border-[#e5e5e5] bg-white pl-4 pr-10 text-[14px] font-semibold text-[#666666]">
-                      <option>All Departments</option>
-                      <option>Engineering</option>
-                      <option>Consulting</option>
-                      <option>Operations</option>
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#666666]" aria-hidden />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-4">
-              {positions.map((position, index) => (
-                <div
-                  key={index}
-                  className="flex h-[78px] items-center justify-between rounded-[24px] border border-[#e5e5e5] bg-white px-6"
-                >
-                  <div>
-                    <p className="text-[16px] font-bold leading-6 text-[#111111]">{position.title}</p>
-                    <p className="text-[14px] leading-5 tracking-[0.035px] text-[#7a7f8e]">
-                      {position.flag} {position.location} · {position.type} · {position.workMode}
-                    </p>
-                  </div>
-                  <ArrowRight className="h-[18px] w-[18px] shrink-0 stroke-[1.5] text-[#111111]" aria-hidden />
-                </div>
-              ))}
-            </div>
-
-            <p className="mt-14 text-center text-[16px] font-bold leading-6 text-[#666666]">
-              Don&apos;t see a role that fits? We&apos;re always open to exceptional talent.
-            </p>
+            <CareersPositionsSection jobs={jobs} />
           </div>
         </div>
       </section>
 
       {/* Application Form — node 205:3074 */}
-      <section className="relative overflow-hidden py-[120px] text-white" style={{ background: "linear-gradient(160deg, #000000 0%, #202020 55%, #101112 100%)" }}>
+      <section
+        id="apply"
+        className="relative overflow-hidden py-[120px] text-white scroll-mt-24"
+        style={{ background: "linear-gradient(160deg, #000000 0%, #202020 55%, #101112 100%)" }}
+      >
         <div className="pointer-events-none absolute -left-[120px] bottom-[-120px] h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle,rgba(76,76,76,0.12)_0%,rgba(56,56,56,0)_65%)]" />
         <div className="pointer-events-none absolute -right-[120px] top-[-100px] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle,rgba(127,127,127,0.1)_0%,rgba(142,142,142,0)_65%)]" />
 
@@ -189,7 +139,7 @@ export default function CareersPage() {
               </p>
 
               <div className="mt-8 space-y-[10px]">
-                {benefits.map((item) => (
+                {c.benefits.map((item) => (
                   <div key={item} className="flex items-center gap-[10px]">
                     <span className="inline-flex h-5 w-5 items-center justify-center rounded-[10px] bg-white">
                       <Check className="h-[10px] w-[10px] text-[#111111]" strokeWidth={3} />

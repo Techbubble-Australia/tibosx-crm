@@ -1,110 +1,31 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Zap, Workflow, Share2, FileStack, Braces, Handshake } from "lucide-react";
-import caseStudyFeaturedImage from "@/src/image/frame_1_2.jpg";
 import { ClientStoriesSection } from "@/components/ClientStoriesSection";
+import { getPublishedCaseStudies, getTestimonials } from "@/lib/api/public";
+import { apiRowToListCard, type CaseStudyListCard } from "@/lib/case-study-mapper";
+import type { ClientStoryItem } from "@/components/ClientStoriesSection";
 
 const categories = ["All", "ServiceNow", "Salesforce", "MuleSoft", "SharePoint", "Staffing"];
 
-const caseStudies = [
-  {
-    slug: "university-of-sydney-rapid-it-talent",
-    category: "ServiceNow",
-    title: "University of Sydney — Rapid IT Talent Deployment Across CTO Office",
-    description: "How TechBubble rebuilt NextCare's fragmented Salesforce environment from the ground up — delivering regulatory compliance, 60% faster reporting, and a care worker-first UX within a non-negotiable deadline.",
-    image: "/images/case-studies/university-sydney.jpg",
-    stat1: { value: "40%", label: "Efficiency gains" },
-    stat2: { value: "3", label: "Domains delivered" },
-    date: "Wednesday, 9 April 2025",
-    featured: true,
-    sidebar: [
-      { label: "Background", href: "#background" },
-      { label: "The Challenge", href: "#challenge" },
-      { label: "Our Solution", href: "#solution" },
-      { label: "Technology Stack", href: "#tech-stack" },
-      { label: "Results", href: "#results" },
-      { label: "Key Takeaways", href: "#takeaways" },
-    ],
-  },
-  {
-    slug: "toyota-usa-servicenow",
-    category: "ServiceNow",
-    title: "Toyota USA — Enterprise ServiceNow Implementation",
-    description: "Toyota USA required a ServiceNow partner who could combine deep technical expertise with the agility to handle a complex, multi-domain rollout. TechBubble delivered a comprehensive implementation covering ITSM, CSM, and custom workflows — with post-launch support that ensured zero business disruption.",
-    image: "/images/case-studies/toyota.jpg",
-    stat1: { value: "40%", label: "Efficiency gains" },
-    stat2: { value: "3", label: "Domains delivered" },
-    date: "Wednesday, 9 April 2025",
-    featured: false,
-  },
-  {
-    slug: "nextcare-salesforce",
-    category: "Salesforce",
-    title: "NextCare Aged Services — Salesforce UX Overhaul",
-    description: "NextCare needed a complete re-architecture of their Salesforce environment to support growing operational complexity across multiple care facilities. TechBubble rebuilt their data model, redesigned user-facing flows, and delivered a custom reporting layer — meeting tight regulatory deadlines.",
-    image: "/images/case-studies/nextcare.jpg",
-    stat1: { value: "60%", label: "Faster reporting" },
-    stat2: { value: "5 star", label: "Client rating" },
-    date: "Wednesday, 9 April 2025",
-    featured: false,
-  },
-  {
-    slug: "brainpower-offshore",
-    category: "Staffing",
-    title: "BrainPower LLC — Offshore Talent Program at Scale",
-    description: "Skeptical of offshore models, BrainPower LLC partnered with TechBubble to pilot an offshore staffing program across five concurrent client engagements. TechBubble's governance model and timezone-aligned teams removed every hesitation — delivering consistent quality across all projects.",
-    image: "/images/case-studies/brainpower.jpg",
-    stat1: { value: "5", label: "Clients served" },
-    stat2: { value: "35%", label: "Cost reduction" },
-    date: "Wednesday, 9 April 2025",
-    featured: false,
-  },
-  {
-    slug: "nidi-tech-salesforce",
-    category: "Salesforce",
-    title: "Nidi Tech Solutions — Salesforce Process Transformation",
-    description: "Nidi Tech required a highly configurable Salesforce solution aligned to complex business logic across their sales and service operations. TechBubble delivered an end-to-end implementation that significantly improved operational efficiency and customer satisfaction scores within the first quarter post-launch.",
-    image: "/images/case-studies/nidi.jpg",
-    stat1: { value: "45%", label: "Op. efficiency uplift" },
-    stat2: { value: "Q1", label: "ROI realised in" },
-    date: "Wednesday, 9 April 2025",
-    featured: false,
-  },
-];
+export default async function CaseStudiesPage() {
+  const [rows, testimonialRows] = await Promise.all([getPublishedCaseStudies(50), getTestimonials()]);
 
-const practices = [
-  {
-    icon: <Zap className="w-5 h-5" />,
-    title: "ServiceNow",
-    description: "Cross-functional teams working across geographies, sharing knowledge and lifting each other up.",
-  },
-  {
-    icon: <Zap className="w-5 h-5" />,
-    title: "Salesforce",
-    description: "Comprehensive implementation across Sales, Service, Marketing, Commerce, Health & Education Cloud — plus Omnistudio and Vlocity.",
-  },
-  {
-    icon: <Zap className="w-5 h-5" />,
-    title: "MuleSoft",
-    description: "Expert API-led integration services covering Anypoint Platform, API management, cloud-based solutions, and B2B integrations.",
-  },
-  {
-    icon: <Zap className="w-5 h-5" />,
-    title: "SharePoint",
-    description: "SharePoint Online, Server & Power Platform integrations — collaboration, document management, and workflow automation.",
-  },
-  {
-    icon: <Zap className="w-5 h-5" />,
-    title: "Custom & AI Apps",
-    description: "Java, D365, React, Mobile (iOS/Android), AI/ML, Python — custom solutions built to your exact requirements.",
-  },
-];
+  const caseStudies: CaseStudyListCard[] = rows.map(apiRowToListCard);
 
-export default function CaseStudiesPage() {
-  const featuredStudy = caseStudies.find(s => s.featured);
-  const regularStudies = caseStudies.filter(s => !s.featured);
-  const topRightStudy = regularStudies[0];
-  const lowerStudies = regularStudies.slice(1, 4);
+  const featuredStudy = caseStudies.find((s) => s.featured) ?? caseStudies[0];
+  const rest = featuredStudy ? caseStudies.filter((s) => s.slug !== featuredStudy.slug) : [];
+  const topRightStudy = rest[0];
+  const lowerStudies = rest.slice(1, 4);
+
+  const clientStories: ClientStoryItem[] = testimonialRows.map((t) => ({
+    quote: t.quote,
+    authorName: t.authorName,
+    authorTitle: t.authorTitle,
+    authorCompany: t.authorCompany,
+    authorInitials: t.authorInitials,
+    authorImageUrl: t.authorImageUrl || undefined,
+  }));
 
   return (
     <>
@@ -180,9 +101,25 @@ export default function CaseStudiesPage() {
               ))}
             </div>
 
-            {featuredStudy && topRightStudy ? (
+            {caseStudies.length === 0 ? (
+              <div className="mt-12 rounded-[24px] border border-dashed border-[#e5e5e5] bg-[#fafafa] px-8 py-16 text-center">
+                <p className="text-[18px] font-semibold text-[#111111]">No published case studies yet</p>
+                <p className="mt-2 text-[16px] leading-6 text-[#666666]">
+                  Content comes from the API (<code className="rounded bg-[#eee] px-1.5 py-0.5 text-sm">GET /api/case-studies</code>). Publish case
+                  studies in the admin app and ensure <code className="rounded bg-[#eee] px-1.5 py-0.5 text-sm">API_URL</code> is set for this site.
+                </p>
+                <Link
+                  href="/contact"
+                  className="mt-6 inline-flex h-11 items-center justify-center rounded-full bg-[#111111] px-6 text-[14px] font-semibold text-white"
+                >
+                  Talk to us
+                </Link>
+              </div>
+            ) : featuredStudy ? (
               <div className="mt-8">
-                <div className="grid grid-cols-[746px_377px] gap-4">
+                <div
+                  className={`grid gap-4 ${topRightStudy ? "grid-cols-[746px_377px]" : "grid-cols-1 max-w-[746px]"}`}
+                >
                   <Link
                     href={`/case-studies/${featuredStudy.slug}`}
                     className="group flex h-[547px] overflow-hidden rounded-[24px] border border-[#e5e5e5] bg-white"
@@ -190,18 +127,18 @@ export default function CaseStudiesPage() {
                     <div className="flex h-full w-[518px] flex-col px-[33px] pb-6 pt-[26px]">
                       <div className="flex w-[451px] items-center justify-between">
                         <div className="inline-flex h-7 items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
-                          SERVICENOW
+                          {featuredStudy.category.toUpperCase()}
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                          <span className="text-[12px] font-medium leading-4 text-[#666666]">Wednesday, 8 April 2026</span>
+                          <span className="text-[12px] font-medium leading-4 text-[#666666]">{featuredStudy.date}</span>
                         </div>
                       </div>
 
                       <div className="relative mt-[14px] h-[150px] w-[451px] overflow-hidden rounded-[8px]">
                         <Image
-                          src={caseStudyFeaturedImage}
-                          alt="University of Sydney campus"
+                          src={featuredStudy.image}
+                          alt=""
                           fill
                           className="object-cover object-center"
                           sizes="(max-width: 1200px) 100vw, 451px"
@@ -209,20 +146,20 @@ export default function CaseStudiesPage() {
                       </div>
 
                       <h3 className="mt-[18px] w-[446px] line-clamp-3 text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">
-                        University of Sydney — Rapid IT Talent Deployment Across CTO Office
+                        {featuredStudy.title}
                       </h3>
                       <p className="mt-[6px] w-[446px] line-clamp-5 text-[16px] leading-6 text-[#666666]">
-                        The University&apos;s CTO Office needed specialized ServiceNow and SharePoint professionals on short notice to support a critical digital transformation initiative. TechBubble leveraged its AI-matching process to deliver pre-vetted, senior-level engineers within days — fully aligned to the University&apos;s working hours and internal delivery standards.
+                        {featuredStudy.description}
                       </p>
 
                       <div className="mt-auto flex items-end justify-between border-t border-[#e5e5e5] pt-[21px]">
                         <div>
-                          <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">40%</p>
-                          <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">Efficiency gains</p>
+                          <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">{featuredStudy.stat1.value}</p>
+                          <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">{featuredStudy.stat1.label}</p>
                         </div>
                         <div>
-                          <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">3</p>
-                          <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">Domains delivered</p>
+                          <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">{featuredStudy.stat2.value}</p>
+                          <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">{featuredStudy.stat2.label}</p>
                         </div>
                         <span className="inline-flex h-[43px] w-[95px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold leading-5 text-white">
                           Read
@@ -244,46 +181,48 @@ export default function CaseStudiesPage() {
                     </div>
                   </Link>
 
-                  <Link
-                    href={`/case-studies/${topRightStudy.slug}`}
-                    className="group flex h-[547px] flex-col rounded-[24px] border border-[#e5e5e5] bg-white px-[30px] pb-[30px] pt-9"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="inline-flex h-[28px] items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
-                        {topRightStudy.category.toUpperCase()}
+                  {topRightStudy ? (
+                    <Link
+                      href={`/case-studies/${topRightStudy.slug}`}
+                      className="group flex h-[547px] flex-col rounded-[24px] border border-[#e5e5e5] bg-white px-[30px] pb-[30px] pt-9"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="inline-flex h-[28px] items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
+                          {topRightStudy.category.toUpperCase()}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
+                          <span className="text-[12px] font-medium leading-4 text-[#666666]">{topRightStudy.date}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                        <span className="text-[12px] font-medium leading-4 text-[#666666]">Wednesday, 8 April 2026</span>
-                      </div>
-                    </div>
 
-                    <h3 className="mt-[13px] w-[317px] line-clamp-3 text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">
-                      {topRightStudy.title}
-                    </h3>
-                    <p className="mt-4 w-[319px] line-clamp-6 text-[16px] leading-6 text-[#666666]">
-                      {topRightStudy.description}
-                    </p>
+                      <h3 className="mt-[13px] w-[317px] line-clamp-3 text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">
+                        {topRightStudy.title}
+                      </h3>
+                      <p className="mt-4 w-[319px] line-clamp-6 text-[16px] leading-6 text-[#666666]">
+                        {topRightStudy.description}
+                      </p>
 
-                    <div className="mt-auto flex items-end justify-between border-t border-[#e5e5e5] pt-[21px]">
-                      <div>
-                        <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">{topRightStudy.stat1.value}</p>
-                        <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">{topRightStudy.stat1.label}</p>
+                      <div className="mt-auto flex items-end justify-between border-t border-[#e5e5e5] pt-[21px]">
+                        <div>
+                          <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">{topRightStudy.stat1.value}</p>
+                          <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">{topRightStudy.stat1.label}</p>
+                        </div>
+                        <div>
+                          <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">{topRightStudy.stat2.value}</p>
+                          <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">{topRightStudy.stat2.label}</p>
+                        </div>
+                        <span className="inline-flex h-[43px] w-[95px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold leading-5 text-white">
+                          Read
+                          <ArrowRight className="h-[18px] w-[18px]" />
+                        </span>
                       </div>
-                      <div>
-                        <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">{topRightStudy.stat2.value}</p>
-                        <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">{topRightStudy.stat2.label}</p>
-                      </div>
-                      <span className="inline-flex h-[43px] w-[95px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold leading-5 text-white">
-                        Read
-                        <ArrowRight className="h-[18px] w-[18px]" />
-                      </span>
-                    </div>
-                  </Link>
+                    </Link>
+                  ) : null}
                 </div>
 
                 <div className="mt-4 grid grid-cols-3 gap-4">
-                  {lowerStudies.map((study, index) => (
+                  {lowerStudies.map((study) => (
                     <Link
                       key={study.slug}
                       href={`/case-studies/${study.slug}`}
@@ -295,7 +234,7 @@ export default function CaseStudiesPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                          <span className="text-[12px] font-medium leading-4 text-[#666666]">Wednesday, 8 April 2026</span>
+                          <span className="text-[12px] font-medium leading-4 text-[#666666]">{study.date}</span>
                         </div>
                       </div>
 
@@ -395,7 +334,7 @@ export default function CaseStudiesPage() {
         </div>
       </section>
 
-      <ClientStoriesSection />
+      <ClientStoriesSection items={clientStories} />
 
       {/* CTA */}
       <section className="py-20 bg-gray-50">

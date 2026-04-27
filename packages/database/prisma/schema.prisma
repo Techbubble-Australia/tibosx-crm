@@ -127,11 +127,13 @@ model CaseStudy {
   
   // Meta
   published         Boolean  @default(true)
+  featured          Boolean  @default(false)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   
   @@index([category])
   @@index([published])
+  @@index([featured])
   @@index([createdAt])
 }
 
@@ -159,4 +161,92 @@ model CareerApplication {
   resumeUrl   String?
   message     String?
   createdAt   DateTime @default(now())
+}
+
+model JobListing {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  location    String
+  country     String
+  flag        String   // emoji flag
+  type        String   // full-time | contract | part-time
+  workMode    String   // remote | hybrid | onsite
+  department  String   @default("Engineering")
+  description String   @default("")
+  published   Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([published])
+  @@index([order])
+}
+
+model TeamMember {
+  id          String   @id @default(cuid())
+  name        String
+  role        String
+  department  String   // e.g. Management Team, ServiceNow Developers, etc.
+  imageUrl    String   @default("")
+  order       Int      @default(0)
+  published   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([department])
+  @@index([published])
+  @@index([order])
+}
+
+model Testimonial {
+  id                  String   @id @default(cuid())
+  quote               String
+  authorName          String
+  authorTitle         String
+  authorCompany       String
+  authorInitials      String
+  authorImageUrl      String   @default("")
+  order               Int      @default(0)
+  published           Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([published])
+  @@index([order])
+}
+
+model FaqItem {
+  id          String   @id @default(cuid())
+  question    String
+  answer      String
+  category    String   @default("general") // pricing | general | technical | home
+  order       Int      @default(0)
+  published   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([published])
+  @@index([order])
+}
+
+model SiteContent {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  label     String   @default("")
+  payload   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         String   @default("admin")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

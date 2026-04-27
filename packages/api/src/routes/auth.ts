@@ -1,11 +1,10 @@
-import { Router } from "express";
+import { Router, type IRouter } from "express";
 import { z } from "zod";
-import { generateToken } from "../middleware/auth";
+import bcrypt from "bcryptjs";
+import { prisma } from "@techbubble/database";
+import { authMiddleware, generateToken, type AuthRequest } from "../middleware/auth";
 
-const router = Router();
-
-// Simple admin authentication
-// In production, use a proper auth solution with hashed passwords
+const router: IRouter = Router();
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -15,30 +14,31 @@ const loginSchema = z.object({
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
-    
-    // Check credentials against environment variables
-    // In production, use a proper user database with hashed passwords
-    const adminEmail = process.env.ADMIN_EMAIL || "admin@techbubble.com";
-    const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
-    
-    if (email !== adminEmail || password !== adminPassword) {
+
+    const user = await prisma.adminUser.findUnique({ where: { email } });
+    if (!user?.passwordHash) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
-    
+
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
     const token = generateToken({
-      id: "admin",
-      email: adminEmail,
-      role: "admin",
+      id: user.id,
+      email: user.email,
+      role: user.role,
     });
-    
+
     res.json({
       message: "Login successful",
       data: {
         token,
         user: {
-          id: "admin",
-          email: adminEmail,
-          role: "admin",
+          id: user.id,
+          email: user.email,
+          role: user.role,
         },
       },
     });
@@ -51,10 +51,16 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.get("/me", async (req, res) => {
-  // This would normally verify the token and return user info
-  // For simplicity, we'll just return a success message
-  res.json({ message: "Authenticated" });
+router.get("/me", authMiddleware, (req: AuthRequest, res) => {
+  const u = req.user;
+  if (!u) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  res.json({
+    data: {
+      user: { id: u.id, email: u.email, role: u.role },
+    },
+  });
 });
 
 export { router as authRoutes };
