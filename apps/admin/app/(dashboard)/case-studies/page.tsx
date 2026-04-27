@@ -30,7 +30,7 @@ export default function CaseStudiesPage() {
 
   async function fetchCaseStudies() {
     try {
-      const res = await adminFetch("/api/admin/case-studies");
+      const res = await adminFetch("/api/admin/case-studies/admin/all");
       const data = await res.json();
       setCaseStudies(data.data || []);
     } catch (error) {

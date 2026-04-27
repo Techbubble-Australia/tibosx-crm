@@ -181,6 +181,28 @@ router.get("/", async (req, res) => {
   }
 });
 
+// GET all case studies (admin — drafts + published, includes `published` for status UI)
+router.get("/admin/all", async (req, res) => {
+  try {
+    const rows = await prisma.caseStudy.findMany({
+      orderBy: [{ featured: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        category: true,
+        clientName: true,
+        published: true,
+        createdAt: true,
+      },
+    });
+    res.json({ data: rows });
+  } catch (error) {
+    console.error("Error fetching case studies (admin):", error);
+    res.status(500).json({ error: "Failed to fetch case studies" });
+  }
+});
+
 // GET single case study by slug (public). Optional ?preview=<signed-token> shows drafts (admin-issued).
 router.get("/slug/:slug", async (req, res) => {
   try {
