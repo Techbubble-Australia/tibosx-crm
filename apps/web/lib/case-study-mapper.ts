@@ -14,6 +14,8 @@ export type CaseStudyApiRecord = {
   heroStat3Value: string;
   heroStat3Label: string;
   featuredImage: string;
+  bannerImage: string;
+  contentImage: string;
   backgroundTitle: string;
   backgroundContent: string;
   challengeTitle: string;
@@ -90,7 +92,8 @@ export type CaseStudyPageModel = {
   title: string;
   subtitle: string;
   category: string;
-  featuredImage: string;
+  bannerImage: string;
+  contentImage: string;
   heroStats: { value: string; label: string }[];
   sidebar: { label: string; href: string }[];
   background: { title: string; content: string };
@@ -138,6 +141,12 @@ function techIconLabel(icon: string, name: string): string {
 }
 
 export function mapCaseStudyApiToPageModel(data: CaseStudyApiRecord): CaseStudyPageModel {
+  const featuredResolved = resolveMediaUrl(data.featuredImage);
+  const bannerRaw = (data.bannerImage ?? "").trim();
+  const bannerImage = bannerRaw ? resolveMediaUrl(bannerRaw) : featuredResolved;
+  const contentRaw = (data.contentImage ?? "").trim();
+  const contentImage = contentRaw ? resolveMediaUrl(contentRaw) : "";
+
   const phases: CaseStudyPageModel["solution"]["phases"] = [
     { number: "1", title: data.phase1Title, duration: data.phase1Duration, content: data.phase1Content, tags: data.phase1Tags ?? [] },
     { number: "2", title: data.phase2Title, duration: data.phase2Duration, content: data.phase2Content, tags: data.phase2Tags ?? [] },
@@ -167,7 +176,8 @@ export function mapCaseStudyApiToPageModel(data: CaseStudyApiRecord): CaseStudyP
     title: data.title,
     subtitle: data.subtitle,
     category: data.category,
-    featuredImage: resolveMediaUrl(data.featuredImage),
+    bannerImage,
+    contentImage,
     heroStats: [
       { value: data.heroStat1Value, label: data.heroStat1Label },
       { value: data.heroStat2Value, label: data.heroStat2Label },

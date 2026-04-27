@@ -7,6 +7,8 @@ export const CASE_STUDY_TEXT_FIELDS = [
   "category",
   "clientName",
   "featuredImage",
+  "bannerImage",
+  "contentImage",
   "heroStat1Value",
   "heroStat1Label",
   "heroStat2Value",

@@ -22,6 +22,8 @@ async function main() {
       heroStat3Value: "SERVICENOW",
       heroStat3Label: "CATEGORY",
       featuredImage: "/images/case-studies/university-sydney.jpg",
+      bannerImage: "/images/case-studies/university-sydney.jpg",
+      contentImage: "/images/case-studies/university-sydney.jpg",
       backgroundTitle: "Scaling delivery across the CTO office",
       backgroundContent:
         "The University of Sydney needed to scale digital delivery across the CTO office while maintaining governance, security, and speed. Legacy processes and fragmented tooling made it difficult to place the right specialists quickly and keep programmes predictable.\n\nTechBubble partnered with stakeholders to stand up a high-velocity delivery model — aligning architecture, execution, and reporting so teams could ship outcomes without compromising enterprise standards.",
@@ -112,6 +114,8 @@ async function main() {
       heroStat3Value: "SERVICENOW",
       heroStat3Label: "CATEGORY",
       featuredImage: "/images/case-studies/university-sydney.jpg",
+      bannerImage: "/images/case-studies/university-sydney.jpg",
+      contentImage: "/images/case-studies/university-sydney.jpg",
       backgroundTitle: "Scaling delivery across the CTO office",
       backgroundContent:
         "The University of Sydney needed to scale digital delivery across the CTO office while maintaining governance, security, and speed. Legacy processes and fragmented tooling made it difficult to place the right specialists quickly and keep programmes predictable.\n\nTechBubble partnered with stakeholders to stand up a high-velocity delivery model — aligning architecture, execution, and reporting so teams could ship outcomes without compromising enterprise standards.",

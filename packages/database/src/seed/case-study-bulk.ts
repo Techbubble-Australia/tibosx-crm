@@ -108,11 +108,16 @@ function mini(
     | "heroStat3Value"
     | "heroStat3Label"
     | "featured"
-  >
+  > &
+    Partial<Pick<Prisma.CaseStudyCreateInput, "bannerImage" | "contentImage">>
 ): Prisma.CaseStudyCreateInput {
+  const { bannerImage, contentImage, ...rest } = fields;
+  const featured = rest.featuredImage;
   return {
     ...SHARED_BODY,
-    ...fields,
+    ...rest,
+    bannerImage: (bannerImage?.trim() || featured) ?? "",
+    contentImage: contentImage?.trim() ?? "",
     published: true,
   };
 }

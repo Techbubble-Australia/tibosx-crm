@@ -135,11 +135,22 @@ export function CaseStudyForm({
           <AdminImageField
             key={`featured-${formKey}`}
             name="featuredImage"
-            label="Featured image"
+            label="Featured image (listing / cards)"
             defaultValue={str(defaults as Record<string, unknown>, "featuredImage")}
             className={inputClass}
             labelClassName={labelClass}
           />
+          <AdminImageField
+            key={`banner-${formKey}`}
+            name="bannerImage"
+            label="Banner image (detail page wide strip)"
+            defaultValue={str(defaults as Record<string, unknown>, "bannerImage")}
+            className={inputClass}
+            labelClassName={labelClass}
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400 -mt-2">
+            Leave banner empty to use the featured image on the detail page.
+          </p>
         </div>
       </section>
 
@@ -186,6 +197,14 @@ export function CaseStudyForm({
               className={inputClass}
             />
           </div>
+          <AdminImageField
+            key={`content-${formKey}`}
+            name="contentImage"
+            label="Case study image (Background section)"
+            defaultValue={str(defaults as Record<string, unknown>, "contentImage")}
+            className={inputClass}
+            labelClassName={labelClass}
+          />
         </div>
       </section>
 

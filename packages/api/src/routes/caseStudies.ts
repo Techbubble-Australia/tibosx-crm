@@ -21,7 +21,9 @@ const caseStudySchema = z.object({
   heroStat3Label: z.string(),
   
   featuredImage: z.string(),
-  
+  bannerImage: z.string(),
+  contentImage: z.string(),
+
   backgroundTitle: z.string(),
   backgroundContent: z.string(),
   
