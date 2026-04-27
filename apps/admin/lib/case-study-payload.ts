@@ -7,7 +7,6 @@ export const CASE_STUDY_TEXT_FIELDS = [
   "category",
   "clientName",
   "featuredImage",
-  "bannerImage",
   "contentImage",
   "heroStat1Value",
   "heroStat1Label",
@@ -104,6 +103,10 @@ export function buildCaseStudyPayloadFromFormData(formData: FormData): Record<st
   for (const key of CASE_STUDY_TEXT_FIELDS) {
     out[key] = String(formData.get(key) ?? "");
   }
+  out.bannerImages = formData
+    .getAll("bannerImages")
+    .map((v) => String(v).trim())
+    .filter(Boolean);
   out.phase1Tags = splitTags(formData.get("phase1Tags") as string | null);
   out.phase2Tags = splitTags(formData.get("phase2Tags") as string | null);
   out.phase3Tags = splitTags(formData.get("phase3Tags") as string | null);
@@ -118,6 +121,7 @@ export function emptyCaseStudyFormDefaults(): Record<string, string | boolean | 
   for (const key of CASE_STUDY_TEXT_FIELDS) {
     out[key] = "";
   }
+  out.bannerImages = [];
   out.phase1Tags = [];
   out.phase2Tags = [];
   out.phase3Tags = [];

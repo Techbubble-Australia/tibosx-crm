@@ -9,6 +9,8 @@ const SHARED_BODY: Omit<
   | "category"
   | "clientName"
   | "featuredImage"
+  | "bannerImages"
+  | "contentImage"
   | "heroStat1Value"
   | "heroStat1Label"
   | "heroStat2Value"
@@ -109,14 +111,20 @@ function mini(
     | "heroStat3Label"
     | "featured"
   > &
-    Partial<Pick<Prisma.CaseStudyCreateInput, "bannerImage" | "contentImage">>
+    Partial<Pick<Prisma.CaseStudyCreateInput, "bannerImages" | "contentImage">>
 ): Prisma.CaseStudyCreateInput {
-  const { bannerImage, contentImage, ...rest } = fields;
+  const { bannerImages, contentImage, ...rest } = fields;
   const featured = rest.featuredImage;
+  const banners =
+    bannerImages !== undefined && bannerImages.length > 0
+      ? bannerImages.map((s) => s.trim()).filter(Boolean)
+      : featured
+        ? [featured]
+        : [];
   return {
     ...SHARED_BODY,
     ...rest,
-    bannerImage: (bannerImage?.trim() || featured) ?? "",
+    bannerImages: banners,
     contentImage: contentImage?.trim() ?? "",
     published: true,
   };

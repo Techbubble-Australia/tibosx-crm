@@ -6,6 +6,7 @@ import { Loader2, Save } from "lucide-react";
 import { useState } from "react";
 import { buildCaseStudyPayloadFromFormData, emptyCaseStudyFormDefaults } from "@/lib/case-study-payload";
 import { AdminImageField } from "@/components/AdminImageField";
+import { AdminBannerImagesField } from "@/components/case-study/AdminBannerImagesField";
 import { adminFetch } from "@/lib/admin-api";
 
 const inputClass =
@@ -23,6 +24,13 @@ function tagsJoin(record: Record<string, unknown> | null | undefined, key: strin
   const v = record[key];
   if (!Array.isArray(v)) return "";
   return v.map(String).join(", ");
+}
+
+function bannerImagesFromRecord(record: Record<string, unknown> | null | undefined): string[] {
+  if (!record) return [];
+  const v = record["bannerImages"];
+  if (!Array.isArray(v)) return [];
+  return v.map(String).map((s) => s.trim()).filter(Boolean);
 }
 
 export function CaseStudyForm({
@@ -140,17 +148,7 @@ export function CaseStudyForm({
             className={inputClass}
             labelClassName={labelClass}
           />
-          <AdminImageField
-            key={`banner-${formKey}`}
-            name="bannerImage"
-            label="Banner image (detail page wide strip)"
-            defaultValue={str(defaults as Record<string, unknown>, "bannerImage")}
-            className={inputClass}
-            labelClassName={labelClass}
-          />
-          <p className="text-xs text-gray-500 dark:text-gray-400 -mt-2">
-            Leave banner empty to use the featured image on the detail page.
-          </p>
+          <AdminBannerImagesField formKey={formKey} initialUrls={bannerImagesFromRecord(defaults as Record<string, unknown>)} />
         </div>
       </section>
 

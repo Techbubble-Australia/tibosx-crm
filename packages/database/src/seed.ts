@@ -22,7 +22,7 @@ async function main() {
       heroStat3Value: "SERVICENOW",
       heroStat3Label: "CATEGORY",
       featuredImage: "/images/case-studies/university-sydney.jpg",
-      bannerImage: "/images/case-studies/university-sydney.jpg",
+      bannerImages: ["/images/case-studies/university-sydney.jpg"],
       contentImage: "/images/case-studies/university-sydney.jpg",
       backgroundTitle: "Scaling delivery across the CTO office",
       backgroundContent:
@@ -114,7 +114,7 @@ async function main() {
       heroStat3Value: "SERVICENOW",
       heroStat3Label: "CATEGORY",
       featuredImage: "/images/case-studies/university-sydney.jpg",
-      bannerImage: "/images/case-studies/university-sydney.jpg",
+      bannerImages: ["/images/case-studies/university-sydney.jpg"],
       contentImage: "/images/case-studies/university-sydney.jpg",
       backgroundTitle: "Scaling delivery across the CTO office",
       backgroundContent:

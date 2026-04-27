@@ -3,6 +3,7 @@ import Image from "next/image";
 import { ArrowLeft, ArrowRight, Zap, Workflow, Share2, FileStack, Braces, Handshake } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getCaseStudyBySlug } from "@/lib/api/public";
+import { CaseStudyBannerGallery } from "@/components/case-study/CaseStudyBannerGallery";
 import { mapCaseStudyApiToPageModel, type CaseStudyPageModel } from "@/lib/case-study-mapper";
 
 export default async function CaseStudyPage({
@@ -54,15 +55,7 @@ export default async function CaseStudyPage({
       <section className="bg-white pb-[60px] pt-[30px] dark:bg-neutral-950">
         <div className="tb-container">
           <div className="mx-auto max-w-[1136px]">
-            <div className="relative h-[307px] overflow-hidden rounded-[8px] dark:ring-1 dark:ring-white/10">
-              <Image
-                src={caseStudy.bannerImage}
-                alt=""
-                fill
-                className="object-cover"
-                sizes="(max-width: 1200px) 100vw, 1136px"
-              />
-            </div>
+            <CaseStudyBannerGallery images={caseStudy.bannerImages} title={caseStudy.title} />
           </div>
         </div>
       </section>

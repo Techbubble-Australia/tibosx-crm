@@ -25,9 +25,9 @@ model CaseStudy {
   heroStat3Value    String
   heroStat3Label    String
   
-  // Images: listing/cards use featuredImage; detail page banner uses bannerImage (falls back to featured in app if empty)
+  // Images: listing/cards use featuredImage; detail banner gallery uses bannerImages (first = hero; rest = thumbnails; empty → featured in app)
   featuredImage     String
-  bannerImage       String   @default("")
+  bannerImages      String[] @default([])
   contentImage      String   @default("")
 
   // Background section
