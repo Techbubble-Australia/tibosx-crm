@@ -40,6 +40,8 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 COPY --from=builder --chown=nextjs:nodejs /app/packages/api/dist ./packages/api/dist
+COPY --from=builder --chown=nextjs:nodejs /app/packages/api/package.json ./packages/api/package.json
+COPY --from=builder --chown=nextjs:nodejs /app/packages/database/package.json ./packages/database/package.json
 COPY --from=builder --chown=nextjs:nodejs /app/packages/database/dist ./packages/database/dist
 COPY --from=builder --chown=nextjs:nodejs /app/packages/database/prisma ./packages/database/prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
@@ -50,8 +52,7 @@ RUN mkdir -p /app/uploads && chown nextjs:nodejs /app/uploads
 
 USER nextjs
 
+# Railway (and others) set PORT at runtime — do not hardcode in ENV or healthchecks target the wrong port.
 EXPOSE 3001
-
-ENV PORT=3001
 
 CMD ["node", "packages/api/dist/index.js"]
