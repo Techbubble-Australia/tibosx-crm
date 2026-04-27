@@ -17,11 +17,13 @@ RUN pnpm install --frozen-lockfile
 # Build
 FROM deps AS builder
 WORKDIR /app
+# Prisma engines on Alpine need OpenSSL; libc6-compat comes from deps stage base
+RUN apk add --no-cache openssl
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma client
-RUN pnpm exec prisma generate --schema=./packages/database/prisma/schema.prisma
+# Prisma CLI is a devDependency of @techbubble/database only — run it in that package context
+RUN pnpm --filter @techbubble/database exec prisma generate
 
 # Build packages
 RUN pnpm --filter @techbubble/database build
@@ -33,6 +35,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+RUN apk add --no-cache openssl libc6-compat
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
