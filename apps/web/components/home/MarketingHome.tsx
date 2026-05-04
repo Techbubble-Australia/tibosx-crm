@@ -163,14 +163,15 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
       <section className="bg-[#f9f9f9] pb-16 pt-2 md:pb-24 md:pt-4">
         <div className="tb-container">
           <div className="relative z-0">
-            <div className="rounded-[24px] border border-[#e5e5e5] bg-white px-6 py-12 shadow-[0_20px_60px_-36px_rgba(0,0,0,0.22)] md:px-8">
-              <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-5">
-                {vm.featuredPartnerCard.map((p) => (
+            <div className="rounded-[24px] border border-[#e5e5e5] bg-white px-6 py-12 shadow-[0_20px_60px_-36px_rgba(0,0,0,0.22)] md:px-8 overflow-hidden">
+              <div className="flex w-max animate-[marquee_30s_linear_infinite] items-center gap-6">
+                {[...vm.featuredPartnerCard, ...vm.featuredPartnerCard].map((p, i) => (
                   <div
-                    key={p.id}
-                    className="flex min-h-[71px] items-center justify-center"
+                    key={`${p.id}-${i}`}
+                    className="flex shrink-0 items-center justify-center"
+                    style={{ width: '300px', height: '90px' }}
                   >
-                    <Image src={p.image} alt={p.id} className={`${p.imageClass} h-auto max-w-full object-contain`} />
+                    <Image src={p.image} alt={p.id} className={`${p.imageClass} h-auto w-auto max-w-full max-h-full object-contain`} width={300} height={90} />
                   </div>
                 ))}
               </div>
@@ -186,7 +187,15 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
             <div className="flex w-max animate-[marquee_30s_linear_infinite] items-center gap-[18px]">
               {[...vm.trustedLogoStrip, ...vm.trustedLogoStrip].map((logo, i) => (
                 <div key={`${logo.name}-${i}`} className="flex shrink-0 items-center justify-center" style={{ width: '180px', height: '80px' }}>
-                  <Image src={logo.image} alt={logo.name} fill className="object-contain" sizes="180px" />
+                  <Image 
+                    src={logo.image} 
+                    alt={logo.name} 
+                    width={180} 
+                    height={80} 
+                    className="object-contain !w-auto !h-auto max-w-full max-h-full" 
+                    sizes="180px"
+                    priority={false}
+                  />
                 </div>
               ))}
             </div>
