@@ -36,16 +36,18 @@ export default async function ServicesPage() {
 
       <section className="relative z-10 -mt-[85px] bg-transparent">
         <div className="tb-container">
-          <div className="mx-auto flex h-[170px] max-w-[1136px] items-center rounded-[30px] bg-white px-8 shadow-[0_24px_48px_-26px_rgba(0,0,0,0.38)]">
+          <div className="mx-auto max-w-[1136px] rounded-[30px] bg-white shadow-[0_24px_48px_-26px_rgba(0,0,0,0.38)]">
+            <div className="flex flex-col divide-y divide-[#e5e5e5] px-6 py-4 sm:flex-row sm:divide-x sm:divide-y-0 sm:px-8 sm:py-0 sm:h-auto sm:items-center">
             {d.highlights.map((item, idx) => (
-              <div key={item.title} className="flex h-[108px] items-center">
-                <div className={`${item.bodyWidth} px-2`}>
-                  <h3 className="text-[18px] font-bold leading-7 text-[#111111]">{item.title}</h3>
+              <div key={item.title} className="flex items-center py-4 sm:h-[108px] sm:px-4">
+                <div className={`${item.bodyWidth}`}>
+                  <h3 className="text-[16px] font-bold leading-7 text-[#111111] md:text-[18px]">{item.title}</h3>
                   <p className="mt-1 text-[14px] font-normal leading-5 tracking-[0.035px] text-[#666666]">{item.description}</p>
                 </div>
-                {idx < d.highlights.length - 1 ? <span className="mx-[30px] h-[78px] w-px bg-[#e5e5e5]" aria-hidden /> : null}
+                {idx < d.highlights.length - 1 ? <span className="mx-[30px] hidden h-[78px] w-px bg-[#e5e5e5] sm:block" aria-hidden /> : null}
               </div>
             ))}
+            </div>
           </div>
         </div>
       </section>
@@ -58,13 +60,13 @@ export default async function ServicesPage() {
                 <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
                 <p className="text-[12px] font-medium leading-4 text-[#666666]">{d.engagementSection.eyebrow}</p>
               </div>
-              <h2 className="mt-2 text-center text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">
+              <h2 className="mt-2 text-center text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">
                 {d.engagementSection.title}
               </h2>
               <p className="mt-1 text-center text-[18px] font-normal leading-7 text-[#666666]">{d.engagementSection.subtitle}</p>
             </div>
 
-            <div className="relative mt-16 grid grid-cols-3 gap-[20.66px]">
+            <div className="relative mt-16 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {d.serviceModels.map((model) => {
                 const isFeatured = model.emphasis === "featured";
                 return (
@@ -171,12 +173,12 @@ export default async function ServicesPage() {
               </div>
             </div>
             <div className="flex flex-col items-center gap-[4px]">
-              <h2 className="text-center text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">{d.processSection.title}</h2>
-              <p className="text-center text-[18px] font-normal leading-[28px] text-[#666666]">{d.processSection.subtitle}</p>
+              <h2 className="text-center text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">{d.processSection.title}</h2>
+              <p className="text-center text-base font-normal leading-[28px] text-[#666666] md:text-[18px]">{d.processSection.subtitle}</p>
             </div>
           </div>
 
-          <div className="relative grid grid-cols-4">
+          <div className="relative grid grid-cols-2 gap-y-10 md:grid-cols-4">
             <div className="pointer-events-none absolute left-[calc(12.5%+28px)] right-[calc(12.5%+28px)] top-[28px] h-[1px] bg-[#e5e5e5]" />
 
             {d.processSteps.map((step) => {

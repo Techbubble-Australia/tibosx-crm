@@ -69,14 +69,14 @@ export default function ContactPage() {
       {/* Contact Section — node 205:11234 */}
       <section className="bg-white py-[120px]">
         <div className="tb-container">
-          <div className="mx-auto grid max-w-[1136px] grid-cols-[536px_487px] gap-[113px]">
+          <div className="mx-auto grid max-w-[1136px] grid-cols-1 gap-10 lg:grid-cols-[536px_1fr] lg:gap-[113px]">
             <div>
               <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
                 <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
                 <p className="text-[12px] font-medium leading-4 text-[#111111]">Contact Information</p>
               </div>
 
-              <h2 className="mt-4 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">We&apos;d Love to Hear From You</h2>
+              <h2 className="mt-4 text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">We&apos;d Love to Hear From You</h2>
               <p className="mt-1 text-[18px] leading-7 text-[#666666]">
                 Our team responds to every enquiry within 4 business hours. For urgent staffing requests, we can mobilise within 24 hours.
               </p>
@@ -142,7 +142,7 @@ export default function ContactPage() {
               </div>
             </div>
 
-            <div className="mt-[161px] h-[764px] rounded-[28px] border border-white/[0.12] bg-[#111111] px-[37px] py-8 text-white">
+            <div className="rounded-[28px] border border-white/[0.12] bg-[#111111] px-[37px] py-8 text-white">
               <h3 className="text-[28px] font-bold leading-9 tracking-[-0.07px]">Send Us a Message</h3>
               <p className="mt-1 max-w-[327px] text-[14px] leading-5 tracking-[0.035px] text-[#e5e5e5]">
                 Fill in your details and we&apos;ll get back to you within 4 business hours.

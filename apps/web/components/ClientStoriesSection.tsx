@@ -53,13 +53,13 @@ export function ClientStoriesSection({ items }: Props) {
               <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
               <p className="text-[12px] font-medium leading-4 text-[#111111]">Client Stories</p>
             </div>
-            <h2 className="text-[56px] font-bold leading-[64px] tracking-[-0.005em] text-[#111111]">
+            <h2 className="text-3xl font-bold leading-tight tracking-[-0.005em] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">
               Trusted by people <br />
               who know technology best
             </h2>
           </div>
 
-          <p className="text-[28px] font-medium leading-9 tracking-[-0.0025em] text-[#666666]">
+          <p className="text-xl font-medium leading-9 tracking-[-0.0025em] text-[#666666] md:text-[28px]">
             &ldquo;{t.quote}&rdquo;
           </p>
 

@@ -50,7 +50,7 @@ export function CareersPositionsSection({ jobs }: { jobs: JobApiRow[] }) {
         </div>
         <div className="mt-2 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h2 className="text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">Current Opportunities</h2>
+            <h2 className="text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">Current Opportunities</h2>
             <p className="mt-1 text-[18px] leading-7 text-[#666666]">Find your perfect role and start your journey with us.</p>
           </div>
           {jobs.length > 0 ? (

@@ -5,11 +5,14 @@ const nextConfig = {
   output: 'standalone',
   transpilePackages: ["@techbubble/ui"],
   images: {
-    domains: ["localhost"],
     remotePatterns: [
       {
         protocol: "https",
         hostname: "**",
+      },
+      {
+        protocol: "http",
+        hostname: "localhost",
       },
       {
         protocol: "http",

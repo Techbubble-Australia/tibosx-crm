@@ -27,7 +27,7 @@ export function Footer() {
     <footer className="bg-[#111111] pt-[82px]">
       <div className="tb-container">
         <div className="mx-auto max-w-[1136px]">
-          <div className="grid grid-cols-[264px_176px_176px_267px] gap-x-[56px]">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-10 md:grid-cols-4 md:gap-x-[56px] lg:grid-cols-[264px_176px_176px_267px]">
             <div>
               <Image src={footerLogo} alt="TechBubble" className="h-[68px] w-[145px] object-contain" />
               <p className="mt-[14px] text-[14px] leading-5 tracking-[0.035px] text-white">
@@ -101,7 +101,7 @@ export function Footer() {
             </div>
           </div>
 
-          <div className="mt-[28px] flex h-[50px] items-end justify-between border-t border-white/[0.06] pb-[4px]">
+          <div className="mt-[28px] flex flex-col items-start gap-3 border-t border-white/[0.06] pb-[4px] pt-4 sm:flex-row sm:h-[50px] sm:items-end sm:justify-between">
             <p className="text-[12px] font-bold leading-4 text-[#666666]">© 2026 TechBubble Pty Ltd · All Rights Reserved</p>
             <div className="flex items-center gap-5">
               <Link href="/privacy" className="text-[12px] font-bold leading-4 text-[#666666] hover:text-white">

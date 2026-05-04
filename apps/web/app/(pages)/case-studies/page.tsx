@@ -44,32 +44,34 @@ export default async function CaseStudiesPage() {
       {/* Stats strip — node 205:2838 */}
       <section className="relative z-10 -mt-[85px] bg-transparent">
         <div className="tb-container">
-          <div className="mx-auto flex h-[170px] max-w-[1136px] items-center rounded-[30px] bg-white px-8 shadow-[0_24px_48px_-26px_rgba(0,0,0,0.38)]">
-            <div className="w-[530px] px-2">
-              <p className="text-[16px] font-bold leading-6 text-[#111111]">
-                Deep-dives into how TechBubble has helped enterprises across Asia Pacific and North America transform their technology operations — with measurable outcomes.
-              </p>
-            </div>
+          <div className="mx-auto max-w-[1136px] rounded-[30px] bg-white shadow-[0_24px_48px_-26px_rgba(0,0,0,0.38)]">
+            <div className="flex flex-wrap items-center justify-around gap-y-4 px-8 py-6 sm:h-[170px] sm:flex-nowrap sm:py-0">
+              <div className="px-2">
+                <p className="text-[16px] font-bold leading-6 text-[#111111]">
+                  Deep-dives into how TechBubble has helped enterprises across Asia Pacific and North America transform their technology operations — with measurable outcomes.
+                </p>
+              </div>
 
-            <span className="mx-[6px] h-[78px] w-px bg-[#e5e5e5]" aria-hidden />
+              <span className="hidden h-[78px] w-px bg-[#e5e5e5] sm:block" aria-hidden />
 
-            <div className="w-[169px] text-center">
-              <p className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#111111]">200+</p>
-              <p className="text-[12px] font-medium leading-4 text-[#666666]">Clients served</p>
-            </div>
+              <div className="text-center">
+                <p className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#111111]">200+</p>
+                <p className="text-[12px] font-medium leading-4 text-[#666666]">Clients served</p>
+              </div>
 
-            <span className="mx-[6px] h-[78px] w-px bg-[#e5e5e5]" aria-hidden />
+              <span className="hidden h-[78px] w-px bg-[#e5e5e5] sm:block" aria-hidden />
 
-            <div className="w-[169px] text-center">
-              <p className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#111111]">500+</p>
-              <p className="text-[12px] font-medium leading-4 text-[#666666]">Projects delivered</p>
-            </div>
+              <div className="text-center">
+                <p className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#111111]">500+</p>
+                <p className="text-[12px] font-medium leading-4 text-[#666666]">Projects delivered</p>
+              </div>
 
-            <span className="mx-[6px] h-[78px] w-px bg-[#e5e5e5]" aria-hidden />
+              <span className="hidden h-[78px] w-px bg-[#e5e5e5] sm:block" aria-hidden />
 
-            <div className="w-[169px] text-center">
-              <p className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#111111]">98%</p>
-              <p className="text-[12px] font-medium leading-4 text-[#666666]">Satisfaction rate</p>
+              <div className="text-center">
+                <p className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#111111]">98%</p>
+                <p className="text-[12px] font-medium leading-4 text-[#666666]">Satisfaction rate</p>
+              </div>
             </div>
           </div>
         </div>
@@ -83,7 +85,7 @@ export default async function CaseStudiesPage() {
               <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
               <p className="text-[12px] font-medium leading-4 text-[#666666]">Our Work</p>
             </div>
-            <h2 className="mt-2 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">Case Studies by Practice</h2>
+            <h2 className="mt-2 text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">Case Studies by Practice</h2>
             <p className="mt-1 max-w-[898px] text-[18px] leading-7 text-[#666666]">
               Explore how we&apos;ve helped leading enterprises transform operations, reduce costs, and accelerate growth.
             </p>
@@ -118,14 +120,14 @@ export default async function CaseStudiesPage() {
             ) : featuredStudy ? (
               <div className="mt-8">
                 <div
-                  className={`grid gap-4 ${topRightStudy ? "grid-cols-[746px_377px]" : "grid-cols-1 max-w-[746px]"}`}
+                  className={`grid gap-4 ${topRightStudy ? "grid-cols-1 lg:grid-cols-[746px_1fr]" : "grid-cols-1 max-w-[746px]"}`}
                 >
                   <Link
                     href={`/case-studies/${featuredStudy.slug}`}
-                    className="group flex h-[547px] overflow-hidden rounded-[24px] border border-[#e5e5e5] bg-white"
+                      className="group flex min-h-[400px] overflow-hidden rounded-[24px] border border-[#e5e5e5] bg-white lg:h-[547px]"
                   >
-                    <div className="flex h-full w-[518px] flex-col px-[33px] pb-6 pt-[26px]">
-                      <div className="flex w-[451px] items-center justify-between">
+                      <div className="flex h-full flex-1 flex-col px-[33px] pb-6 pt-[26px]">
+                        <div className="flex items-center justify-between">
                         <div className="inline-flex h-7 items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
                           {featuredStudy.category.toUpperCase()}
                         </div>
@@ -135,7 +137,7 @@ export default async function CaseStudiesPage() {
                         </div>
                       </div>
 
-                      <div className="relative mt-[14px] h-[150px] w-[451px] overflow-hidden rounded-[8px]">
+                        <div className="relative mt-[14px] h-[150px] overflow-hidden rounded-[8px]">
                         <Image
                           src={featuredStudy.image}
                           alt=""
@@ -145,10 +147,10 @@ export default async function CaseStudiesPage() {
                         />
                       </div>
 
-                      <h3 className="mt-[18px] w-[446px] line-clamp-3 text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">
+                      <h3 className="mt-[18px] line-clamp-3 text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">
                         {featuredStudy.title}
                       </h3>
-                      <p className="mt-[6px] w-[446px] line-clamp-5 text-[16px] leading-6 text-[#666666]">
+                      <p className="mt-[6px] line-clamp-5 text-[16px] leading-6 text-[#666666]">
                         {featuredStudy.description}
                       </p>
 
@@ -168,7 +170,7 @@ export default async function CaseStudiesPage() {
                       </div>
                     </div>
 
-                    <div className="w-[228px] bg-[#111111] px-[25px] pt-[49px] text-white">
+                      <div className="hidden w-[228px] shrink-0 bg-[#111111] px-[25px] pt-[49px] text-white lg:block">
                       <p className="text-[12px] font-bold leading-4">ON THIS CASE STUDY</p>
                       <div className="mt-[15px]">
                         {featuredStudy.sidebar?.map((item, idx) => (
@@ -184,7 +186,7 @@ export default async function CaseStudiesPage() {
                   {topRightStudy ? (
                     <Link
                       href={`/case-studies/${topRightStudy.slug}`}
-                      className="group flex h-[547px] flex-col rounded-[24px] border border-[#e5e5e5] bg-white px-[30px] pb-[30px] pt-9"
+                        className="group flex flex-col rounded-[24px] border border-[#e5e5e5] bg-white px-[30px] pb-[30px] pt-9 lg:h-[547px]"
                     >
                       <div className="flex items-center justify-between">
                         <div className="inline-flex h-[28px] items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
@@ -196,10 +198,10 @@ export default async function CaseStudiesPage() {
                         </div>
                       </div>
 
-                      <h3 className="mt-[13px] w-[317px] line-clamp-3 text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">
+                      <h3 className="mt-[13px] line-clamp-3 text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">
                         {topRightStudy.title}
                       </h3>
-                      <p className="mt-4 w-[319px] line-clamp-6 text-[16px] leading-6 text-[#666666]">
+                      <p className="mt-4 line-clamp-6 text-[16px] leading-6 text-[#666666]">
                         {topRightStudy.description}
                       </p>
 
@@ -221,7 +223,7 @@ export default async function CaseStudiesPage() {
                   ) : null}
                 </div>
 
-                <div className="mt-4 grid grid-cols-3 gap-4">
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {lowerStudies.map((study) => (
                     <Link
                       key={study.slug}
@@ -279,7 +281,7 @@ export default async function CaseStudiesPage() {
               <p className="text-[12px] font-medium leading-4 text-[#666666]">Our Practice Areas</p>
             </div>
 
-            <h2 className="mt-2 max-w-[898px] text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">
+            <h2 className="mt-2 max-w-[898px] text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">
               Deep Expertise Across 5 Platform
               <br />
               Practices
@@ -288,7 +290,7 @@ export default async function CaseStudiesPage() {
               We&apos;ve built a culture where talented people do the best work of their careers — and have fun doing it.
             </p>
 
-            <div className="mt-8 grid grid-cols-3 gap-4">
+            <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {[
                 { title: "ServiceNow", description: "Cross-functional teams working across geographies, sharing knowledge and lifting each other up.", icon: <Zap className="h-6 w-6 text-[#111111]" /> },
                 { title: "Salesforce", description: "Comprehensive implementation across Sales, Service, Marketing, Commerce, Health & Education Cloud — plus Omnistudio and Vlocity.", icon: <Workflow className="h-6 w-6 text-[#111111]" /> },
@@ -296,7 +298,7 @@ export default async function CaseStudiesPage() {
                 { title: "SharePoint", description: "SharePoint Online, Server & Power Platform integrations — collaboration, document management, and workflow automation.", icon: <FileStack className="h-6 w-6 text-[#111111]" /> },
                 { title: "Custom & AI Apps", description: "Java, D365, React, Mobile (iOS/Android), AI/ML, Python — custom solutions built to your exact requirements.", icon: <Braces className="h-6 w-6 text-[#111111]" /> },
               ].map((item) => (
-                <div key={item.title} className="h-[305px] rounded-[15px] border border-[#e5e5e5] bg-[#f7f7f7] px-[22px] pt-8">
+                <div key={item.title} className="rounded-[15px] border border-[#e5e5e5] bg-[#f7f7f7] px-[22px] pt-8 pb-6">
                   <div className="flex h-12 w-12 items-center justify-center rounded-[14px] border border-[#e5e5e5] bg-white">{item.icon}</div>
 
                   <h3 className="mt-4 text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">{item.title}</h3>
@@ -309,7 +311,7 @@ export default async function CaseStudiesPage() {
                 </div>
               ))}
 
-              <div className="h-[305px] rounded-[15px] border border-[#e5e5e5] bg-[#111111] px-[22px] pt-8 text-white">
+              <div className="rounded-[15px] border border-[#e5e5e5] bg-[#111111] px-[22px] pt-8 pb-6 text-white">
                 <div className="flex items-start gap-4">
                   <div className="flex h-[72px] w-[72px] items-center justify-center">
                     <Handshake className="h-10 w-10 text-white" />

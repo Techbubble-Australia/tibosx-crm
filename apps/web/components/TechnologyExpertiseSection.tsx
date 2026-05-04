@@ -43,7 +43,7 @@ export function TechnologyExpertiseSection() {
           <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
           <p className="text-xs font-medium leading-4 text-[#666666]">ACROSS THE TECHNOLOGY OFFERINGS</p>
         </div>
-        <h2 className="mt-4 text-[56px] font-bold leading-[64px] tracking-[-0.005em] text-[#111111]">
+        <h2 className="mt-4 text-3xl font-bold leading-tight tracking-[-0.005em] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">
           Technology Expertise
         </h2>
         <p className="mx-auto mt-2 text-[18px] leading-7 text-[#666666]">

@@ -27,15 +27,17 @@ export default async function PricingPage() {
 
       <section className="relative z-10 -mt-[84px] bg-transparent">
         <div className="tb-container">
-          <div className="mx-auto flex h-[170px] max-w-[1136px] items-center rounded-[30px] bg-white px-8 shadow-[0_24px_48px_-26px_rgba(0,0,0,0.38)]">
+          <div className="mx-auto max-w-[1136px] rounded-[30px] bg-white shadow-[0_24px_48px_-26px_rgba(0,0,0,0.38)]">
+            <div className="flex flex-wrap items-center justify-around gap-y-4 px-8 py-6 sm:h-[170px] sm:flex-nowrap sm:py-0">
             {d.valueStrip.map((item, idx) => (
-              <div key={item.text} className="flex h-[72px] items-center">
+              <div key={item.text} className="flex items-center">
                 <div className={`${item.width} text-center`}>
-                  <p className="text-[18px] font-bold leading-7 text-[#111111]">{item.text}</p>
+                  <p className="text-base font-bold leading-7 text-[#111111] md:text-[18px]">{item.text}</p>
                 </div>
-                {idx < d.valueStrip.length - 1 ? <span className="mx-[22.625px] h-[78px] w-px bg-[#e5e5e5]" aria-hidden /> : null}
+                {idx < d.valueStrip.length - 1 ? <span className="mx-[22.625px] hidden h-[78px] w-px bg-[#e5e5e5] sm:block" aria-hidden /> : null}
               </div>
             ))}
+            </div>
           </div>
         </div>
       </section>
@@ -106,14 +108,14 @@ export default async function PricingPage() {
         <div className="pointer-events-none absolute -right-[120px] top-[-100px] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle,rgba(127,127,127,0.1)_0%,rgba(142,142,142,0)_65%)]" />
 
         <div className="tb-container relative">
-          <div className="mx-auto grid max-w-[1136px] grid-cols-[604px_489px] gap-[43px]">
+          <div className="mx-auto grid max-w-[1136px] grid-cols-1 gap-10 lg:grid-cols-[604px_1fr] lg:gap-[43px]">
             <div>
               <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
                 <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
                 <p className="text-[12px] font-medium leading-4 text-[#111111]">{d.rateCardSection.eyebrow}</p>
               </div>
 
-              <h2 className="mt-4 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-white">{d.rateCardSection.title}</h2>
+              <h2 className="mt-4 text-3xl font-bold leading-tight tracking-[-0.28px] text-white md:text-5xl lg:text-[56px] lg:leading-[64px]">{d.rateCardSection.title}</h2>
               <p className="mt-1 text-[18px] font-normal leading-7 text-[#e5e5e5]">{d.rateCardSection.subtitle}</p>
 
               <div className="mt-4 space-y-[10px]">

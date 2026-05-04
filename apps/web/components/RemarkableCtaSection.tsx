@@ -23,9 +23,9 @@ export function RemarkableCtaSection({
   return (
     <section className={className}>
       <div className="tb-container">
-        <div className="mx-auto grid max-w-[1136px] grid-cols-[751px_353px] gap-8">
+        <div className="mx-auto grid max-w-[1136px] grid-cols-1 gap-8 lg:grid-cols-[1fr_353px]">
           <div>
-            <h2 className="text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">{title}</h2>
+            <h2 className="text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">{title}</h2>
             <p className="mt-2 max-w-[751px] text-[18px] leading-7 text-[#666666]">{description}</p>
             <div className="mt-2 h-[84px] pt-4">
               <div className="flex items-center gap-[22px]">
@@ -47,7 +47,7 @@ export function RemarkableCtaSection({
           </div>
 
           <div>
-            <div className="ml-8 flex w-[289px] items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Link
                 href="/contact"
                 className="inline-flex h-[51px] w-[118px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold text-white"
@@ -63,7 +63,7 @@ export function RemarkableCtaSection({
               </a>
             </div>
 
-            <div className="ml-8 mt-8 space-y-4">
+            <div className="mt-8 space-y-4">
               {[
                 "No commitment required",
                 "Response within 2 hours",
