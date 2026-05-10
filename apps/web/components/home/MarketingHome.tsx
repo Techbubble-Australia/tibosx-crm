@@ -18,7 +18,7 @@ import {
   Clock,
   DollarSign,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MarketingHomePayload } from "@/lib/data/marketing-home-payload";
 import { buildMarketingHomeViewModel } from "@/lib/marketing-home-view";
 import heroNetworkPattern from "@image/home-hero-network.svg";
@@ -76,11 +76,69 @@ type MarketingHomeProps = {
   previewJobs: HomePreviewJob[];
 };
 
+function parseStatValue(raw: string): { target: number; suffix: string } {
+  const match = raw.trim().match(/^(\d+)(.*)$/);
+  if (!match) {
+    return { target: 0, suffix: "" };
+  }
+  return { target: Number(match[1]), suffix: match[2] ?? "" };
+}
+
 export function MarketingHome({ content, testimonials, previewJobs }: MarketingHomeProps) {
   const vm = useMemo(() => buildMarketingHomeViewModel(content), [content]);
   const [engagementId, setEngagementId] = useState<string>(vm.engagementModels[0]!.id);
   const [platformId, setPlatformId] = useState<string>(vm.platforms[0]!.id);
   const [faqOpenIndex, setFaqOpenIndex] = useState<number>(0);
+  const statsSectionRef = useRef<HTMLElement | null>(null);
+  const [statsInView, setStatsInView] = useState(false);
+  const [animatedStats, setAnimatedStats] = useState<number[]>(() => vm.statsStrip.items.map(() => 0));
+
+  const statTargets = useMemo(() => vm.statsStrip.items.map((s) => parseStatValue(s.n)), [vm.statsStrip.items]);
+
+  useEffect(() => {
+    setAnimatedStats(vm.statsStrip.items.map(() => 0));
+    setStatsInView(false);
+  }, [vm.statsStrip.items]);
+
+  useEffect(() => {
+    const node = statsSectionRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setStatsInView(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.35 },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!statsInView) return;
+
+    const durationMs = 1300;
+    const start = performance.now();
+    let frameId = 0;
+
+    const tick = (now: number) => {
+      const progress = Math.min((now - start) / durationMs, 1);
+      const eased = 1 - (1 - progress) * (1 - progress);
+
+      setAnimatedStats(statTargets.map(({ target }) => Math.round(target * eased)));
+
+      if (progress < 1) {
+        frameId = requestAnimationFrame(tick);
+      }
+    };
+
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [statTargets, statsInView]);
 
   const engagement = vm.engagementModels.find((m) => m.id === engagementId) ?? vm.engagementModels[0]!;
   const platform = vm.platforms.find((p) => p.id === platformId) ?? vm.platforms[0]!;
@@ -205,7 +263,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
       </section>
 
       {/* Stats — black */}
-      <section className="bg-[#111111] py-20 text-white md:py-24">
+      <section ref={statsSectionRef} className="bg-[#111111] py-20 text-white md:py-24">
         <div className="tb-container text-center">
           <div className="mb-5 inline-flex items-center gap-3 rounded-full bg-transparent px-4 py-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-[#666666]" aria-hidden />
@@ -222,7 +280,9 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
                 key={s.l}
                 className={`relative px-2 ${i > 0 ? "md:before:absolute md:before:-left-[48px] md:before:top-1 md:before:h-[78px] md:before:w-px md:before:bg-white/20 md:before:content-['']" : ""}`}
               >
-                <div className="text-5xl font-bold leading-none tracking-[-0.02em] md:text-[56px]">{s.n}</div>
+                <div className="text-5xl font-bold leading-none tracking-[-0.02em] md:text-[56px]">
+                  {statTargets[i]?.target ? `${animatedStats[i] ?? 0}${statTargets[i]?.suffix ?? ""}` : s.n}
+                </div>
                 <div className="mt-2 text-xs font-medium uppercase tracking-[0.02em] text-[#f7f7f7]">{s.l}</div>
               </div>
             ))}
