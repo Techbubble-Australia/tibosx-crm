@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowRight, Minus, Plus } from "lucide-react";
+import { SectionPill } from "@/components/ui/SectionPill";
 
 export type PricingFaqItem = { question: string; answer: string };
 
@@ -25,10 +26,7 @@ export function PricingFaqList({ items, aside }: Props) {
       <div className="tb-container">
         <div className="mx-auto grid max-w-[1136px] grid-cols-1 gap-10 lg:grid-cols-[360px_1fr] lg:gap-[72px]">
           <div>
-            <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-              <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-              <p className="text-[12px] font-medium leading-4 text-[#111111]">{aside.eyebrow}</p>
-            </div>
+            <SectionPill label={aside.eyebrow} />
 
             <h2 className="mt-[6px] text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">
               {aside.titleLines.map((line, i) => (

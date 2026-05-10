@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ArrowRight, ChevronDown } from "lucide-react";
 import type { JobApiRow } from "@/lib/api/public";
+import { SectionPill } from "@/components/ui/SectionPill";
 
 function formatType(s: string): string {
   const t = s.trim();
@@ -44,10 +45,7 @@ export function CareersPositionsSection({ jobs }: { jobs: JobApiRow[] }) {
   return (
     <>
       <div className="mb-8">
-        <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-          <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-          <p className="text-[12px] font-medium leading-4 text-[#111111]">Open Positions</p>
-        </div>
+        <SectionPill label="Open Positions" />
         <div className="mt-2 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">Current Opportunities</h2>

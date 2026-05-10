@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Check, ChevronDown } from "lucide-react";
 import { RemarkableCtaSection } from "@/components/RemarkableCtaSection";
 import { PricingFaqList } from "@/components/pricing/PricingFaqList";
+import { SectionPill } from "@/components/ui/SectionPill";
 import { fetchSiteContentPayload } from "@/lib/fetch-site-content";
 import { getPublishedFaqs } from "@/lib/api/public";
 import { resolvePricingPage } from "@/lib/site-content/resolve-pages";
@@ -110,10 +111,7 @@ export default async function PricingPage() {
         <div className="tb-container relative">
           <div className="mx-auto grid max-w-[1136px] grid-cols-1 gap-10 lg:grid-cols-[604px_1fr] lg:gap-[43px]">
             <div>
-              <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                <p className="text-[12px] font-medium leading-4 text-[#111111]">{d.rateCardSection.eyebrow}</p>
-              </div>
+              <SectionPill label={d.rateCardSection.eyebrow} />
 
               <h2 className="mt-4 text-3xl font-bold leading-tight tracking-[-0.28px] text-white md:text-5xl lg:text-[56px] lg:leading-[64px]">{d.rateCardSection.title}</h2>
               <p className="mt-1 text-[18px] font-normal leading-7 text-[#e5e5e5]">{d.rateCardSection.subtitle}</p>

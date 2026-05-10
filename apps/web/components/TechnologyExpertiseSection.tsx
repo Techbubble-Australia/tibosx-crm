@@ -15,6 +15,7 @@ import techReactLogo from "@image/techbubble_-_home_29.png";
 import techJavaLogo from "@image/techbubble_-_home_30.png";
 import techAppleAndroidLogo from "@image/techbubble_-_home_31.png";
 import techDynamicsLogo from "@image/techbubble_-_home_32.jpg";
+import { SectionPill } from "@/components/ui/SectionPill";
 
 const technologyCards = [
   { name: "ServiceNow", image: techServiceNowLogo },
@@ -39,10 +40,7 @@ export function TechnologyExpertiseSection() {
   return (
     <section className="bg-white py-[120px]">
       <div className="tb-container text-center">
-        <div className="mb-2.5 inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-          <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
-          <p className="text-xs font-medium leading-4 text-[#666666]">ACROSS THE TECHNOLOGY OFFERINGS</p>
-        </div>
+        <SectionPill label="ACROSS THE TECHNOLOGY OFFERINGS" className="mb-2.5" textClassName="text-xs uppercase" />
         <h2 className="mt-4 text-3xl font-bold leading-tight tracking-[-0.005em] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">
           Technology Expertise
         </h2>

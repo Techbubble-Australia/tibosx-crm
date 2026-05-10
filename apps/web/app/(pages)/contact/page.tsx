@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Mail, Phone, Linkedin, Clock } from "lucide-react";
+import { SectionPill } from "@/components/ui/SectionPill";
 
 const contactInfo = [
   {
@@ -71,10 +72,7 @@ export default function ContactPage() {
         <div className="tb-container">
           <div className="mx-auto grid max-w-[1136px] grid-cols-1 gap-10 lg:grid-cols-[536px_1fr] lg:gap-[113px]">
             <div>
-              <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                <p className="text-[12px] font-medium leading-4 text-[#111111]">Contact Information</p>
-              </div>
+              <SectionPill label="Contact Information" />
 
               <h2 className="mt-4 text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">We&apos;d Love to Hear From You</h2>
               <p className="mt-1 text-[18px] leading-7 text-[#666666]">
@@ -100,10 +98,7 @@ export default function ContactPage() {
               </div>
 
               <div className="mt-12">
-                <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#111111] px-3">
-                  <span className="h-1.5 w-1.5 rounded-[3px] bg-white" aria-hidden />
-                  <p className="text-[12px] font-medium leading-4 text-white">Our Offices</p>
-                </div>
+                <SectionPill label="Our Offices" tone="dark" />
 
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   {offices.map((office, index) => (

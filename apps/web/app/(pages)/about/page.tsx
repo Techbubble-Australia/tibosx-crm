@@ -7,6 +7,7 @@ import type { ClientStoryItem } from "@/components/ClientStoriesSection";
 import { RemarkableCtaSection } from "@/components/RemarkableCtaSection";
 import { fetchSiteContentPayload } from "@/lib/fetch-site-content";
 import { resolveAboutPage } from "@/lib/site-content/resolve-pages";
+import { SectionPill } from "@/components/ui/SectionPill";
 import aboutUs1 from "@image/techbubble_-_about_us_1.jpg";
 import aboutUs2 from "@image/techbubble_-_about_us_2.jpg";
 import aboutUs3 from "@image/techbubble_-_about_us_3.jpg";
@@ -89,10 +90,7 @@ export default async function AboutPage() {
         <div className="tb-container">
           <div className="relative mx-auto grid max-w-[1139px] grid-cols-1 gap-12 lg:grid-cols-[557px_1fr] lg:gap-[131px]">
             <div className="pt-1">
-              <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
-                <p className="text-[12px] font-medium leading-4 text-[#666666]">{a.mission.eyebrow}</p>
-              </div>
+              <SectionPill label={a.mission.eyebrow} />
               <h2 className="mt-4 text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">{a.mission.title}</h2>
               <p className="mt-2 max-w-[532px] whitespace-pre-line text-base leading-7 text-[#666666] md:text-[18px]">{a.mission.body}</p>
               <Link
@@ -135,10 +133,7 @@ export default async function AboutPage() {
       >
         <div className="tb-container">
           <div className="mx-auto mb-16 max-w-[1139px] text-center">
-            <div className="mx-auto inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-              <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
-              <p className="text-[12px] font-medium leading-4 text-[#666666]">Our Team</p>
-            </div>
+            <SectionPill label="Our Team" className="mx-auto" />
             <h2 className="mt-2 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">Meet The Leadership</h2>
             <p className="mt-1 text-[18px] leading-7 text-[#666666]">
               The visionaries driving TechBubble&apos;s mission to transform businesses through technology.
@@ -166,10 +161,7 @@ export default async function AboutPage() {
         <div className="tb-container">
           <div className="mx-auto max-w-[1136px]">
             <div className="text-center">
-              <div className="mx-auto inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
-                <p className="text-[12px] font-medium leading-4 text-[#666666]">Our Complete Team</p>
-              </div>
+              <SectionPill label="Our Complete Team" className="mx-auto" />
               <h2 className="mt-2 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">Meet Our Entire Workforce</h2>
               <p className="mx-auto mt-1 max-w-[923px] text-[18px] leading-7 text-[#666666]">
                 With 150+ expert technicians across multiple specializations and global offices, we bring world-class expertise to every project. Our diverse team ensures excellence across every technology stack.
@@ -247,10 +239,7 @@ export default async function AboutPage() {
       <section className="bg-white py-[120px]">
         <div className="tb-container">
           <div className="mx-auto max-w-[1139px]">
-            <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-              <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
-              <p className="text-[12px] font-medium leading-4 text-[#666666]">Why Choose Us</p>
-            </div>
+            <SectionPill label="Why Choose Us" />
             <div className="mt-2 max-w-[898px]">
           <h2 className="text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">Our Unique Selling Points</h2>
               <p className="mt-1 text-[18px] leading-7 text-[#666666]">Discover what makes TechBubble the preferred partner for businesses worldwide.</p>
@@ -283,10 +272,7 @@ export default async function AboutPage() {
         <div className="tb-container">
           <div className="mx-auto grid max-w-[1139px] grid-cols-1 items-center gap-10 lg:grid-cols-[526px_1fr] lg:gap-[81px]">
             <div>
-              <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                <p className="text-[12px] font-medium leading-4 text-[#111111]">Our Values</p>
-              </div>
+              <SectionPill label="Our Values" />
               <h2 className="mt-2 text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">What Drives Us Forward</h2>
               <p className="mt-2 text-[16px] leading-6 text-[#666666]">
                 <strong>At TechBubble,</strong> we&apos;re passionate about innovation and committed to empowering businesses with cutting-edge technology solutions. We believe in fostering a culture that celebrates creativity, collaboration, and continuous growth.

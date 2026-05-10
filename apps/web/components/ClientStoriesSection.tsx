@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { SectionPill } from "@/components/ui/SectionPill";
 
 export type ClientStoryItem = {
   quote: string;
@@ -49,10 +50,7 @@ export function ClientStoriesSection({ items }: Props) {
       <div className="tb-container">
         <div className="mx-auto max-w-[1139px]">
           <div className="mb-12">
-            <div className="mb-6 inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-              <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-              <p className="text-[12px] font-medium leading-4 text-[#111111]">Client Stories</p>
-            </div>
+            <SectionPill label="Client Stories" className="mb-6" />
             <h2 className="text-3xl font-bold leading-tight tracking-[-0.005em] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">
               Trusted by people <br />
               who know technology best

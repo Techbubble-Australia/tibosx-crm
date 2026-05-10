@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Zap, Workflow, Share2, FileStack, Braces, Handshake } from "lucide-react";
 import { ClientStoriesSection } from "@/components/ClientStoriesSection";
+import { SectionPill } from "@/components/ui/SectionPill";
 import { getPublishedCaseStudies, getTestimonials } from "@/lib/api/public";
 import { apiRowToListCard, type CaseStudyListCard } from "@/lib/case-study-mapper";
 import type { ClientStoryItem } from "@/components/ClientStoriesSection";
@@ -81,10 +82,7 @@ export default async function CaseStudiesPage() {
       <section className="py-[100px]">
         <div className="tb-container">
           <div className="mx-auto max-w-[1136px]">
-            <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-              <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
-              <p className="text-[12px] font-medium leading-4 text-[#666666]">Our Work</p>
-            </div>
+            <SectionPill label="Our Work" />
             <h2 className="mt-2 text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">Case Studies by Practice</h2>
             <p className="mt-1 max-w-[898px] text-[18px] leading-7 text-[#666666]">
               Explore how we&apos;ve helped leading enterprises transform operations, reduce costs, and accelerate growth.
@@ -276,10 +274,7 @@ export default async function CaseStudiesPage() {
       <section className="bg-[#e5e5e5] py-[100px]">
         <div className="tb-container">
           <div className="mx-auto max-w-[1139px]">
-            <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-              <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
-              <p className="text-[12px] font-medium leading-4 text-[#666666]">Our Practice Areas</p>
-            </div>
+            <SectionPill label="Our Practice Areas" />
 
             <h2 className="mt-2 max-w-[898px] text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">
               Deep Expertise Across 5 Platform

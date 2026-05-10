@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ClientStoriesSection } from "@/components/ClientStoriesSection";
 import { TechnologyExpertiseSection } from "@/components/TechnologyExpertiseSection";
+import { SectionPill } from "@/components/ui/SectionPill";
 import {
   ArrowRight,
   Check,
@@ -234,10 +235,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
         <div className="tb-container">
           <div className="mx-auto w-full max-w-[1139px]">
             <div className="mb-16">
-              <div className="mb-2.5 inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
-                <p className="text-xs font-medium uppercase leading-4 text-[#666666]">{vm.engagementHeader.pill}</p>
-              </div>
+              <SectionPill label={vm.engagementHeader.pill} className="mb-2.5" textClassName="text-xs uppercase" />
               <h2 className="mb-1 text-3xl font-bold leading-tight tracking-[-0.005em] text-[#111111] sm:text-4xl md:text-5xl lg:text-[56px] lg:leading-[64px]">
                 {vm.engagementHeader.titleLine1}
                 <br />
@@ -323,10 +321,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
         <div className="tb-container">
           <div className="mx-auto w-full max-w-[1139px]">
             <div className="text-center">
-              <div className="mx-auto mb-2.5 inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
-                <p className="text-xs font-medium leading-4 text-[#666666]">{vm.howItWorksHeader.pill}</p>
-              </div>
+              <SectionPill label={vm.howItWorksHeader.pill} className="mx-auto mb-2.5" textClassName="text-xs" />
               <h2 className="text-3xl font-bold leading-tight tracking-[-0.005em] text-[#111111] sm:text-4xl md:text-5xl lg:text-[56px] lg:leading-[64px]">
                 {vm.howItWorksHeader.title}
               </h2>
@@ -376,10 +371,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
           <div className="mx-auto w-full max-w-[1139px]">
             {/* Header */}
             <div className="mb-10">
-              <div className="mb-2.5 inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                <p className="text-xs font-medium leading-4 text-[#111111]">{vm.platformsIntro.pill}</p>
-              </div>
+              <SectionPill label={vm.platformsIntro.pill} className="mb-2.5" textClassName="text-xs" />
               <h2 className="mt-4 text-3xl font-bold leading-tight tracking-[-0.005em] text-[#111111] sm:text-4xl md:text-5xl lg:text-[56px] lg:leading-[64px]">
                 {vm.platformsIntro.title}
               </h2>
@@ -497,10 +489,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
           <div className="mx-auto w-full max-w-[1139px]">
             {/* Header */}
             <div className="mb-14">
-              <div className="mb-5 inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                <p className="text-xs font-medium leading-4 text-[#111111]">Why Choose TechBubble</p>
-              </div>
+              <SectionPill label="Why Choose TechBubble" className="mb-5" textClassName="text-xs" />
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-10">
                 <h2 className="w-full text-3xl font-bold leading-tight tracking-[-0.005em] text-[#111111] sm:text-4xl md:text-5xl lg:w-[541px] lg:shrink-0 lg:text-[56px] lg:leading-[64px]">
                   We&apos;re more than a<br />vendor. We&apos;re your tech partner.
@@ -688,10 +677,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
         <div className="tb-container">
           <div className="mx-auto flex max-w-[1139px] flex-col items-center">
             {/* Badge */}
-            <div className="mb-10 inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-              <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
-              <p className="text-[12px] font-medium leading-4 text-[#666666]">Global Presence</p>
-            </div>
+            <SectionPill label="Global Presence" className="mb-10" />
             {/* Heading */}
             <h2 className="text-center text-3xl font-bold leading-tight tracking-[-0.005em] text-white sm:text-4xl md:text-5xl lg:text-[56px] lg:leading-[64px]">
               6 offices. 3 continents.<br />One standard of excellence.
@@ -733,10 +719,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
             {/* Header */}
               <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-8">
               <div>
-                <div className="mb-6 inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-                  <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                  <p className="text-[12px] font-medium leading-4 text-[#111111]">Proven Results</p>
-                </div>
+                <SectionPill label="Proven Results" className="mb-6" />
                 <h2 className="text-3xl font-bold leading-tight tracking-[-0.005em] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">Case Studies</h2>
                 <p className="mt-3 text-base leading-7 text-[#666666] md:text-[18px]">Proven success across diverse industries and challenges.</p>
               </div>
@@ -945,10 +928,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
         <div className="tb-container">
           <div className="mx-auto grid max-w-[1136px] grid-cols-1 gap-10 lg:grid-cols-[360px_1fr] lg:gap-[72px]">
             <div>
-              <div className="mb-[6px] inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                <p className="text-[12px] font-medium leading-4 text-[#111111]">FAQ</p>
-              </div>
+              <SectionPill label="FAQ" className="mb-[6px]" />
               <h2 className="max-w-[385px] text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">
                 Questions we
                 <br />
@@ -1017,10 +997,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
         <div className="relative tb-container">
           <div className="mx-auto grid max-w-[1137px] grid-cols-1 items-start justify-between gap-10 lg:grid-cols-[604px_420px] lg:gap-[63px]">
             <div className="lg:pt-[67px]">
-              <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                <p className="text-[12px] font-medium leading-4 text-[#111111]">{vm.scheduleDemo.pill}</p>
-              </div>
+              <SectionPill label={vm.scheduleDemo.pill} />
               <h2 className="mt-4 whitespace-pre-line text-3xl font-bold leading-tight tracking-[-0.28px] text-white sm:text-4xl md:text-5xl lg:text-[56px] lg:leading-[64px]">
                 {vm.scheduleDemo.title}
               </h2>
@@ -1121,10 +1098,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
         <div className="tb-container">
           <div className="mx-auto grid max-w-[1136px] grid-cols-1 gap-8 lg:grid-cols-[1fr_413px]">
             <div>
-              <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                <p className="text-[12px] font-medium leading-4 text-[#111111]">{vm.careersBand.pill}</p>
-              </div>
+              <SectionPill label={vm.careersBand.pill} />
               <h2 className="mt-2 max-w-[640px] text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">
                 {vm.careersBand.title}
               </h2>
@@ -1236,10 +1210,7 @@ function JourneySection({ journey }: { journey: MarketingHomePayload["journey"] 
         <div className="mx-auto w-full max-w-[1139px]">
           {/* Header */}
           <div className="text-center">
-            <div className="mx-auto mb-2.5 inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-              <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
-              <p className="text-xs font-medium leading-4 text-[#666666]">{header.pill}</p>
-            </div>
+            <SectionPill label={header.pill} className="mx-auto mb-2.5" textClassName="text-xs" />
             <h2 className="text-3xl font-bold leading-tight tracking-[-0.005em] text-[#111111] sm:text-4xl md:text-5xl lg:text-[56px] lg:leading-[64px]">
               {header.titleLine1}
               <br />

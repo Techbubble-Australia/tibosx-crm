@@ -6,6 +6,7 @@ import { getPublishedJobs } from "@/lib/api/public";
 import { fetchSiteContentPayload } from "@/lib/fetch-site-content";
 import { resolveCareersPage } from "@/lib/site-content/resolve-pages";
 import { CareersPositionsSection } from "@/components/careers/CareersPositionsSection";
+import { SectionPill } from "@/components/ui/SectionPill";
 
 const CAREERS_ICONS: Record<string, LucideIcon> = {
   Laptop,
@@ -82,10 +83,7 @@ export default async function CareersPage() {
       <section className="bg-white pb-10">
         <div className="tb-container">
           <div className="mx-auto max-w-[1136px]">
-            <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-              <span className="h-1.5 w-1.5 rounded-[3px] bg-[#666666]" aria-hidden />
-              <p className="text-[12px] font-medium leading-4 text-[#666666]">{c.cultureSection.eyebrow}</p>
-            </div>
+            <SectionPill label={c.cultureSection.eyebrow} />
             <h2 className="mt-2 text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">{c.cultureSection.title}</h2>
             <p className="mt-1 max-w-[898px] text-[18px] leading-7 text-[#666666]">{c.cultureSection.subtitle}</p>
             <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -130,10 +128,7 @@ export default async function CareersPage() {
         <div className="tb-container relative">
           <div className="mx-auto grid max-w-[1136px] grid-cols-1 justify-between gap-10 lg:grid-cols-[536px_1fr]">
             <div>
-              <div className="inline-flex h-7 items-center gap-2 rounded-[24px] border border-[#e5e5e5] bg-[#f7f7f7] px-3">
-                <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                <p className="text-[12px] font-medium leading-4 text-[#111111]">Apply Now</p>
-              </div>
+              <SectionPill label="Apply Now" />
 
               <h2 className="mt-4 text-3xl font-bold leading-tight tracking-[-0.28px] text-white md:text-5xl lg:text-[56px] lg:leading-[64px]">Take the First Step</h2>
               <p className="mt-1 text-[18px] font-normal leading-7 text-[#e5e5e5]">
