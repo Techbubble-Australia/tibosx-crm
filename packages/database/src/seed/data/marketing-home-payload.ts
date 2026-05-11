@@ -9,11 +9,16 @@ export const marketingHomePayload = {
     title: "We Deliver World-Class Digital Transformations powered by AI",
     subtitle:
       "AI-driven digital transformation across Asia Pacific and North America — connecting ambitious enterprises with the top 1% of platform talent, fast.",
-    trustChips: ["No lock-in contracts", "Onboard in <24 hours", "Best-any-quote guarantee", "24/7 support included"],
+    trustChips: [
+      "Onboard in <24 hours",
+      "Timezone Aligned",
+      "Beat-any-quote guarantee",
+      "24/7 support included",
+    ],
     socialProof: {
-      initials: ["TY", "SC", "TL", "DF", "MK"],
-      clientLabel: "50+ enterprise clients",
-      ratingLabel: "5.0 avg. rating",
+      initials: ["TY", "SC", "TL", "PP", "+"],
+      clientLabel: "50+ enterprises served",
+      ratingLabel: "4.7 avg. rating",
       availableLabel: "Available now",
     },
   },

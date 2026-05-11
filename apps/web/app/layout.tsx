@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
+import { Figtree, Fira_Sans, Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { SiteChrome } from "@/components/SiteChrome";
 import { fetchSiteContentPayload } from "@/lib/fetch-site-content";
@@ -10,6 +11,27 @@ const inter = Inter({
   display: "swap",
   weight: ["400", "500", "600", "700", "800"],
   variable: "--font-inter",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["700"],
+  variable: "--font-space-grotesk",
+});
+
+const figtree = Figtree({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400"],
+  variable: "--font-figtree",
+});
+
+const firaSans = Fira_Sans({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["300", "400", "500"],
+  variable: "--font-fira-sans",
 });
 
 export const metadata: Metadata = {
@@ -37,7 +59,10 @@ export default async function RootLayout({
   const announcement = isAnnouncementPayload(raw) ? raw : null;
 
   return (
-    <html lang="en" className={inter.variable}>
+    <html
+      lang="en"
+      className={`${inter.variable} ${GeistSans.variable} ${spaceGrotesk.variable} ${figtree.variable} ${firaSans.variable}`}
+    >
       <body className={`${inter.className} antialiased`}>
         <SiteChrome announcement={announcement}>{children}</SiteChrome>
       </body>

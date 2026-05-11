@@ -22,6 +22,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { MarketingHomePayload } from "@/lib/data/marketing-home-payload";
 import { buildMarketingHomeViewModel } from "@/lib/marketing-home-view";
 import heroNetworkPattern from "@image/home-hero-network.svg";
+import heroGovNsw from "@image/hero-gov-nsw-approved-supplier.png";
+import heroGovVictoria from "@image/hero-gov-victoria-approved-supplier.png";
+import heroGovQueensland from "@image/hero-gov-queensland-wordmark.png";
 import caseStudyCampusImage from "@image/techbubble_-_home_34.jpg";
 import caseStudyCampusImageAlt from "@image/techbubble_-_home_35.jpg";
 import innovationImage from "@image/Innovation_Cutting_Edge_Tech.png";
@@ -150,7 +153,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
           className="pointer-events-none absolute inset-0 bg-[length:880px_auto] bg-top opacity-60"
           style={{ backgroundImage: `url(${heroNetworkPattern})` }}
         />
-        <div className="relative tb-container py-10 text-center md:py-15 lg:py-15">
+        <div className="relative tb-container pt-6 text-center md:pt-8 lg:pt-10">
           <div className="mb-8 inline-flex overflow-hidden rounded-full border border-neutral-200 bg-white shadow-sm">
             <span className="bg-black px-3 py-2 text-xs font-bold uppercase tracking-wide text-white">{vm.hero.pillLeft}</span>
             <span className="flex items-center gap-1 px-4 py-2 text-xs font-medium text-neutral-700">
@@ -158,7 +161,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
               <ArrowRight className="h-3.5 w-3.5" aria-hidden />
             </span>
           </div>
-          <h1 className="mx-auto max-w-4xl text-4xl font-bold tracking-tight text-[#0a0a0a] md:text-5xl lg:text-[3.25rem] lg:leading-[1.1]">
+          <h1 className="order-0 mx-auto w-full max-w-[1137px] shrink-0 grow-0 text-balance text-center font-geist text-3xl font-black leading-[1.1] tracking-[-0.01em] text-[#111111] sm:text-4xl md:text-5xl lg:text-[80px] lg:leading-[88px]">
             {vm.hero.title}
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-neutral-600">
@@ -176,72 +179,115 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
               Explore Services
             </Link>
           </div>
-          <div className="mx-auto mt-10 flex max-w-3xl flex-wrap items-center justify-center gap-2 sm:gap-3">
-            {vm.hero.trustChips.map((label) => (
-              <span
-                key={label}
-                className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-2 text-left text-xs font-medium text-neutral-800 shadow-sm"
-              >
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500">
-                  <Check className="h-3 w-3 text-white" strokeWidth={3} aria-hidden />
-                </span>
-                {label}
-              </span>
-            ))}
-          </div>
-          <div className="mx-auto mt-14 flex max-w-2xl flex-wrap items-center justify-center gap-4 text-sm">
-            <div className="flex -space-x-2">
-              {vm.hero.socialProof.initials.map((initials) => (
+          <div className="order-2 mx-auto mt-10 flex w-full max-w-[766px] shrink-0 grow-0 flex-col items-center gap-4 px-2">
+            <div className="flex flex-none flex-row flex-wrap items-center justify-center gap-[10px]">
+              {vm.hero.trustChips.map((label) => (
                 <span
-                  key={initials}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-neutral-200 text-xs font-semibold text-neutral-700"
+                  key={label}
+                  className="inline-flex h-[37px] shrink-0 items-center gap-2 rounded-full border border-[#E5E5E5] bg-white px-[11px] shadow-[0px_2px_10px_rgba(0,0,0,0.06)]"
                 >
-                  {initials}
+                  <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[9px] border border-[#E5E5E5] bg-[#fafafa]">
+                    <Check className="h-2.5 w-2.5 text-[#111111]" strokeWidth={1.25} aria-hidden />
+                  </span>
+                  <span className="font-geist text-left text-[12px] font-medium leading-4 text-[#666666]">{label}</span>
                 </span>
               ))}
             </div>
-            <span className="font-semibold text-neutral-800">{vm.hero.socialProof.clientLabel}</span>
-            <span className="hidden h-4 w-px bg-neutral-300 sm:block" aria-hidden />
-            <span className="flex items-center gap-1">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <Star key={i} className="h-4 w-4 fill-amber-400 text-amber-400" aria-hidden />
-              ))}
-            </span>
-            <span className="font-medium text-neutral-700">{vm.hero.socialProof.ratingLabel}</span>
-            <span className="hidden h-4 w-px bg-neutral-300 sm:block" aria-hidden />
-            <span className="inline-flex items-center gap-2 text-neutral-700">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
-              {vm.hero.socialProof.availableLabel}
-            </span>
+            <div className="flex w-full max-w-[484px] flex-none flex-col items-center justify-center gap-3 sm:flex-row sm:gap-0">
+              <div className="flex items-center">
+                <div className="flex shrink-0 -space-x-2">
+                  {vm.hero.socialProof.initials.map((initials) => (
+                    <span
+                      key={initials}
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#F7F7F7] bg-[#E5E5E5] text-[10px] font-bold leading-4 text-[#4E4E4E] ${
+                        initials === "+" ? "font-sans" : "font-spaceGrotesk"
+                      }`}
+                    >
+                      {initials}
+                    </span>
+                  ))}
+                </div>
+                <span className="pl-3 font-geist text-[14px] font-semibold leading-5 text-[#111111] sm:pl-4">
+                  {vm.hero.socialProof.clientLabel}
+                </span>
+              </div>
+              <span
+                className="hidden h-7 w-px shrink-0 bg-black/12 sm:mx-3 sm:block"
+                aria-hidden
+              />
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-1.5">
+                <div
+                  className="flex items-center gap-0.5 font-figtree text-[13px] leading-[21px] tracking-[1px] text-[#F59E0B]"
+                  aria-hidden
+                >
+                  {[0, 1, 2, 3].map((i) => (
+                    <Star key={i} className="h-[15px] w-[15px] fill-[#F59E0B] stroke-[#F59E0B]" strokeWidth={1} />
+                  ))}
+                  <span className="relative inline-flex h-[15px] w-[8px] shrink-0 overflow-hidden">
+                    <Star className="h-[15px] w-[15px] fill-[#F59E0B] stroke-[#F59E0B]" strokeWidth={1} />
+                  </span>
+                </div>
+                <span className="font-geist text-[13px] font-normal leading-[21px] text-[#666666]">
+                  {vm.hero.socialProof.ratingLabel}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Government supplier strip — Figma: flush card, static row, rounded top */}
+          <div className="relative z-[1] mx-auto mt-12 w-full max-w-[1139px] px-0 sm:px-2">
+            <div
+              className="pointer-events-none absolute bottom-full left-0 right-0 h-20"
+              aria-hidden
+            />
+            <div className="rounded-t-[20px] border border-b-0 border-[#E5E5E5] bg-white/95 shadow-[0px_8px_32px_rgba(0,0,0,0.09)] backdrop-blur-[6px] supports-[backdrop-filter]:bg-white/90">
+              <div className="flex min-h-[142px] flex-col items-center justify-center gap-10 px-4 py-6 sm:flex-row sm:gap-[81px] sm:px-6 md:px-8">
+                <div className="flex h-[89px] w-full max-w-[238px] shrink-0 items-center justify-center">
+                  <Image
+                    src={heroGovNsw}
+                    alt="NSW Government approved supplier — ICT Services Scheme, Advanced Register"
+                    width={238}
+                    height={89}
+                    className="h-[89px] w-auto max-w-full object-contain"
+                    sizes="(max-width: 768px) 90vw, 238px"
+                  />
+                </div>
+                <div className="flex h-[89px] w-full max-w-[242px] shrink-0 items-center justify-center overflow-hidden rounded-md">
+                  <Image
+                    src={heroGovVictoria}
+                    alt="Victoria State Government — Approved Supplier, Buying for Victoria"
+                    width={242}
+                    height={89}
+                    className="h-[89px] w-auto max-w-full object-contain"
+                    sizes="(max-width: 768px) 90vw, 242px"
+                  />
+                </div>
+                <div className="flex h-[89px] w-full max-w-[280px] shrink-0 items-center justify-center overflow-hidden rounded-md">
+                  <Image
+                    src={heroGovQueensland}
+                    alt="Queensland Government"
+                    width={280}
+                    height={89}
+                    className="h-[89px] w-auto max-w-full object-contain object-left"
+                    sizes="(max-width: 768px) 90vw, 280px"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Trusted partners — elevated card + pill + logo strip */}
-      <section className="bg-[#f9f9f9] pb-16 pt-2 md:pb-24 md:pt-4">
-        <div className="tb-container">
-          <div className="relative z-0">
-            <div className="rounded-[24px] border border-[#e5e5e5] bg-white px-6 py-12 shadow-[0_20px_60px_-36px_rgba(0,0,0,0.22)] md:px-8 overflow-hidden">
-              <div className="flex w-max animate-[marquee_30s_linear_infinite] items-center gap-6">
-                {[...vm.featuredPartnerCard, ...vm.featuredPartnerCard].map((p, i) => (
-                  <div
-                    key={`${p.id}-${i}`}
-                    className="flex shrink-0 items-center justify-center"
-                    style={{ width: '300px', height: '90px' }}
-                  >
-                    <Image src={p.image} alt={p.id} className={`${p.imageClass} h-auto w-auto max-w-full max-h-full object-contain`} width={300} height={90} />
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="relative z-10 -mt-4 flex justify-center px-4">
-              <span className="rounded-full border border-neutral-200/80 bg-[#f0f0f0] px-5 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500 shadow-sm">
-                Trusted by leading companies
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-14 w-full overflow-hidden">
+      {/* Trusted partners — Figma Frame 7 badge + corporate logo strip */}
+      <section className="relative bg-[#f9f9f9] pb-16 md:pb-24">
+        <div
+          className="absolute left-1/2 top-0 z-10 box-border flex min-h-[32px] w-[275px] max-w-[calc(100%-2rem)] -translate-x-1/2 flex-row items-center justify-center gap-1.5 rounded-t-none rounded-b-[24px] border border-[#E5E5E5] bg-[#FAFAFA] px-4 py-2 font-geist text-[12px] font-medium uppercase leading-4 text-[#666666]"
+          role="note"
+        >
+          Trusted by leading companies
+        </div>
+        <div className="tb-container pt-10">
+          <div className="w-full overflow-hidden">
             <div className="flex w-max animate-[marquee_30s_linear_infinite] items-center gap-[18px]">
               {[...vm.trustedLogoStrip, ...vm.trustedLogoStrip].map((logo, i) => (
                 <div key={`${logo.name}-${i}`} className="flex shrink-0 items-center justify-center" style={{ width: '180px', height: '80px' }}>
@@ -343,12 +389,20 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
 
                 <ul className="mt-8 grid gap-x-[11px] gap-y-4 sm:grid-cols-2">
                   {engagement.bullets.map((b, i) => {
-                    const staffIcons = [Zap, Shield, Clock, DollarSign];
-                    const IconComp = engagement.id === "staff" ? staffIcons[i] ?? Check : Check;
+                    // Always use checkbox for Product Delivery and Product Engineering
+                    const isCheckbox = engagement.id === "delivery" || engagement.id === "product";
                     return (
                       <li key={b} className="flex items-center gap-4">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-[#e5e5e5] bg-[#fafafa]">
-                          <IconComp className="h-[18px] w-[18px] text-[#111111]" strokeWidth={1.6} aria-hidden />
+                          {isCheckbox ? (
+                            <Check className="h-[18px] w-[18px] text-[#111111]" strokeWidth={2.2} aria-hidden />
+                          ) : (
+                            (() => {
+                              const staffIcons = [Zap, Shield, Clock, DollarSign];
+                              const IconComp = engagement.id === "staff" ? staffIcons[i] ?? Check : Check;
+                              return <IconComp className="h-[18px] w-[18px] text-[#111111]" strokeWidth={1.6} aria-hidden />;
+                            })()
+                          )}
                         </span>
                         <span className="text-[28px] font-medium leading-[36px] tracking-[-0.0025em] text-[#111111]">{b}</span>
                       </li>

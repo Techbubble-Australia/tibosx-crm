@@ -39,6 +39,10 @@ const config: Config = {
       fontFamily: {
         sans: ["var(--font-inter)", "var(--font-sans)", "system-ui", "sans-serif"],
         serif: ["var(--font-serif)", "Georgia", "Cambria", "Times New Roman", "serif"],
+        geist: ["var(--font-geist-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
+        figtree: ["var(--font-figtree)", "ui-sans-serif", "system-ui", "sans-serif"],
+        spaceGrotesk: ["var(--font-space-grotesk)", "ui-sans-serif", "system-ui", "sans-serif"],
+        fira: ["var(--font-fira-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       letterSpacing: {
         tight: "-0.02em",
