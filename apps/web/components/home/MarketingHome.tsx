@@ -151,7 +151,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
           className="pointer-events-none absolute inset-0 bg-[length:880px_auto] bg-top opacity-60"
           style={{ backgroundImage: `url(${heroNetworkPattern})` }}
         />
-        <div className="relative tb-container py-16 text-center md:py-24 lg:py-28">
+        <div className="relative tb-container py-10 text-center md:py-15 lg:py-15">
           <div className="mb-8 inline-flex overflow-hidden rounded-full border border-neutral-200 bg-white shadow-sm">
             <span className="bg-black px-3 py-2 text-xs font-bold uppercase tracking-wide text-white">{vm.hero.pillLeft}</span>
             <span className="flex items-center gap-1 px-4 py-2 text-xs font-medium text-neutral-700">
