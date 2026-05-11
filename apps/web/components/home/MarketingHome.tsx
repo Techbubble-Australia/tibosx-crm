@@ -106,10 +106,9 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          setStatsInView(true);
-          observer.disconnect();
-        }
+        if (!entry?.isIntersecting) return;
+        setStatsInView(true);
+        observer.disconnect();
       },
       { threshold: 0.35 },
     );
