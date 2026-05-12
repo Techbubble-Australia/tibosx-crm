@@ -110,8 +110,8 @@ function TabHeroStatsLogos({
           <textarea
             className={inputClass}
             rows={6}
-            value={[...v.hero.trustChips].join("\n")}
-            onChange={(e) => setHero({ trustChips: lines(e.target.value) })}
+            value={typeof v.hero.trustChips === 'string' ? v.hero.trustChips : (Array.isArray(v.hero.trustChips) ? v.hero.trustChips.join("\n") : "")}
+            onChange={(e) => setHero({ trustChips: e.target.value })}
           />
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -271,8 +271,8 @@ function TabEngagementHow({
                 <textarea
                   className={inputClass}
                   rows={4}
-                  value={[...m.bullets].join("\n")}
-                  onChange={(e) => setModel(i, { bullets: lines(e.target.value) })}
+                  value={Array.isArray(m.bullets) ? m.bullets.join("\n") : (typeof m.bullets === 'string' ? m.bullets : "")}
+                  onChange={(e) => setModel(i, { bullets: e.target.value.split("\n") })}
                 />
               </div>
               <div>
@@ -280,8 +280,8 @@ function TabEngagementHow({
                 <textarea
                   className={inputClass}
                   rows={3}
-                  value={[...m.tags].join("\n")}
-                  onChange={(e) => setModel(i, { tags: lines(e.target.value) })}
+                  value={Array.isArray(m.tags) ? m.tags.join("\n") : (typeof m.tags === 'string' ? m.tags : "")}
+                  onChange={(e) => setModel(i, { tags: e.target.value.split("\n") })}
                 />
               </div>
             </div>
@@ -383,8 +383,8 @@ function TabPlatforms({
             <textarea
               className={inputClass}
               rows={3}
-              value={[...plat.tags].join("\n")}
-              onChange={(e) => setPlat(pi, { tags: lines(e.target.value) })}
+              value={Array.isArray(plat.tags) ? plat.tags.join("\n") : (typeof plat.tags === 'string' ? plat.tags : "")}
+              onChange={(e) => setPlat(pi, { tags: e.target.value.split("\n") })}
             />
           </div>
         </section>
@@ -517,8 +517,8 @@ function TabFaqCtas({
         <textarea
           className={inputClass}
           rows={3}
-          value={[...v.scheduleDemo.bullets].join("\n")}
-          onChange={(e) => setSched({ bullets: lines(e.target.value) })}
+          value={Array.isArray(v.scheduleDemo.bullets) ? v.scheduleDemo.bullets.join("\n") : (typeof v.scheduleDemo.bullets === 'string' ? v.scheduleDemo.bullets : "")}
+          onChange={(e) => setSched({ bullets: e.target.value.split("\n") })}
         />
       </section>
 
@@ -530,8 +530,8 @@ function TabFaqCtas({
         <textarea
           className={inputClass}
           rows={3}
-          value={[...v.careersCta.bullets].join("\n")}
-          onChange={(e) => setCareersCta({ bullets: lines(e.target.value) })}
+          value={Array.isArray(v.careersCta.bullets) ? v.careersCta.bullets.join("\n") : (typeof v.careersCta.bullets === 'string' ? v.careersCta.bullets : "")}
+          onChange={(e) => setCareersCta({ bullets: e.target.value.split("\n") })}
         />
       </section>
 
