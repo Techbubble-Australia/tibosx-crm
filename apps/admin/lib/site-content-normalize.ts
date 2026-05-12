@@ -32,6 +32,28 @@ export function isVisualSiteContentKey(key: string): key is SiteContentFormKey {
   return (SITE_CONTENT_FORM_KEYS as readonly string[]).includes(key);
 }
 
+/**
+ * Coerces known form quirks before persisting (e.g. textarea fields stored as strings).
+ * Does not mutate the input object.
+ */
+export function serializeSiteContentForPersist(key: string, payload: unknown): unknown {
+  if (key !== "marketing_home" || !payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return payload;
+  }
+  const p = payload as Record<string, unknown>;
+  const hero = p.hero;
+  if (!hero || typeof hero !== "object" || Array.isArray(hero)) {
+    return payload;
+  }
+  const h = hero as Record<string, unknown>;
+  const tc = h.trustChips;
+  if (typeof tc === "string") {
+    const trustChips = tc.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+    return { ...p, hero: { ...h, trustChips } };
+  }
+  return payload;
+}
+
 export function normalizeSiteContentPayload(key: string, raw: unknown): unknown {
   if (!isVisualSiteContentKey(key)) {
     return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};

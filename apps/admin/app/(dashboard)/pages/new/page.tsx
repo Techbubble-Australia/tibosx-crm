@@ -9,6 +9,7 @@ import {
   SITE_CONTENT_FORM_KEYS,
   normalizeSiteContentPayload,
   isVisualSiteContentKey,
+  serializeSiteContentForPersist,
   type SiteContentFormKey,
 } from "@/lib/site-content-normalize";
 import { adminFetch } from "@/lib/admin-api";
@@ -50,7 +51,10 @@ export default function NewSitePageDocumentPage() {
       const res = await adminFetch(`/api/admin/site-content/${encodeURIComponent(keyRaw)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label: label.trim() || keyRaw, payload }),
+        body: JSON.stringify({
+          label: label.trim() || keyRaw,
+          payload: serializeSiteContentForPersist(keyRaw, payload),
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));

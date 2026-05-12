@@ -5,7 +5,11 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { SiteContentPayloadEditor } from "@/components/site-content/SiteContentPayloadEditor";
-import { normalizeSiteContentPayload, isVisualSiteContentKey } from "@/lib/site-content-normalize";
+import {
+  normalizeSiteContentPayload,
+  isVisualSiteContentKey,
+  serializeSiteContentForPersist,
+} from "@/lib/site-content-normalize";
 import { adminFetch } from "@/lib/admin-api";
 
 interface SiteContentRecord {
@@ -60,7 +64,10 @@ export default function EditSitePageDocumentPage() {
       const res = await adminFetch(`/api/admin/site-content/${encodeURIComponent(record.key)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label: label.trim() || record.key, payload }),
+        body: JSON.stringify({
+          label: label.trim() || record.key,
+          payload: serializeSiteContentForPersist(record.key, payload),
+        }),
       });
       if (!res.ok) throw new Error("Save failed");
       router.push("/pages");

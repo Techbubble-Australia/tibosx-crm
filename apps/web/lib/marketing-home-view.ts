@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { FileText, PhoneCall, Rocket, ShieldCheck } from "lucide-react";
-import type { MarketingHomePayload } from "@/lib/data/marketing-home-payload";
+import { marketingHomePayload, type MarketingHomePayload } from "@/lib/data/marketing-home-payload";
 import { HOME_IMAGE_MAP } from "@/lib/home-image-map";
 import type { StaticImageData } from "next/image";
 import defaultHomeImage from "@image/techbubble_-_home_1.png";
@@ -16,7 +16,8 @@ function mapImage(key: string, fallback?: StaticImageData): StaticImageData {
   return HOME_IMAGE_MAP[key] ?? fallback ?? defaultHomeImage;
 }
 
-function normalizePlatformTags(value: unknown): string[] {
+/** Coerces CMS / form values (array, newline string, CSV) into a clean string[]. */
+function normalizeStringList(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value.map((t) => String(t).trim()).filter(Boolean);
   }
@@ -27,6 +28,10 @@ function normalizePlatformTags(value: unknown): string[] {
       .filter(Boolean);
   }
   return [];
+}
+
+function normalizePlatformTags(value: unknown): string[] {
+  return normalizeStringList(value);
 }
 
 export function buildMarketingHomeViewModel(content: MarketingHomePayload) {
@@ -54,7 +59,23 @@ export function buildMarketingHomeViewModel(content: MarketingHomePayload) {
     })),
     faqItems: content.faqItems.map((f) => ({ question: f.question, answer: f.answer })),
     statsStrip: content.statsStrip,
-    hero: content.hero,
+    hero: (() => {
+      const h = content.hero;
+      const sp = h.socialProof;
+      const trustChips = normalizeStringList(h.trustChips);
+      const initials = normalizeStringList(sp?.initials);
+      const defaultSp = marketingHomePayload.hero.socialProof;
+      return {
+        ...h,
+        trustChips,
+        socialProof: {
+          initials: initials.length ? initials : [...defaultSp.initials],
+          clientLabel: typeof sp?.clientLabel === "string" ? sp.clientLabel : defaultSp.clientLabel,
+          ratingLabel: typeof sp?.ratingLabel === "string" ? sp.ratingLabel : defaultSp.ratingLabel,
+          availableLabel: typeof sp?.availableLabel === "string" ? sp.availableLabel : defaultSp.availableLabel,
+        },
+      };
+    })(),
     engagementHeader: content.engagement.header,
     engagementHelp: content.engagement.helpCard,
     howItWorksHeader: {

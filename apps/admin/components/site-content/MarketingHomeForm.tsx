@@ -8,10 +8,6 @@ type HomePayload = any;
 /** Explicit `any` for `.map` callbacks so `noImplicitAny` passes when iterating `HomePayload`. */
 type HomeAny = any;
 
-function lines(s: string): string[] {
-  return s.split("\n").map((l) => l.trim()).filter(Boolean);
-}
-
 const tabs = [
   "Hero, stats & logos",
   "Engagement & how it works",
@@ -110,7 +106,7 @@ function TabHeroStatsLogos({
           <textarea
             className={inputClass}
             rows={6}
-            value={typeof v.hero.trustChips === 'string' ? v.hero.trustChips : (Array.isArray(v.hero.trustChips) ? v.hero.trustChips.join("\n") : "")}
+            value={typeof v.hero.trustChips === "string" ? v.hero.trustChips : Array.isArray(v.hero.trustChips) ? v.hero.trustChips.join("\n") : ""}
             onChange={(e) => setHero({ trustChips: e.target.value })}
           />
         </div>
