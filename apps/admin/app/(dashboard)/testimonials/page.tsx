@@ -23,7 +23,7 @@ export default function TestimonialsPage() {
 
   async function fetchTestimonials() {
     try {
-      const res = await adminFetch("/api/admin/testimonials/admin/all");
+      const res = await adminFetch("/api/admin/testimonials/all");
       const data = await res.json();
       setTestimonials(data.data || []);
     } catch (error) {

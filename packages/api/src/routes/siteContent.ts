@@ -19,6 +19,7 @@ publicRouter.get("/:key", async (req, res) => {
     if (!row) {
       return res.status(404).json({ error: "Not found" });
     }
+    res.set("Cache-Control", "no-store");
     res.json({ data: { key: row.key, label: row.label, payload: row.payload } });
   } catch (error) {
     console.error("Error fetching site content:", error);

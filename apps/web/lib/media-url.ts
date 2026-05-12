@@ -8,13 +8,20 @@ export const CASE_STUDY_IMAGE_PLACEHOLDER = "/images/placeholder-case-study.svg"
  * - Absolute http(s) → unchanged
  * - `/uploads/...` → prefixed with API origin (files are served by the API)
  */
+function uploadsPath(s: string): string | null {
+  if (s.startsWith("/uploads/")) return s;
+  if (s.toLowerCase().startsWith("uploads/")) return `/${s}`;
+  return null;
+}
+
 export function resolveMediaUrl(src: string | null | undefined): string {
   const s = (src ?? "").trim();
   if (!s) return CASE_STUDY_IMAGE_PLACEHOLDER;
   if (s.startsWith("http://") || s.startsWith("https://")) return s;
-  if (s.startsWith("/uploads/")) {
+  const upload = uploadsPath(s);
+  if (upload) {
     const base = getServerApiBaseUrl().replace(/\/$/, "");
-    return `${base}${s}`;
+    return `${base}${upload}`;
   }
   return s;
 }
@@ -24,9 +31,10 @@ export function resolveOptionalMediaUrl(src: string | null | undefined): string 
   const s = (src ?? "").trim();
   if (!s) return "";
   if (s.startsWith("http://") || s.startsWith("https://")) return s;
-  if (s.startsWith("/uploads/")) {
+  const upload = uploadsPath(s);
+  if (upload) {
     const base = getServerApiBaseUrl().replace(/\/$/, "");
-    return `${base}${s}`;
+    return `${base}${upload}`;
   }
   return s;
 }

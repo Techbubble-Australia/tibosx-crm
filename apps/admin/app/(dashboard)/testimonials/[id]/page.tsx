@@ -19,7 +19,7 @@ export default function EditTestimonialPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await adminFetch("/api/admin/testimonials/admin/all");
+        const res = await adminFetch("/api/admin/testimonials/all");
         const data = await res.json();
         const found = (data.data || []).find((item: { id: string }) => item.id === id);
         setT(found || null);

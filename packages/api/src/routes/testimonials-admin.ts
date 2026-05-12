@@ -15,22 +15,8 @@ const testimonialSchema = z.object({
   published: z.boolean().default(true),
 });
 
-// Public: list published testimonials
-router.get("/", async (req, res) => {
-  try {
-    const testimonials = await prisma.testimonial.findMany({
-      where: { published: true },
-      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-    });
-    res.json({ data: testimonials });
-  } catch (error) {
-    console.error("Error fetching testimonials:", error);
-    res.status(500).json({ error: "Failed to fetch testimonials" });
-  }
-});
-
-// Admin: list all testimonials (including unpublished)
-router.get("/admin/all", async (req, res) => {
+/** Admin: list all testimonials (including unpublished). Mounted at /api/admin/testimonials. */
+router.get("/all", async (_req, res) => {
   try {
     const testimonials = await prisma.testimonial.findMany({
       orderBy: [{ order: "asc" }, { createdAt: "asc" }],
@@ -42,7 +28,6 @@ router.get("/admin/all", async (req, res) => {
   }
 });
 
-// Admin: create testimonial
 router.post("/", async (req, res) => {
   try {
     const data = testimonialSchema.parse(req.body);
@@ -57,7 +42,6 @@ router.post("/", async (req, res) => {
   }
 });
 
-// Admin: update testimonial
 router.put("/:id", async (req, res) => {
   try {
     const data = testimonialSchema.partial().parse(req.body);
@@ -75,7 +59,6 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// Admin: delete testimonial
 router.delete("/:id", async (req, res) => {
   try {
     await prisma.testimonial.delete({ where: { id: req.params.id } });
@@ -86,4 +69,4 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-export { router as testimonialRoutes };
+export { router as testimonialAdminRoutes };

@@ -6,7 +6,7 @@ async function apiGet<T>(path: string): Promise<T | null> {
   try {
     const base = getServerApiBaseUrl().replace(/\/$/, "");
     const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) {
       if (process.env.NODE_ENV === "development") {
         console.warn(`[web apiGet] ${res.status} ${url}`);

@@ -16,6 +16,19 @@ function mapImage(key: string, fallback?: StaticImageData): StaticImageData {
   return HOME_IMAGE_MAP[key] ?? fallback ?? defaultHomeImage;
 }
 
+function normalizePlatformTags(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((t) => String(t).trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 export function buildMarketingHomeViewModel(content: MarketingHomePayload) {
   return {
     featuredPartnerCard: content.featuredPartners.map((p) => ({
@@ -35,7 +48,10 @@ export function buildMarketingHomeViewModel(content: MarketingHomePayload) {
       body: s.body,
       icon: STEP_ICONS[s.icon] ?? PhoneCall,
     })),
-    platforms: content.platforms.map((p) => ({ ...p })),
+    platforms: content.platforms.map((p) => ({
+      ...p,
+      tags: normalizePlatformTags((p as { tags?: unknown }).tags),
+    })),
     faqItems: content.faqItems.map((f) => ({ question: f.question, answer: f.answer })),
     statsStrip: content.statsStrip,
     hero: content.hero,

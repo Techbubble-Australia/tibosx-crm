@@ -384,7 +384,14 @@ function TabPlatforms({
               className={inputClass}
               rows={3}
               value={Array.isArray(plat.tags) ? plat.tags.join("\n") : (typeof plat.tags === 'string' ? plat.tags : "")}
-              onChange={(e) => setPlat(pi, { tags: e.target.value.split("\n") })}
+              onChange={(e) =>
+                setPlat(pi, {
+                  tags: e.target.value
+                    .split(/\r?\n/)
+                    .map((line) => line.trim())
+                    .filter(Boolean),
+                })
+              }
             />
           </div>
         </section>
