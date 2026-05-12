@@ -109,7 +109,7 @@ function TabHeroStatsLogos({
           <label className={labelClass}>Trust chips (one per line)</label>
           <textarea
             className={inputClass}
-            rows={4}
+            rows={6}
             value={[...v.hero.trustChips].join("\n")}
             onChange={(e) => setHero({ trustChips: lines(e.target.value) })}
           />
