@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { adminFetch } from "@/lib/admin-api";
+import { resolveAdminMediaPreviewUrl } from "@/lib/public-media-url";
 
 type Props = {
   name: string;
@@ -56,11 +57,11 @@ export function AdminImageField({
       <p className="mb-2 text-xs text-gray-500">{helpText}</p>
       <input type="hidden" name={name} value={url} readOnly />
       <input
-        type="url"
+        type="text"
         value={url}
         onChange={(e) => setUrl(e.target.value)}
         className={className}
-        placeholder="https://…"
+        placeholder="https://… or /uploads/…"
         aria-label={label}
       />
       <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -79,7 +80,11 @@ export function AdminImageField({
       </div>
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element -- admin preview of arbitrary URLs
-        <img src={url} alt="" className="mt-3 h-28 max-w-full rounded-lg border border-gray-200 object-cover" />
+        <img
+          src={resolveAdminMediaPreviewUrl(url)}
+          alt=""
+          className="mt-3 h-28 max-w-full rounded-lg border border-gray-200 object-cover"
+        />
       ) : null}
     </div>
   );

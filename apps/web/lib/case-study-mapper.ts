@@ -140,11 +140,35 @@ function techIconLabel(icon: string, name: string): string {
   return name.charAt(0).toUpperCase();
 }
 
+function normalizeBannerImagesList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((s) => String(s).trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    const t = value.trim();
+    if (!t) {
+      return [];
+    }
+    try {
+      const parsed = JSON.parse(t) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed.map((s) => String(s).trim()).filter(Boolean);
+      }
+    } catch {
+      /* single URL string */
+    }
+    return [t];
+  }
+  return [];
+}
+
 function resolveBannerGalleryUrls(data: CaseStudyApiRecord): string[] {
-  const raw = Array.isArray(data.bannerImages) ? data.bannerImages : [];
+  const raw = normalizeBannerImagesList((data as { bannerImages?: unknown }).bannerImages);
   const trimmed = raw.map((s) => String(s).trim()).filter(Boolean);
   const resolved = trimmed.map((s) => resolveMediaUrl(s));
-  if (resolved.length > 0) return resolved;
+  if (resolved.length > 0) {
+    return resolved;
+  }
   return [resolveMediaUrl(data.featuredImage)];
 }
 

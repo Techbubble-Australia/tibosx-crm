@@ -49,9 +49,9 @@ router.post("/image", upload.single("image"), (req, res) => {
       return res.status(400).json({ error: "No file uploaded" });
     }
     
-    const baseUrl = process.env.UPLOAD_URL || "http://localhost:3001/uploads";
-    const fileUrl = `${baseUrl}/${req.file.filename}`;
-    
+    /** Portable path; clients resolve with their public API base (see web `resolveMediaUrl`). */
+    const fileUrl = `/uploads/${req.file.filename}`;
+
     res.json({
       message: "File uploaded successfully",
       data: {
@@ -73,9 +73,8 @@ router.post("/resume", upload.single("resume"), (req, res) => {
       return res.status(400).json({ error: "No file uploaded" });
     }
     
-    const baseUrl = process.env.UPLOAD_URL || "http://localhost:3001/uploads";
-    const fileUrl = `${baseUrl}/${req.file.filename}`;
-    
+    const fileUrl = `/uploads/${req.file.filename}`;
+
     res.json({
       message: "Resume uploaded successfully",
       data: {

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ImagePlus, Info, Loader2, Plus, Trash2, Upload } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
+import { resolveAdminMediaPreviewUrl } from "@/lib/public-media-url";
 
 type Props = {
   formKey: string;
@@ -105,7 +106,7 @@ export function AdminBannerImagesField({ formKey, initialUrls }: Props) {
             >
               {primary ? (
                 // eslint-disable-next-line @next/next/no-img-element -- admin preview
-                <img src={primary} alt="" className="h-full w-full object-cover" />
+                <img src={resolveAdminMediaPreviewUrl(primary)} alt="" className="h-full w-full object-cover" />
               ) : (
                 <div className="flex h-full min-h-[120px] flex-col items-center justify-center gap-2 px-4 text-center text-neutral-500">
                   <LayoutPlaceholder />
@@ -118,7 +119,7 @@ export function AdminBannerImagesField({ formKey, initialUrls }: Props) {
               <div className="min-w-0 flex-1">
                 <label className="mb-1.5 block text-xs font-medium text-neutral-700">Image URL</label>
                 <input
-                  type="url"
+                  type="text"
                   value={primary}
                   onChange={(e) => setAt(0, e.target.value)}
                   className={inputClass}
@@ -205,7 +206,7 @@ export function AdminBannerImagesField({ formKey, initialUrls }: Props) {
                       <div className="relative mb-3 aspect-[16/10] overflow-hidden rounded-md bg-neutral-100">
                         {url ? (
                           // eslint-disable-next-line @next/next/no-img-element -- admin preview
-                          <img src={url} alt="" className="h-full w-full object-cover" />
+                          <img src={resolveAdminMediaPreviewUrl(url)} alt="" className="h-full w-full object-cover" />
                         ) : (
                           <div className="flex h-full items-center justify-center text-[10px] text-neutral-400">
                             No image
@@ -213,11 +214,11 @@ export function AdminBannerImagesField({ formKey, initialUrls }: Props) {
                         )}
                       </div>
                       <input
-                        type="url"
+                        type="text"
                         value={url}
                         onChange={(e) => setAt(index, e.target.value)}
                         className={inputClass}
-                        placeholder="Image URL"
+                        placeholder="Image URL or /uploads/…"
                         aria-label={`Thumbnail ${tIdx + 1} URL`}
                       />
                       <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-neutral-200 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50">
