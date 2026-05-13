@@ -864,7 +864,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_377px]">
                 {/* Featured card */}
                 <div className="flex flex-col overflow-hidden rounded-[24px] border border-[#e5e5e5] bg-white md:flex-row md:h-[547px]">
-                  <div className="flex flex-1 flex-col px-6 pb-[22px] pt-[26px] md:w-[518px] md:px-[37px]">
+                  <div className="flex min-w-0 flex-1 flex-col px-6 pb-[22px] pt-[26px] md:w-[518px] md:px-[37px]">
                     <div className="flex items-center justify-between">
                       <span className="inline-flex h-7 items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
                         SERVICENOW
@@ -883,20 +883,24 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
                     <p className="mt-[7px] w-full text-[16px] leading-6 text-[#666666] md:w-[446px]">
                       How TechBubble rebuilt NextCare&apos;s fragmented Salesforce environment from the ground up — delivering regulatory compliance, 60% faster reporting, and a care-worker-first UX within a non-negotiable deadline.
                     </p>
-                    <div className="mt-auto flex items-end justify-between">
-                      <div className="flex gap-[59px]">
-                        <div>
-                          <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-black">40%</p>
-                          <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">Efficiency gains</p>
+                    <div className="mt-auto flex min-w-0 items-center justify-between gap-4 pt-6">
+                      <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-4 sm:gap-x-10">
+                        <div className="flex min-w-0 flex-col gap-2">
+                          <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">40%</p>
+                          <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
+                            Efficiency gains
+                          </p>
                         </div>
-                        <div>
-                          <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-black">3</p>
-                          <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">Domains delivered</p>
+                        <div className="flex min-w-0 flex-col gap-2">
+                          <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">3</p>
+                          <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
+                            Domains delivered
+                          </p>
                         </div>
                       </div>
                       <Link
                         href="/case-studies/university-of-sydney"
-                        className="inline-flex h-[43px] w-[95px] items-center justify-center gap-2 whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
+                        className="inline-flex h-[43px] w-[95px] shrink-0 items-center justify-center gap-2 self-center whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
                       >
                         Read
                         <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
@@ -924,7 +928,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
                 </div>
 
                 {/* Toyota card */}
-                <div className="flex flex-col rounded-[24px] border border-[#e5e5e5] bg-white px-[30px] pb-[26px] pt-9 lg:h-[547px]">
+                <div className="flex min-w-0 flex-col rounded-[24px] border border-[#e5e5e5] bg-white px-[30px] pb-[26px] pt-9 lg:min-h-0">
                   <div className="flex flex-1 flex-col border-b border-[#eff2f7] pb-[52px]">
                     <div className="flex items-center justify-between">
                       <span className="inline-flex h-[28px] items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
@@ -942,20 +946,24 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
                       Toyota USA required a ServiceNow partner who could combine deep technical xpertise with the agility to handle a complex, multi-domain rollout. TechBubble delivered a comprehensive implementation covering ITSM, CSM, and custom workflows — with post-launch support that ensured zero business disruption.
                     </p>
                   </div>
-                  <div className="flex items-end justify-between pt-[21px]">
-                    <div className="flex gap-[31px]">
-                      <div>
-                        <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-black">40%</p>
-                        <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">Efficiency gains</p>
+                  <div className="flex min-w-0 shrink-0 items-center justify-between gap-4 pt-[21px]">
+                    <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-4 sm:gap-x-8">
+                      <div className="flex min-w-0 flex-col gap-2">
+                        <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">40%</p>
+                        <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
+                          Efficiency gains
+                        </p>
                       </div>
-                      <div>
-                        <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-black">3</p>
-                        <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">Domains delivered</p>
+                      <div className="flex min-w-0 flex-col gap-2">
+                        <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">3</p>
+                        <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
+                          Domains delivered
+                        </p>
                       </div>
                     </div>
                     <Link
                       href="/case-studies/toyota-usa"
-                      className="inline-flex h-[43px] w-[95px] items-center justify-center gap-2 whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
+                      className="inline-flex h-[43px] w-[95px] shrink-0 items-center justify-center gap-2 self-center whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
                     >
                       Read
                       <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
@@ -970,7 +978,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
                 {
                   tag: "SALESFORCE",
                   title: "NextCare Aged Services — Salesforce UX Overhaul",
-                    body: "NextCare needed a complete re-architecture of their Salesforce environment to support growing operational complexity across multiple care facilities. TechBubble rebuilt their data model, redesigned user-facing flows, anddelivered a custom reporting layer — meeting tight regulatory deadlines.",
+                    body: "NextCare needed a complete re-architecture of their Salesforce environment to support growing operational complexity across multiple care facilities. TechBubble rebuilt their data model, redesigned user-facing flows, and delivered a custom reporting layer — meeting tight regulatory deadlines.",
                   stats: [{ v: "60%", l: "Faster reporting" }, { v: "5 star", l: "Client rating" }],
                   slug: "nextcare",
                 },
@@ -989,8 +997,8 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
                     slug: "nidi-tech",
                   },
               ].map((c) => (
-                  <div key={c.slug} className="flex flex-col rounded-[24px] border border-[#e2e7f4] bg-white px-9 pb-[23px] pt-9 lg:h-[494px]">
-                    <div className="flex flex-1 flex-col border-b border-[#eff2f7] pb-[19px]">
+                  <div key={c.slug} className="flex min-w-0 flex-col rounded-[24px] border border-[#e2e7f4] bg-white px-9 pb-6 pt-9">
+                    <div className="flex min-h-0 flex-1 flex-col border-b border-[#eff2f7] pb-5">
                       <div className="flex items-center justify-between">
                         <span className="inline-flex h-[28px] w-fit items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
                           {c.tag}
@@ -1001,20 +1009,22 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
                         </span>
                       </div>
                       <h3 className="mt-[9px] text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">{c.title}</h3>
-                      <p className="mt-[13px] flex-1 text-[16px] leading-6 text-[#666666]">{c.body}</p>
+                      <p className="mt-[13px] min-h-0 flex-1 text-[16px] leading-6 text-[#666666]">{c.body}</p>
                     </div>
-                    <div className="flex items-end justify-between pt-4">
-                      <div className="flex gap-[44px]">
+                    <div className="flex min-w-0 shrink-0 items-center justify-between gap-4 pt-5">
+                      <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-3 gap-y-3 sm:gap-x-6">
                         {c.stats.map((s) => (
-                          <div key={s.l}>
-                            <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-black">{s.v}</p>
-                            <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">{s.l}</p>
+                          <div key={s.l} className="flex min-w-0 flex-col gap-2">
+                            <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">{s.v}</p>
+                            <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
+                              {s.l}
+                            </p>
                           </div>
                         ))}
                       </div>
                       <Link
                         href={`/case-studies/${c.slug}`}
-                        className="inline-flex h-[43px] w-[95px] items-center justify-center gap-2 whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
+                        className="inline-flex h-[43px] w-[95px] shrink-0 items-center justify-center gap-2 self-center whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
                       >
                         Read
                         <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
