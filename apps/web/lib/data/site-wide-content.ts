@@ -13,28 +13,124 @@ export const servicesPagePayload = {
     subtitle:
       "From AI-powered staff augmentation to fixed-fee project delivery and custom product engineering — we have the expertise and talent to accelerate your enterprise.",
   },
+  /** Hero trust row — icon keys map in apps/web services page */
   highlights: [
     {
-      title: "Rapid Deployment",
-      description: "Get started in under 24 hours with our streamlined onboarding process.",
-      bodyWidth: "w-[213px]",
+      title: "Scalability",
+      description: "Elastic capacity to scale specialist teams up or down as your priorities shift.",
+      icon: "Scaling",
     },
     {
-      title: "Timezone Aligned",
-      description: "Our teams work in your timezone for seamless real-time collaboration.",
-      bodyWidth: "w-[213px]",
+      title: "Transparency",
+      description: "Weekly reporting, clear milestones, and predictable governance on every engagement.",
+      icon: "Transparency",
     },
     {
       title: "Quality Assured",
-      description: "Rigorous quality standards and governance at no additional cost.",
-      bodyWidth: "w-[204px]",
+      description: "Multi-stage vetting, code review, and QA baked into every delivery increment.",
+      icon: "Quality",
     },
     {
       title: "Global Reach",
-      description: "Offices in USA, Australia, India, and Philippines for local support.",
-      bodyWidth: "w-[196px]",
+      description: "Delivery hubs across APAC, North America, the UK, and the Middle East.",
+      icon: "Global",
     },
   ],
+  projectServices: {
+    eyebrow: "01. Services",
+    title: "Project Services",
+    body: "End-to-end delivery for complex enterprise initiatives — from discovery and solution architecture through build, QA, and handover. We embed senior practitioners who align to your governance model and ship outcomes on a predictable cadence.",
+    bullets: [
+      "Discovery workshops and joint solution shaping",
+      "Architecture, roadmaps, and delivery governance",
+      "Agile squads integrated with your tools and ceremonies",
+      "Hypercare, documentation, and clean knowledge transfer",
+    ],
+    tags: ["Strategy", "Design", "Development", "QA", "DevOps"],
+    missionCard: {
+      title: "Our Mission",
+      body: "We make world-class engineering talent accessible to ambitious enterprises — combining AI-enabled matching with human judgment, transparent delivery, and uncompromising quality.",
+      metrics: [
+        { value: "10+", label: "Years Experience" },
+        { value: "6+", label: "Offices" },
+      ],
+    },
+  },
+  productDevelopment: {
+    eyebrow: "02. Services",
+    title: "Product Development",
+    intro:
+      "Whether you are launching a greenfield product or modernising a legacy estate, we bring product-minded engineers, designers, and platform specialists who ship increments every sprint.",
+    bullets: [
+      "End-to-end product squads with design and engineering",
+      "Design systems, UX research, and accessibility baked in",
+      "Cloud-native architectures and secure release pipelines",
+      "Continuous delivery automation and observability",
+    ],
+    metricsBar: [
+      { value: "150+", label: "Projects delivered" },
+      { value: "18+", label: "Tech stacks" },
+      { value: "AI Driven", label: "Solutions" },
+      { value: "24/7", label: "Support" },
+    ],
+    tags: ["React", "Node.js", "Python", "AWS", "Kubernetes", "AI/ML"],
+  },
+  staffingServices: {
+    eyebrow: "03. Services",
+    title: "Staffing Services",
+    body: "Scale your teams with pre-vetted specialists who embed in your workflows, tools, and ceremonies — onboarded in as little as 24 hours with SLA-backed performance.",
+    bullets: [
+      "AI-matched profiles within hours of your request",
+      "Timezone-aligned squads for real-time collaboration",
+      "Governance, reporting, and escalation paths included",
+      "48-hour replacement guarantee on eligible engagements",
+    ],
+    tags: ["Salesforce", "ServiceNow", "MuleSoft", "Data", "Cloud"],
+    metricsTitle: "Key Metrics",
+    metrics: [
+      { value: "24h", label: "Response time" },
+      { value: "98%", label: "Success rate" },
+      { value: "150+", label: "Talent pool" },
+    ],
+  },
+  processSection: {
+    eyebrow: "Our process",
+    title: "From Request to Results in 4 Steps",
+    subtitle: "A clear, repeatable path from first conversation to measurable outcomes.",
+  },
+  /** Lucide icon keys: MessageCircle | LineChart | FileText | Rocket */
+  processSteps: [
+    {
+      icon: "MessageCircle",
+      title: "Initial Contact",
+      description: "Share your goals, constraints, and timeline — we align on scope and success metrics.",
+    },
+    {
+      icon: "LineChart",
+      title: "Analysis",
+      description: "We assess skills, platforms, and delivery model fit — then propose the right team shape.",
+    },
+    {
+      icon: "FileText",
+      title: "Proposal",
+      description: "Transparent plan, milestones, commercials, and governance — agreed before kick-off.",
+    },
+    {
+      icon: "Rocket",
+      title: "Implementation",
+      description: "Specialists onboard fast, deliver in cadence, and hand over with documentation and training.",
+    },
+  ],
+  cta: {
+    title: "Ready to Transform Your Business?",
+    description:
+      "Tell us about your roadmap and we will respond with a tailored approach — typically within four business hours.",
+    primaryLabel: "Contact Us",
+    primaryHref: "/contact",
+    secondaryLabel: "Learn More",
+    secondaryHref: "/about",
+    checklist: ["Dedicated engagement lead", "Clear outcomes and KPIs", "No-obligation discovery session"],
+  },
 };
 
 export const pricingPagePayload = {

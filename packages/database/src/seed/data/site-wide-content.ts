@@ -13,127 +13,123 @@ export const servicesPagePayload = {
     subtitle:
       "From AI-powered staff augmentation to fixed-fee project delivery and custom product engineering — we have the expertise and talent to accelerate your enterprise.",
   },
+  /** Hero trust row — icon keys map in apps/web services page */
   highlights: [
     {
-      title: "Rapid Deployment",
-      description: "Get started in under 24 hours with our streamlined onboarding process.",
-      bodyWidth: "w-[213px]",
+      title: "Scalability",
+      description: "Elastic capacity to scale specialist teams up or down as your priorities shift.",
+      icon: "Scaling",
     },
     {
-      title: "Timezone Aligned",
-      description: "Our teams work in your timezone for seamless real-time collaboration.",
-      bodyWidth: "w-[213px]",
+      title: "Transparency",
+      description: "Weekly reporting, clear milestones, and predictable governance on every engagement.",
+      icon: "Transparency",
     },
     {
       title: "Quality Assured",
-      description: "Rigorous quality standards and governance at no additional cost.",
-      bodyWidth: "w-[204px]",
+      description: "Multi-stage vetting, code review, and QA baked into every delivery increment.",
+      icon: "Quality",
     },
     {
       title: "Global Reach",
-      description: "Offices in USA, Australia, India, and Philippines for local support.",
-      bodyWidth: "w-[196px]",
+      description: "Delivery hubs across APAC, North America, the UK, and the Middle East.",
+      icon: "Global",
     },
   ],
-  engagementSection: {
-    eyebrow: "Our Engagement Models",
-    title: "Choose the Model That Fits Your Needs",
-    subtitle:
-      "Three proven engagement models - each designed to give you maximum value and zero surprises.",
+  projectServices: {
+    eyebrow: "01. Services",
+    title: "Project Services",
+    body: "End-to-end delivery for complex enterprise initiatives — from discovery and solution architecture through build, QA, and handover. We embed senior practitioners who align to your governance model and ship outcomes on a predictable cadence.",
+    bullets: [
+      "Discovery workshops and joint solution shaping",
+      "Architecture, roadmaps, and delivery governance",
+      "Agile squads integrated with your tools and ceremonies",
+      "Hypercare, documentation, and clean knowledge transfer",
+    ],
+    tags: ["Strategy", "Design", "Development", "QA", "DevOps"],
+    missionCard: {
+      title: "Our Mission",
+      body: "We make world-class engineering talent accessible to ambitious enterprises — combining AI-enabled matching with human judgment, transparent delivery, and uncompromising quality.",
+      metrics: [
+        { value: "10+", label: "Years Experience" },
+        { value: "6+", label: "Offices" },
+      ],
+    },
   },
-  /** Three tier cards (matches marketing services layout: left / featured / right) */
-  serviceModels: [
-    {
-      name: "STARTER",
-      title: "Staff Augmentation",
-      description:
-        "Skilled engineers deployed to your team, fast. T&M pricing with full flexibility.",
-      price: "Custom",
-      priceNote: "/ based on role",
-      features: [
-        "1-10 engineers placed",
-        "Onboarded in <24 hours",
-        "Timezone-aligned resources",
-        "Flexible scale up/down",
-        "Dedicated account manager",
-        "48-hour replacement guarantee",
-      ],
-      cta: "Get a Quote",
-      emphasis: "standard",
-    },
-    {
-      name: "Professional",
-      title: "Project Delivery",
-      description: "Fixed-fee SaaS implementations with full end-to-end delivery assurance.",
-      price: "Fixed Fee",
-      priceNote: "",
-      features: [
-        "ServiceNow or Salesforce project",
-        "Dedicated project team assembled",
-        "Milestone-based delivery plan",
-        "99% on-budget delivery record",
-        "3-month post-launch support",
-        "Beat-any-quote guarantee",
-      ],
-      cta: "Start a Project",
-      emphasis: "featured",
-      featuredBadge: "Most Popular",
-    },
-    {
-      name: "ENTERPRISE",
-      title: "Product Engineering",
-      description:
-        "Full-scale product development with a\ndedicated AI-powered engineering team.",
-      price: "Tailored",
-      priceNote: "/ your scope",
-      features: [
-        "5-50+ dedicated engineers",
-        "Full-stack & mobile development",
-        "AI/ML integration included",
-        "DevSecOps pipeline setup",
-        "24/7 support & governance",
-        "Dedicated VP of Engineering",
-      ],
-      cta: "Talk to Sales",
-      emphasis: "standard",
-    },
-  ],
+  productDevelopment: {
+    eyebrow: "02. Services",
+    title: "Product Development",
+    intro:
+      "Whether you are launching a greenfield product or modernising a legacy estate, we bring product-minded engineers, designers, and platform specialists who ship increments every sprint.",
+    bullets: [
+      "End-to-end product squads with design and engineering",
+      "Design systems, UX research, and accessibility baked in",
+      "Cloud-native architectures and secure release pipelines",
+      "Continuous delivery automation and observability",
+    ],
+    metricsBar: [
+      { value: "150+", label: "Projects delivered" },
+      { value: "18+", label: "Tech stacks" },
+      { value: "AI Driven", label: "Solutions" },
+      { value: "24/7", label: "Support" },
+    ],
+    tags: ["React", "Node.js", "Python", "AWS", "Kubernetes", "AI/ML"],
+  },
+  staffingServices: {
+    eyebrow: "03. Services",
+    title: "Staffing Services",
+    body: "Scale your teams with pre-vetted specialists who embed in your workflows, tools, and ceremonies — onboarded in as little as 24 hours with SLA-backed performance.",
+    bullets: [
+      "AI-matched profiles within hours of your request",
+      "Timezone-aligned squads for real-time collaboration",
+      "Governance, reporting, and escalation paths included",
+      "48-hour replacement guarantee on eligible engagements",
+    ],
+    tags: ["Salesforce", "ServiceNow", "MuleSoft", "Data", "Cloud"],
+    metricsTitle: "Key Metrics",
+    metrics: [
+      { value: "24h", label: "Response time" },
+      { value: "98%", label: "Success rate" },
+      { value: "150+", label: "Talent pool" },
+    ],
+  },
   processSection: {
-    eyebrow: "How We Work",
+    eyebrow: "Our process",
     title: "From Request to Results in 4 Steps",
-    subtitle: "A streamlined approach to ensure your success from day one.",
+    subtitle: "A clear, repeatable path from first conversation to measurable outcomes.",
   },
-  /** Lucide icon keys: Phone | Search | User | Heart */
+  /** Lucide icon keys: MessageCircle | LineChart | FileText | Rocket */
   processSteps: [
     {
-      icon: "Phone",
-      title: "Submit Request",
-      description: "Tell us your requirement — role, platform, timeline, or project brief.",
+      icon: "MessageCircle",
+      title: "Initial Contact",
+      description: "Share your goals, constraints, and timeline — we align on scope and success metrics.",
     },
     {
-      icon: "Search",
-      title: "AI Matching",
-      description: "Our engine shortlists 2–4 pre-vetted specialists within hours.",
+      icon: "LineChart",
+      title: "Analysis",
+      description: "We assess skills, platforms, and delivery model fit — then propose the right team shape.",
     },
     {
-      icon: "User",
-      title: "You Choose",
-      description: "Review profiles, run an optional 30-min tech interview, confirm.",
+      icon: "FileText",
+      title: "Proposal",
+      description: "Transparent plan, milestones, commercials, and governance — agreed before kick-off.",
     },
     {
-      icon: "Heart",
-      title: "Onboarded in 24h",
-      description: "Contracts signed, tools live, and your specialist is productive by tomorrow.",
+      icon: "Rocket",
+      title: "Implementation",
+      description: "Specialists onboard fast, deliver in cadence, and hand over with documentation and training.",
     },
   ],
   cta: {
     title: "Ready to Transform Your Business?",
     description:
-      "Join 50+ enterprises who trust TechBubble to power their most critical technology initiatives.",
-    primaryLabel: "Request a Free Consultation",
+      "Tell us about your roadmap and we will respond with a tailored approach — typically within four business hours.",
+    primaryLabel: "Contact Us",
     primaryHref: "/contact",
-    secondaryLabel: "View Pricing",
-    secondaryHref: "/pricing",
+    secondaryLabel: "Learn More",
+    secondaryHref: "/about",
+    checklist: ["Dedicated engagement lead", "Clear outcomes and KPIs", "No-obligation discovery session"],
   },
 };
 

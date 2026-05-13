@@ -13,16 +13,44 @@ export type CareersPagePayload = typeof careersPagePayload;
 export function resolveServicesPage(raw: unknown): ServicesPagePayload {
   if (!raw || typeof raw !== "object") return servicesPagePayload;
   const r = raw as Partial<ServicesPagePayload>;
+  const base = servicesPagePayload;
   return {
-    ...servicesPagePayload,
+    ...base,
     ...r,
-    hero: { ...servicesPagePayload.hero, ...r.hero },
-    highlights: r.highlights ?? servicesPagePayload.highlights,
-    engagementSection: { ...servicesPagePayload.engagementSection, ...r.engagementSection },
-    serviceModels: r.serviceModels ?? servicesPagePayload.serviceModels,
-    processSection: { ...servicesPagePayload.processSection, ...r.processSection },
-    processSteps: r.processSteps ?? servicesPagePayload.processSteps,
-    cta: { ...servicesPagePayload.cta, ...r.cta },
+    hero: { ...base.hero, ...r.hero },
+    highlights: r.highlights ?? base.highlights,
+    projectServices: {
+      ...base.projectServices,
+      ...r.projectServices,
+      bullets: r.projectServices?.bullets ?? base.projectServices.bullets,
+      tags: r.projectServices?.tags ?? base.projectServices.tags,
+      missionCard: {
+        ...base.projectServices.missionCard,
+        ...r.projectServices?.missionCard,
+        metrics: r.projectServices?.missionCard?.metrics ?? base.projectServices.missionCard.metrics,
+      },
+    },
+    productDevelopment: {
+      ...base.productDevelopment,
+      ...r.productDevelopment,
+      bullets: r.productDevelopment?.bullets ?? base.productDevelopment.bullets,
+      metricsBar: r.productDevelopment?.metricsBar ?? base.productDevelopment.metricsBar,
+      tags: r.productDevelopment?.tags ?? base.productDevelopment.tags,
+    },
+    staffingServices: {
+      ...base.staffingServices,
+      ...r.staffingServices,
+      bullets: r.staffingServices?.bullets ?? base.staffingServices.bullets,
+      tags: r.staffingServices?.tags ?? base.staffingServices.tags,
+      metrics: r.staffingServices?.metrics ?? base.staffingServices.metrics,
+    },
+    processSection: { ...base.processSection, ...r.processSection },
+    processSteps: r.processSteps ?? base.processSteps,
+    cta: {
+      ...base.cta,
+      ...r.cta,
+      checklist: r.cta?.checklist ?? base.cta.checklist,
+    },
   };
 }
 

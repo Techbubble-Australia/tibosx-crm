@@ -25,43 +25,8 @@ import heroNetworkPattern from "@image/home-hero-network.svg";
 import heroGovNsw from "@image/hero-gov-nsw-approved-supplier.png";
 import heroGovVictoria from "@image/hero-gov-victoria-approved-supplier.png";
 import heroGovQueensland from "@image/hero-gov-queensland-wordmark.png";
-import caseStudyCampusImage from "@image/techbubble_-_home_34.jpg";
-import caseStudyCampusImageAlt from "@image/techbubble_-_home_35.jpg";
 import innovationImage from "@image/Innovation_Cutting_Edge_Tech.png";
-
-const caseStudyItems = [
-  {
-    title: "University of Sydney — Digital transformation uplift",
-    category: "Strategy + Delivery",
-    summary:
-      "End-to-end modernisation program across workflows, integrations, and student-facing digital experiences.",
-    image: caseStudyCampusImage,
-  },
-  {
-    title: "Major Energy Utility — Field ops optimisation",
-    category: "ServiceNow",
-    summary: "Improved dispatch speed, SLA adherence, and cross-team visibility with governed release cycles.",
-    image: caseStudyCampusImageAlt,
-  },
-  {
-    title: "National Retail Group — CRM unification",
-    category: "Salesforce",
-    summary: "Consolidated customer operations and launched automated journeys across key business units.",
-    image: caseStudyCampusImage,
-  },
-  {
-    title: "Health Provider — Integration modernization",
-    category: "MuleSoft",
-    summary: "Built resilient APIs and event-driven integrations across critical care and business systems.",
-    image: caseStudyCampusImageAlt,
-  },
-  {
-    title: "Enterprise Bank — Data platform acceleration",
-    category: "Data + Cloud",
-    summary: "Migrated analytics workloads with improved governance and faster business reporting cycles.",
-    image: caseStudyCampusImage,
-  },
-];
+import { CASE_STUDY_SIDEBAR, type CaseStudyListCard } from "@/lib/case-study-mapper";
 
 export type HomePreviewJob = { slug: string; title: string; meta: string; href: string };
 export type HomeClientStory = {
@@ -77,6 +42,9 @@ type MarketingHomeProps = {
   content: MarketingHomePayload;
   testimonials: HomeClientStory[];
   previewJobs: HomePreviewJob[];
+  caseStudyFeatured: CaseStudyListCard | null;
+  caseStudySecondary: CaseStudyListCard | null;
+  caseStudyGrid: CaseStudyListCard[];
 };
 
 function parseStatValue(raw: string): { target: number; suffix: string } {
@@ -87,7 +55,34 @@ function parseStatValue(raw: string): { target: number; suffix: string } {
   return { target: Number(match[1]), suffix: match[2] ?? "" };
 }
 
-export function MarketingHome({ content, testimonials, previewJobs }: MarketingHomeProps) {
+const WORLD_CLOCK_ZONES = [
+  { city: "Sydney", timeZone: "Australia/Sydney" },
+  { city: "London", timeZone: "Europe/London" },
+  { city: "New York", timeZone: "America/New_York" },
+  { city: "Ahmedabad", timeZone: "Asia/Kolkata" },
+] as const;
+
+function formatWorldClockTime(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone,
+  }).format(date);
+}
+
+function caseStudyCategoryPill(category: string): string {
+  return category.trim().toUpperCase();
+}
+
+export function MarketingHome({
+  content,
+  testimonials,
+  previewJobs,
+  caseStudyFeatured,
+  caseStudySecondary,
+  caseStudyGrid,
+}: MarketingHomeProps) {
   const vm = useMemo(() => buildMarketingHomeViewModel(content), [content]);
   const [engagementId, setEngagementId] = useState<string>(vm.engagementModels[0]!.id);
   const [platformId, setPlatformId] = useState<string>(vm.platforms[0]!.id);
@@ -95,13 +90,29 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
   const statsSectionRef = useRef<HTMLElement | null>(null);
   const [statsInView, setStatsInView] = useState(false);
   const [animatedStats, setAnimatedStats] = useState<number[]>(() => vm.statsStrip.items.map(() => 0));
+  const [worldClockNow, setWorldClockNow] = useState(() => new Date());
+  const [worldClocksReady, setWorldClocksReady] = useState(false);
 
   const statTargets = useMemo(() => vm.statsStrip.items.map((s) => parseStatValue(s.n)), [vm.statsStrip.items]);
+
+  useEffect(() => {
+    setWorldClocksReady(true);
+    setWorldClockNow(new Date());
+    const id = window.setInterval(() => setWorldClockNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     setAnimatedStats(vm.statsStrip.items.map(() => 0));
     setStatsInView(false);
   }, [vm.statsStrip.items]);
+
+  useEffect(() => {
+    const ids = new Set(vm.engagementModels.map((m) => m.id));
+    if (!ids.has(engagementId) && vm.engagementModels[0]?.id) {
+      setEngagementId(vm.engagementModels[0].id);
+    }
+  }, [vm.engagementModels, engagementId]);
 
   useEffect(() => {
     const node = statsSectionRef.current;
@@ -352,7 +363,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
             </div>
 
             <div className="grid gap-10 lg:grid-cols-[300px_1fr] lg:gap-[63px]">
-              <div className="w-full">
+              <div className="flex w-full flex-col gap-3">
                 {vm.engagementModels.map((m, index) => (
                   <div key={m.id}>
                     <button
@@ -364,8 +375,9 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
                     >
                       {m.navLabel}
                     </button>
-                    {index === 0 ? <div className="mb-3 mt-[17px] h-px w-full bg-[#e5e5e5]" /> : null}
-                    {index === 1 ? <div className="mb-[13px] mt-2 h-px w-full bg-[#e5e5e5]" /> : null}
+                    {index < vm.engagementModels.length - 1 ? (
+                      <div className="mt-3 h-px w-full bg-[#e5e5e5]" aria-hidden />
+                    ) : null}
                   </div>
                 ))}
 
@@ -389,20 +401,17 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
 
                 <ul className="mt-8 grid gap-x-[11px] gap-y-4 sm:grid-cols-2">
                   {engagement.bullets.map((b, i) => {
-                    // Always use checkbox for Product Delivery and Product Engineering
-                    const isCheckbox = engagement.id === "delivery" || engagement.id === "product";
+                    const useCheckmarks = engagement.bulletListStyle === "checkboxes";
+                    const featureIcons = [Zap, Shield, Clock, DollarSign];
+                    const IconComp = useCheckmarks ? Check : featureIcons[i] ?? Check;
                     return (
-                      <li key={b} className="flex items-center gap-4">
+                      <li key={`${engagement.id}-${b}-${i}`} className="flex items-center gap-4">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-[#e5e5e5] bg-[#fafafa]">
-                          {isCheckbox ? (
-                            <Check className="h-[18px] w-[18px] text-[#111111]" strokeWidth={2.2} aria-hidden />
-                          ) : (
-                            (() => {
-                              const staffIcons = [Zap, Shield, Clock, DollarSign];
-                              const IconComp = engagement.id === "staff" ? staffIcons[i] ?? Check : Check;
-                              return <IconComp className="h-[18px] w-[18px] text-[#111111]" strokeWidth={1.6} aria-hidden />;
-                            })()
-                          )}
+                          <IconComp
+                            className="h-[18px] w-[18px] text-[#111111]"
+                            strokeWidth={useCheckmarks ? 2.2 : 1.6}
+                            aria-hidden
+                          />
                         </span>
                         <span className="text-[28px] font-medium leading-[36px] tracking-[-0.0025em] text-[#111111]">{b}</span>
                       </li>
@@ -673,39 +682,63 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
                 </div>
               </div>
 
-              {/* TIMEZONE — 6 cols */}
-              <div className="rounded-[24px] border border-[#e5e5e5] bg-gradient-to-br from-[#f5f5f5] via-[#e9e9e9] to-[#eeeeee] p-8 sm:col-span-6">
-                <h3 className="text-[28px] font-bold leading-[36px] tracking-[-0.0025em] text-[#06091a]">Time Zone Alignment — Always</h3>
-                <p className="mt-4 max-w-[305px] text-[16px] leading-6 text-[#666666]">
-                  Your resources work your exact hours. Whether you&apos;re in Sydney, San Francisco, or London — real-time collaboration, zero overnight handoffs, maximum productivity every day.
-                </p>
-                {/* Timezone + world-clock row */}
-                <div className="mt-6 flex items-end gap-6">
-                  <div>
-                    {/* Timezone pills row 1 */}
-                    <div className="flex flex-wrap gap-2">
-                      {["🇦🇺 AEST", "🇺🇸 EST / PST", "🇬🇧 GMT"].map((tz) => (
-                        <span key={tz} className="inline-flex h-8 items-center rounded-[35px] border border-[#e5e5e5] bg-white px-4 text-[12px] font-bold text-[#666666]">{tz}</span>
-                      ))}
-                    </div>
-                    {/* Timezone pills row 2 */}
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {["🇮🇳 IST", "🇵🇭 PHT"].map((tz) => (
-                        <span key={tz} className="inline-flex h-8 items-center rounded-[35px] border border-[#e5e5e5] bg-white px-4 text-[12px] font-bold text-[#666666]">{tz}</span>
-                      ))}
+              {/* TIMEZONE — 6 cols (reference: light grey panel, white chips & clock cards) */}
+              <div className="rounded-[24px] bg-[#f2f2f2] p-8 sm:p-10 sm:col-span-6">
+                <div className="flex flex-col gap-10 lg:flex-row lg:items-start lg:justify-between lg:gap-12">
+                  <div className="min-w-0 flex-1 lg:max-w-[520px]">
+                    <h3 className="text-[28px] font-bold leading-[36px] tracking-[-0.0025em] text-[#06091a]">
+                      Time Zone Alignment — Always
+                    </h3>
+                    <p className="mt-4 text-[16px] leading-6 text-[#666666]">
+                      Your resources work your exact hours. Whether you&apos;re in Sydney, San Francisco, or London —
+                      real-time collaboration, zero overnight handoffs, maximum productivity every day.
+                    </p>
+                    <div className="mt-8 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { flag: "🇦🇺", label: "AEST" },
+                          { flag: "🇺🇸", label: "EST / PST" },
+                          { flag: "🇬🇧", label: "GMT" },
+                        ].map((chip) => (
+                          <span
+                            key={chip.label}
+                            className="inline-flex h-9 items-center gap-2 rounded-full border border-[#e8e8e8] bg-white px-4 text-[12px] font-bold leading-none text-[#111111]"
+                          >
+                            <span className="text-[14px] leading-none" aria-hidden>
+                              {chip.flag}
+                            </span>
+                            {chip.label}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { flag: "🇮🇳", label: "IST" },
+                          { flag: "🇵🇭", label: "PHT" },
+                        ].map((chip) => (
+                          <span
+                            key={chip.label}
+                            className="inline-flex h-9 items-center gap-2 rounded-full border border-[#e8e8e8] bg-white px-4 text-[12px] font-bold leading-none text-[#111111]"
+                          >
+                            <span className="text-[14px] leading-none" aria-hidden>
+                              {chip.flag}
+                            </span>
+                            {chip.label}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                  {/* World clocks */}
-                  <div className="flex flex-col gap-[8px]">
-                    {[
-                      { time: "17:08", city: "Sydney" },
-                      { time: "06:08", city: "London" },
-                      { time: "02:08", city: "New York" },
-                      { time: "11:38", city: "Ahmedabad" },
-                    ].map((c) => (
-                      <div key={c.city} className="flex w-[154px] items-center justify-between rounded-[10px] border border-[#e5e5e5] bg-[#fafafa] px-3 py-2">
-                        <span className="text-[16px] font-bold leading-6 text-[#666666]">{c.time}</span>
-                        <span className="text-[10px] font-medium tracking-[0.01em] text-[#666666]">{c.city}</span>
+                  <div className="flex w-full flex-col gap-2 lg:w-[min(100%,220px)] lg:shrink-0">
+                    {WORLD_CLOCK_ZONES.map((z) => (
+                      <div
+                        key={z.city}
+                        className="flex items-center justify-between rounded-[12px] border border-[#e8e8e8] bg-white px-4 py-3"
+                      >
+                        <span className="text-[16px] font-bold tabular-nums leading-6 text-[#111111]">
+                          {worldClocksReady ? formatWorldClockTime(worldClockNow, z.timeZone) : "—:—"}
+                        </span>
+                        <span className="pl-3 text-right text-[12px] font-medium leading-4 text-[#666666]">{z.city}</span>
                       </div>
                     ))}
                   </div>
@@ -862,178 +895,195 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
               ))}
             </div>
 
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_377px]">
-                {/* Featured card */}
-                <div className="flex flex-col overflow-hidden rounded-[24px] border border-[#e5e5e5] bg-white md:flex-row md:h-[547px]">
-                  <div className="flex min-w-0 flex-1 flex-col px-6 pb-[22px] pt-[26px] md:w-[518px] md:px-[37px]">
-                    <div className="flex items-center justify-between">
-                      <span className="inline-flex h-7 items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
-                        SERVICENOW
-                      </span>
-                      <span className="flex items-center gap-1.5 text-[12px] font-medium leading-4 text-[#666666]">
-                        <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                        Wednesday, 8 April 2026
-                      </span>
-                    </div>
-                    <div className="mt-[14px] h-[150px] w-full overflow-hidden rounded-[15px] bg-[#e5e5e5] md:w-[451px]">
-                      <Image src={caseStudyCampusImage} alt="University of Sydney campus" className="h-full w-full object-cover" />
-                    </div>
-                    <h3 className="mt-[19px] w-full text-xl font-bold leading-9 tracking-[-0.07px] text-[#06091a] md:w-[446px] md:text-[28px]">
-                      University of Sydney — Rapid IT Talent Deployment Across CTO Office
-                    </h3>
-                    <p className="mt-[7px] w-full text-[16px] leading-6 text-[#666666] md:w-[446px]">
-                      How TechBubble rebuilt NextCare&apos;s fragmented Salesforce environment from the ground up — delivering regulatory compliance, 60% faster reporting, and a care-worker-first UX within a non-negotiable deadline.
-                    </p>
-                    <div className="mt-auto flex min-w-0 items-center justify-between gap-4 pt-6">
-                      <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-4 sm:gap-x-10">
-                        <div className="flex min-w-0 flex-col gap-2">
-                          <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">40%</p>
-                          <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
-                            Efficiency gains
-                          </p>
-                        </div>
-                        <div className="flex min-w-0 flex-col gap-2">
-                          <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">3</p>
-                          <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
-                            Domains delivered
-                          </p>
-                        </div>
-                      </div>
-                      <Link
-                        href="/case-studies/university-of-sydney"
-                        className="inline-flex h-[43px] w-[95px] shrink-0 items-center justify-center gap-2 self-center whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
-                      >
-                        Read
-                        <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
-                      </Link>
-                    </div>
-                  </div>
-                  <div className="hidden w-[228px] shrink-0 flex-col bg-[#111111] px-[25px] py-[49px] text-white md:flex">
-                    <p className="text-[12px] font-bold leading-4">ON THIS CASE STUDY</p>
-                    <div className="mt-[15px]">
-                      {[
-                        { label: "Background", active: false },
-                        { label: "The Challenge", active: false },
-                        { label: "Our Solution", active: false },
-                        { label: "Technology Stack", active: false },
-                        { label: "Results", active: false },
-                        { label: "Key Takeaways", active: true },
-                      ].map((item) => (
-                        <div key={item.label} className="flex h-[42px] items-center border-b border-[#e5e5e5] last:border-b-0">
-                          <span className={`mr-[10px] h-[14px] w-[3px] rounded-[2px] ${item.active ? "bg-[#086eff]" : "bg-white"}`} aria-hidden />
-                          <span className="text-[12px] font-medium leading-4 text-white">{item.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Toyota card */}
-                <div className="flex min-w-0 flex-col rounded-[24px] border border-[#e5e5e5] bg-white px-[30px] pb-[26px] pt-9 lg:min-h-0">
-                  <div className="flex flex-1 flex-col border-b border-[#eff2f7] pb-[52px]">
-                    <div className="flex items-center justify-between">
-                      <span className="inline-flex h-[28px] items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
-                        SERVICENOW
-                      </span>
-                      <span className="flex items-center gap-1.5 text-[12px] font-medium leading-4 text-[#666666]">
-                        <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                        Wednesday, 8 April 2026
-                      </span>
-                    </div>
-                    <h3 className="mt-[13px] w-full text-xl font-bold leading-9 tracking-[-0.07px] text-[#06091a] md:text-[28px]">
-                      Toyota USA — Enterprise ServiceNow Implementation
-                    </h3>
-                    <p className="mt-[16px] w-full text-[16px] leading-6 text-[#666666]">
-                      Toyota USA required a ServiceNow partner who could combine deep technical xpertise with the agility to handle a complex, multi-domain rollout. TechBubble delivered a comprehensive implementation covering ITSM, CSM, and custom workflows — with post-launch support that ensured zero business disruption.
-                    </p>
-                  </div>
-                  <div className="flex min-w-0 shrink-0 items-center justify-between gap-4 pt-[21px]">
-                    <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-4 sm:gap-x-8">
-                      <div className="flex min-w-0 flex-col gap-2">
-                        <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">40%</p>
-                        <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
-                          Efficiency gains
-                        </p>
-                      </div>
-                      <div className="flex min-w-0 flex-col gap-2">
-                        <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">3</p>
-                        <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
-                          Domains delivered
-                        </p>
-                      </div>
-                    </div>
-                    <Link
-                      href="/case-studies/toyota-usa"
-                      className="inline-flex h-[43px] w-[95px] shrink-0 items-center justify-center gap-2 self-center whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
-                    >
-                      Read
-                      <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
-                    </Link>
-                  </div>
-                </div>
+            {!caseStudyFeatured ? (
+              <div className="mt-8 rounded-[24px] border border-dashed border-[#e5e5e5] bg-white px-8 py-16 text-center">
+                <p className="text-[18px] font-semibold text-[#111111]">No published case studies yet</p>
+                <p className="mt-2 text-[16px] leading-6 text-[#666666]">
+                  Publish case studies in the admin app — they will appear here automatically.
+                </p>
+                <Link
+                  href="/case-studies"
+                  className="mt-6 inline-flex h-11 items-center justify-center rounded-full bg-[#111111] px-6 text-[14px] font-semibold text-white"
+                >
+                  View case studies
+                </Link>
               </div>
-
-              {/* Row 2 */}
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {[
-                {
-                  tag: "SALESFORCE",
-                  title: "NextCare Aged Services — Salesforce UX Overhaul",
-                    body: "NextCare needed a complete re-architecture of their Salesforce environment to support growing operational complexity across multiple care facilities. TechBubble rebuilt their data model, redesigned user-facing flows, and delivered a custom reporting layer — meeting tight regulatory deadlines.",
-                  stats: [{ v: "60%", l: "Faster reporting" }, { v: "5 star", l: "Client rating" }],
-                  slug: "nextcare",
-                },
-                {
-                  tag: "STAFFING",
-                  title: "BrainPower LLC — Offshore Talent Program at Scale",
-                    body: "Skeptical of offshore models, Brainpower LLC partnered with TechBubble to pilot an offshore staffing program across five concurrent client engagements. TechBubble's governance model and timezone-aligned teams removed every hesitation — delivering consistent quality across all projects.",
-                  stats: [{ v: "5", l: "Clients served" }, { v: "35%", l: "Cost reduction" }],
-                  slug: "brainpower",
-                },
-                  {
-                    tag: "SALESFORCE",
-                    title: "Nidi Tech Solutions — Salesforce Process Transformation",
-                    body: "Nidi Tech required a highly configurable Salesforce solution aligned to complex business logic across their sales and service operations. TechBubble delivered an end-to-end implementation that significantly improved operational efficiency and customer satisfaction scores within the first quarter post-launch.",
-                    stats: [{ v: "45%", l: "Ops efficiency uplift" }, { v: "Q1", l: "ROI realised in" }],
-                    slug: "nidi-tech",
-                  },
-              ].map((c) => (
-                  <div key={c.slug} className="flex min-w-0 flex-col rounded-[24px] border border-[#e2e7f4] bg-white px-9 pb-6 pt-9">
-                    <div className="flex min-h-0 flex-1 flex-col border-b border-[#eff2f7] pb-5">
+            ) : (
+              <>
+                <div
+                  className={
+                    caseStudySecondary
+                      ? "grid grid-cols-1 gap-4 lg:grid-cols-[1fr_377px]"
+                      : "grid grid-cols-1 gap-4"
+                  }
+                >
+                  <div className="flex flex-col overflow-hidden rounded-[24px] border border-[#e5e5e5] bg-white md:flex-row md:h-[547px]">
+                    <div className="flex min-w-0 flex-1 flex-col px-6 pb-[22px] pt-[26px] md:w-[518px] md:px-[37px]">
                       <div className="flex items-center justify-between">
-                        <span className="inline-flex h-[28px] w-fit items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
-                          {c.tag}
+                        <span className="inline-flex h-7 items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
+                          {caseStudyCategoryPill(caseStudyFeatured.category)}
                         </span>
                         <span className="flex items-center gap-1.5 text-[12px] font-medium leading-4 text-[#666666]">
                           <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                          Wednesday, 8 April 2026
+                          {caseStudyFeatured.date || "—"}
                         </span>
                       </div>
-                      <h3 className="mt-[9px] text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">{c.title}</h3>
-                      <p className="mt-[13px] min-h-0 flex-1 text-[16px] leading-6 text-[#666666]">{c.body}</p>
-                    </div>
-                    <div className="flex min-w-0 shrink-0 items-center justify-between gap-4 pt-5">
-                      <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-3 gap-y-3 sm:gap-x-6">
-                        {c.stats.map((s) => (
-                          <div key={s.l} className="flex min-w-0 flex-col gap-2">
-                            <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">{s.v}</p>
-                            <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
-                              {s.l}
+                      <div className="relative mt-[14px] h-[150px] w-full overflow-hidden rounded-[15px] bg-[#e5e5e5] md:w-[451px]">
+                        <Image
+                          src={caseStudyFeatured.image}
+                          alt={caseStudyFeatured.title}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 100vw, 451px"
+                        />
+                      </div>
+                      <h3 className="mt-[19px] w-full text-xl font-bold leading-9 tracking-[-0.07px] text-[#06091a] md:w-[446px] md:text-[28px]">
+                        {caseStudyFeatured.title}
+                      </h3>
+                      <p className="mt-[7px] w-full text-[16px] leading-6 text-[#666666] md:w-[446px]">
+                        {caseStudyFeatured.description}
+                      </p>
+                      <div className="mt-auto flex min-w-0 items-center justify-between gap-4 pt-6">
+                        <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-4 sm:gap-x-10">
+                          <div className="flex min-w-0 flex-col gap-2">
+                            <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">
+                              {caseStudyFeatured.stat1.value}
                             </p>
+                            <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
+                              {caseStudyFeatured.stat1.label}
+                            </p>
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-2">
+                            <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">
+                              {caseStudyFeatured.stat2.value}
+                            </p>
+                            <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
+                              {caseStudyFeatured.stat2.label}
+                            </p>
+                          </div>
+                        </div>
+                        <Link
+                          href={`/case-studies/${encodeURIComponent(caseStudyFeatured.slug)}`}
+                          className="inline-flex h-[43px] w-[95px] shrink-0 items-center justify-center gap-2 self-center whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
+                        >
+                          Read
+                          <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+                        </Link>
+                      </div>
+                    </div>
+                    <div className="hidden w-[228px] shrink-0 flex-col bg-[#111111] px-[25px] py-[49px] text-white md:flex">
+                      <p className="text-[12px] font-bold leading-4">ON THIS CASE STUDY</p>
+                      <div className="mt-[15px]">
+                        {CASE_STUDY_SIDEBAR.map((item, idx) => (
+                          <div key={item.label} className="flex h-[42px] items-center border-b border-[#e5e5e5] last:border-b-0">
+                            <span
+                              className={`mr-[10px] h-[14px] w-[3px] rounded-[2px] ${
+                                idx === CASE_STUDY_SIDEBAR.length - 1 ? "bg-[#086eff]" : "bg-white"
+                              }`}
+                              aria-hidden
+                            />
+                            <span className="text-[12px] font-medium leading-4 text-white">{item.label}</span>
                           </div>
                         ))}
                       </div>
-                      <Link
-                        href={`/case-studies/${c.slug}`}
-                        className="inline-flex h-[43px] w-[95px] shrink-0 items-center justify-center gap-2 self-center whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
-                      >
-                        Read
-                        <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
-                      </Link>
                     </div>
                   </div>
-                ))}
-              </div>
+
+                  {caseStudySecondary ? (
+                    <div className="flex min-w-0 flex-col rounded-[24px] border border-[#e5e5e5] bg-white px-[30px] pb-[26px] pt-9 lg:min-h-0">
+                      <div className="flex flex-1 flex-col border-b border-[#eff2f7] pb-[52px]">
+                        <div className="flex items-center justify-between">
+                          <span className="inline-flex h-[28px] items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
+                            {caseStudyCategoryPill(caseStudySecondary.category)}
+                          </span>
+                          <span className="flex items-center gap-1.5 text-[12px] font-medium leading-4 text-[#666666]">
+                            <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
+                            {caseStudySecondary.date || "—"}
+                          </span>
+                        </div>
+                        <h3 className="mt-[13px] w-full text-xl font-bold leading-9 tracking-[-0.07px] text-[#06091a] md:text-[28px]">
+                          {caseStudySecondary.title}
+                        </h3>
+                        <p className="mt-[16px] w-full text-[16px] leading-6 text-[#666666]">
+                          {caseStudySecondary.description}
+                        </p>
+                      </div>
+                      <div className="flex min-w-0 shrink-0 items-center justify-between gap-4 pt-[21px]">
+                        <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-4 sm:gap-x-8">
+                          <div className="flex min-w-0 flex-col gap-2">
+                            <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">
+                              {caseStudySecondary.stat1.value}
+                            </p>
+                            <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
+                              {caseStudySecondary.stat1.label}
+                            </p>
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-2">
+                            <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">
+                              {caseStudySecondary.stat2.value}
+                            </p>
+                            <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
+                              {caseStudySecondary.stat2.label}
+                            </p>
+                          </div>
+                        </div>
+                        <Link
+                          href={`/case-studies/${encodeURIComponent(caseStudySecondary.slug)}`}
+                          className="inline-flex h-[43px] w-[95px] shrink-0 items-center justify-center gap-2 self-center whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
+                        >
+                          Read
+                          <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+                        </Link>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                {caseStudyGrid.length > 0 ? (
+                  <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {caseStudyGrid.map((c) => (
+                      <div key={c.slug} className="flex min-w-0 flex-col rounded-[24px] border border-[#e2e7f4] bg-white px-9 pb-6 pt-9">
+                        <div className="flex min-h-0 flex-1 flex-col border-b border-[#eff2f7] pb-5">
+                          <div className="flex items-center justify-between">
+                            <span className="inline-flex h-[28px] w-fit max-w-[70%] items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
+                              {caseStudyCategoryPill(c.category)}
+                            </span>
+                            <span className="flex shrink-0 items-center gap-1.5 text-[12px] font-medium leading-4 text-[#666666]">
+                              <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
+                              {c.date || "—"}
+                            </span>
+                          </div>
+                          <h3 className="mt-[9px] text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">{c.title}</h3>
+                          <p className="mt-[13px] min-h-0 flex-1 text-[16px] leading-6 text-[#666666]">{c.description}</p>
+                        </div>
+                        <div className="flex min-w-0 shrink-0 items-center justify-between gap-4 pt-5">
+                          <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-3 gap-y-3 sm:gap-x-6">
+                            {[
+                              { v: c.stat1.value, l: c.stat1.label },
+                              { v: c.stat2.value, l: c.stat2.label },
+                            ].map((s) => (
+                              <div key={s.l} className="flex min-w-0 flex-col gap-2">
+                                <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">{s.v}</p>
+                                <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
+                                  {s.l}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                          <Link
+                            href={`/case-studies/${encodeURIComponent(c.slug)}`}
+                            className="inline-flex h-[43px] w-[95px] shrink-0 items-center justify-center gap-2 self-center whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
+                          >
+                            Read
+                            <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            )}
 
               <div className="mt-8 flex justify-center">
                 <Link

@@ -34,6 +34,60 @@ function normalizePlatformTags(value: unknown): string[] {
   return normalizeStringList(value);
 }
 
+export type EngagementBulletListStyle = "checkboxes" | "feature_icons";
+
+function inferEngagementBulletListStyle(id: string, explicit: unknown): EngagementBulletListStyle {
+  if (explicit === "feature_icons" || explicit === "checkboxes") {
+    return explicit;
+  }
+  if (id === "staff") {
+    return "feature_icons";
+  }
+  return "checkboxes";
+}
+
+/** Homepage “Our services” tabs: any count; coerces CMS shapes and legacy rows without bulletListStyle. */
+function normalizeEngagementModels(raw: unknown): Array<{
+  id: string;
+  navLabel: string;
+  label: string;
+  description: string;
+  bullets: string[];
+  tags: string[];
+  bulletListStyle: EngagementBulletListStyle;
+}> {
+  const fallback = marketingHomePayload.engagement.models.map((m) => ({
+    ...m,
+    bullets: normalizeStringList(m.bullets),
+    tags: normalizeStringList(m.tags),
+    bulletListStyle: inferEngagementBulletListStyle(m.id, (m as { bulletListStyle?: unknown }).bulletListStyle),
+  }));
+
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return fallback;
+  }
+
+  const seen = new Set<string>();
+  return raw.map((row, index) => {
+    const m = row as Record<string, unknown>;
+    let id = String(m.id ?? "").trim() || `service-${index + 1}`;
+    while (seen.has(id)) {
+      id = `${id}-${index}-${seen.size}`;
+    }
+    seen.add(id);
+
+    return {
+      id,
+      navLabel: typeof m.navLabel === "string" ? m.navLabel : "",
+      label: typeof m.label === "string" ? m.label : "",
+      description: typeof m.description === "string" ? m.description : "",
+      bullets: normalizeStringList(m.bullets),
+      tags: normalizeStringList(m.tags),
+      bulletListStyle: inferEngagementBulletListStyle(id, m.bulletListStyle),
+    };
+  });
+}
+
 export function buildMarketingHomeViewModel(content: MarketingHomePayload) {
   return {
     featuredPartnerCard: content.featuredPartners.map((p) => ({
@@ -47,7 +101,7 @@ export function buildMarketingHomeViewModel(content: MarketingHomePayload) {
       width: l.width,
       height: l.height,
     })),
-    engagementModels: [...content.engagement.models],
+    engagementModels: normalizeEngagementModels(content.engagement.models),
     deliverySteps: content.howItWorks.steps.map((s) => ({
       title: s.title,
       body: s.body,

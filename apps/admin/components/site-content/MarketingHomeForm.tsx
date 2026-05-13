@@ -10,7 +10,7 @@ type HomeAny = any;
 
 const tabs = [
   "Hero, stats & logos",
-  "Engagement & how it works",
+  "Our services & how it works",
   "Platforms",
   "Journey",
   "FAQ & CTAs",
@@ -223,15 +223,50 @@ function TabEngagementHow({
   v: HomePayload;
   onChange: (n: HomePayload) => void;
 }) {
-  const eg = v.engagement;
+  const eg = v.engagement ?? {};
+  const models: HomeAny[] = Array.isArray(eg.models) ? eg.models : [];
+
   const setHeader = (patch: Record<string, unknown>) =>
-    onChange({ ...v, engagement: { ...eg, header: { ...eg.header, ...patch } } });
+    onChange({ ...v, engagement: { ...eg, models, header: { ...(eg.header ?? {}), ...patch } } });
   const setHelp = (patch: Record<string, unknown>) =>
-    onChange({ ...v, engagement: { ...eg, helpCard: { ...eg.helpCard, ...patch } } });
+    onChange({ ...v, engagement: { ...eg, models, helpCard: { ...(eg.helpCard ?? {}), ...patch } } });
+
+  const setModels = (next: HomeAny[]) => onChange({ ...v, engagement: { ...eg, models: next } });
+
   const setModel = (i: number, patch: Record<string, unknown>) => {
-    const models = eg.models.map((m: HomeAny, j: number) => (j === i ? { ...m, ...patch } : m));
-    onChange({ ...v, engagement: { ...eg, models } });
+    const next = models.map((m: HomeAny, j: number) => (j === i ? { ...m, ...patch } : m));
+    setModels(next);
   };
+
+  const effectiveBulletStyle = (m: HomeAny): "checkboxes" | "feature_icons" => {
+    if (m.bulletListStyle === "feature_icons" || m.bulletListStyle === "checkboxes") {
+      return m.bulletListStyle;
+    }
+    return m.id === "staff" ? "feature_icons" : "checkboxes";
+  };
+
+  const addModel = () => {
+    const n = models.length + 1;
+    setModels([
+      ...models,
+      {
+        id: `service-${Date.now()}`,
+        navLabel: `NEW SERVICE ${n}`,
+        label: "New service title",
+        description: "Short summary visitors see when this tab is selected.",
+        bullets: ["First highlight", "Second highlight", "Third highlight"],
+        tags: ["Example skill tag"],
+        bulletListStyle: "checkboxes",
+      },
+    ]);
+  };
+
+  const removeModel = (i: number) => {
+    if (models.length <= 1) return;
+    if (!window.confirm("Remove this service option from the homepage?")) return;
+    setModels(models.filter((_: HomeAny, j: number) => j !== i));
+  };
+
   const hi = v.howItWorks;
   const setHi = (patch: Record<string, unknown>) => onChange({ ...v, howItWorks: { ...hi, ...patch } });
   const setStep = (i: number, patch: Record<string, unknown>) => {
@@ -239,45 +274,122 @@ function TabEngagementHow({
     onChange({ ...v, howItWorks: { ...hi, steps } });
   };
 
+  const header = eg.header ?? {};
+  const helpCard = eg.helpCard ?? {};
+
   return (
     <div className="space-y-6">
       <section className={sectionClass}>
-        <h3 className="mb-4 font-semibold">Engagement header</h3>
+        <h3 className="mb-2 font-semibold">Section title (OUR SERVICES)</h3>
+        <p className="mb-4 text-sm text-gray-600">
+          This is the block on the homepage with tabs on the left and details on the right. Each &quot;service option&quot; is one tab — add as many as
+          you need (for example Staffing, Fixed projects, Product teams, Managed service).
+        </p>
         <div className="space-y-3">
-          <input className={inputClass} value={eg.header.pill} onChange={(e) => setHeader({ pill: e.target.value })} />
-          <input className={inputClass} value={eg.header.titleLine1} onChange={(e) => setHeader({ titleLine1: e.target.value })} />
-          <input className={inputClass} value={eg.header.titleLine2} onChange={(e) => setHeader({ titleLine2: e.target.value })} />
-          <textarea className={inputClass} rows={3} value={eg.header.subtitle} onChange={(e) => setHeader({ subtitle: e.target.value })} />
+          <div>
+            <label className={labelClass}>Small label above the headline (pill)</label>
+            <input className={inputClass} value={header.pill ?? ""} onChange={(e) => setHeader({ pill: e.target.value })} />
+          </div>
+          <div>
+            <label className={labelClass}>Headline — first line</label>
+            <input className={inputClass} value={header.titleLine1 ?? ""} onChange={(e) => setHeader({ titleLine1: e.target.value })} />
+          </div>
+          <div>
+            <label className={labelClass}>Headline — second line</label>
+            <input className={inputClass} value={header.titleLine2 ?? ""} onChange={(e) => setHeader({ titleLine2: e.target.value })} />
+          </div>
+          <div>
+            <label className={labelClass}>Intro paragraph under the headline</label>
+            <textarea className={inputClass} rows={3} value={header.subtitle ?? ""} onChange={(e) => setHeader({ subtitle: e.target.value })} />
+          </div>
         </div>
       </section>
 
       <section className={sectionClass}>
-        <h3 className="mb-4 font-semibold">Engagement models (3)</h3>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="font-semibold">Service options (left-hand tabs)</h3>
+            <p className="mt-1 text-sm text-gray-600">
+              {models.length} option{models.length === 1 ? "" : "s"} — each becomes a tab visitors click.
+            </p>
+          </div>
+          <button type="button" className="rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800" onClick={addModel}>
+            + Add service option
+          </button>
+        </div>
+
         <div className="space-y-6">
-          {eg.models.map((m: HomeAny, i: number) => (
-            <div key={m.id} className="space-y-2 rounded-lg border border-gray-100 p-3">
-              <div className="grid gap-2 sm:grid-cols-2">
-                <input className={inputClass} value={m.id} onChange={(e) => setModel(i, { id: e.target.value })} />
-                <input className={inputClass} value={m.navLabel} onChange={(e) => setModel(i, { navLabel: e.target.value })} />
+          {models.map((m: HomeAny, i: number) => (
+            <div key={`${m.id ?? "row"}-${i}`} className="space-y-3 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-semibold text-gray-800">Option {i + 1}</span>
+                <button
+                  type="button"
+                  disabled={models.length <= 1}
+                  className="text-sm font-medium text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:text-gray-400"
+                  onClick={() => removeModel(i)}
+                >
+                  Remove
+                </button>
               </div>
-              <input className={inputClass} value={m.label} onChange={(e) => setModel(i, { label: e.target.value })} />
-              <textarea className={inputClass} rows={3} value={m.description} onChange={(e) => setModel(i, { description: e.target.value })} />
+
+              <div>
+                <label className={labelClass}>Tab text (left column, keep it short)</label>
+                <input className={inputClass} value={m.navLabel ?? ""} onChange={(e) => setModel(i, { navLabel: e.target.value })} />
+              </div>
+              <div>
+                <label className={labelClass}>Main heading (right column)</label>
+                <input className={inputClass} value={m.label ?? ""} onChange={(e) => setModel(i, { label: e.target.value })} />
+              </div>
+              <div>
+                <label className={labelClass}>Summary paragraph</label>
+                <textarea className={inputClass} rows={4} value={m.description ?? ""} onChange={(e) => setModel(i, { description: e.target.value })} />
+              </div>
+              <div>
+                <label className={labelClass}>Bullet list style</label>
+                <select
+                  className={inputClass}
+                  value={effectiveBulletStyle(m)}
+                  onChange={(e) => setModel(i, { bulletListStyle: e.target.value })}
+                >
+                  <option value="checkboxes">Checkmarks (best for milestones, deliverables, commitments)</option>
+                  <option value="feature_icons">Lightning / shield / clock / dollar icons (best for quick value points; uses first four bullets)</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Internal ID (letters, numbers, dashes only — used in links and tracking)</label>
+                <input className={inputClass} value={m.id ?? ""} onChange={(e) => setModel(i, { id: e.target.value.trim().replace(/\s+/g, "-") })} />
+              </div>
               <div>
                 <label className={labelClass}>Bullets (one per line)</label>
                 <textarea
                   className={inputClass}
                   rows={4}
-                  value={Array.isArray(m.bullets) ? m.bullets.join("\n") : (typeof m.bullets === 'string' ? m.bullets : "")}
-                  onChange={(e) => setModel(i, { bullets: e.target.value.split("\n") })}
+                  value={Array.isArray(m.bullets) ? m.bullets.join("\n") : typeof m.bullets === "string" ? m.bullets : ""}
+                  onChange={(e) =>
+                    setModel(i, {
+                      bullets: e.target.value
+                        .split(/\r?\n/)
+                        .map((line: string) => line.trim())
+                        .filter(Boolean),
+                    })
+                  }
                 />
               </div>
               <div>
-                <label className={labelClass}>Tags (one per line)</label>
+                <label className={labelClass}>Skill / tech tags (one per line)</label>
                 <textarea
                   className={inputClass}
                   rows={3}
-                  value={Array.isArray(m.tags) ? m.tags.join("\n") : (typeof m.tags === 'string' ? m.tags : "")}
-                  onChange={(e) => setModel(i, { tags: e.target.value.split("\n") })}
+                  value={Array.isArray(m.tags) ? m.tags.join("\n") : typeof m.tags === "string" ? m.tags : ""}
+                  onChange={(e) =>
+                    setModel(i, {
+                      tags: e.target.value
+                        .split(/\r?\n/)
+                        .map((line: string) => line.trim())
+                        .filter(Boolean),
+                    })
+                  }
                 />
               </div>
             </div>
@@ -286,14 +398,15 @@ function TabEngagementHow({
       </section>
 
       <section className={sectionClass}>
-        <h3 className="mb-4 font-semibold">Help card</h3>
-        <input className={inputClass} value={eg.helpCard.title} onChange={(e) => setHelp({ title: e.target.value })} />
-        <textarea className={inputClass} rows={2} value={eg.helpCard.body} onChange={(e) => setHelp({ body: e.target.value })} />
-        <input className={inputClass} value={eg.helpCard.ctaLabel} onChange={(e) => setHelp({ ctaLabel: e.target.value })} />
+        <h3 className="mb-2 font-semibold">Help card (grey box under the tabs)</h3>
+        <p className="mb-3 text-sm text-gray-600">Shown under all tabs — use it to nudge visitors who are unsure which option fits.</p>
+        <input className={inputClass} value={helpCard.title ?? ""} onChange={(e) => setHelp({ title: e.target.value })} />
+        <textarea className={inputClass} rows={2} value={helpCard.body ?? ""} onChange={(e) => setHelp({ body: e.target.value })} />
+        <input className={inputClass} value={helpCard.ctaLabel ?? ""} onChange={(e) => setHelp({ ctaLabel: e.target.value })} />
       </section>
 
       <section className={sectionClass}>
-        <h3 className="mb-4 font-semibold">How it works</h3>
+        <h3 className="mb-4 font-semibold">How it works (steps below services)</h3>
         <input className={inputClass} value={hi.pill} onChange={(e) => setHi({ pill: e.target.value })} />
         <input className={inputClass} value={hi.title} onChange={(e) => setHi({ title: e.target.value })} />
         <textarea className={inputClass} rows={2} value={hi.subtitle} onChange={(e) => setHi({ subtitle: e.target.value })} />

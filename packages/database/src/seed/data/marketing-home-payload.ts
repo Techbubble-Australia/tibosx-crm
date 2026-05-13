@@ -65,6 +65,7 @@ export const marketingHomePayload = {
         id: "staff",
         navLabel: "STAFFING SERVICES",
         label: "AI-Infused Staff Augmentation",
+        bulletListStyle: "feature_icons" as const,
         description:
           "Our Time & Material-based model deploys rigorously vetted specialists directly into your team — within one business day. We use AI to match the exact skill profile, experience level, and timezone to your requirements.",
         bullets: ["Lightning Onboarding", "Top 1% Talent Only", "Timezone Aligned", "No Lock-in"],
@@ -85,6 +86,7 @@ export const marketingHomePayload = {
         id: "delivery",
         navLabel: "PROJECT DELIVERY",
         label: "Project Delivery",
+        bulletListStyle: "checkboxes" as const,
         description:
           "Fixed-scope programmes with defined milestones — discovery, build, test, and hypercare — predictable delivery without compromising quality.",
         bullets: ["Discovery-led", "Milestone billing", "Governance built in", "Knowledge transfer"],
@@ -94,6 +96,7 @@ export const marketingHomePayload = {
         id: "product",
         navLabel: "PRODUCT ENGINEERING",
         label: "Product Engineering",
+        bulletListStyle: "checkboxes" as const,
         description:
           "Outcome-based product pods — design, build, and run modern applications on your stack with clear ownership from roadmap to production.",
         bullets: ["Product trio", "CI/CD embedded", "Observability", "Continuous delivery"],
