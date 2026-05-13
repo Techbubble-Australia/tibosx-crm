@@ -1112,7 +1112,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
 
       {/* Schedule demo */}
       <section
-        className="relative overflow-hidden py-[186px] text-white"
+        className="relative overflow-hidden py-[60px] text-white"
         style={{ background: "linear-gradient(160deg, #000000 0%, #202020 55%, #101112 100%)" }}
       >
         <div className="pointer-events-none absolute left-[-125px] top-[456px] h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle,_rgba(76,76,76,0.12)_0%,_rgba(56,56,56,0)_65%)]" />
