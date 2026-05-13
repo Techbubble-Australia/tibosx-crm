@@ -800,17 +800,18 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
               A truly global delivery model — local expertise, international reach, and seamless collaboration across every timezone.
             </p>
             {/* Office cards */}
-            <div className="mt-12 grid w-full grid-cols-2 gap-4 sm:grid-cols-3 lg:flex lg:flex-row">
+            <div className="mt-12 grid w-full grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
               {[
-                { flag: "🇦🇺", name: "Australia",   addr: "HQ · Sydney, NSW\nLevel 12, 126 Banks Ave" },
-                { flag: "🇺🇸", name: "USA",          addr: "Wilmington, Delaware\n1007 N Orange St" },
-                { flag: "🇮🇳", name: "India",        addr: "Ahmedabad, Gujarat\nK.P. Epitome Office" },
-                { flag: "🇵🇭", name: "Philippines",  addr: "SE Asia Hub\nDelivery Centre" },
-                { flag: "🇬🇧", name: "UK & ME",      addr: "London · Dubai\nRegional Offices" },
+                { flag: "🇦🇺", name: "Australia", addr: "HQ · Sydney, NSW\nLevel 12, 126 Banks Ave" },
+                { flag: "🇺🇸", name: "USA", addr: "Wilmington, Delaware\n1007 N Orange St" },
+                { flag: "🇮🇳", name: "India", addr: "Ahmedabad, Gujarat\nK.P. Epitome Office" },
+                { flag: "🇵🇭", name: "Philippines", addr: "SE Asia Hub\nDelivery Centre" },
+                { flag: "🇬🇧", name: "UK", addr: "London\nRegional Offices" },
+                { flag: "🇦🇪", name: "UAE", addr: "Dubai\nRegional Offices" },
               ].map((o) => (
                 <div
                   key={o.name}
-                  className="flex flex-1 flex-col items-center justify-center rounded-[24px] border border-[#666666] bg-[#fafafa] py-8 text-center"
+                  className="flex flex-col items-center justify-center rounded-[24px] border border-[#666666] bg-[#fafafa] py-8 text-center"
                 >
                   <span className="text-[35px] leading-none">{o.flag}</span>
                   <p className="mt-4 text-[28px] font-bold leading-9 tracking-[-0.0025em] text-[#111111]">{o.name}</p>
