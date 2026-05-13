@@ -245,7 +245,7 @@ export default async function CaseStudyPage({
       </section>
 
       {/* Practice Areas — node 205:2669 */}
-      <section className="bg-white py-[120px]">
+      <section className="bg-white py-[60px]">
         <div className="tb-container">
           <div className="mx-auto max-w-[1139px]">
             <SectionPill label="Our Practice Areas" />

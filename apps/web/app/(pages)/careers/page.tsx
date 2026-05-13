@@ -108,7 +108,7 @@ export default async function CareersPage() {
       </section>
 
       {/* Open Positions — API-driven list + filters */}
-      <section className="bg-[#e5e5e5] py-[120px]">
+      <section className="bg-[#e5e5e5] py-[60px]">
         <div className="tb-container">
           <div className="mx-auto max-w-[1136px]">
             <CareersPositionsSection jobs={jobs} />
@@ -119,7 +119,7 @@ export default async function CareersPage() {
       {/* Application Form — node 205:3074 */}
       <section
         id="apply"
-        className="relative overflow-hidden py-[120px] text-white scroll-mt-24"
+        className="relative overflow-hidden py-[60px] text-white scroll-mt-24"
         style={{ background: "linear-gradient(160deg, #000000 0%, #202020 55%, #101112 100%)" }}
       >
         <div className="pointer-events-none absolute -left-[120px] bottom-[-120px] h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle,rgba(76,76,76,0.12)_0%,rgba(56,56,56,0)_65%)]" />
@@ -219,7 +219,7 @@ export default async function CareersPage() {
       </section>
 
       {/* CTA — node 205:3151 */}
-      <section className="bg-[#f7f7f7] py-[120px]">
+      <section className="bg-[#f7f7f7] py-[60px]">
         <div className="tb-container">
           <div className="mx-auto grid max-w-[1136px] grid-cols-[751px_353px] gap-8">
             <div>

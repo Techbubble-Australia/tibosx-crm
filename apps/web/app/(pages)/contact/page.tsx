@@ -68,7 +68,7 @@ export default function ContactPage() {
       </section>
 
       {/* Contact Section — node 205:11234 */}
-      <section className="bg-white py-[120px]">
+      <section className="bg-white py-[60px]">
         <div className="tb-container">
           <div className="mx-auto grid max-w-[1136px] grid-cols-1 gap-10 lg:grid-cols-[536px_1fr] lg:gap-[113px]">
             <div>
@@ -204,7 +204,7 @@ export default function ContactPage() {
       </section>
 
       {/* Urgent Talent CTA — node 205:11311 */}
-      <section className="bg-[#fafafa] py-[120px]">
+      <section className="bg-[#fafafa] py-[60px]">
         <div className="tb-container">
           <div className="mx-auto flex max-w-[1136px] items-start justify-between">
             <div>

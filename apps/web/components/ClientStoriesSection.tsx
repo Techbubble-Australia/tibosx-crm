@@ -46,7 +46,7 @@ export function ClientStoriesSection({ items }: Props) {
   }
 
   return (
-    <section className="bg-white py-[120px]">
+    <section className="bg-white py-[60px]">
       <div className="tb-container">
         <div className="mx-auto max-w-[1139px]">
           <div className="mb-12">

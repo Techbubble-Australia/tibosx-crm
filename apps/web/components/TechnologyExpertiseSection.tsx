@@ -38,7 +38,7 @@ const technologyCards = [
 
 export function TechnologyExpertiseSection() {
   return (
-    <section className="bg-white py-[120px]">
+    <section className="bg-white py-[60px]">
       <div className="tb-container text-center">
         <SectionPill label="ACROSS THE TECHNOLOGY OFFERINGS" className="mb-2.5" textClassName="text-xs uppercase" />
         <h2 className="mt-4 text-3xl font-bold leading-tight tracking-[-0.005em] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">

@@ -161,7 +161,7 @@ export default async function ServicesPage() {
         </div>
       </section>
 
-      <section className="bg-[#fafafa] py-[120px]">
+      <section className="bg-[#fafafa] py-[60px]">
         <div className="mx-auto w-full max-w-[1139px]">
           <div className="mb-[64px] flex flex-col items-center gap-[36px]">
             <div className="flex w-full justify-end">

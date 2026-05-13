@@ -18,7 +18,7 @@ export function RemarkableCtaSection({
   primaryHref,
   secondaryLabel,
   secondaryHref,
-  className = "bg-[#f7f7f7] py-[120px]",
+  className = "bg-[#f7f7f7] py-[60px]",
 }: RemarkableCtaSectionProps) {
   return (
     <section className={className}>

@@ -86,7 +86,7 @@ export default async function AboutPage() {
         </div>
       </section>
 
-      <section className="relative bg-white py-16 md:py-[120px]">
+      <section className="relative bg-white py-16 md:py-[60px]">
         <div className="tb-container">
           <div className="relative mx-auto grid max-w-[1139px] grid-cols-1 gap-12 lg:grid-cols-[557px_1fr] lg:gap-[131px]">
             <div className="pt-1">
@@ -125,7 +125,7 @@ export default async function AboutPage() {
       </section>
 
       <section
-        className="bg-[#fafafa] py-[120px]"
+        className="bg-[#fafafa] py-[60px]"
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23d4d4d4' stroke-width='0.5'%3E%3Cpath d='M40 0 L80 20 L80 60 L40 80 L0 60 L0 20 Z'/%3E%3C/g%3E%3C/svg%3E")`,
           backgroundSize: "120px",
@@ -157,7 +157,7 @@ export default async function AboutPage() {
         </div>
       </section>
 
-      <section className="bg-white py-[120px]">
+      <section className="bg-white py-[60px]">
         <div className="tb-container">
           <div className="mx-auto max-w-[1136px]">
             <div className="text-center">
@@ -236,7 +236,7 @@ export default async function AboutPage() {
         </div>
       </section>
 
-      <section className="bg-white py-[120px]">
+      <section className="bg-white py-[60px]">
         <div className="tb-container">
           <div className="mx-auto max-w-[1139px]">
             <SectionPill label="Why Choose Us" />
@@ -268,7 +268,7 @@ export default async function AboutPage() {
         </div>
       </section>
 
-      <section className="bg-[#fafafa] py-16 md:py-[120px]">
+      <section className="bg-[#fafafa] py-16 md:py-[60px]">
         <div className="tb-container">
           <div className="mx-auto grid max-w-[1139px] grid-cols-1 items-center gap-10 lg:grid-cols-[526px_1fr] lg:gap-[81px]">
             <div>

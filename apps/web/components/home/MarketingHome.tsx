@@ -308,7 +308,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
       </section>
 
       {/* Stats — black */}
-      <section ref={statsSectionRef} className="bg-[#111111] py-20 text-white md:py-24">
+      <section ref={statsSectionRef} className="bg-[#111111] py-10 text-white md:py-10">
         <div className="tb-container text-center">
           <div className="mb-5 inline-flex items-center gap-3 rounded-full bg-transparent px-4 py-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-[#666666]" aria-hidden />
@@ -336,7 +336,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
       </section>
 
       {/* Engagement models — Figma services: sidebar + detail */}
-      <section className="bg-white py-[120px]">
+      <section className="bg-white py-[50px]">
         <div className="tb-container">
           <div className="mx-auto w-full max-w-[1139px]">
             <div className="mb-16">
@@ -430,7 +430,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
       </section>
 
       {/* How it works — selected Figma section */}
-      <section className="bg-[#fafafa] py-16 md:py-[120px]">
+      <section className="bg-[#fafafa] py-[60px] md:py-[60px]">
         <div className="tb-container">
           <div className="mx-auto w-full max-w-[1139px]">
             <div className="text-center">
@@ -479,7 +479,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
       <JourneySection journey={vm.journey} />
 
       {/* Multi-Platform Expertise — Figma node 130:2046 */}
-      <section className="bg-[#fafafa] py-16 md:py-[120px]">
+      <section className="bg-[#fafafa] py-[60px] md:py-[60px]">
         <div className="tb-container">
           <div className="mx-auto w-full max-w-[1139px]">
             {/* Header */}
@@ -597,7 +597,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
       <TechnologyExpertiseSection />
 
       {/* Why us bento — Figma node 144:60 */}
-      <section className="bg-[#f7f7f7] py-16 md:py-[120px]">
+      <section className="bg-[#f7f7f7] py-[60px] md:py-[60px]">
         <div className="tb-container">
           <div className="mx-auto w-full max-w-[1139px]">
             {/* Header */}
@@ -784,7 +784,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
 
       {/* Global Presence — Figma node 150:382 */}
       <section
-        className="py-16 md:py-[120px]"
+        className="py-[60px] md:py-[60px]"
         style={{ background: "linear-gradient(160deg, #000000 0%, #202020 55%, #101112 100%)" }}
       >
         <div className="tb-container">
@@ -826,7 +826,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
       <ClientStoriesSection items={testimonials} />
 
       {/* Case Studies — Figma node 150:622 */}
-      <section className="bg-[#fafafa] py-16 md:py-[120px]">
+      <section className="bg-[#fafafa] py-[60px] md:py-[60px]">
         <div className="tb-container">
           <div className="mx-auto max-w-[1139px]">
             {/* Header */}
@@ -1207,7 +1207,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
       </section>
 
       {/* Careers — Figma node 156:1278 */}
-      <section className="bg-white py-16 md:py-[120px]">
+      <section className="bg-white py-[60px] md:py-[60px]">
         <div className="tb-container">
           <div className="mx-auto grid max-w-[1136px] grid-cols-1 gap-8 lg:grid-cols-[1fr_413px]">
             <div>
@@ -1263,7 +1263,7 @@ export function MarketingHome({ content, testimonials, previewJobs }: MarketingH
       </section>
 
       {/* Careers CTA — Figma node 159:1355 */}
-      <section className="bg-[#f7f7f7] py-16 md:py-[120px]">
+      <section className="bg-[#f7f7f7] py-[60px] md:py-[60px]">
         <div className="tb-container">
           <div className="mx-auto grid max-w-[1136px] grid-cols-1 gap-8 lg:grid-cols-[1fr_353px]">
             <div>
@@ -1318,7 +1318,7 @@ function JourneySection({ journey }: { journey: MarketingHomePayload["journey"] 
   const header = journey.header;
 
   return (
-    <section className="bg-white py-[120px]">
+    <section className="bg-white py-[60px]">
       <div className="tb-container">
         <div className="mx-auto w-full max-w-[1139px]">
           {/* Header */}
