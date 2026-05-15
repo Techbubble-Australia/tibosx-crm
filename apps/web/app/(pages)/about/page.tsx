@@ -11,6 +11,7 @@ import { fetchSiteContentPayload } from "@/lib/fetch-site-content";
 import { resolveAboutPage } from "@/lib/site-content/resolve-pages";
 import { SectionPill } from "@/components/ui/SectionPill";
 import { AboutWorkforceApiSection, AboutWorkforceCmsFallbackSection } from "@/components/about/AboutWorkforceSection";
+import { resolveLeadershipDisplay } from "@/lib/about/resolve-leadership-display";
 
 export default async function AboutPage() {
   const rawAbout = await fetchSiteContentPayload<unknown>("about_page");
@@ -42,6 +43,8 @@ export default async function AboutPage() {
     management: a.workforce.management,
     defaultMemberBio: a.workforce.defaultMemberBio,
   };
+
+  const leadershipMembers = resolveLeadershipDisplay(a.leadership, teamRows);
 
   return (
     <>
@@ -116,8 +119,8 @@ export default async function AboutPage() {
           </div>
 
           <div className="mx-auto grid max-w-[1558px] grid-cols-1 gap-10 pt-12 sm:grid-cols-2 md:grid-cols-3">
-            {a.leadership.members.map((leader) => (
-              <div key={leader.name} className="rounded-[21px] bg-[#111111] px-[30px] pb-9 pt-12 text-white md:pt-0">
+            {leadershipMembers.map((leader, index) => (
+              <div key={`${leader.name}-${index}`} className="rounded-[21px] bg-[#111111] px-[30px] pb-9 pt-12 text-white md:pt-0">
                 <div className="mx-auto mb-5 h-[241px] w-[241px] overflow-hidden rounded-[14px] border border-[#f7f7f7] bg-neutral-700 md:-mt-[45px]">
                   <AboutPersonImage
                     imageUrl={leader.imageUrl}

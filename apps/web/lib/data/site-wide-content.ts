@@ -240,6 +240,7 @@ export const aboutPagePayload = {
     title: "Meet The Leadership",
     subtitle:
       "The visionaries driving TechBubble's mission to transform businesses through technology.",
+    featuredTeamMemberIds: ["", "", ""] as [string, string, string],
     members: [
       {
         name: "Nikita T",
