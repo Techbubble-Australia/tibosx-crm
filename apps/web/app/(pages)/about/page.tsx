@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { ClientStoriesSection } from "@/components/ClientStoriesSection";
-import { getPublishedTeam, getTestimonials } from "@/lib/api/public";
+import { getPublishedLeadershipLineup, getPublishedTeam, getTestimonials } from "@/lib/api/public";
 import type { ClientStoryItem } from "@/components/ClientStoriesSection";
 import { AboutAnimatedHeroStatsStrip } from "@/components/about/AboutAnimatedHeroStatsStrip";
 import { AboutAnimatedMissionStatCards } from "@/components/about/AboutAnimatedMissionStatCards";
@@ -16,7 +16,11 @@ import { resolveLeadershipDisplay } from "@/lib/about/resolve-leadership-display
 export default async function AboutPage() {
   const rawAbout = await fetchSiteContentPayload<unknown>("about_page");
   const a = resolveAboutPage(rawAbout ?? {});
-  const [testimonialRows, teamRows] = await Promise.all([getTestimonials(), getPublishedTeam()]);
+  const [testimonialRows, teamRows, leadershipLineup] = await Promise.all([
+    getTestimonials(),
+    getPublishedTeam(),
+    getPublishedLeadershipLineup(),
+  ]);
   const clientStories: ClientStoryItem[] = testimonialRows.map((t) => ({
     quote: t.quote,
     authorName: t.authorName,
@@ -44,7 +48,7 @@ export default async function AboutPage() {
     defaultMemberBio: a.workforce.defaultMemberBio,
   };
 
-  const leadershipMembers = resolveLeadershipDisplay(a.leadership, teamRows);
+  const leadershipMembers = resolveLeadershipDisplay(a.leadership, leadershipLineup);
 
   return (
     <>

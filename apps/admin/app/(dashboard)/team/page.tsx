@@ -13,6 +13,7 @@ interface TeamMember {
   imageUrl: string;
   order: number;
   published: boolean;
+  featuredLeadershipOrder: number | null;
 }
 
 export default function TeamPage() {
@@ -73,6 +74,7 @@ export default function TeamPage() {
               <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Role</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Department</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Leadership</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Order</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
               <th className="text-right px-4 py-3 font-medium text-gray-600">Actions</th>
@@ -81,7 +83,7 @@ export default function TeamPage() {
           <tbody className="divide-y divide-gray-100">
             {members.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">No team members yet.</td>
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">No team members yet.</td>
               </tr>
             ) : (
               members.map((member) => (
@@ -89,6 +91,9 @@ export default function TeamPage() {
                   <td className="px-4 py-3 font-medium">{member.name}</td>
                   <td className="px-4 py-3 text-gray-600">{member.role}</td>
                   <td className="px-4 py-3 text-gray-600">{member.department}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {member.featuredLeadershipOrder != null ? `Slot ${member.featuredLeadershipOrder}` : "—"}
+                  </td>
                   <td className="px-4 py-3 text-gray-600">{member.order}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${member.published ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>

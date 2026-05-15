@@ -146,3 +146,28 @@ export async function getPublishedTeam(department?: string): Promise<TeamMemberP
     imageUrl: resolveOptionalMediaUrl(row.imageUrl),
   }));
 }
+
+/** Published members with Meet the Leadership slots 1–3 (ordered). */
+export async function getPublishedLeadershipLineup(): Promise<TeamMemberPublicRow[]> {
+  const json = await apiGet<{
+    data: {
+      id: string;
+      name: string;
+      role: string;
+      department: string;
+      description?: string;
+      imageUrl: string;
+      order: number;
+    }[];
+  }>("/api/team/leadership");
+  const rows = json?.data ?? [];
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    role: row.role,
+    department: row.department,
+    description: row.description ?? "",
+    order: row.order ?? 0,
+    imageUrl: resolveOptionalMediaUrl(row.imageUrl),
+  }));
+}

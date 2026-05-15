@@ -10,17 +10,14 @@ export type LeadershipDisplayMember = {
 };
 
 /**
- * When all three {@link AboutPagePayload.leadership.featuredTeamMemberIds} are set and each id exists in
- * {@link publishedTeam}, the section uses team data (description → bio, role, image). Otherwise uses CMS
- * {@link AboutPagePayload.leadership.members} only.
+ * When the API returns exactly three published team members with leadership slots 1–3, the section uses
+ * their data (description → bio, role, image). Otherwise uses CMS {@link AboutPagePayload.leadership.members}.
  */
 export function resolveLeadershipDisplay(
   leadership: AboutPagePayload["leadership"],
-  publishedTeam: TeamMemberPublicRow[],
+  leadershipLineup: TeamMemberPublicRow[],
 ): LeadershipDisplayMember[] {
-  const raw = leadership.featuredTeamMemberIds ?? ["", "", ""];
-  const ids = [String(raw[0] ?? "").trim(), String(raw[1] ?? "").trim(), String(raw[2] ?? "").trim()];
-  if (ids.some((id) => !id)) {
+  if (leadershipLineup.length !== 3) {
     return leadership.members.map((m) => ({
       name: m.name,
       role: m.role,
@@ -30,12 +27,9 @@ export function resolveLeadershipDisplay(
     }));
   }
 
-  const byId = new Map(publishedTeam.map((t) => [t.id, t]));
   const cards: LeadershipDisplayMember[] = [];
-
   for (let i = 0; i < 3; i++) {
-    const id = ids[i] as string;
-    const m = byId.get(id);
+    const m = leadershipLineup[i];
     if (!m) {
       return leadership.members.map((mem) => ({
         name: mem.name,
@@ -54,6 +48,5 @@ export function resolveLeadershipDisplay(
     const imageKey = imageUrl ? "" : (cms?.imageKey ?? "");
     cards.push({ name: m.name, role: m.role, bio, imageUrl, imageKey });
   }
-
   return cards;
 }

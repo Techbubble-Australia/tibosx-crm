@@ -188,16 +188,18 @@ model JobListing {
 }
 
 model TeamMember {
-  id          String   @id @default(cuid())
-  name        String
-  role        String
-  department  String   // e.g. Management Team, ServiceNow Developers, etc.
-  description String   @default("")
-  imageUrl    String   @default("")
-  order       Int      @default(0)
-  published   Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                       String   @id @default(cuid())
+  name                     String
+  role                     String
+  department               String   // e.g. Management Team, ServiceNow Developers, etc.
+  description              String   @default("")
+  imageUrl                 String   @default("")
+  order                    Int      @default(0)
+  published                Boolean  @default(true)
+  /// 1–3 = "Meet the Leadership" slot on About (public site). At most one row per value; null = not featured.
+  featuredLeadershipOrder  Int?     @unique
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
   @@index([department])
   @@index([published])

@@ -80,17 +80,6 @@ export function resolvePricingPage(raw: unknown): PricingPagePayload {
   };
 }
 
-function coalesceFeaturedTeamMemberIds(
-  value: unknown,
-  fallback: AboutPagePayload["leadership"]["featuredTeamMemberIds"],
-): AboutPagePayload["leadership"]["featuredTeamMemberIds"] {
-  if (!Array.isArray(value)) {
-    return fallback;
-  }
-  const s = value.map((x) => String(x ?? "").trim());
-  return [s[0] ?? "", s[1] ?? "", s[2] ?? ""] as AboutPagePayload["leadership"]["featuredTeamMemberIds"];
-}
-
 export function resolveAboutPage(raw: unknown): AboutPagePayload {
   if (!raw || typeof raw !== "object") return aboutPagePayload;
   const r = raw as Partial<AboutPagePayload>;
@@ -105,10 +94,6 @@ export function resolveAboutPage(raw: unknown): AboutPagePayload {
     leadership: {
       ...base.leadership,
       ...r.leadership,
-      featuredTeamMemberIds: coalesceFeaturedTeamMemberIds(
-        r.leadership?.featuredTeamMemberIds ?? base.leadership.featuredTeamMemberIds,
-        base.leadership.featuredTeamMemberIds,
-      ),
       members: r.leadership?.members ?? base.leadership.members,
     },
     workforce: {

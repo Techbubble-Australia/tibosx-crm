@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { adminFetch } from "@/lib/admin-api";
 import { inputClass, labelClass, sectionClass } from "./form-styles";
 
@@ -37,7 +37,6 @@ export type AboutPagePayload = {
     pill: string;
     title: string;
     subtitle: string;
-    featuredTeamMemberIds: [string, string, string];
     members: LeadershipMember[];
   };
   workforce: {
@@ -71,7 +70,7 @@ export type AboutPagePayload = {
 const TABS = [
   "Hero & stats",
   "Mission",
-  "Leadership",
+  "Leadership (CMS fallbacks)",
   "Workforce",
   "USP",
   "Values & footer CTA",
@@ -137,30 +136,6 @@ export function AboutPageForm({
 }) {
   const [tab, setTab] = useState(0);
 
-  const [teamPickList, setTeamPickList] = useState<{ id: string; label: string }[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await adminFetch("/api/admin/team/admin/all");
-        const json = await res.json();
-        if (cancelled || !res.ok) return;
-        const rows = (json.data || []) as { id: string; name: string; department: string; published: boolean }[];
-        setTeamPickList(
-          rows
-            .filter((r) => r.published)
-            .map((r) => ({ id: r.id, label: `${r.name} — ${r.department}` })),
-        );
-      } catch {
-        /* ignore */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const setHero = (patch: Partial<AboutPagePayload["hero"]>) => onChange({ ...value, hero: { ...value.hero, ...patch } });
   const setMission = (patch: Partial<AboutPagePayload["mission"]>) =>
     onChange({ ...value, mission: { ...value.mission, ...patch } });
@@ -187,13 +162,6 @@ export function AboutPageForm({
   const setLeader = (i: number, patch: Partial<LeadershipMember>) => {
     const members = value.leadership.members.map((m, j) => (j === i ? { ...m, ...patch } : m));
     onChange({ ...value, leadership: { ...value.leadership, members } });
-  };
-
-  const setFeaturedTeamMemberId = (index: 0 | 1 | 2, id: string) => {
-    const cur = value.leadership.featuredTeamMemberIds ?? ["", "", ""];
-    const next: [string, string, string] = [...cur] as [string, string, string];
-    next[index] = id;
-    onChange({ ...value, leadership: { ...value.leadership, featuredTeamMemberIds: next } });
   };
 
   const setWorkforceStat = (i: number, patch: Partial<{ n: string; l: string }>) => {
@@ -365,35 +333,14 @@ export function AboutPageForm({
             </div>
           </div>
 
-          <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <h4 className="mb-2 text-sm font-semibold text-gray-900">Meet the Leadership — team picks (marketing site)</h4>
-            <p className="mb-3 text-xs text-gray-600">
-              Choose three <strong>published</strong> team members (left → right). Name, role, photo, and description come from Admin → Team. Bio falls back to
-              the CMS card below if the team member has no description. Leave any slot empty to show all three CMS cards instead.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {([0, 1, 2] as const).map((slot) => (
-                <div key={slot}>
-                  <label className={labelClass}>Profile {slot + 1}</label>
-                  <select
-                    className={inputClass}
-                    value={(value.leadership.featuredTeamMemberIds ?? ["", "", ""])[slot]}
-                    onChange={(e) => setFeaturedTeamMemberId(slot, e.target.value)}
-                  >
-                    <option value="">— CMS card {slot + 1} only —</option>
-                    {teamPickList.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-            </div>
-          </div>
+          <p className="mb-3 text-sm text-gray-600">
+            Assign who appears in <strong>Meet the Leadership</strong> under <span className="font-medium">Team</span>: edit a member and set
+            leadership slot <strong>1</strong>, <strong>2</strong>, or <strong>3</strong> (published members only). All three slots must be filled for the marketing site to use team data;
+            otherwise the CMS cards below are used for the whole row.
+          </p>
 
           <p className="mb-3 text-xs text-gray-600">
-            CMS cards below: used when team picks are incomplete, or as fallback text/image when a picked member has no description or photo URL.
+            CMS cards: fallback when fewer than three slotted members are published, and for bundled image / bio text when a slotted member has no photo URL or description.
           </p>
           <div className="space-y-6">
             {value.leadership.members.map((m, i) => (

@@ -16,7 +16,10 @@ export default function NewTeamMemberPage() {
     setIsLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const payload = {
+    const slotRaw = formData.get("featuredLeadershipOrder");
+    const featuredLeadershipOrder =
+      slotRaw === "" || slotRaw == null ? undefined : Number(String(slotRaw));
+    const payload: Record<string, unknown> = {
       name: formData.get("name"),
       role: formData.get("role"),
       department: formData.get("department"),
@@ -25,6 +28,9 @@ export default function NewTeamMemberPage() {
       order: parseInt(formData.get("order") as string) || 0,
       published: formData.get("published") === "on",
     };
+    if (featuredLeadershipOrder !== undefined && [1, 2, 3].includes(featuredLeadershipOrder)) {
+      payload.featuredLeadershipOrder = featuredLeadershipOrder;
+    }
 
     try {
       const res = await adminFetch("/api/admin/team", {
@@ -76,6 +82,7 @@ export default function NewTeamMemberPage() {
             <label className="block text-sm font-medium mb-1">Department *</label>
             <select name="department" required
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm bg-white">
+              <option value="Leadership">Leadership</option>
               <option value="Management Team">Management Team</option>
               <option value="Sales Team">Sales Team</option>
               <option value="Recruitment Team">Recruitment Team</option>
@@ -104,6 +111,23 @@ export default function NewTeamMemberPage() {
               placeholder="Short bio shown on the About page when this member is published."
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Meet the Leadership slot</label>
+            <select
+              name="featuredLeadershipOrder"
+              defaultValue=""
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm bg-white"
+            >
+              <option value="">Not on leadership row</option>
+              <option value="1">Position 1 (left)</option>
+              <option value="2">Position 2 (center)</option>
+              <option value="3">Position 3 (right)</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              Assigns this profile to the About page leadership row. All three positions must be filled with published members for the site to use Team data.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

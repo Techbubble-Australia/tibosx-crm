@@ -217,6 +217,7 @@ export async function seedJobsFaqsTestimonialsTeam() {
       role: "Founder & Director, Australia",
       department: "Leadership",
       order: 0,
+      featuredLeadershipOrder: 1,
       description:
         "Sets the strategic direction for TechBubble and leads enterprise partnerships across APAC and North America.",
     },
@@ -225,6 +226,7 @@ export async function seedJobsFaqsTestimonialsTeam() {
       role: "Founder & Director, Australia",
       department: "Leadership",
       order: 1,
+      featuredLeadershipOrder: 2,
       description: "",
     },
     {
@@ -232,6 +234,7 @@ export async function seedJobsFaqsTestimonialsTeam() {
       role: "Head of Product, Australia",
       department: "Leadership",
       order: 2,
+      featuredLeadershipOrder: 3,
       description: "",
     },
     {

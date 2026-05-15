@@ -37,6 +37,11 @@ export default function EditTeamMemberPage() {
     setIsLoading(true);
 
     const formData = new FormData(e.currentTarget);
+    const slotRaw = formData.get("featuredLeadershipOrder");
+    const slotNum = slotRaw === "" || slotRaw == null ? null : Number(String(slotRaw));
+    const featuredLeadershipOrder =
+      slotNum != null && !Number.isNaN(slotNum) && [1, 2, 3].includes(slotNum) ? slotNum : null;
+
     const payload = {
       name: formData.get("name"),
       role: formData.get("role"),
@@ -45,6 +50,7 @@ export default function EditTeamMemberPage() {
       imageUrl: formData.get("imageUrl") || "",
       order: parseInt(formData.get("order") as string) || 0,
       published: formData.get("published") === "on",
+      featuredLeadershipOrder,
     };
 
     try {
@@ -95,6 +101,7 @@ export default function EditTeamMemberPage() {
             <label className="block text-sm font-medium mb-1">Department *</label>
             <select name="department" required defaultValue={member.department as string}
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm bg-white">
+              <option value="Leadership">Leadership</option>
               <option value="Management Team">Management Team</option>
               <option value="Sales Team">Sales Team</option>
               <option value="Recruitment Team">Recruitment Team</option>
@@ -123,6 +130,26 @@ export default function EditTeamMemberPage() {
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
             />
             <p className="mt-1 text-xs text-gray-500">If left empty, the marketing site uses the matching placeholder from Site content → About page (workforce).</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Meet the Leadership slot</label>
+            <select
+              name="featuredLeadershipOrder"
+              defaultValue={
+                member.featuredLeadershipOrder != null && typeof member.featuredLeadershipOrder === "number"
+                  ? String(member.featuredLeadershipOrder)
+                  : ""
+              }
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm bg-white"
+            >
+              <option value="">Not on leadership row</option>
+              <option value="1">Position 1 (left)</option>
+              <option value="2">Position 2 (center)</option>
+              <option value="3">Position 3 (right)</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              Saving assigns this slot; another member with the same slot is cleared automatically.
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
