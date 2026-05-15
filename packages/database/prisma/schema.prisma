@@ -192,6 +192,7 @@ model TeamMember {
   name        String
   role        String
   department  String   // e.g. Management Team, ServiceNow Developers, etc.
+  description String   @default("")
   imageUrl    String   @default("")
   order       Int      @default(0)
   published   Boolean  @default(true)

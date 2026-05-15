@@ -5,6 +5,7 @@ import "./globals.css";
 import { SiteChrome } from "@/components/SiteChrome";
 import { fetchSiteContentPayload } from "@/lib/fetch-site-content";
 import type { AnnouncementBarContent } from "@/components/AnnouncementBar";
+import { resolveSiteFooter } from "@/lib/site-content/resolve-pages";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -55,8 +56,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const raw = await fetchSiteContentPayload<unknown>("announcement_bar");
-  const announcement = isAnnouncementPayload(raw) ? raw : null;
+  const [rawAnnouncement, rawFooter] = await Promise.all([
+    fetchSiteContentPayload<unknown>("announcement_bar"),
+    fetchSiteContentPayload<unknown>("site_footer"),
+  ]);
+  const announcement = isAnnouncementPayload(rawAnnouncement) ? rawAnnouncement : null;
+  const footer = resolveSiteFooter(rawFooter);
 
   return (
     <html
@@ -64,7 +69,9 @@ export default async function RootLayout({
       className={`${inter.variable} ${GeistSans.variable} ${spaceGrotesk.variable} ${figtree.variable} ${firaSans.variable}`}
     >
       <body className={`${inter.className} antialiased`}>
-        <SiteChrome announcement={announcement}>{children}</SiteChrome>
+        <SiteChrome announcement={announcement} footer={footer}>
+          {children}
+        </SiteChrome>
       </body>
     </html>
   );

@@ -8,6 +8,7 @@ const teamMemberSchema = z.object({
   name: z.string().min(1),
   role: z.string().min(1),
   department: z.string().min(1),
+  description: z.string().default(""),
   imageUrl: z.string().default(""),
   order: z.number().int().default(0),
   published: z.boolean().default(true),

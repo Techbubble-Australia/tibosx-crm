@@ -113,18 +113,36 @@ export async function getPublishedFaqs(category?: string): Promise<FaqPublicRow[
 }
 
 export type TeamMemberPublicRow = {
+  id: string;
   name: string;
   role: string;
   department: string;
+  description: string;
   imageUrl: string;
+  order: number;
 };
 
 export async function getPublishedTeam(department?: string): Promise<TeamMemberPublicRow[]> {
   const query = department ? `?department=${encodeURIComponent(department)}` : "";
-  const json = await apiGet<{ data: TeamMemberPublicRow[] }>(`/api/team${query}`);
+  const json = await apiGet<{
+    data: {
+      id: string;
+      name: string;
+      role: string;
+      department: string;
+      description?: string;
+      imageUrl: string;
+      order: number;
+    }[];
+  }>(`/api/team${query}`);
   const rows = json?.data ?? [];
   return rows.map((row) => ({
-    ...row,
+    id: row.id,
+    name: row.name,
+    role: row.role,
+    department: row.department,
+    description: row.description ?? "",
+    order: row.order ?? 0,
     imageUrl: resolveOptionalMediaUrl(row.imageUrl),
   }));
 }

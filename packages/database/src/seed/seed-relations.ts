@@ -212,13 +212,56 @@ export async function seedJobsFaqsTestimonialsTeam() {
   }
 
   const team = [
-    { name: "Nikita T", role: "Founder & Director, Australia", department: "Leadership", order: 0 },
-    { name: "Jeet Bhatt", role: "Founder & Director, Australia", department: "Leadership", order: 1 },
-    { name: "Dhruv Bhatt", role: "Head of Product, Australia", department: "Leadership", order: 2 },
-    { name: "Yogesh Panchal", role: "Delivery Manager, USA", department: "Management Team", order: 0 },
-    { name: "Lakshminarayanan", role: "Sr. Manager - Talent Acquisition, India", department: "Management Team", order: 1 },
-    { name: "Dinky Rajpal", role: "Sr. Manager - Business Development, India", department: "Management Team", order: 2 },
-    { name: "Kamal Rajput", role: "Sr. Account Manager, APAC & UK", department: "Management Team", order: 3 },
+    {
+      name: "Nikita T",
+      role: "Founder & Director, Australia",
+      department: "Leadership",
+      order: 0,
+      description:
+        "Sets the strategic direction for TechBubble and leads enterprise partnerships across APAC and North America.",
+    },
+    {
+      name: "Jeet Bhatt",
+      role: "Founder & Director, Australia",
+      department: "Leadership",
+      order: 1,
+      description: "",
+    },
+    {
+      name: "Dhruv Bhatt",
+      role: "Head of Product, Australia",
+      department: "Leadership",
+      order: 2,
+      description: "",
+    },
+    {
+      name: "Yogesh Panchal",
+      role: "Delivery Manager, USA",
+      department: "Management Team",
+      order: 0,
+      description: "",
+    },
+    {
+      name: "Lakshminarayanan",
+      role: "Sr. Manager - Talent Acquisition, India",
+      department: "Management Team",
+      order: 1,
+      description: "",
+    },
+    {
+      name: "Dinky Rajpal",
+      role: "Sr. Manager - Business Development, India",
+      department: "Management Team",
+      order: 2,
+      description: "",
+    },
+    {
+      name: "Kamal Rajput",
+      role: "Sr. Account Manager, APAC & UK",
+      department: "Management Team",
+      order: 3,
+      description: "",
+    },
   ];
 
   for (const m of team) {
@@ -228,11 +271,11 @@ export async function seedJobsFaqsTestimonialsTeam() {
     if (existing) {
       await prisma.teamMember.update({
         where: { id: existing.id },
-        data: { ...m, imageUrl: "", published: true },
+        data: { ...m, imageUrl: "", published: true, description: m.description ?? "" },
       });
     } else {
       await prisma.teamMember.create({
-        data: { ...m, imageUrl: "", published: true },
+        data: { ...m, imageUrl: "", published: true, description: m.description ?? "" },
       });
     }
   }

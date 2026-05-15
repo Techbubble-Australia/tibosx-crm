@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ClientStoriesSection } from "@/components/ClientStoriesSection";
 import { TechnologyExpertiseSection } from "@/components/TechnologyExpertiseSection";
 import { SectionPill } from "@/components/ui/SectionPill";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 import {
   ArrowRight,
   Check,
@@ -18,7 +19,7 @@ import {
   Clock,
   DollarSign,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { MarketingHomePayload } from "@/lib/data/marketing-home-payload";
 import { buildMarketingHomeViewModel } from "@/lib/marketing-home-view";
 import heroNetworkPattern from "@image/home-hero-network.svg";
@@ -26,7 +27,10 @@ import heroGovNsw from "@image/hero-gov-nsw-approved-supplier.png";
 import heroGovVictoria from "@image/hero-gov-victoria-approved-supplier.png";
 import heroGovQueensland from "@image/hero-gov-queensland-wordmark.png";
 import innovationImage from "@image/Innovation_Cutting_Edge_Tech.png";
-import { CASE_STUDY_SIDEBAR, type CaseStudyListCard } from "@/lib/case-study-mapper";
+import { CASE_STUDY_SIDEBAR, buildHomeCaseStudySlots, type CaseStudyListCard } from "@/lib/case-study-mapper";
+import { useStatCountUpOnView } from "@/hooks/useStatCountUpOnView";
+
+const CASE_STUDY_HOME_CATEGORY_FILTERS = ["All", "ServiceNow", "Salesforce", "MuleSoft", "SharePoint", "Staffing"] as const;
 
 export type HomePreviewJob = { slug: string; title: string; meta: string; href: string };
 export type HomeClientStory = {
@@ -42,18 +46,8 @@ type MarketingHomeProps = {
   content: MarketingHomePayload;
   testimonials: HomeClientStory[];
   previewJobs: HomePreviewJob[];
-  caseStudyFeatured: CaseStudyListCard | null;
-  caseStudySecondary: CaseStudyListCard | null;
-  caseStudyGrid: CaseStudyListCard[];
+  caseStudies: CaseStudyListCard[];
 };
-
-function parseStatValue(raw: string): { target: number; suffix: string } {
-  const match = raw.trim().match(/^(\d+)(.*)$/);
-  if (!match) {
-    return { target: 0, suffix: "" };
-  }
-  return { target: Number(match[1]), suffix: match[2] ?? "" };
-}
 
 const WORLD_CLOCK_ZONES = [
   { city: "Sydney", timeZone: "Australia/Sydney" },
@@ -79,21 +73,31 @@ export function MarketingHome({
   content,
   testimonials,
   previewJobs,
-  caseStudyFeatured,
-  caseStudySecondary,
-  caseStudyGrid,
+  caseStudies,
 }: MarketingHomeProps) {
   const vm = useMemo(() => buildMarketingHomeViewModel(content), [content]);
   const [engagementId, setEngagementId] = useState<string>(vm.engagementModels[0]!.id);
   const [platformId, setPlatformId] = useState<string>(vm.platforms[0]!.id);
   const [faqOpenIndex, setFaqOpenIndex] = useState<number>(0);
-  const statsSectionRef = useRef<HTMLElement | null>(null);
-  const [statsInView, setStatsInView] = useState(false);
-  const [animatedStats, setAnimatedStats] = useState<number[]>(() => vm.statsStrip.items.map(() => 0));
+  const statsNumberStrings = useMemo(() => vm.statsStrip.items.map((s) => s.n), [vm.statsStrip.items]);
+  const { ref: statsSectionRef, formatAt: formatStatAt } = useStatCountUpOnView<HTMLElement>(statsNumberStrings);
   const [worldClockNow, setWorldClockNow] = useState(() => new Date());
   const [worldClocksReady, setWorldClocksReady] = useState(false);
 
-  const statTargets = useMemo(() => vm.statsStrip.items.map((s) => parseStatValue(s.n)), [vm.statsStrip.items]);
+  const [homeCaseStudyCategory, setHomeCaseStudyCategory] =
+    useState<(typeof CASE_STUDY_HOME_CATEGORY_FILTERS)[number]>("All");
+
+  const caseStudiesFiltered = useMemo(() => {
+    if (homeCaseStudyCategory === "All") {
+      return caseStudies;
+    }
+    return caseStudies.filter((c) => c.category === homeCaseStudyCategory);
+  }, [caseStudies, homeCaseStudyCategory]);
+
+  const { featured: caseStudyFeatured, secondary: caseStudySecondary, grid: caseStudyGrid } = useMemo(
+    () => buildHomeCaseStudySlots(caseStudiesFiltered),
+    [caseStudiesFiltered],
+  );
 
   useEffect(() => {
     setWorldClocksReady(true);
@@ -103,55 +107,11 @@ export function MarketingHome({
   }, []);
 
   useEffect(() => {
-    setAnimatedStats(vm.statsStrip.items.map(() => 0));
-    setStatsInView(false);
-  }, [vm.statsStrip.items]);
-
-  useEffect(() => {
     const ids = new Set(vm.engagementModels.map((m) => m.id));
     if (!ids.has(engagementId) && vm.engagementModels[0]?.id) {
       setEngagementId(vm.engagementModels[0].id);
     }
   }, [vm.engagementModels, engagementId]);
-
-  useEffect(() => {
-    const node = statsSectionRef.current;
-    if (!node) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry?.isIntersecting) return;
-        setStatsInView(true);
-        observer.disconnect();
-      },
-      { threshold: 0.35 },
-    );
-
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!statsInView) return;
-
-    const durationMs = 1300;
-    const start = performance.now();
-    let frameId = 0;
-
-    const tick = (now: number) => {
-      const progress = Math.min((now - start) / durationMs, 1);
-      const eased = 1 - (1 - progress) * (1 - progress);
-
-      setAnimatedStats(statTargets.map(({ target }) => Math.round(target * eased)));
-
-      if (progress < 1) {
-        frameId = requestAnimationFrame(tick);
-      }
-    };
-
-    frameId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frameId);
-  }, [statTargets, statsInView]);
 
   const engagement = vm.engagementModels.find((m) => m.id === engagementId) ?? vm.engagementModels[0]!;
   const platform = vm.platforms.find((p) => p.id === platformId) ?? vm.platforms[0]!;
@@ -337,7 +297,7 @@ export function MarketingHome({
                 className={`relative px-2 ${i > 0 ? "md:before:absolute md:before:-left-[48px] md:before:top-1 md:before:h-[78px] md:before:w-px md:before:bg-white/20 md:before:content-['']" : ""}`}
               >
                 <div className="text-5xl font-bold leading-none tracking-[-0.02em] md:text-[56px]">
-                  {statTargets[i]?.target ? `${animatedStats[i] ?? 0}${statTargets[i]?.suffix ?? ""}` : s.n}
+                  {formatStatAt(i)}
                 </div>
                 <div className="mt-2 text-xs font-medium uppercase tracking-[0.02em] text-[#f7f7f7]">{s.l}</div>
               </div>
@@ -696,33 +656,37 @@ export function MarketingHome({
                     <div className="mt-8 space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {[
-                          { flag: "🇦🇺", label: "AEST" },
-                          { flag: "🇺🇸", label: "EST / PST" },
-                          { flag: "🇬🇧", label: "GMT" },
+                          { code: "au" as const, label: "AEST", country: "Australia" },
+                          { code: "us" as const, label: "EST / PST", country: "United States" },
+                          { code: "gb" as const, label: "GMT", country: "United Kingdom" },
                         ].map((chip) => (
                           <span
                             key={chip.label}
                             className="inline-flex h-9 items-center gap-2 rounded-full border border-[#e8e8e8] bg-white px-4 text-[12px] font-bold leading-none text-[#111111]"
                           >
-                            <span className="text-[14px] leading-none" aria-hidden>
-                              {chip.flag}
-                            </span>
+                            <CountryFlag
+                              code={chip.code}
+                              height={16}
+                              label={`${chip.country}, ${chip.label}`}
+                            />
                             {chip.label}
                           </span>
                         ))}
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {[
-                          { flag: "🇮🇳", label: "IST" },
-                          { flag: "🇵🇭", label: "PHT" },
+                          { code: "in" as const, label: "IST", country: "India" },
+                          { code: "ph" as const, label: "PHT", country: "Philippines" },
                         ].map((chip) => (
                           <span
                             key={chip.label}
                             className="inline-flex h-9 items-center gap-2 rounded-full border border-[#e8e8e8] bg-white px-4 text-[12px] font-bold leading-none text-[#111111]"
                           >
-                            <span className="text-[14px] leading-none" aria-hidden>
-                              {chip.flag}
-                            </span>
+                            <CountryFlag
+                              code={chip.code}
+                              height={16}
+                              label={`${chip.country}, ${chip.label}`}
+                            />
                             {chip.label}
                           </span>
                         ))}
@@ -835,19 +799,19 @@ export function MarketingHome({
             {/* Office cards */}
             <div className="mt-12 grid w-full grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
               {[
-                { flag: "🇦🇺", name: "Australia", addr: "HQ · Sydney, NSW\nLevel 12, 126 Banks Ave" },
-                { flag: "🇺🇸", name: "USA", addr: "Wilmington, Delaware\n1007 N Orange St" },
-                { flag: "🇮🇳", name: "India", addr: "Ahmedabad, Gujarat\nK.P. Epitome Office" },
-                { flag: "🇵🇭", name: "Philippines", addr: "SE Asia Hub\nDelivery Centre" },
-                { flag: "🇬🇧", name: "UK", addr: "London\nRegional Offices" },
-                { flag: "🇦🇪", name: "UAE", addr: "Dubai\nRegional Offices" },
+                { code: "au" as const, name: "Australia", addr: "HQ · Sydney, NSW\nLevel 12, 126 Banks Ave" },
+                { code: "us" as const, name: "USA", addr: "Wilmington, Delaware\n1007 N Orange St" },
+                { code: "in" as const, name: "India", addr: "Ahmedabad, Gujarat\nK.P. Epitome Office" },
+                { code: "ph" as const, name: "Philippines", addr: "SE Asia Hub\nDelivery Centre" },
+                { code: "gb" as const, name: "UK", addr: "London\nRegional Offices" },
+                { code: "ae" as const, name: "UAE", addr: "Dubai\nRegional Offices" },
               ].map((o) => (
                 <div
                   key={o.name}
                   className="flex flex-col items-center justify-center rounded-[24px] border border-[#666666] bg-[#fafafa] py-8 text-center"
                 >
-                  <span className="text-[35px] leading-none">{o.flag}</span>
-                  <p className="mt-4 text-[28px] font-bold leading-9 tracking-[-0.0025em] text-[#111111]">{o.name}</p>
+                  <CountryFlag code={o.code} height={22} decorative />
+                  <p className="mt-4 text-[16px] font-bold leading-9 tracking-[-0.0025em] text-[#111111]">{o.name}</p>
                   <p className="mt-3 whitespace-pre-line text-[12px] font-medium leading-4 text-[#666666]">{o.addr}</p>
                 </div>
               ))}
@@ -859,44 +823,53 @@ export function MarketingHome({
       {/* Testimonial — Figma node 150:465 */}
       <ClientStoriesSection items={testimonials} />
 
-      {/* Case Studies — Figma node 150:622 */}
+      {/* Case Studies — layout: 32px rhythm, 3-col top row (featured 2 + secondary 1), 3-up grid */}
       <section className="bg-[#fafafa] py-[60px] md:py-[60px]">
         <div className="tb-container">
-          <div className="mx-auto max-w-[1139px]">
-            {/* Header */}
-              <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-8">
+          <div className="mx-auto flex max-w-[1136px] flex-col gap-8">
+            <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
               <div>
-                <SectionPill label="Proven Results" className="mb-6" />
-                <h2 className="text-3xl font-bold leading-tight tracking-[-0.005em] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">Case Studies</h2>
-                <p className="mt-3 text-base leading-7 text-[#666666] md:text-[18px]">Proven success across diverse industries and challenges.</p>
+                <SectionPill label="Proven Results" className="mb-4" />
+                <h2 className="text-3xl font-bold leading-tight tracking-[-0.005em] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">
+                  Case Studies
+                </h2>
+                <p className="mt-3 max-w-[640px] text-base leading-7 text-[#666666] md:text-[18px]">
+                  Proven success across diverse industries and challenges.
+                </p>
               </div>
               <Link
                 href="/case-studies"
-                  className="inline-flex h-[43px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
+                className="inline-flex h-[43px] shrink-0 items-center justify-center gap-2 self-start rounded-full bg-[#111111] px-6 text-[14px] font-semibold text-white sm:self-auto"
               >
                 View All Case Studies
                 <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
               </Link>
             </div>
 
-            {/* Filter tabs */}
-              <div className="mb-8 flex items-center gap-2 overflow-x-auto pb-1">
-              {["All", "ServiceNow", "Salesforce", "MuleSoft", "SharePoint", "Staffing"].map((tab, i) => (
-                <button
-                  key={tab}
-                    className={`inline-flex h-10 shrink-0 items-center rounded-[35px] border px-[23px] text-[16px] font-semibold leading-6 ${
-                    i === 0
-                        ? "border-[#e5e5e5] bg-[#111111] text-white"
-                        : "border-[#e5e5e5] bg-white text-[#666666]"
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
+            <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter case studies by category">
+              {CASE_STUDY_HOME_CATEGORY_FILTERS.map((tab) => {
+                const active = homeCaseStudyCategory === tab;
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setHomeCaseStudyCategory(tab)}
+                    className={`inline-flex h-10 shrink-0 items-center rounded-full border px-5 text-[14px] font-semibold leading-6 transition-colors ${
+                      active
+                        ? "border-[#111111] bg-[#111111] text-white"
+                        : "border-[#e5e5e5] bg-white text-[#666666] hover:border-[#cccccc]"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                );
+              })}
             </div>
 
-            {!caseStudyFeatured ? (
-              <div className="mt-8 rounded-[24px] border border-dashed border-[#e5e5e5] bg-white px-8 py-16 text-center">
+            {caseStudies.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[#e5e5e5] bg-white px-8 py-16 text-center">
                 <p className="text-[18px] font-semibold text-[#111111]">No published case studies yet</p>
                 <p className="mt-2 text-[16px] leading-6 text-[#666666]">
                   Publish case studies in the admin app — they will appear here automatically.
@@ -908,128 +881,132 @@ export function MarketingHome({
                   View case studies
                 </Link>
               </div>
+            ) : caseStudiesFiltered.length === 0 || !caseStudyFeatured ? (
+              <div className="rounded-2xl border border-[#e5e5e5] bg-white px-8 py-14 text-center">
+                <p className="text-[17px] font-semibold text-[#111111]">No case studies in this category</p>
+                <p className="mt-2 text-[15px] leading-6 text-[#666666]">Try another filter or view the full library.</p>
+                <button
+                  type="button"
+                  onClick={() => setHomeCaseStudyCategory("All")}
+                  className="mt-6 inline-flex h-11 items-center justify-center rounded-full border border-[#e5e5e5] bg-white px-6 text-[14px] font-semibold text-[#111111] hover:bg-[#fafafa]"
+                >
+                  Show all
+                </button>
+              </div>
             ) : (
               <>
                 <div
-                  className={
-                    caseStudySecondary
-                      ? "grid grid-cols-1 gap-4 lg:grid-cols-[1fr_377px]"
-                      : "grid grid-cols-1 gap-4"
-                  }
+                  className={`grid grid-cols-1 gap-8 ${caseStudySecondary ? "lg:grid-cols-3 lg:items-stretch" : ""}`}
                 >
-                  <div className="flex flex-col overflow-hidden rounded-[24px] border border-[#e5e5e5] bg-white md:flex-row md:h-[547px]">
-                    <div className="flex min-w-0 flex-1 flex-col px-6 pb-[22px] pt-[26px] md:w-[518px] md:px-[37px]">
-                      <div className="flex items-center justify-between">
-                        <span className="inline-flex h-7 items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
-                          {caseStudyCategoryPill(caseStudyFeatured.category)}
-                        </span>
-                        <span className="flex items-center gap-1.5 text-[12px] font-medium leading-4 text-[#666666]">
-                          <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                          {caseStudyFeatured.date || "—"}
-                        </span>
-                      </div>
-                      <div className="relative mt-[14px] h-[150px] w-full overflow-hidden rounded-[15px] bg-[#e5e5e5] md:w-[451px]">
-                        <Image
-                          src={caseStudyFeatured.image}
-                          alt={caseStudyFeatured.title}
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 768px) 100vw, 451px"
-                        />
-                      </div>
-                      <h3 className="mt-[19px] w-full text-xl font-bold leading-9 tracking-[-0.07px] text-[#06091a] md:w-[446px] md:text-[28px]">
-                        {caseStudyFeatured.title}
-                      </h3>
-                      <p className="mt-[7px] w-full text-[16px] leading-6 text-[#666666] md:w-[446px]">
-                        {caseStudyFeatured.description}
-                      </p>
-                      <div className="mt-auto flex min-w-0 items-center justify-between gap-4 pt-6">
-                        <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-4 sm:gap-x-10">
-                          <div className="flex min-w-0 flex-col gap-2">
-                            <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">
-                              {caseStudyFeatured.stat1.value}
-                            </p>
-                            <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
-                              {caseStudyFeatured.stat1.label}
-                            </p>
-                          </div>
-                          <div className="flex min-w-0 flex-col gap-2">
-                            <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">
-                              {caseStudyFeatured.stat2.value}
-                            </p>
-                            <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
-                              {caseStudyFeatured.stat2.label}
-                            </p>
-                          </div>
+                  <div className={caseStudySecondary ? "lg:col-span-2" : ""}>
+                    <div className="grid h-full min-h-[480px] grid-cols-1 overflow-hidden rounded-2xl border border-[#e5e5e5] bg-white lg:min-h-[520px] lg:grid-cols-[minmax(0,2fr)_minmax(232px,1fr)]">
+                      <div className="flex min-w-0 flex-col px-6 pb-6 pt-6 md:px-8 md:pb-8 md:pt-8">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <span className="inline-flex min-h-7 items-center rounded bg-[#f7f7f7] px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-[#666666]">
+                            {caseStudyCategoryPill(caseStudyFeatured.category)}
+                          </span>
+                          <span className="flex items-center gap-1.5 text-[12px] font-medium text-[#666666]">
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-sm bg-[#111111]" aria-hidden />
+                            {caseStudyFeatured.date || "—"}
+                          </span>
                         </div>
-                        <Link
-                          href={`/case-studies/${encodeURIComponent(caseStudyFeatured.slug)}`}
-                          className="inline-flex h-[43px] w-[95px] shrink-0 items-center justify-center gap-2 self-center whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
-                        >
-                          Read
-                          <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
-                        </Link>
-                      </div>
-                    </div>
-                    <div className="hidden w-[228px] shrink-0 flex-col bg-[#111111] px-[25px] py-[49px] text-white md:flex">
-                      <p className="text-[12px] font-bold leading-4">ON THIS CASE STUDY</p>
-                      <div className="mt-[15px]">
-                        {CASE_STUDY_SIDEBAR.map((item, idx) => (
-                          <div key={item.label} className="flex h-[42px] items-center border-b border-[#e5e5e5] last:border-b-0">
-                            <span
-                              className={`mr-[10px] h-[14px] w-[3px] rounded-[2px] ${
-                                idx === CASE_STUDY_SIDEBAR.length - 1 ? "bg-[#086eff]" : "bg-white"
-                              }`}
-                              aria-hidden
-                            />
-                            <span className="text-[12px] font-medium leading-4 text-white">{item.label}</span>
+                        <div className="relative mt-4 aspect-[1136/307] w-full max-h-[240px] overflow-hidden rounded-xl bg-[#e5e5e5] md:max-h-[280px]">
+                          <Image
+                            src={caseStudyFeatured.image}
+                            alt={caseStudyFeatured.title}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 1024px) 100vw, 66vw"
+                          />
+                        </div>
+                        <h3 className="mt-5 text-xl font-bold leading-snug tracking-[-0.02em] text-[#06091a] md:text-[26px] md:leading-8">
+                          {caseStudyFeatured.title}
+                        </h3>
+                        <p className="mt-3 flex-1 text-[15px] leading-6 text-[#666666] md:text-[16px]">{caseStudyFeatured.description}</p>
+                        <div className="mt-6 flex min-w-0 flex-wrap items-end justify-between gap-4 border-t border-[#f0f0f0] pt-6">
+                          <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-6 gap-y-2">
+                            <div>
+                              <p className="text-[26px] font-medium leading-none tracking-[-0.02em] text-[#111111] md:text-[28px]">
+                                {caseStudyFeatured.stat1.value}
+                              </p>
+                              <p className="mt-1.5 text-[11px] font-medium uppercase leading-snug tracking-[0.08em] text-[#666666]">
+                                {caseStudyFeatured.stat1.label}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[26px] font-medium leading-none tracking-[-0.02em] text-[#111111] md:text-[28px]">
+                                {caseStudyFeatured.stat2.value}
+                              </p>
+                              <p className="mt-1.5 text-[11px] font-medium uppercase leading-snug tracking-[0.08em] text-[#666666]">
+                                {caseStudyFeatured.stat2.label}
+                              </p>
+                            </div>
                           </div>
-                        ))}
+                          <Link
+                            href={`/case-studies/${encodeURIComponent(caseStudyFeatured.slug)}`}
+                            className="inline-flex h-[43px] shrink-0 items-center justify-center gap-2 rounded-full bg-[#111111] px-5 text-[14px] font-semibold text-white"
+                          >
+                            Read
+                            <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+                          </Link>
+                        </div>
                       </div>
+                      <aside className="flex flex-col border-t border-[#2a2a2a] bg-[#111111] px-6 py-8 text-white lg:border-l lg:border-t-0 lg:px-7 lg:py-10">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/80">On this case study</p>
+                        <nav className="mt-5 flex flex-col" aria-label="Case study sections">
+                          {CASE_STUDY_SIDEBAR.map((item) => (
+                            <Link
+                              key={item.href}
+                              href={`/case-studies/${encodeURIComponent(caseStudyFeatured.slug)}${item.href}`}
+                              className="border-b border-white/15 py-3 text-[13px] font-medium leading-5 text-white/95 transition-colors hover:text-white last:border-b-0"
+                            >
+                              {item.label}
+                            </Link>
+                          ))}
+                        </nav>
+                      </aside>
                     </div>
                   </div>
 
                   {caseStudySecondary ? (
-                    <div className="flex min-w-0 flex-col rounded-[24px] border border-[#e5e5e5] bg-white px-[30px] pb-[26px] pt-9 lg:min-h-0">
-                      <div className="flex flex-1 flex-col border-b border-[#eff2f7] pb-[52px]">
-                        <div className="flex items-center justify-between">
-                          <span className="inline-flex h-[28px] items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
+                    <div className="flex min-h-0 flex-col rounded-2xl border border-[#e5e5e5] bg-white p-6 md:p-8">
+                      <div className="min-h-0 flex-1 border-b border-[#eff2f7] pb-8">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <span className="inline-flex min-h-7 items-center rounded bg-[#f7f7f7] px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-[#666666]">
                             {caseStudyCategoryPill(caseStudySecondary.category)}
                           </span>
-                          <span className="flex items-center gap-1.5 text-[12px] font-medium leading-4 text-[#666666]">
-                            <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
+                          <span className="flex items-center gap-1.5 text-[12px] font-medium text-[#666666]">
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-sm bg-[#111111]" aria-hidden />
                             {caseStudySecondary.date || "—"}
                           </span>
                         </div>
-                        <h3 className="mt-[13px] w-full text-xl font-bold leading-9 tracking-[-0.07px] text-[#06091a] md:text-[28px]">
+                        <h3 className="mt-4 text-xl font-bold leading-snug tracking-[-0.02em] text-[#06091a] md:text-[22px] md:leading-7">
                           {caseStudySecondary.title}
                         </h3>
-                        <p className="mt-[16px] w-full text-[16px] leading-6 text-[#666666]">
-                          {caseStudySecondary.description}
-                        </p>
+                        <p className="mt-3 text-[15px] leading-6 text-[#666666] md:text-[16px]">{caseStudySecondary.description}</p>
                       </div>
-                      <div className="flex min-w-0 shrink-0 items-center justify-between gap-4 pt-[21px]">
-                        <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-4 sm:gap-x-8">
-                          <div className="flex min-w-0 flex-col gap-2">
-                            <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">
+                      <div className="mt-6 flex min-w-0 flex-wrap items-end justify-between gap-4">
+                        <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-4">
+                          <div>
+                            <p className="text-[26px] font-medium leading-none text-[#111111] md:text-[28px]">
                               {caseStudySecondary.stat1.value}
                             </p>
-                            <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
+                            <p className="mt-1.5 text-[11px] font-medium uppercase leading-snug tracking-[0.08em] text-[#666666]">
                               {caseStudySecondary.stat1.label}
                             </p>
                           </div>
-                          <div className="flex min-w-0 flex-col gap-2">
-                            <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">
+                          <div>
+                            <p className="text-[26px] font-medium leading-none text-[#111111] md:text-[28px]">
                               {caseStudySecondary.stat2.value}
                             </p>
-                            <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
+                            <p className="mt-1.5 text-[11px] font-medium uppercase leading-snug tracking-[0.08em] text-[#666666]">
                               {caseStudySecondary.stat2.label}
                             </p>
                           </div>
                         </div>
                         <Link
                           href={`/case-studies/${encodeURIComponent(caseStudySecondary.slug)}`}
-                          className="inline-flex h-[43px] w-[95px] shrink-0 items-center justify-center gap-2 self-center whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
+                          className="inline-flex h-[43px] shrink-0 items-center justify-center gap-2 rounded-full bg-[#111111] px-5 text-[14px] font-semibold text-white"
                         >
                           Read
                           <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
@@ -1040,31 +1017,36 @@ export function MarketingHome({
                 </div>
 
                 {caseStudyGrid.length > 0 ? (
-                  <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
                     {caseStudyGrid.map((c) => (
-                      <div key={c.slug} className="flex min-w-0 flex-col rounded-[24px] border border-[#e2e7f4] bg-white px-9 pb-6 pt-9">
-                        <div className="flex min-h-0 flex-1 flex-col border-b border-[#eff2f7] pb-5">
-                          <div className="flex items-center justify-between">
-                            <span className="inline-flex h-[28px] w-fit max-w-[70%] items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
+                      <div
+                        key={c.slug}
+                        className="flex min-h-0 min-w-0 flex-col rounded-2xl border border-[#e5e5e5] bg-white p-6 md:p-8"
+                      >
+                        <div className="min-h-0 flex-1 border-b border-[#eff2f7] pb-6">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <span className="inline-flex max-w-[72%] items-center rounded bg-[#f7f7f7] px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-[#666666]">
                               {caseStudyCategoryPill(c.category)}
                             </span>
-                            <span className="flex shrink-0 items-center gap-1.5 text-[12px] font-medium leading-4 text-[#666666]">
-                              <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
+                            <span className="flex shrink-0 items-center gap-1.5 text-[12px] font-medium text-[#666666]">
+                              <span className="h-1.5 w-1.5 shrink-0 rounded-sm bg-[#111111]" aria-hidden />
                               {c.date || "—"}
                             </span>
                           </div>
-                          <h3 className="mt-[9px] text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">{c.title}</h3>
-                          <p className="mt-[13px] min-h-0 flex-1 text-[16px] leading-6 text-[#666666]">{c.description}</p>
+                          <h3 className="mt-4 text-[22px] font-bold leading-7 tracking-[-0.02em] text-[#06091a] md:text-[24px] md:leading-8">
+                            {c.title}
+                          </h3>
+                          <p className="mt-3 min-h-0 flex-1 text-[15px] leading-6 text-[#666666] md:text-[16px]">{c.description}</p>
                         </div>
-                        <div className="flex min-w-0 shrink-0 items-center justify-between gap-4 pt-5">
-                          <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-3 gap-y-3 sm:gap-x-6">
+                        <div className="mt-6 flex min-w-0 flex-wrap items-end justify-between gap-4">
+                          <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-3 sm:gap-x-5">
                             {[
                               { v: c.stat1.value, l: c.stat1.label },
                               { v: c.stat2.value, l: c.stat2.label },
                             ].map((s) => (
-                              <div key={s.l} className="flex min-w-0 flex-col gap-2">
-                                <p className="m-0 text-[28px] font-medium leading-none tracking-[-0.07px] text-black">{s.v}</p>
-                                <p className="m-0 break-words text-[10px] font-medium leading-snug tracking-[0.1px] text-[#666666]">
+                              <div key={s.l} className="min-w-0">
+                                <p className="text-[26px] font-medium leading-none text-[#111111] md:text-[28px]">{s.v}</p>
+                                <p className="mt-1.5 text-[11px] font-medium uppercase leading-snug tracking-[0.08em] text-[#666666]">
                                   {s.l}
                                 </p>
                               </div>
@@ -1072,7 +1054,7 @@ export function MarketingHome({
                           </div>
                           <Link
                             href={`/case-studies/${encodeURIComponent(c.slug)}`}
-                            className="inline-flex h-[43px] w-[95px] shrink-0 items-center justify-center gap-2 self-center whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
+                            className="inline-flex h-[43px] shrink-0 items-center justify-center gap-2 rounded-full bg-[#111111] px-5 text-[14px] font-semibold text-white"
                           >
                             Read
                             <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
@@ -1085,15 +1067,15 @@ export function MarketingHome({
               </>
             )}
 
-              <div className="mt-8 flex justify-center">
-                <Link
-                  href="/case-studies"
-                  className="inline-flex h-[43px] w-[224px] items-center justify-center gap-2 whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
-                >
-                  Explore All Case Studies
-                  <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
-                </Link>
-              </div>
+            <div className="flex justify-center pt-2">
+              <Link
+                href="/case-studies"
+                className="inline-flex h-[52px] min-w-[min(100%,280px)] items-center justify-center gap-2 rounded-full bg-[#111111] px-10 text-[15px] font-semibold text-white sm:min-w-[320px]"
+              >
+                Explore All Case Studies
+                <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+              </Link>
+            </div>
           </div>
         </div>
       </section>

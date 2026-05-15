@@ -41,6 +41,7 @@ export default function EditTeamMemberPage() {
       name: formData.get("name"),
       role: formData.get("role"),
       department: formData.get("department"),
+      description: String(formData.get("description") ?? ""),
       imageUrl: formData.get("imageUrl") || "",
       order: parseInt(formData.get("order") as string) || 0,
       published: formData.get("published") === "on",
@@ -112,6 +113,17 @@ export default function EditTeamMemberPage() {
             className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
             labelClassName="mb-1 block text-sm font-medium"
           />
+          <div>
+            <label className="block text-sm font-medium mb-1">Description / bio</label>
+            <textarea
+              name="description"
+              rows={4}
+              defaultValue={(member.description as string) || ""}
+              placeholder="Short bio shown on the About page under this person when published."
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
+            />
+            <p className="mt-1 text-xs text-gray-500">If left empty, the marketing site uses the matching placeholder from Site content → About page (workforce).</p>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Display Order</label>

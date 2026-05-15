@@ -4,13 +4,16 @@ import { usePathname } from "next/navigation";
 import { AnnouncementBar, type AnnouncementBarContent } from "@/components/AnnouncementBar";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import type { SiteFooterPayload } from "@/lib/site-content/resolve-pages";
 
 export function SiteChrome({
   children,
   announcement,
+  footer,
 }: {
   children: React.ReactNode;
   announcement?: AnnouncementBarContent | null;
+  footer: SiteFooterPayload;
 }) {
   usePathname();
 
@@ -19,7 +22,7 @@ export function SiteChrome({
       <AnnouncementBar content={announcement} />
       <Header />
       <main>{children}</main>
-      <Footer />
+      <Footer data={footer} />
     </>
   );
 }

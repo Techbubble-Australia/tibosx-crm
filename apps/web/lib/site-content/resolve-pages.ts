@@ -3,12 +3,21 @@ import {
   careersPagePayload,
   pricingPagePayload,
   servicesPagePayload,
+  contactPagePayload,
+  legalPagesPayload,
+  caseStudiesPagePayload,
+  siteFooterPayload,
 } from "@site-content/defaults";
+import { deepMerge } from "@/lib/deep-merge";
 
 export type ServicesPagePayload = typeof servicesPagePayload;
 export type PricingPagePayload = typeof pricingPagePayload;
 export type AboutPagePayload = typeof aboutPagePayload;
 export type CareersPagePayload = typeof careersPagePayload;
+export type ContactPagePayload = typeof contactPagePayload;
+export type LegalPagesPayload = typeof legalPagesPayload;
+export type CaseStudiesPagePayload = typeof caseStudiesPagePayload;
+export type SiteFooterPayload = typeof siteFooterPayload;
 
 export function resolveServicesPage(raw: unknown): ServicesPagePayload {
   if (!raw || typeof raw !== "object") return servicesPagePayload;
@@ -74,13 +83,47 @@ export function resolvePricingPage(raw: unknown): PricingPagePayload {
 export function resolveAboutPage(raw: unknown): AboutPagePayload {
   if (!raw || typeof raw !== "object") return aboutPagePayload;
   const r = raw as Partial<AboutPagePayload>;
+  const base = aboutPagePayload;
   return {
-    ...aboutPagePayload,
+    ...base,
     ...r,
-    hero: { ...aboutPagePayload.hero, ...r.hero },
-    mission: { ...aboutPagePayload.mission, ...r.mission },
-    statsStrip: r.statsStrip ?? aboutPagePayload.statsStrip,
-    missionCards: r.missionCards ?? aboutPagePayload.missionCards,
+    hero: { ...base.hero, ...r.hero },
+    mission: { ...base.mission, ...r.mission },
+    statsStrip: r.statsStrip ?? base.statsStrip,
+    missionCards: r.missionCards ?? base.missionCards,
+    leadership: {
+      ...base.leadership,
+      ...r.leadership,
+      members: r.leadership?.members ?? base.leadership.members,
+    },
+    workforce: {
+      ...base.workforce,
+      ...r.workforce,
+      defaultMemberBio: r.workforce?.defaultMemberBio ?? base.workforce.defaultMemberBio,
+      stats: r.workforce?.stats ?? base.workforce.stats,
+      tabs: r.workforce?.tabs ?? base.workforce.tabs,
+      management: {
+        ...base.workforce.management,
+        ...r.workforce?.management,
+        people: r.workforce?.management?.people ?? base.workforce.management.people,
+      },
+    },
+    usp: {
+      ...base.usp,
+      ...r.usp,
+      columns: r.usp?.columns ?? base.usp.columns,
+    },
+    values: {
+      ...base.values,
+      ...r.values,
+      pillars: r.values?.pillars ?? base.values.pillars,
+      missionCard: {
+        ...base.values.missionCard,
+        ...r.values?.missionCard,
+        metrics: r.values?.missionCard?.metrics ?? base.values.missionCard.metrics,
+      },
+    },
+    closingCta: { ...base.closingCta, ...r.closingCta },
   };
 }
 
@@ -96,4 +139,30 @@ export function resolveCareersPage(raw: unknown): CareersPagePayload {
     benefits: r.benefits ?? careersPagePayload.benefits,
     cultureCards: r.cultureCards ?? careersPagePayload.cultureCards,
   };
+}
+
+export function resolveContactPage(raw: unknown): ContactPagePayload {
+  if (!raw || typeof raw !== "object") return contactPagePayload;
+  return deepMerge(contactPagePayload as unknown as Record<string, unknown>, raw) as ContactPagePayload;
+}
+
+export function resolveLegalPages(raw: unknown): LegalPagesPayload {
+  if (!raw || typeof raw !== "object") return legalPagesPayload;
+  const r = raw as Partial<LegalPagesPayload>;
+  const base = legalPagesPayload;
+  return {
+    privacy: deepMerge(base.privacy as unknown as Record<string, unknown>, r.privacy ?? {}) as LegalPagesPayload["privacy"],
+    terms: deepMerge(base.terms as unknown as Record<string, unknown>, r.terms ?? {}) as LegalPagesPayload["terms"],
+    cookies: deepMerge(base.cookies as unknown as Record<string, unknown>, r.cookies ?? {}) as LegalPagesPayload["cookies"],
+  };
+}
+
+export function resolveCaseStudiesPage(raw: unknown): CaseStudiesPagePayload {
+  if (!raw || typeof raw !== "object") return caseStudiesPagePayload;
+  return deepMerge(caseStudiesPagePayload as unknown as Record<string, unknown>, raw) as CaseStudiesPagePayload;
+}
+
+export function resolveSiteFooter(raw: unknown): SiteFooterPayload {
+  if (!raw || typeof raw !== "object") return siteFooterPayload;
+  return deepMerge(siteFooterPayload as unknown as Record<string, unknown>, raw) as SiteFooterPayload;
 }

@@ -7,6 +7,10 @@ import {
   careersPagePayload,
   pricingPagePayload,
   servicesPagePayload,
+  contactPagePayload,
+  legalPagesPayload,
+  caseStudiesPagePayload,
+  siteFooterPayload,
 } from "./data/site-wide-content";
 
 const entries: { key: string; label: string; payload: Prisma.InputJsonValue }[] = [
@@ -16,6 +20,10 @@ const entries: { key: string; label: string; payload: Prisma.InputJsonValue }[] 
   { key: "pricing_page", label: "Pricing page", payload: pricingPagePayload as Prisma.InputJsonValue },
   { key: "about_page", label: "About page", payload: aboutPagePayload as Prisma.InputJsonValue },
   { key: "careers_page", label: "Careers page", payload: careersPagePayload as Prisma.InputJsonValue },
+  { key: "contact_page", label: "Contact page", payload: contactPagePayload as Prisma.InputJsonValue },
+  { key: "legal_pages", label: "Legal pages (privacy, terms, cookies)", payload: legalPagesPayload as Prisma.InputJsonValue },
+  { key: "case_studies_page", label: "Case studies listing", payload: caseStudiesPagePayload as Prisma.InputJsonValue },
+  { key: "site_footer", label: "Site footer", payload: siteFooterPayload as Prisma.InputJsonValue },
 ];
 
 export async function seedSiteContent() {

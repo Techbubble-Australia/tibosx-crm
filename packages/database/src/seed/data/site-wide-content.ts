@@ -282,6 +282,8 @@ export const aboutPagePayload = {
     title: "Empowering enterprises with world-class technology talent",
     body:
       "At TechBubble, we provide tailored AI-powered IT solutions and digital strategies to help Australian and global enterprises thrive. Our focus is on efficiency, security, and innovation.\nPartner with TechBubble to unlock tailored, innovative solutions that drive success and position your business for long-term growth.",
+    ctaLabel: "Explore Services",
+    ctaHref: "/services",
   },
   statsStrip: [
     { n: "150+", l: "Expert Technicians", labelClass: "text-[12px] font-medium leading-4" },
@@ -297,6 +299,143 @@ export const aboutPagePayload = {
     { title: "AI-Infused", text: "Our AI-matching engine reduces time-to-hire by 70% versus traditional models." },
     { title: "Innovation-Led", text: "Continuous upskilling ensures our talent stays ahead of every platform curve." },
   ],
+  leadership: {
+    pill: "Our Team",
+    title: "Meet The Leadership",
+    subtitle:
+      "The visionaries driving TechBubble's mission to transform businesses through technology.",
+    members: [
+      {
+        name: "Nikita T",
+        role: "Founder & Director, Australia",
+        bio: "Leads corporate strategy and client partnerships across APAC, with a focus on enterprise transformation, governance, and measurable delivery outcomes.",
+        imageKey: "about_us_1",
+        imageUrl: "",
+      },
+      {
+        name: "Jeet Bhatt",
+        role: "Founder & Director, Australia",
+        bio: "Drives growth, alliances, and operating model design—aligning global delivery with local compliance and client success at scale.",
+        imageKey: "about_us_2",
+        imageUrl: "",
+      },
+      {
+        name: "Dhruv Bhatt",
+        role: "Head of Product, Australia",
+        bio: "Owns product vision and platform roadmaps, ensuring every engagement ships secure, scalable solutions that match real business priorities.",
+        imageKey: "about_us_3",
+        imageUrl: "",
+      },
+    ],
+  },
+  workforce: {
+    pill: "Our Complete Team",
+    title: "Meet Our Entire Workforce",
+    intro:
+      "With 150+ expert technicians across multiple specializations and global offices, we bring world-class expertise to every project. Our diverse team ensures excellence across every technology stack.",
+    defaultMemberBio:
+      "Short professional bio for this team member will appear here. Add a description in Admin → Team members, or edit placeholder text in Site content → About page.",
+    stats: [
+      { n: "150+", l: "Expert Team Members" },
+      { n: "9", l: "Specialized Departments" },
+      { n: "5", l: "Global Offices" },
+      { n: "10+", l: "Years Experience" },
+    ],
+    tabs: [
+      { label: "Management Team (5)", widthPx: 215, active: true },
+      { label: "Sales Team (4)", widthPx: 157, active: false },
+      { label: "Recruitment Team (4)", widthPx: 209, active: false },
+      { label: "ServiceNow Developers (16)", widthPx: 260, active: false },
+      { label: "Salesforce Developers (8)", widthPx: 243, active: false },
+      { label: "MuleSoft Developers (8)", widthPx: 232, active: false },
+      { label: "Workday Team (5)", widthPx: 183, active: false },
+      { label: "Product Team (8)", widthPx: 176, active: false },
+      { label: "Other Techstack Developers (12)", widthPx: 295, active: false },
+    ],
+    management: {
+      title: "Management Team",
+      memberCountLabel: "5 members",
+      people: [
+        {
+          name: "Yogesh Panchal",
+          role: "Delivery Manager, USA",
+          bio: "Leads delivery governance and client outcomes for complex programs across the United States.",
+          imageKey: "about_us_4",
+          imageUrl: "",
+        },
+        {
+          name: "Lakshminarayanan",
+          role: "Sr. Manager - Talent Acquisition, India",
+          bio: "Builds high-performing squads and hiring pipelines aligned to enterprise skills demand.",
+          imageKey: "about_us_6",
+          imageUrl: "",
+        },
+        {
+          name: "Dinky Rajpal",
+          role: "Sr. Manager - Business Development, India",
+          bio: "Partners with clients to shape engagements that balance speed, quality, and commercial clarity.",
+          imageKey: "about_us_7",
+          imageUrl: "",
+        },
+        {
+          name: "Kamal Rajput",
+          role: "Sr. Account Manager, APAC & UK",
+          bio: "Owns account strategy across APAC and UK, ensuring continuity from first meeting to delivery.",
+          imageKey: "about_us_8",
+          imageUrl: "",
+        },
+      ],
+    },
+  },
+  usp: {
+    pill: "Why Choose Us",
+    title: "Our Unique Selling Points",
+    subtitle: "Discover what makes TechBubble the preferred partner for businesses worldwide.",
+    columns: [
+      {
+        title: "Technical Expertise That Spans Industries",
+        body: "Our team is proficient across a wide spectrum of technologies, including SaaS platforms like ServiceNow, Salesforce, and MuleSoft, and programming languages such as Java, Ruby, and Laravel. Whether your business requires IT solutions for small projects or complex, large-scale initiatives, our experience and skills make us your go-to partner for any technology stack.",
+      },
+      {
+        title: "World-Class Talent, Available When You Need It",
+        body: "We connect you with a vast network of skilled professionals experienced in handling international projects of all complexities. Our resources work within your time zone, ensuring seamless collaboration during your business hours. By outsourcing your IT needs to us, you can focus on what you do best—running your business—while we handle the technical details.",
+      },
+      {
+        title: "24/7 Support & Governance—At No Extra Cost",
+        body: "At TechBubble, customer satisfaction is our priority. We deliver tailored solutions, regardless of your budget, while providing round-the-clock professional support and governance at no additional charge. From start to finish, we ensure a smooth, worry-free experience and guarantee exceptional service at every stage of the engagement.",
+      },
+    ],
+  },
+  values: {
+    pill: "Our Values",
+    title: "What Drives Us Forward",
+    introLeadBold: "At TechBubble,",
+    introRest:
+      " We're passionate about innovation and committed to empowering businesses with cutting-edge technology solutions. We believe in fostering a culture that celebrates creativity, collaboration, and continuous growth.",
+    pillars: [
+      { title: "Innovation", subtitle: "Constantly pushing boundaries with cutting-edge solutions" },
+      { title: "Excellence", subtitle: "Delivering exceptional quality in every project" },
+      { title: "Partnership", subtitle: "Building lasting relationships with our clients" },
+      { title: "Integrity", subtitle: "Operating with transparency and honesty" },
+    ],
+    missionCard: {
+      title: "Our Mission",
+      body: "To empower businesses worldwide with innovative technology solutions that drive growth, efficiency, and success in an ever-evolving digital landscape.",
+      metrics: [
+        { n: "10+", l: "Years Experience" },
+        { n: "5", l: "Global Offices" },
+      ],
+    },
+  },
+  closingCta: {
+    title: "Ready to build something remarkable?",
+    description:
+      "Join 50+ enterprises who trust TechBubble to power their most critical technology initiatives.",
+    primaryLabel: "Book a Free Consultation",
+    primaryHref: "/contact",
+    secondaryLabel: "Explore Services",
+    secondaryHref: "/services",
+  },
 };
 
 export const careersPagePayload = {
@@ -362,3 +501,10 @@ export const careersPagePayload = {
     },
   ],
 };
+
+export {
+  contactPagePayload,
+  legalPagesPayload,
+  caseStudiesPagePayload,
+  siteFooterPayload,
+} from "./extra-site-pages-payload";

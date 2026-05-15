@@ -3,33 +3,13 @@ import { marketingHomePayload, type MarketingHomePayload } from "@/lib/data/mark
 import { deepMerge } from "@/lib/deep-merge";
 import { fetchSiteContentPayload } from "@/lib/fetch-site-content";
 import { getPublishedCaseStudies, getPublishedJobs, getTestimonials } from "@/lib/api/public";
-import { apiRowToListCard, type CaseStudyListCard } from "@/lib/case-study-mapper";
+import { apiRowToListCard } from "@/lib/case-study-mapper";
 import type { HomeClientStory, HomePreviewJob } from "@/components/home/MarketingHome";
 
 export const dynamic = "force-dynamic";
 
 function cloneMarketingHomeDefaults(): MarketingHomePayload {
   return JSON.parse(JSON.stringify(marketingHomePayload)) as MarketingHomePayload;
-}
-
-function buildHomeCaseStudySlots(cards: CaseStudyListCard[]): {
-  featured: CaseStudyListCard | null;
-  secondary: CaseStudyListCard | null;
-  grid: CaseStudyListCard[];
-} {
-  if (cards.length === 0) {
-    return { featured: null, secondary: null, grid: [] };
-  }
-  const featured = cards.find((c) => c.featured) ?? cards[0] ?? null;
-  if (!featured) {
-    return { featured: null, secondary: null, grid: [] };
-  }
-  const rest = cards.filter((c) => c.slug !== featured.slug);
-  return {
-    featured,
-    secondary: rest[0] ?? null,
-    grid: rest.slice(1, 4),
-  };
 }
 
 export default async function HomePage() {
@@ -64,18 +44,14 @@ export default async function HomePage() {
     href: `/careers/${encodeURIComponent(j.slug)}`,
   }));
 
-  const caseStudyCards = caseStudyRows.map(apiRowToListCard);
-  const { featured: caseStudyFeatured, secondary: caseStudySecondary, grid: caseStudyGrid } =
-    buildHomeCaseStudySlots(caseStudyCards);
+  const caseStudies = caseStudyRows.map(apiRowToListCard);
 
   return (
     <MarketingHome
       content={content}
       testimonials={testimonials}
       previewJobs={previewJobs}
-      caseStudyFeatured={caseStudyFeatured}
-      caseStudySecondary={caseStudySecondary}
-      caseStudyGrid={caseStudyGrid}
+      caseStudies={caseStudies}
     />
   );
 }

@@ -1,16 +1,30 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Zap, Workflow, Share2, FileStack, Braces, Handshake } from "lucide-react";
+import { ArrowRight, Zap, Workflow, Share2, FileStack, Braces, Handshake, type LucideIcon } from "lucide-react";
 import { ClientStoriesSection } from "@/components/ClientStoriesSection";
 import { SectionPill } from "@/components/ui/SectionPill";
 import { getPublishedCaseStudies, getTestimonials } from "@/lib/api/public";
 import { apiRowToListCard, type CaseStudyListCard } from "@/lib/case-study-mapper";
 import type { ClientStoryItem } from "@/components/ClientStoriesSection";
+import { fetchSiteContentPayload } from "@/lib/fetch-site-content";
+import { resolveCaseStudiesPage } from "@/lib/site-content/resolve-pages";
 
-const categories = ["All", "ServiceNow", "Salesforce", "MuleSoft", "SharePoint", "Staffing"];
+const CASE_STUDY_TILE_ICONS: Record<string, LucideIcon> = {
+  Zap,
+  Workflow,
+  Share2,
+  FileStack,
+  Braces,
+};
 
 export default async function CaseStudiesPage() {
-  const [rows, testimonialRows] = await Promise.all([getPublishedCaseStudies(50), getTestimonials()]);
+  const [rows, testimonialRows, rawCs] = await Promise.all([
+    getPublishedCaseStudies(50),
+    getTestimonials(),
+    fetchSiteContentPayload<unknown>("case_studies_page"),
+  ]);
+  const cs = resolveCaseStudiesPage(rawCs);
 
   const caseStudies: CaseStudyListCard[] = rows.map(apiRowToListCard);
 
@@ -34,10 +48,8 @@ export default async function CaseStudiesPage() {
       <section className="bg-[#111111] pb-[149px] pt-[109px] text-white">
         <div className="tb-container">
           <div className="mx-auto max-w-[1136px]">
-            <h1 className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-white">Real Results for Real Enterprises</h1>
-            <p className="mt-1 max-w-[976px] text-[18px] leading-7 text-[#e5e5e5]">
-              From government-scale ServiceNow transformations to Salesforce CRM overhauls — see how TechBubble delivers measurable outcomes across industries and platforms.
-            </p>
+            <h1 className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-white">{cs.hero.title}</h1>
+            <p className="mt-1 max-w-[976px] text-[18px] leading-7 text-[#e5e5e5]">{cs.hero.subtitle}</p>
           </div>
         </div>
       </section>
@@ -48,31 +60,18 @@ export default async function CaseStudiesPage() {
           <div className="mx-auto max-w-[1136px] rounded-[30px] bg-white shadow-[0_24px_48px_-26px_rgba(0,0,0,0.38)]">
             <div className="flex flex-wrap items-center justify-around gap-y-4 px-8 py-6 sm:h-[170px] sm:flex-nowrap sm:py-0">
               <div className="px-2">
-                <p className="text-[16px] font-bold leading-6 text-[#111111]">
-                  Deep-dives into how TechBubble has helped enterprises across Asia Pacific and North America transform their technology operations — with measurable outcomes.
-                </p>
+                <p className="text-[16px] font-bold leading-6 text-[#111111]">{cs.statsStrip.blurb}</p>
               </div>
 
-              <span className="hidden h-[78px] w-px bg-[#e5e5e5] sm:block" aria-hidden />
-
-              <div className="text-center">
-                <p className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#111111]">200+</p>
-                <p className="text-[12px] font-medium leading-4 text-[#666666]">Clients served</p>
-              </div>
-
-              <span className="hidden h-[78px] w-px bg-[#e5e5e5] sm:block" aria-hidden />
-
-              <div className="text-center">
-                <p className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#111111]">500+</p>
-                <p className="text-[12px] font-medium leading-4 text-[#666666]">Projects delivered</p>
-              </div>
-
-              <span className="hidden h-[78px] w-px bg-[#e5e5e5] sm:block" aria-hidden />
-
-              <div className="text-center">
-                <p className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#111111]">98%</p>
-                <p className="text-[12px] font-medium leading-4 text-[#666666]">Satisfaction rate</p>
-              </div>
+              {cs.statsStrip.stats.map((stat, index) => (
+                <Fragment key={`${stat.label}-${index}`}>
+                  <span className="hidden h-[78px] w-px bg-[#e5e5e5] sm:block" aria-hidden />
+                  <div className="text-center">
+                    <p className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#111111]">{stat.value}</p>
+                    <p className="text-[12px] font-medium leading-4 text-[#666666]">{stat.label}</p>
+                  </div>
+                </Fragment>
+              ))}
             </div>
           </div>
         </div>
@@ -82,14 +81,20 @@ export default async function CaseStudiesPage() {
       <section className="py-[100px]">
         <div className="tb-container">
           <div className="mx-auto max-w-[1136px]">
-            <SectionPill label="Our Work" />
-            <h2 className="mt-2 text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">Case Studies by Practice</h2>
-            <p className="mt-1 max-w-[898px] text-[18px] leading-7 text-[#666666]">
-              Explore how we&apos;ve helped leading enterprises transform operations, reduce costs, and accelerate growth.
-            </p>
+            <SectionPill label={cs.practiceSection.pill} />
+            <h2 className="mt-2 text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">
+              {cs.practiceSection.titleLine1}
+              {cs.practiceSection.titleLine2 ? (
+                <>
+                  <br />
+                  {cs.practiceSection.titleLine2}
+                </>
+              ) : null}
+            </h2>
+            <p className="mt-1 max-w-[898px] text-[18px] leading-7 text-[#666666]">{cs.practiceSection.subtitle}</p>
 
             <div className="mt-8 flex flex-wrap gap-2">
-              {categories.map((cat, index) => (
+              {cs.practiceSection.categories.map((cat, index) => (
                 <button
                   key={cat}
                   className={`inline-flex h-10 items-center rounded-[35px] border border-[#e5e5e5] px-[23px] text-[16px] font-semibold leading-6 transition-colors ${
@@ -103,16 +108,13 @@ export default async function CaseStudiesPage() {
 
             {caseStudies.length === 0 ? (
               <div className="mt-12 rounded-[24px] border border-dashed border-[#e5e5e5] bg-[#fafafa] px-8 py-16 text-center">
-                <p className="text-[18px] font-semibold text-[#111111]">No published case studies yet</p>
-                <p className="mt-2 text-[16px] leading-6 text-[#666666]">
-                  Content comes from the API (<code className="rounded bg-[#eee] px-1.5 py-0.5 text-sm">GET /api/case-studies</code>). Publish case
-                  studies in the admin app and ensure <code className="rounded bg-[#eee] px-1.5 py-0.5 text-sm">API_URL</code> is set for this site.
-                </p>
+                <p className="text-[18px] font-semibold text-[#111111]">{cs.emptyState.title}</p>
+                <p className="mt-2 text-[16px] leading-6 text-[#666666]">{cs.emptyState.body}</p>
                 <Link
-                  href="/contact"
+                  href={cs.emptyState.ctaHref}
                   className="mt-6 inline-flex h-11 items-center justify-center rounded-full bg-[#111111] px-6 text-[14px] font-semibold text-white"
                 >
-                  Talk to us
+                  {cs.emptyState.ctaLabel}
                 </Link>
               </div>
             ) : featuredStudy ? (
@@ -274,56 +276,55 @@ export default async function CaseStudiesPage() {
       <section className="bg-[#e5e5e5] py-[100px]">
         <div className="tb-container">
           <div className="mx-auto max-w-[1139px]">
-            <SectionPill label="Our Practice Areas" />
+            <SectionPill label={cs.expertiseSection.pill} />
 
             <h2 className="mt-2 max-w-[898px] text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">
-              Deep Expertise Across 5 Platform
-              <br />
-              Practices
+              {cs.expertiseSection.titleLine1}
+              {cs.expertiseSection.titleLine2 ? (
+                <>
+                  <br />
+                  {cs.expertiseSection.titleLine2}
+                </>
+              ) : null}
             </h2>
-            <p className="mt-1 max-w-[898px] text-[18px] leading-7 text-[#666666]">
-              We&apos;ve built a culture where talented people do the best work of their careers — and have fun doing it.
-            </p>
+            <p className="mt-1 max-w-[898px] text-[18px] leading-7 text-[#666666]">{cs.expertiseSection.subtitle}</p>
 
             <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {[
-                { title: "ServiceNow", description: "Cross-functional teams working across geographies, sharing knowledge and lifting each other up.", icon: <Zap className="h-6 w-6 text-[#111111]" /> },
-                { title: "Salesforce", description: "Comprehensive implementation across Sales, Service, Marketing, Commerce, Health & Education Cloud — plus Omnistudio and Vlocity.", icon: <Workflow className="h-6 w-6 text-[#111111]" /> },
-                { title: "MuleSoft", description: "Expert API-led integration services covering Anypoint Platform, API management, cloud-based solutions, and B2B integrations.", icon: <Share2 className="h-6 w-6 text-[#111111]" /> },
-                { title: "SharePoint", description: "SharePoint Online, Server & Power Platform integrations — collaboration, document management, and workflow automation.", icon: <FileStack className="h-6 w-6 text-[#111111]" /> },
-                { title: "Custom & AI Apps", description: "Java, D365, React, Mobile (iOS/Android), AI/ML, Python — custom solutions built to your exact requirements.", icon: <Braces className="h-6 w-6 text-[#111111]" /> },
-              ].map((item) => (
-                <div key={item.title} className="rounded-[15px] border border-[#e5e5e5] bg-[#f7f7f7] px-[22px] pt-8 pb-6">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-[14px] border border-[#e5e5e5] bg-white">{item.icon}</div>
+              {cs.expertiseSection.tiles.map((item) => {
+                const Icon = CASE_STUDY_TILE_ICONS[item.iconKey] ?? Zap;
+                return (
+                  <div key={item.title} className="rounded-[15px] border border-[#e5e5e5] bg-[#f7f7f7] px-[22px] pt-8 pb-6">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-[14px] border border-[#e5e5e5] bg-white">
+                      <Icon className="h-6 w-6 text-[#111111]" strokeWidth={2} aria-hidden />
+                    </div>
 
-                  <h3 className="mt-4 text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">{item.title}</h3>
-                  <p className="mt-1 text-[16px] leading-6 text-[#666666]">{item.description}</p>
+                    <h3 className="mt-4 text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">{item.title}</h3>
+                    <p className="mt-1 text-[16px] leading-6 text-[#666666]">{item.description}</p>
 
-                  <button className="mt-4 inline-flex h-[29px] items-center gap-[10px] rounded-[18px] text-[14px] font-semibold leading-5 text-[#666666]">
-                    Explore Practice
-                    <ArrowRight className="h-[18px] w-[18px]" />
-                  </button>
-                </div>
-              ))}
+                    <button type="button" className="mt-4 inline-flex h-[29px] items-center gap-[10px] rounded-[18px] text-[14px] font-semibold leading-5 text-[#666666]">
+                      {item.exploreLabel}
+                      <ArrowRight className="h-[18px] w-[18px]" aria-hidden />
+                    </button>
+                  </div>
+                );
+              })}
 
               <div className="rounded-[15px] border border-[#e5e5e5] bg-[#111111] px-[22px] pt-8 pb-6 text-white">
                 <div className="flex items-start gap-4">
                   <div className="flex h-[72px] w-[72px] items-center justify-center">
-                    <Handshake className="h-10 w-10 text-white" />
+                    <Handshake className="h-10 w-10 text-white" strokeWidth={2} aria-hidden />
                   </div>
-                  <h3 className="max-w-[235px] text-[28px] font-bold leading-9 tracking-[-0.07px]">Ready to be our next success story?</h3>
+                  <h3 className="max-w-[235px] text-[28px] font-bold leading-9 tracking-[-0.07px]">{cs.expertiseSection.ctaTile.title}</h3>
                 </div>
 
-                <p className="mt-3 text-[16px] leading-6 text-[#e5e5e5]">
-                  Let&apos;s discuss your requirements and how we can deliver measurable results for your enterprise.
-                </p>
+                <p className="mt-3 text-[16px] leading-6 text-[#e5e5e5]">{cs.expertiseSection.ctaTile.body}</p>
 
                 <Link
-                  href="/contact"
+                  href={cs.expertiseSection.ctaTile.buttonHref}
                   className="mt-3 inline-flex h-[43px] w-[208px] items-center justify-center gap-2 rounded-[18px] bg-white text-[14px] font-semibold leading-5 text-[#111111]"
                 >
-                  Talk to Us
-                  <ArrowRight className="h-[18px] w-[18px]" />
+                  {cs.expertiseSection.ctaTile.buttonLabel}
+                  <ArrowRight className="h-[18px] w-[18px]" aria-hidden />
                 </Link>
               </div>
             </div>
@@ -338,24 +339,22 @@ export default async function CaseStudiesPage() {
         <div className="tb-container">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to write your own success story?</h2>
-              <p className="text-gray-500">
-                Tell us about your challenge and we&apos;ll show you how TechBubble can deliver measurable results.
-              </p>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">{cs.bottomCta.title}</h2>
+              <p className="text-gray-500">{cs.bottomCta.description}</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link
-                href="/contact"
+                href={cs.bottomCta.primaryHref}
                 className="inline-flex items-center justify-center gap-2 bg-black text-white px-6 py-3 rounded-full font-medium hover:bg-gray-800 transition-colors"
               >
-                Start a Conversation
-                <ArrowRight className="w-4 h-4" />
+                {cs.bottomCta.primaryLabel}
+                <ArrowRight className="w-4 h-4" aria-hidden />
               </Link>
               <Link
-                href="/services"
+                href={cs.bottomCta.secondaryHref}
                 className="inline-flex items-center justify-center gap-2 border border-gray-300 bg-white text-black px-6 py-3 rounded-full font-medium hover:bg-gray-50 transition-colors"
               >
-                Explore Services
+                {cs.bottomCta.secondaryLabel}
               </Link>
             </div>
           </div>

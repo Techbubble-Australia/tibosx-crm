@@ -4,6 +4,10 @@ import {
   careersPagePayload,
   servicesPagePayload,
   pricingPagePayload,
+  contactPagePayload,
+  legalPagesPayload,
+  caseStudiesPagePayload,
+  siteFooterPayload,
 } from "@site-content/defaults";
 import { marketingHomePayload } from "@site-content/marketing-home";
 import { deepMerge } from "@/lib/deep-merge";
@@ -24,6 +28,10 @@ export const SITE_CONTENT_FORM_KEYS = [
   "pricing_page",
   "about_page",
   "careers_page",
+  "contact_page",
+  "legal_pages",
+  "case_studies_page",
+  "site_footer",
 ] as const;
 
 export type SiteContentFormKey = (typeof SITE_CONTENT_FORM_KEYS)[number];
@@ -54,10 +62,28 @@ export function serializeSiteContentForPersist(key: string, payload: unknown): u
   return payload;
 }
 
+function mergeLegalPages(raw: unknown): typeof legalPagesPayload {
+  const base = clone(legalPagesPayload);
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return base;
+  }
+  const r = raw as Partial<typeof legalPagesPayload>;
+  return {
+    privacy: deepMerge(base.privacy as Record<string, unknown>, (r.privacy ?? {}) as Record<string, unknown>) as (typeof base)["privacy"],
+    terms: deepMerge(base.terms as Record<string, unknown>, (r.terms ?? {}) as Record<string, unknown>) as (typeof base)["terms"],
+    cookies: deepMerge(base.cookies as Record<string, unknown>, (r.cookies ?? {}) as Record<string, unknown>) as (typeof base)["cookies"],
+  };
+}
+
 export function normalizeSiteContentPayload(key: string, raw: unknown): unknown {
   if (!isVisualSiteContentKey(key)) {
     return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   }
+
+  if (key === "legal_pages") {
+    return mergeLegalPages(raw);
+  }
+
   const base = (() => {
     switch (key) {
       case "announcement_bar":
@@ -72,9 +98,20 @@ export function normalizeSiteContentPayload(key: string, raw: unknown): unknown 
         return clone(pricingPagePayload) as PricingPagePayload;
       case "marketing_home":
         return clone(marketingHomePayload) as MarketingHomePayload;
+      case "contact_page":
+        return clone(contactPagePayload);
+      case "case_studies_page":
+        return clone(caseStudiesPagePayload);
+      case "site_footer":
+        return clone(siteFooterPayload);
       default:
         return {};
     }
   })();
-  return deepMerge(base as Record<string, unknown>, raw);
+
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return base;
+  }
+
+  return deepMerge(base as Record<string, unknown>, raw as Record<string, unknown>);
 }

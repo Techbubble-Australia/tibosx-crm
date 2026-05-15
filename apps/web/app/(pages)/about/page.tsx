@@ -1,51 +1,21 @@
 import Link from "next/link";
-import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import { ClientStoriesSection } from "@/components/ClientStoriesSection";
-import { getTestimonials } from "@/lib/api/public";
+import { getPublishedTeam, getTestimonials } from "@/lib/api/public";
 import type { ClientStoryItem } from "@/components/ClientStoriesSection";
+import { AboutAnimatedHeroStatsStrip } from "@/components/about/AboutAnimatedHeroStatsStrip";
+import { AboutAnimatedMissionStatCards } from "@/components/about/AboutAnimatedMissionStatCards";
+import { AboutPersonImage } from "@/components/about/AboutPersonImage";
 import { RemarkableCtaSection } from "@/components/RemarkableCtaSection";
 import { fetchSiteContentPayload } from "@/lib/fetch-site-content";
 import { resolveAboutPage } from "@/lib/site-content/resolve-pages";
 import { SectionPill } from "@/components/ui/SectionPill";
-import aboutUs1 from "@image/techbubble_-_about_us_1.jpg";
-import aboutUs2 from "@image/techbubble_-_about_us_2.jpg";
-import aboutUs3 from "@image/techbubble_-_about_us_3.jpg";
-import aboutUs4 from "@image/techbubble_-_about_us_4.png";
-import aboutUs5 from "@image/techbubble_-_about_us_5.jpg";
-import aboutUs6 from "@image/techbubble_-_about_us_6.png";
-import aboutUs7 from "@image/techbubble_-_about_us_7.png";
-import aboutUs8 from "@image/techbubble_-_about_us_8.png";
-
-const leadershipCards = [
-  { name: "Nikita T", role: "Founder & Director, Australia", image: aboutUs1 },
-  { name: "Jeet Bhatt", role: "Founder & Director, Australia", image: aboutUs2 },
-  { name: "Dhruv Bhatt", role: "Head of Product, Australia", image: aboutUs3 },
-];
-
-const workforceTabs = [
-  { label: "Management Team (5)", width: 215, active: true },
-  { label: "Sales Team (4)", width: 157, active: false },
-  { label: "Recruitment Team (4)", width: 209, active: false },
-  { label: "ServiceNow Developers (16)", width: 260, active: false },
-  { label: "Salesforce Developers (8)", width: 243, active: false },
-  { label: "MuleSoft Developers (8)", width: 232, active: false },
-  { label: "Workday Team (5)", width: 183, active: false },
-  { label: "Product Team (8)", width: 176, active: false },
-  { label: "Other Techstack Developers (12)", width: 295, active: false },
-];
-
-const managementTeam = [
-  { name: "Yogesh Panchal", role: "Delivery Manager, USA", image: aboutUs4 },
-  { name: "Lakshminarayanan", role: "Sr. Manager - Talent Acquisition, India", image: aboutUs6 },
-  { name: "Dinky Rajpal", role: "Sr. Manager - Business Development, India", image: aboutUs7 },
-  { name: "Kamal Rajput", role: "Sr. Account Manager, APAC & UK", image: aboutUs8 },
-];
+import { AboutWorkforceApiSection, AboutWorkforceCmsFallbackSection } from "@/components/about/AboutWorkforceSection";
 
 export default async function AboutPage() {
   const rawAbout = await fetchSiteContentPayload<unknown>("about_page");
   const a = resolveAboutPage(rawAbout ?? {});
-  const testimonialRows = await getTestimonials();
+  const [testimonialRows, teamRows] = await Promise.all([getTestimonials(), getPublishedTeam()]);
   const clientStories: ClientStoryItem[] = testimonialRows.map((t) => ({
     quote: t.quote,
     authorName: t.authorName,
@@ -54,6 +24,24 @@ export default async function AboutPage() {
     authorInitials: t.authorInitials,
     authorImageUrl: t.authorImageUrl || undefined,
   }));
+
+  const bioFallbackByName: Record<string, string> = {};
+  for (const m of a.leadership.members) {
+    bioFallbackByName[m.name] = m.bio;
+  }
+  for (const p of a.workforce.management.people) {
+    const b = (p.bio ?? "").trim();
+    if (b) bioFallbackByName[p.name] = b;
+  }
+
+  const cmsWorkforce = {
+    pill: a.workforce.pill,
+    title: a.workforce.title,
+    intro: a.workforce.intro,
+    stats: a.workforce.stats,
+    management: a.workforce.management,
+    defaultMemberBio: a.workforce.defaultMemberBio,
+  };
 
   return (
     <>
@@ -72,17 +60,7 @@ export default async function AboutPage() {
 
       <section className="relative z-10 -mt-[85px] bg-transparent">
         <div className="tb-container">
-          <div className="mx-auto flex max-w-[1136px] flex-wrap items-stretch rounded-[30px] bg-white shadow-[0_24px_48px_-26px_rgba(0,0,0,0.38)] sm:flex-nowrap">
-            {a.statsStrip.map((stat, idx) => (
-              <div key={stat.l} className="flex flex-1 items-center justify-center px-4 py-6">
-                <div className="text-center">
-                  <p className="text-4xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px]">{stat.n}</p>
-                  <p className={`${stat.labelClass} text-[#666666]`}>{stat.l}</p>
-                </div>
-                {idx < 3 ? <span className="ml-4 hidden h-[78px] w-px bg-[#e5e5e5] sm:block" aria-hidden /> : null}
-              </div>
-            ))}
-          </div>
+          <AboutAnimatedHeroStatsStrip stats={a.statsStrip} />
         </div>
       </section>
 
@@ -94,16 +72,16 @@ export default async function AboutPage() {
               <h2 className="mt-4 text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">{a.mission.title}</h2>
               <p className="mt-2 max-w-[532px] whitespace-pre-line text-base leading-7 text-[#666666] md:text-[18px]">{a.mission.body}</p>
               <Link
-                href="/services"
+                href={a.mission.ctaHref}
                 className="mt-4 inline-flex h-[52px] w-[182px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold text-white"
               >
-                Explore Services
+                {a.mission.ctaLabel}
                 <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
               </Link>
             </div>
 
             <div className="relative max-h-[500px] overflow-hidden">
-              <div className="h-full overflow-y-auto pr-2 [scrollbar-width:thin] [scrollbar-color:#c1c1c1_#f1f1f1] [&::-webkit-scrollbar]:w-[7px] [&::-webkit-scrollbar-track]:bg-[#f1f1f1] [&::-webkit-scrollbar-thumb]:bg-[#c1c1c1] space-y-4">
+              <div className="h-full space-y-4 overflow-y-auto pr-2 [scrollbar-width:thin] [scrollbar-color:#c1c1c1_#f1f1f1] [&::-webkit-scrollbar]:w-[7px] [&::-webkit-scrollbar-track]:bg-[#f1f1f1] [&::-webkit-scrollbar-thumb]:bg-[#c1c1c1]">
                 {a.missionCards.map((card) => (
                   <div key={card.title} className="min-h-[150px] rounded-[24px] border border-[#e5e5e5] bg-white px-4 py-[15px]">
                     <div className="flex items-start gap-5">
@@ -119,7 +97,6 @@ export default async function AboutPage() {
                 ))}
               </div>
             </div>
-
           </div>
         </div>
       </section>
@@ -133,137 +110,55 @@ export default async function AboutPage() {
       >
         <div className="tb-container">
           <div className="mx-auto mb-16 max-w-[1139px] text-center">
-            <SectionPill label="Our Team" className="mx-auto" />
-            <h2 className="mt-2 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">Meet The Leadership</h2>
-            <p className="mt-1 text-[18px] leading-7 text-[#666666]">
-              The visionaries driving TechBubble&apos;s mission to transform businesses through technology.
-            </p>
+            <SectionPill label={a.leadership.pill} className="mx-auto" />
+            <h2 className="mt-2 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">{a.leadership.title}</h2>
+            <p className="mt-1 text-[18px] leading-7 text-[#666666]">{a.leadership.subtitle}</p>
           </div>
 
           <div className="mx-auto grid max-w-[1558px] grid-cols-1 gap-10 pt-12 sm:grid-cols-2 md:grid-cols-3">
-            {leadershipCards.map((leader) => (
+            {a.leadership.members.map((leader) => (
               <div key={leader.name} className="rounded-[21px] bg-[#111111] px-[30px] pb-9 pt-12 text-white md:pt-0">
-                <div className="mx-auto mb-5 md:-mt-[45px] h-[241px] w-[241px] overflow-hidden rounded-[14px] border border-[#f7f7f7] bg-neutral-700">
-                  <Image src={leader.image} alt={leader.name} width={241} height={241} className="h-full w-full object-cover" />
+                <div className="mx-auto mb-5 h-[241px] w-[241px] overflow-hidden rounded-[14px] border border-[#f7f7f7] bg-neutral-700 md:-mt-[45px]">
+                  <AboutPersonImage
+                    imageUrl={leader.imageUrl}
+                    imageKey={leader.imageKey}
+                    alt={leader.name}
+                    width={241}
+                    height={241}
+                    className="h-full w-full object-cover"
+                  />
                 </div>
                 <h3 className="text-[35px] font-semibold leading-[42px] tracking-[-0.09px]">{leader.name}</h3>
                 <p className="mt-[3px] text-[14px] font-bold leading-[21px] text-white">{leader.role}</p>
-                <p className="mt-3 text-[12px] leading-[17.6px] text-white">
-                  Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry&apos;s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book.
-                </p>
+                <p className="mt-3 text-[12px] leading-[17.6px] text-white">{leader.bio}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="bg-white py-[60px]">
-        <div className="tb-container">
-          <div className="mx-auto max-w-[1136px]">
-            <div className="text-center">
-              <SectionPill label="Our Complete Team" className="mx-auto" />
-              <h2 className="mt-2 text-[56px] font-bold leading-[64px] tracking-[-0.28px] text-[#111111]">Meet Our Entire Workforce</h2>
-              <p className="mx-auto mt-1 max-w-[923px] text-[18px] leading-7 text-[#666666]">
-                With 150+ expert technicians across multiple specializations and global offices, we bring world-class expertise to every project. Our diverse team ensures excellence across every technology stack.
-              </p>
-            </div>
-
-            <div className="mx-auto mt-8 w-full max-w-[944px] rounded-[21px] bg-[#111111] px-6 py-8">
-              <div className="flex flex-wrap items-center justify-around gap-8">
-              {[
-                { n: "150+", l: "Expert Team Members" },
-                { n: "9", l: "Specialized Departments" },
-                { n: "5", l: "Global Offices" },
-                { n: "10+", l: "Years Experience" },
-              ].map((s, idx) => (
-                <div key={s.l} className="flex items-center">
-                  <div className="text-center">
-                    <p className="text-3xl font-semibold leading-[48px] tracking-[-0.1px] text-white md:text-[40px]">{s.n}</p>
-                    <p className="text-[12px] font-medium leading-4 text-[#f7f7f7]">{s.l}</p>
-                  </div>
-                  {idx < 3 ? <span className="mx-[30px] hidden h-[78px] w-px bg-white/[0.17] md:block" aria-hidden /> : null}
-                </div>
-              ))}
-              </div>
-            </div>
-
-            <div className="mt-16">
-              <div className="flex flex-wrap items-center gap-2">
-                {workforceTabs.slice(0, 5).map((tab) => (
-                  <span
-                    key={tab.label}
-                    className={`inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-[35px] border px-[23px] text-[14px] font-semibold leading-6 ${
-                      tab.active ? "border-[#111111] bg-[#111111] text-white" : "border-[#e5e5e5] bg-white text-[#666666]"
-                    }`}
-                    style={{ width: `${tab.width}px` }}
-                  >
-                    {tab.label}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                {workforceTabs.slice(5).map((tab) => (
-                  <span
-                    key={tab.label}
-                    className="inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-[35px] border border-[#e5e5e5] bg-white px-[23px] text-[16px] font-semibold leading-6 text-[#666666]"
-                    style={{ width: `${tab.width}px` }}
-                  >
-                    {tab.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-12">
-              <div className="border-b border-[#e5e5e5] pb-2">
-              <h3 className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#0e0f11]">Management Team</h3>
-              <p className="mt-1 text-[14px] leading-5 tracking-[0.035px] text-[#666666]">5 members</p>
-              </div>
-
-              <div className="mt-8 grid grid-cols-2 gap-6 sm:grid-cols-4">
-                {managementTeam.map((person) => (
-                  <div key={person.name} className="text-center">
-                    <div className="mx-auto h-[145px] w-[145px] overflow-hidden rounded-[14px] border border-[#f7f7f7] bg-neutral-200">
-                      <Image src={person.image} alt={person.name} width={145} height={145} className="h-full w-full object-cover" />
-                    </div>
-                    <p className="mt-2 text-[16px] font-bold leading-6 text-[#111111]">{person.name}</p>
-                    <p className="mx-auto mt-0.5 max-w-[190px] text-[14px] leading-5 tracking-[0.035px] text-[#666666]">{person.role}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {teamRows.length > 0 ? (
+        <AboutWorkforceApiSection cms={cmsWorkforce} bioFallbackByName={bioFallbackByName} apiMembers={teamRows} />
+      ) : (
+        <AboutWorkforceCmsFallbackSection cms={cmsWorkforce} />
+      )}
 
       <section className="bg-white py-[60px]">
         <div className="tb-container">
           <div className="mx-auto max-w-[1139px]">
-            <SectionPill label="Why Choose Us" />
+            <SectionPill label={a.usp.pill} />
             <div className="mt-2 max-w-[898px]">
-          <h2 className="text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">Our Unique Selling Points</h2>
-              <p className="mt-1 text-[18px] leading-7 text-[#666666]">Discover what makes TechBubble the preferred partner for businesses worldwide.</p>
+              <h2 className="text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">{a.usp.title}</h2>
+              <p className="mt-1 text-[18px] leading-7 text-[#666666]">{a.usp.subtitle}</p>
             </div>
           </div>
           <div className="mx-auto mt-8 grid max-w-[1139px] grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <h3 className="text-2xl font-semibold leading-tight tracking-[-0.1px] text-[#0e0f11] md:text-[40px] md:leading-[48px]">Technical Expertise That Spans Industries</h3>
-              <p className="mt-2 text-[16px] leading-6 text-[#838383]">
-                Our team is proficient across a wide spectrum of technologies, including SaaS platforms like ServiceNow, Salesforce, and MuleSoft, and programming languages such as Java, Ruby, and Laravel. Whether your business requires IT solutions for small projects or complex, large-scale initiatives, our experience and skills make us your go-to partner for any technology stack.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-2xl font-semibold leading-tight tracking-[-0.1px] text-[#0e0f11] md:text-[40px] md:leading-[48px]">World-Class Talent, Available When You Need It</h3>
-              <p className="mt-2 text-[16px] leading-6 text-[#838383]">
-                We connect you with a vast network of skilled professionals experienced in handling international projects of all complexities. Our resources work within your time zone, ensuring seamless collaboration during your business hours. By outsourcing your IT needs to us, you can focus on what you do best&mdash;running your business&mdash;while we handle the technical details.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-2xl font-semibold leading-tight tracking-[-0.1px] text-[#0e0f11] md:text-[40px] md:leading-[48px]">24/7 Support &amp; Governance&mdash;At No Extra Cost</h3>
-              <p className="mt-2 text-[16px] leading-6 text-[#838383]">
-                At TechBubble, customer satisfaction is our priority. We deliver tailored solutions, regardless of your budget, while providing round-the-clock professional support and governance at no additional charge. From start to finish, we ensure a smooth, worry-free experience and guarantee exceptional service at every stage of the engagement.
-              </p>
-            </div>
+            {a.usp.columns.map((col) => (
+              <div key={col.title}>
+                <h3 className="text-2xl font-semibold leading-tight tracking-[-0.1px] text-[#0e0f11] md:text-[40px] md:leading-[48px]">{col.title}</h3>
+                <p className="mt-2 text-[16px] leading-6 text-[#838383]">{col.body}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -272,25 +167,21 @@ export default async function AboutPage() {
         <div className="tb-container">
           <div className="mx-auto grid max-w-[1139px] grid-cols-1 items-center gap-10 lg:grid-cols-[526px_1fr] lg:gap-[81px]">
             <div>
-              <SectionPill label="Our Values" />
-              <h2 className="mt-2 text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">What Drives Us Forward</h2>
+              <SectionPill label={a.values.pill} />
+              <h2 className="mt-2 text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">{a.values.title}</h2>
               <p className="mt-2 text-[16px] leading-6 text-[#666666]">
-                <strong>At TechBubble,</strong> we&apos;re passionate about innovation and committed to empowering businesses with cutting-edge technology solutions. We believe in fostering a culture that celebrates creativity, collaboration, and continuous growth.
+                <strong>{a.values.introLeadBold}</strong>
+                {a.values.introRest}
               </p>
 
               <div className="mt-8 space-y-2">
-                {[
-                  { t: "Innovation", s: "Constantly pushing boundaries with cutting-edge solutions" },
-                  { t: "Excellence", s: "Delivering exceptional quality in every project" },
-                  { t: "Partnership", s: "Building lasting relationships with our clients" },
-                  { t: "Integrity", s: "Operating with transparency and honesty" },
-                ].map((item) => (
-                  <div key={item.t} className="rounded-[15px] border border-[#e5e5e5] bg-white px-4 py-4">
+                {a.values.pillars.map((item) => (
+                  <div key={item.title} className="rounded-[15px] border border-[#e5e5e5] bg-white px-4 py-4">
                     <div className="flex items-center gap-3">
                       <span className="h-2 w-2 rounded-[4px] bg-[#666666]" aria-hidden />
-                      <span className="text-[16px] font-semibold leading-6 text-[#06091a]">{item.t}</span>
+                      <span className="text-[16px] font-semibold leading-6 text-[#06091a]">{item.title}</span>
                     </div>
-                    <p className="mt-1 pl-5 text-[12px] font-medium leading-4 text-[#666666]">{item.s}</p>
+                    <p className="mt-1 pl-5 text-[12px] font-medium leading-4 text-[#666666]">{item.subtitle}</p>
                   </div>
                 ))}
               </div>
@@ -298,21 +189,10 @@ export default async function AboutPage() {
 
             <div className="overflow-hidden rounded-[36px] border border-[#e2e7f4] bg-white">
               <div className="bg-[#111111] px-[30px] py-[31px]">
-                <h3 className="text-xl font-medium leading-9 tracking-[-0.07px] text-white md:text-[28px]">Our Mission</h3>
+                <h3 className="text-xl font-medium leading-9 tracking-[-0.07px] text-white md:text-[28px]">{a.values.missionCard.title}</h3>
               </div>
-              <p className="px-[27px] pb-[37px] pt-6 text-base leading-7 text-[#666666] md:text-[18px]">
-                To empower businesses worldwide with innovative technology solutions that drive growth, efficiency, and success in an ever-evolving digital landscape.
-              </p>
-              <div className="flex flex-wrap gap-[18px] px-[27px] pb-[39px]">
-                <div className="flex h-[85px] w-[228px] flex-col justify-center rounded-[10px] border border-[#e5e5e5] bg-[#fafafa] px-[27px]">
-                  <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">10+</p>
-                  <p className="text-[12px] font-medium leading-4 text-[#666666]">Years Experience</p>
-                </div>
-                <div className="flex h-[85px] w-[228px] flex-col justify-center rounded-[10px] border border-[#e5e5e5] bg-[#fafafa] px-[27px]">
-                  <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">5</p>
-                  <p className="text-[12px] font-medium leading-4 text-[#666666]">Global Offices</p>
-                </div>
-              </div>
+              <p className="px-[27px] pb-[37px] pt-6 text-base leading-7 text-[#666666] md:text-[18px]">{a.values.missionCard.body}</p>
+              <AboutAnimatedMissionStatCards metrics={a.values.missionCard.metrics} />
             </div>
           </div>
         </div>
@@ -321,12 +201,12 @@ export default async function AboutPage() {
       <ClientStoriesSection items={clientStories} />
 
       <RemarkableCtaSection
-        title="Ready to build something remarkable?"
-        description="Join 50+ enterprises who trust TechBubble to power their most critical technology initiatives."
-        primaryLabel="Book a Free Consultation"
-        primaryHref="/contact"
-        secondaryLabel="Explore Services"
-        secondaryHref="/services"
+        title={a.closingCta.title}
+        description={a.closingCta.description}
+        primaryLabel={a.closingCta.primaryLabel}
+        primaryHref={a.closingCta.primaryHref}
+        secondaryLabel={a.closingCta.secondaryLabel}
+        secondaryHref={a.closingCta.secondaryHref}
       />
     </>
   );

@@ -7,6 +7,10 @@ import { CareersPageForm, type CareersPagePayload } from "./CareersPageForm";
 import { ServicesPageForm, type ServicesPagePayload } from "./ServicesPageForm";
 import { PricingPageForm, type PricingPagePayload } from "./PricingPageForm";
 import { MarketingHomeForm } from "./MarketingHomeForm";
+import { ContactPageForm, type ContactPagePayload } from "./ContactPageForm";
+import { LegalPagesForm, type LegalPagesPayload } from "./LegalPagesForm";
+import { CaseStudiesPageForm, type CaseStudiesPagePayload } from "./CaseStudiesPageForm";
+import { SiteFooterForm, type SiteFooterPayload } from "./SiteFooterForm";
 import { isVisualSiteContentKey } from "@/lib/site-content-normalize";
 
 export function SiteContentPayloadEditor({
@@ -50,6 +54,14 @@ export function SiteContentPayloadEditor({
       return (
         <MarketingHomeForm value={payload as MarketingHomePayload} onChange={onPayloadChange} />
       );
+    case "contact_page":
+      return <ContactPageForm value={payload as ContactPagePayload} onChange={onPayloadChange} />;
+    case "legal_pages":
+      return <LegalPagesForm value={payload as LegalPagesPayload} onChange={onPayloadChange} />;
+    case "case_studies_page":
+      return <CaseStudiesPageForm value={payload as CaseStudiesPagePayload} onChange={onPayloadChange} />;
+    case "site_footer":
+      return <SiteFooterForm value={payload as SiteFooterPayload} onChange={onPayloadChange} />;
     default:
       return null;
   }

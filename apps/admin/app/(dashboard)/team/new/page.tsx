@@ -20,6 +20,7 @@ export default function NewTeamMemberPage() {
       name: formData.get("name"),
       role: formData.get("role"),
       department: formData.get("department"),
+      description: String(formData.get("description") ?? ""),
       imageUrl: formData.get("imageUrl") || "",
       order: parseInt(formData.get("order") as string) || 0,
       published: formData.get("published") === "on",
@@ -94,6 +95,16 @@ export default function NewTeamMemberPage() {
             className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
             labelClassName="mb-1 block text-sm font-medium"
           />
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Description / bio</label>
+            <textarea
+              name="description"
+              rows={4}
+              placeholder="Short bio shown on the About page when this member is published."
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
+            />
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
