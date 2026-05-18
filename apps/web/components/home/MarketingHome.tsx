@@ -49,6 +49,20 @@ type MarketingHomeProps = {
   caseStudies: CaseStudyListCard[];
 };
 
+/** Shape used by the homepage platform tab UI (view-model normalizes `tags` to `string[]`). */
+type HomeMarketingPlatformUi = {
+  id: string;
+  name: string;
+  headline: string;
+  body: string;
+  features: Array<{ title: string; sub: string }>;
+  ctaLabel: string;
+  cardTitle: string;
+  cardSubtitle: string;
+  stats: Array<{ value: string; label: string }>;
+  tags: string[];
+};
+
 const WORLD_CLOCK_ZONES = [
   { city: "Sydney", timeZone: "Australia/Sydney" },
   { city: "London", timeZone: "Europe/London" },
@@ -114,7 +128,7 @@ export function MarketingHome({
   }, [vm.engagementModels, engagementId]);
 
   const engagement = vm.engagementModels.find((m) => m.id === engagementId) ?? vm.engagementModels[0]!;
-  const platform = vm.platforms.find((p) => p.id === platformId) ?? vm.platforms[0]!;
+  const platform = (vm.platforms.find((p) => p.id === platformId) ?? vm.platforms[0]!) as unknown as HomeMarketingPlatformUi;
 
   return (
     <>

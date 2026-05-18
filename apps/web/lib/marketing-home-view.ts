@@ -98,8 +98,11 @@ function mergeHomeObject<A extends JsonObject>(fallback: A, actual: unknown): A 
   return deepMerge(fallback, actual as JsonObject) as A;
 }
 
-function pickHomeArray<T>(value: unknown, fallback: T[]): T[] {
-  return Array.isArray(value) && value.length > 0 ? (value as T[]) : fallback;
+function pickHomeArray<T>(value: unknown, fallback: readonly T[]): T[] {
+  if (Array.isArray(value) && value.length > 0) {
+    return value as T[];
+  }
+  return [...fallback];
 }
 
 export function buildMarketingHomeViewModel(content: MarketingHomePayload) {
