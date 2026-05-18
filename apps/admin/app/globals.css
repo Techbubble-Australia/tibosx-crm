@@ -32,6 +32,13 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Safari + macOS dark appearance: textareas/selects default to dark chrome without explicit surfaces */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="image"]):not([type="range"]):not([type="color"]):not([type="hidden"]),
+  textarea,
+  select {
+    @apply bg-white text-gray-900;
+    color-scheme: light;
+  }
 }
 
 html {
