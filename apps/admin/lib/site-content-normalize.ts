@@ -15,6 +15,7 @@ import type { AboutPagePayload } from "@/components/site-content/AboutPageForm";
 import type { CareersPagePayload } from "@/components/site-content/CareersPageForm";
 import type { ServicesPagePayload } from "@/components/site-content/ServicesPageForm";
 import type { PricingPagePayload } from "@/components/site-content/PricingPageForm";
+import type { SiteFooterPayload } from "@/components/site-content/SiteFooterForm";
 import type { MarketingHomePayload } from "@site-content/marketing-home";
 
 function clone<T>(x: T): T {
@@ -36,6 +37,20 @@ export const SITE_CONTENT_FORM_KEYS = [
 
 export type SiteContentFormKey = (typeof SITE_CONTENT_FORM_KEYS)[number];
 
+/** Short labels for the Site pages list (every key should appear even before DB seed). */
+export const SITE_CONTENT_KEY_LABELS: Record<SiteContentFormKey, string> = {
+  announcement_bar: "Announcement bar",
+  marketing_home: "Marketing homepage",
+  services_page: "Services page",
+  pricing_page: "Pricing page",
+  about_page: "About page",
+  careers_page: "Careers page",
+  contact_page: "Contact page",
+  legal_pages: "Legal pages (privacy, terms, cookies)",
+  case_studies_page: "Case studies listing",
+  site_footer: "Site footer (offices, contact block)",
+};
+
 export function isVisualSiteContentKey(key: string): key is SiteContentFormKey {
   return (SITE_CONTENT_FORM_KEYS as readonly string[]).includes(key);
 }
@@ -45,6 +60,21 @@ export function isVisualSiteContentKey(key: string): key is SiteContentFormKey {
  * Does not mutate the input object.
  */
 export function serializeSiteContentForPersist(key: string, payload: unknown): unknown {
+  if (key === "site_footer" && payload && typeof payload === "object" && !Array.isArray(payload)) {
+    const p = payload as SiteFooterPayload;
+    const offices = p.offices
+      .map((o) => ({
+        flagCode: o.flagCode,
+        region: typeof o.region === "string" ? o.region.trim() : "",
+        entity: typeof o.entity === "string" ? o.entity.trim() : "",
+        address: typeof o.address === "string" ? o.address.trim() : "",
+      }))
+      .filter((o) => o.region.length > 0 || o.entity.length > 0 || o.address.length > 0);
+    return {
+      ...p,
+      offices: offices.length > 0 ? offices : siteFooterPayload.offices,
+    };
+  }
   if (key !== "marketing_home" || !payload || typeof payload !== "object" || Array.isArray(payload)) {
     return payload;
   }

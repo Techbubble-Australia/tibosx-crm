@@ -273,6 +273,10 @@ export const caseStudiesPagePayload = {
   },
 };
 
+/** ISO-style codes matching `apps/web/public/flags/{code}.svg` */
+export const SITE_FOOTER_FLAG_CODES = ["au", "us", "in", "ph", "gb", "ae"] as const;
+export type SiteFooterFlagCode = (typeof SITE_FOOTER_FLAG_CODES)[number];
+
 export const siteFooterPayload = {
   tagline: "AI-driven digital transformation across Asia Pacific and North America. Top 1% tech talent, deployed fast.",
   social: [

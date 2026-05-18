@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { SiteContentPayloadEditor } from "@/components/site-content/SiteContentPayloadEditor";
 import {
   SITE_CONTENT_FORM_KEYS,
+  SITE_CONTENT_KEY_LABELS,
   normalizeSiteContentPayload,
   isVisualSiteContentKey,
   serializeSiteContentForPersist,
@@ -26,6 +27,14 @@ export default function NewSitePageDocumentPage() {
   const [payload, setPayload] = useState<unknown>(() => normalizeSiteContentPayload("marketing_home", {}));
 
   const effectiveKey = customKey.trim() || selectedTemplate;
+
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("template");
+    if (q && isVisualSiteContentKey(q)) {
+      setSelectedTemplate(q);
+      setCustomKey("");
+    }
+  }, []);
 
   useEffect(() => {
     setPayload(normalizeSiteContentPayload(effectiveKey, {}));
@@ -96,7 +105,7 @@ export default function NewSitePageDocumentPage() {
               >
                 {SITE_CONTENT_FORM_KEYS.map((k) => (
                   <option key={k} value={k}>
-                    {k}
+                    {k} — {SITE_CONTENT_KEY_LABELS[k]}
                   </option>
                 ))}
               </select>

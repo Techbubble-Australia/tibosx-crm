@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
+import { SITE_CONTENT_FORM_KEYS, SITE_CONTENT_KEY_LABELS } from "@/lib/site-content-normalize";
 
 interface SiteContentRow {
   id: string;
@@ -12,9 +13,33 @@ interface SiteContentRow {
   updatedAt: string;
 }
 
+type MergedRow =
+  | (SiteContentRow & { missing?: false })
+  | { id: string; key: string; label: string; updatedAt: string | null; missing: true };
+
 export default function SitePagesListPage() {
   const [rows, setRows] = useState<SiteContentRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const mergedRows = useMemo(() => {
+    const byKey = new Map(rows.map((r) => [r.key, r]));
+    const canonical: MergedRow[] = SITE_CONTENT_FORM_KEYS.map((key) => {
+      const existing = byKey.get(key);
+      if (existing) {
+        return { ...existing, missing: false as const };
+      }
+      return {
+        id: `__missing__${key}`,
+        key,
+        label: SITE_CONTENT_KEY_LABELS[key],
+        updatedAt: null,
+        missing: true,
+      };
+    });
+    const canonicalKeys = new Set<string>(SITE_CONTENT_FORM_KEYS);
+    const extras = rows.filter((r) => !canonicalKeys.has(r.key)).map((r) => ({ ...r, missing: false as const }));
+    return [...canonical, ...extras];
+  }, [rows]);
 
   useEffect(() => {
     void fetchRows();
@@ -62,7 +87,9 @@ export default function SitePagesListPage() {
         <div>
           <h2 className="text-lg font-semibold">Site pages &amp; CMS blocks</h2>
           <p className="text-sm text-gray-500">
-            JSON documents keyed for the marketing site (home, services, pricing, about, careers, announcement bar, etc.)
+            JSON documents for the marketing site, including the{" "}
+            <span className="font-medium text-gray-700">footer</span> (<code className="text-xs">site_footer</code>
+            ), announcement bar, homepage, and inner pages.
           </p>
         </div>
         <Link
@@ -85,33 +112,55 @@ export default function SitePagesListPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {rows.length === 0 ? (
+            {mergedRows.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
                   No site content yet. Run the database seed or create a document.
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
-                <tr key={row.id} className="hover:bg-gray-50">
+              mergedRows.map((row) => (
+                <tr key={row.id} className={row.missing ? "bg-amber-50/50" : "hover:bg-gray-50"}>
                   <td className="px-4 py-3 font-mono text-xs font-medium text-gray-900">{row.key}</td>
-                  <td className="max-w-[280px] truncate px-4 py-3 text-gray-700">{row.label || "—"}</td>
-                  <td className="px-4 py-3 text-gray-500">{new Date(row.updatedAt).toLocaleString()}</td>
+                  <td className="max-w-[320px] truncate px-4 py-3 text-gray-700">
+                    {row.missing ? (
+                      <span>
+                        <span className="text-amber-800">{row.label}</span>
+                        <span className="ml-2 text-xs font-normal text-amber-700">(not in database)</span>
+                      </span>
+                    ) : (
+                      row.label || "—"
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">
+                    {row.missing ? "—" : new Date(row.updatedAt as string).toLocaleString()}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex items-center gap-2">
-                      <Link
-                        href={`/pages/${encodeURIComponent(row.key)}`}
-                        className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-black"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => deleteRow(row.key)}
-                        className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {row.missing ? (
+                        <Link
+                          href={`/pages/new?template=${encodeURIComponent(row.key)}`}
+                          className="rounded px-2 py-1 text-xs font-medium text-amber-900 underline decoration-amber-700 hover:bg-amber-100"
+                        >
+                          Create
+                        </Link>
+                      ) : (
+                        <>
+                          <Link
+                            href={`/pages/${encodeURIComponent(row.key)}`}
+                            className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-black"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => deleteRow(row.key)}
+                            className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

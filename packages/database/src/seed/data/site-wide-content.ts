@@ -507,4 +507,7 @@ export {
   legalPagesPayload,
   caseStudiesPagePayload,
   siteFooterPayload,
+  SITE_FOOTER_FLAG_CODES,
 } from "./extra-site-pages-payload";
+
+export type { SiteFooterFlagCode } from "./extra-site-pages-payload";

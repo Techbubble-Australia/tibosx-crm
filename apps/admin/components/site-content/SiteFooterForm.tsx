@@ -1,9 +1,13 @@
 "use client";
 
-import { siteFooterPayload } from "@site-content/defaults";
+import { siteFooterPayload, SITE_FOOTER_FLAG_CODES } from "@site-content/defaults";
 import { inputClass, labelClass, sectionClass } from "./form-styles";
 
 export type SiteFooterPayload = typeof siteFooterPayload;
+
+function createEmptyOffice(): SiteFooterPayload["offices"][number] {
+  return { flagCode: "au", region: "", entity: "", address: "" };
+}
 
 export function SiteFooterForm({
   value,
@@ -114,6 +118,9 @@ export function SiteFooterForm({
 
       <section className={sectionClass}>
         <h3 className="mb-4 font-semibold">Offices</h3>
+        <p className="mb-4 text-sm text-gray-600">
+          These entries power the marketing site footer &quot;{value.officesHeading || "Our Offices"}&quot; block (region, legal entity, and address lines).
+        </p>
         <div className="mb-3">
           <label className={labelClass}>Offices heading</label>
           <input className={inputClass} value={value.officesHeading} onChange={(e) => onChange({ ...value, officesHeading: e.target.value })} />
@@ -122,16 +129,36 @@ export function SiteFooterForm({
           {value.offices.map((o, i) => (
             <div key={`of-${i}`} className="grid gap-2 rounded-lg border border-gray-100 p-3 sm:grid-cols-2">
               <div>
-                <label className={labelClass}>Flag code (au | us | in)</label>
-                <input
+                <label className={labelClass}>Flag</label>
+                <select
                   className={inputClass}
-                  value={o.flagCode}
+                  value={(SITE_FOOTER_FLAG_CODES as readonly string[]).includes(o.flagCode) ? o.flagCode : "au"}
                   onChange={(e) => {
                     const next = [...value.offices];
-                    next[i] = { ...o, flagCode: e.target.value as (typeof o)["flagCode"] };
+                    const flagCode = e.target.value as (typeof o)["flagCode"];
+                    next[i] = { ...o, flagCode };
                     onChange({ ...value, offices: next });
                   }}
-                />
+                >
+                  {SITE_FOOTER_FLAG_CODES.map((code) => (
+                    <option key={code} value={code}>
+                      {code.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-end justify-end sm:col-span-1">
+                <button
+                  type="button"
+                  disabled={value.offices.length <= 1}
+                  onClick={() => {
+                    const next = value.offices.filter((_, j) => j !== i);
+                    onChange({ ...value, offices: next.length > 0 ? next : [createEmptyOffice()] });
+                  }}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Remove
+                </button>
               </div>
               <div>
                 <label className={labelClass}>Region</label>
@@ -159,8 +186,9 @@ export function SiteFooterForm({
               </div>
               <div className="sm:col-span-2">
                 <label className={labelClass}>Address</label>
-                <input
+                <textarea
                   className={inputClass}
+                  rows={2}
                   value={o.address}
                   onChange={(e) => {
                     const next = [...value.offices];
@@ -172,6 +200,13 @@ export function SiteFooterForm({
             </div>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={() => onChange({ ...value, offices: [...value.offices, createEmptyOffice()] })}
+          className="mt-3 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+        >
+          Add office
+        </button>
       </section>
 
       <section className={sectionClass}>

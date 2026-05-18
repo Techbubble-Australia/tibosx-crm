@@ -7,6 +7,7 @@ import {
   legalPagesPayload,
   caseStudiesPagePayload,
   siteFooterPayload,
+  SITE_FOOTER_FLAG_CODES,
 } from "@site-content/defaults";
 import { deepMerge } from "@/lib/deep-merge";
 
@@ -18,6 +19,26 @@ export type ContactPagePayload = typeof contactPagePayload;
 export type LegalPagesPayload = typeof legalPagesPayload;
 export type CaseStudiesPagePayload = typeof caseStudiesPagePayload;
 export type SiteFooterPayload = typeof siteFooterPayload;
+
+const VALID_FOOTER_FLAGS = new Set<string>(SITE_FOOTER_FLAG_CODES);
+
+function normalizeFooterOffices(raw: unknown): SiteFooterPayload["offices"] {
+  if (!Array.isArray(raw)) return siteFooterPayload.offices;
+  type Office = SiteFooterPayload["offices"][number];
+  const out: Office[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const o = item as Record<string, unknown>;
+    const flagRaw = typeof o.flagCode === "string" ? o.flagCode.trim().toLowerCase() : "";
+    const flagCode = (VALID_FOOTER_FLAGS.has(flagRaw) ? flagRaw : "au") as Office["flagCode"];
+    const region = typeof o.region === "string" ? o.region : "";
+    const entity = typeof o.entity === "string" ? o.entity : "";
+    const address = typeof o.address === "string" ? o.address : "";
+    if (!region.trim() && !entity.trim() && !address.trim()) continue;
+    out.push({ flagCode, region, entity, address });
+  }
+  return out.length > 0 ? out : siteFooterPayload.offices;
+}
 
 export function resolveServicesPage(raw: unknown): ServicesPagePayload {
   if (!raw || typeof raw !== "object") return servicesPagePayload;
@@ -163,6 +184,9 @@ export function resolveCaseStudiesPage(raw: unknown): CaseStudiesPagePayload {
 }
 
 export function resolveSiteFooter(raw: unknown): SiteFooterPayload {
-  if (!raw || typeof raw !== "object") return siteFooterPayload;
-  return deepMerge(siteFooterPayload as unknown as Record<string, unknown>, raw) as SiteFooterPayload;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return siteFooterPayload;
+  const r = raw as Partial<SiteFooterPayload>;
+  const merged = deepMerge(siteFooterPayload as unknown as Record<string, unknown>, raw as Record<string, unknown>) as SiteFooterPayload;
+  const offices = Array.isArray(r.offices) ? normalizeFooterOffices(r.offices) : merged.offices;
+  return { ...merged, offices };
 }

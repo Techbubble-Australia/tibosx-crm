@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
+import type { SiteFooterFlagCode } from "@site-content/defaults";
 
-export type CountryFlagCode = "au" | "us" | "in" | "ph" | "gb" | "ae";
+export type CountryFlagCode = SiteFooterFlagCode;
 
 type CountryFlagProps = {
   code: CountryFlagCode;
