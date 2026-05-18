@@ -1,4 +1,5 @@
 import type { StaticImageData } from "next/image";
+import { resolveOptionalMediaUrl } from "@/lib/media-url";
 import aboutUs1 from "@image/techbubble_-_about_us_1.jpg";
 import aboutUs2 from "@image/techbubble_-_about_us_2.jpg";
 import aboutUs3 from "@image/techbubble_-_about_us_3.jpg";
@@ -30,6 +31,7 @@ export const ABOUT_BUNDLED_IMAGE_KEYS = Object.keys(ABOUT_IMAGE_MAP);
 
 /**
  * Prefer `imageUrl` (uploaded or absolute URL). Otherwise resolve `imageKey` against bundled assets.
+ * Upload paths (`/uploads/...`) are rewritten to the public API origin so Next/Image can load them.
  */
 export function resolveAboutBundledImage(
   imageUrl?: string | null,
@@ -37,7 +39,10 @@ export function resolveAboutBundledImage(
 ): StaticImageData | string | null {
   const url = imageUrl?.trim();
   if (url) {
-    return url;
+    const resolved = resolveOptionalMediaUrl(url);
+    if (resolved) {
+      return resolved;
+    }
   }
   const key = imageKey?.trim();
   if (key && ABOUT_IMAGE_MAP[key]) {

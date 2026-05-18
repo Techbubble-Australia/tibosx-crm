@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import type { TeamMemberPublicRow } from "@/lib/api/public";
+import { resolveOptionalMediaUrl } from "@/lib/media-url";
 import { AboutAnimatedWorkforceStats } from "@/components/about/AboutAnimatedWorkforceStats";
 import { AboutPersonImage } from "@/components/about/AboutPersonImage";
 import { SectionPill } from "@/components/ui/SectionPill";
@@ -120,12 +121,13 @@ export function AboutWorkforceApiSection({ cms, bioFallbackByName, apiMembers }:
             <div className="mt-8 grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4">
               {activeMembers.map((person) => {
                 const bio = memberBioText(person.name, person.description, bioFallbackByName, cms.defaultMemberBio);
+                const avatarSrc = resolveOptionalMediaUrl(person.imageUrl);
                 return (
                   <div key={person.id} className="text-center">
                     <div className="mx-auto h-[145px] w-[145px] overflow-hidden rounded-[14px] border border-[#f7f7f7] bg-neutral-200">
-                      {person.imageUrl ? (
+                      {avatarSrc ? (
                         <Image
-                          src={person.imageUrl}
+                          src={avatarSrc}
                           alt={person.name}
                           width={145}
                           height={145}
