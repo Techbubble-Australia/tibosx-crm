@@ -202,7 +202,7 @@ export async function seedJobsFaqsTestimonialsTeam() {
     if (existing) {
       await prisma.testimonial.update({
         where: { id: existing.id },
-        data: { ...t, published: true, authorImageUrl: "" },
+        data: { ...t, published: true },
       });
     } else {
       await prisma.testimonial.create({
@@ -274,7 +274,7 @@ export async function seedJobsFaqsTestimonialsTeam() {
     if (existing) {
       await prisma.teamMember.update({
         where: { id: existing.id },
-        data: { ...m, imageUrl: "", published: true, description: m.description ?? "" },
+        data: { ...m, published: true, description: m.description ?? "" },
       });
     } else {
       await prisma.teamMember.create({

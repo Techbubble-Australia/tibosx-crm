@@ -4,6 +4,9 @@
  *
  * Run: `pnpm --filter @techbubble/database db:seed:site-content`
  * Requires `DATABASE_URL` (see packages/database/.env or your deployment env).
+ *
+ * Existing rows keep their JSON `payload` (upload URLs, copy). Set `FORCE_SITE_CONTENT=1` to overwrite
+ * every `site_content` payload with repo defaults.
  */
 import { prisma } from "./client";
 import { seedSiteContent } from "./seed/site-content";

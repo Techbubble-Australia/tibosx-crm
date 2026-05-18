@@ -307,7 +307,7 @@ export const siteFooterPayload = {
       flagCode: "au" as const,
       region: "Australia (HQ)",
       entity: "Techbubble Pty Ltd",
-      address: "Level 1216/126 Banks Ave, Eastgardens, Sydney NSW 2000",
+      address: "16/126 Banks Ave, Eastgardens, Sydney NSW 2000",
     },
     {
       flagCode: "us" as const,

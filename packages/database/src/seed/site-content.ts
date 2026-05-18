@@ -26,12 +26,20 @@ const entries: { key: string; label: string; payload: Prisma.InputJsonValue }[] 
   { key: "site_footer", label: "Site footer (offices, contact block)", payload: siteFooterPayload as Prisma.InputJsonValue },
 ];
 
+const forceSiteContentPayload =
+  process.env.FORCE_SITE_CONTENT === "1" || process.env.FORCE_SITE_CONTENT === "true";
+
+/**
+ * Ensures every canonical SiteContent key exists.
+ * By default **does not replace `payload`** on update (preserves CMS edits and `/uploads/...` URLs).
+ * Set `FORCE_SITE_CONTENT=1` to reset all documents to repo defaults.
+ */
 export async function seedSiteContent() {
   for (const e of entries) {
     await prisma.siteContent.upsert({
       where: { key: e.key },
       create: { key: e.key, label: e.label, payload: e.payload },
-      update: { label: e.label, payload: e.payload },
+      update: forceSiteContentPayload ? { label: e.label, payload: e.payload } : { label: e.label },
     });
   }
 }

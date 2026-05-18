@@ -202,10 +202,9 @@ export async function seedCaseStudiesBulk() {
   ];
 
   for (const data of rows) {
-    await prisma.caseStudy.upsert({
-      where: { slug: data.slug },
-      create: data,
-      update: data,
-    });
+    const existing = await prisma.caseStudy.findUnique({ where: { slug: data.slug } });
+    if (!existing) {
+      await prisma.caseStudy.create({ data });
+    }
   }
 }

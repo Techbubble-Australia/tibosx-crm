@@ -813,7 +813,7 @@ export function MarketingHome({
             {/* Office cards */}
             <div className="mt-12 grid w-full grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
               {[
-                { code: "au" as const, name: "Australia", addr: "HQ · Sydney, NSW\nLevel 12, 126 Banks Ave" },
+                { code: "au" as const, name: "Australia", addr: "HQ · Sydney, NSW\n, 126 Banks Ave" },
                 { code: "us" as const, name: "USA", addr: "Wilmington, Delaware\n1007 N Orange St" },
                 { code: "in" as const, name: "India", addr: "Ahmedabad, Gujarat\nK.P. Epitome Office" },
                 { code: "ph" as const, name: "Philippines", addr: "SE Asia Hub\nDelivery Centre" },
