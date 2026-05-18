@@ -9,8 +9,11 @@ export function deepMerge<T extends Record<string, unknown>>(base: T, patch: unk
   for (const key of Object.keys(p)) {
     const bv = out[key];
     const pv = p[key];
+    // JSON/CMS often stores explicit null; never wipe base keys with null/undefined.
+    if (pv === null || pv === undefined) {
+      continue;
+    }
     if (
-      pv &&
       typeof pv === "object" &&
       !Array.isArray(pv) &&
       bv &&

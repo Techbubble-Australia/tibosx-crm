@@ -13,7 +13,8 @@
     "db:migrate": "turbo run db:migrate",
     "db:generate": "turbo run db:generate",
     "db:push": "turbo run db:push",
-    "db:studio": "turbo run db:studio"
+    "db:studio": "turbo run db:studio",
+    "db:seed:site-content": "pnpm --filter @techbubble/database db:seed:site-content"
   },
   "devDependencies": {
     "@typescript-eslint/parser": "^8",

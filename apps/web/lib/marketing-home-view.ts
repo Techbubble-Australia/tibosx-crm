@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import { FileText, PhoneCall, Rocket, ShieldCheck } from "lucide-react";
 import { marketingHomePayload, type MarketingHomePayload } from "@/lib/data/marketing-home-payload";
 import { HOME_IMAGE_MAP } from "@/lib/home-image-map";
+import { deepMerge } from "@/lib/deep-merge";
 import type { StaticImageData } from "next/image";
 import defaultHomeImage from "@image/techbubble_-_home_1.png";
 
@@ -88,33 +89,88 @@ function normalizeEngagementModels(raw: unknown): Array<{
   });
 }
 
+type JsonObject = Record<string, unknown>;
+
+function mergeHomeObject<A extends JsonObject>(fallback: A, actual: unknown): A {
+  if (!actual || typeof actual !== "object" || Array.isArray(actual)) {
+    return fallback;
+  }
+  return deepMerge(fallback, actual as JsonObject) as A;
+}
+
+function pickHomeArray<T>(value: unknown, fallback: T[]): T[] {
+  return Array.isArray(value) && value.length > 0 ? (value as T[]) : fallback;
+}
+
 export function buildMarketingHomeViewModel(content: MarketingHomePayload) {
+  const engagement = mergeHomeObject(
+    marketingHomePayload.engagement as unknown as JsonObject,
+    content.engagement,
+  ) as MarketingHomePayload["engagement"];
+  const howItWorks = mergeHomeObject(
+    marketingHomePayload.howItWorks as unknown as JsonObject,
+    content.howItWorks,
+  ) as MarketingHomePayload["howItWorks"];
+  const statsStrip = mergeHomeObject(
+    marketingHomePayload.statsStrip as unknown as JsonObject,
+    content.statsStrip,
+  ) as MarketingHomePayload["statsStrip"];
+  const heroBase = mergeHomeObject(marketingHomePayload.hero as unknown as JsonObject, content.hero) as MarketingHomePayload["hero"];
+  const platformsIntro = mergeHomeObject(
+    marketingHomePayload.platformsIntro as unknown as JsonObject,
+    content.platformsIntro,
+  ) as MarketingHomePayload["platformsIntro"];
+  const journey = mergeHomeObject(
+    marketingHomePayload.journey as unknown as JsonObject,
+    content.journey,
+  ) as MarketingHomePayload["journey"];
+  const faqAside = mergeHomeObject(
+    marketingHomePayload.faqAside as unknown as JsonObject,
+    content.faqAside,
+  ) as MarketingHomePayload["faqAside"];
+  const scheduleDemo = mergeHomeObject(
+    marketingHomePayload.scheduleDemo as unknown as JsonObject,
+    content.scheduleDemo,
+  ) as MarketingHomePayload["scheduleDemo"];
+  const careersBand = mergeHomeObject(
+    marketingHomePayload.careersBand as unknown as JsonObject,
+    content.careersBand,
+  ) as MarketingHomePayload["careersBand"];
+  const careersCta = mergeHomeObject(
+    marketingHomePayload.careersCta as unknown as JsonObject,
+    content.careersCta,
+  ) as MarketingHomePayload["careersCta"];
+  const featuredPartners = pickHomeArray(content.featuredPartners, marketingHomePayload.featuredPartners);
+  const trustedLogos = pickHomeArray(content.trustedLogos, marketingHomePayload.trustedLogos);
+  const platforms = pickHomeArray(content.platforms, marketingHomePayload.platforms);
+  const faqItems = pickHomeArray(content.faqItems, marketingHomePayload.faqItems);
+
   return {
-    featuredPartnerCard: content.featuredPartners.map((p) => ({
+    featuredPartnerCard: featuredPartners.map((p) => ({
       id: p.id,
       image: mapImage(p.imageKey, HOME_IMAGE_MAP.home_1),
       imageClass: p.imageClass,
     })),
-    trustedLogoStrip: content.trustedLogos.map((l) => ({
+    trustedLogoStrip: trustedLogos.map((l) => ({
       name: l.name,
       image: mapImage(l.imageKey, HOME_IMAGE_MAP.home_6),
       width: l.width,
       height: l.height,
     })),
-    engagementModels: normalizeEngagementModels(content.engagement.models),
-    deliverySteps: content.howItWorks.steps.map((s) => ({
+    engagementModels: normalizeEngagementModels(engagement.models),
+    deliverySteps: howItWorks.steps.map((s) => ({
       title: s.title,
       body: s.body,
       icon: STEP_ICONS[s.icon] ?? PhoneCall,
     })),
-    platforms: content.platforms.map((p) => ({
+    platforms: platforms.map((p) => ({
       ...p,
       tags: normalizePlatformTags((p as { tags?: unknown }).tags),
     })),
-    faqItems: content.faqItems.map((f) => ({ question: f.question, answer: f.answer })),
-    statsStrip: content.statsStrip,
+    faqItems: faqItems.map((f) => ({ question: f.question, answer: f.answer })),
+    statsStrip,
     hero: (() => {
-      const h = content.hero;
+      const h = heroBase;
       const sp = h.socialProof;
       const trustChips = normalizeStringList(h.trustChips);
       const initials = normalizeStringList(sp?.initials);
@@ -130,19 +186,19 @@ export function buildMarketingHomeViewModel(content: MarketingHomePayload) {
         },
       };
     })(),
-    engagementHeader: content.engagement.header,
-    engagementHelp: content.engagement.helpCard,
+    engagementHeader: engagement.header,
+    engagementHelp: engagement.helpCard,
     howItWorksHeader: {
-      pill: content.howItWorks.pill,
-      title: content.howItWorks.title,
-      subtitle: content.howItWorks.subtitle,
+      pill: howItWorks.pill,
+      title: howItWorks.title,
+      subtitle: howItWorks.subtitle,
     },
-    platformsIntro: content.platformsIntro,
-    journey: content.journey,
-    faqAside: content.faqAside,
-    scheduleDemo: content.scheduleDemo,
-    careersBand: content.careersBand,
-    careersCta: content.careersCta,
+    platformsIntro,
+    journey,
+    faqAside,
+    scheduleDemo,
+    careersBand,
+    careersCta,
   };
 }
 

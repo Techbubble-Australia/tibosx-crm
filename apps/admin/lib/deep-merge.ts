@@ -9,8 +9,10 @@ export function deepMerge<T extends Record<string, unknown>>(base: T, patch: unk
   for (const key of Object.keys(p)) {
     const bv = out[key];
     const pv = p[key];
+    if (pv === null || pv === undefined) {
+      continue;
+    }
     if (
-      pv &&
       typeof pv === "object" &&
       !Array.isArray(pv) &&
       bv &&
