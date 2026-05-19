@@ -1,5 +1,7 @@
 /**
- * Absolute URL for <img> previews in admin when stored value is a portable `/uploads/...` path.
+ * URL for `<img src>` previews in admin.
+ * `/uploads/...` stays same-origin so `app/uploads/[...path]` can proxy to the API (avoids relying on
+ * `NEXT_PUBLIC_API_URL` in the browser, which is often unset or wrong in Docker/production).
  */
 export function resolveAdminMediaPreviewUrl(url: string): string {
   const u = (url ?? "").trim();
@@ -10,8 +12,7 @@ export function resolveAdminMediaPreviewUrl(url: string): string {
     return u;
   }
   if (u.startsWith("/uploads/")) {
-    const base = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001").replace(/\/$/, "");
-    return `${base}${u}`;
+    return u;
   }
   return u;
 }

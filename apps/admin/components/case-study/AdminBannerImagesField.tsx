@@ -43,12 +43,12 @@ export function AdminBannerImagesField({ formKey, initialUrls }: Props) {
         method: "POST",
         body: fd,
       });
-      const json = (await res.json().catch(() => ({}))) as { error?: string; data?: { url?: string } };
+      const json = (await res.json().catch(() => ({}))) as { error?: string; data?: { url?: string }; url?: string };
       if (!res.ok) {
         alert(json.error || "Upload failed");
         return;
       }
-      const next = json.data?.url;
+      const next = json.data?.url ?? json.url;
       if (next) setAt(index, next);
     } catch (err) {
       console.error(err);

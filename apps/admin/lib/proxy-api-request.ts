@@ -60,3 +60,47 @@ export async function proxyApiRequest(req: NextRequest, pathSegments: string[]):
     return NextResponse.json({ error: "Upstream API unavailable" }, { status: 502 });
   }
 }
+
+function isSafeUploadPathSegment(segment: string): boolean {
+  return Boolean(segment) && segment !== "." && segment !== "..";
+}
+
+/** Forwards `/uploads/*` to the Express API (static files). Same-origin for `<img>` previews in admin. */
+export async function proxyUploadsRequest(req: NextRequest, pathSegments: string[]): Promise<NextResponse> {
+  const safe = pathSegments.filter(isSafeUploadPathSegment);
+  if (safe.length === 0) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  const subpath = safe.join("/");
+  const target = `${getUpstreamApiBase()}/uploads/${subpath}${req.nextUrl.search}`;
+
+  const headers = new Headers();
+  req.headers.forEach((value, key) => {
+    const low = key.toLowerCase();
+    if (low === "host" || HOP_BY_HOP.has(low)) return;
+    headers.set(key, value);
+  });
+
+  const init: RequestInit = {
+    method: req.method,
+    headers,
+    redirect: "manual",
+  };
+
+  try {
+    const res = await fetch(target, init);
+    const out = new NextResponse(res.body, {
+      status: res.status,
+      statusText: res.statusText,
+    });
+    res.headers.forEach((value, key) => {
+      const low = key.toLowerCase();
+      if (low === "transfer-encoding") return;
+      out.headers.set(key, value);
+    });
+    return out;
+  } catch (err) {
+    console.error("[admin uploads proxy]", target, err);
+    return NextResponse.json({ error: "Upstream API unavailable" }, { status: 502 });
+  }
+}
