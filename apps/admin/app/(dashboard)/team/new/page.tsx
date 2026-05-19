@@ -10,6 +10,7 @@ import { adminFetch } from "@/lib/admin-api";
 export default function NewTeamMemberPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [imageUrl, setImageUrl] = useState("");
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -24,7 +25,7 @@ export default function NewTeamMemberPage() {
       role: formData.get("role"),
       department: formData.get("department"),
       description: String(formData.get("description") ?? ""),
-      imageUrl: formData.get("imageUrl") || "",
+      imageUrl: imageUrl.trim(),
       order: parseInt(formData.get("order") as string) || 0,
       published: formData.get("published") === "on",
     };
@@ -98,7 +99,8 @@ export default function NewTeamMemberPage() {
           <AdminImageField
             name="imageUrl"
             label="Profile photo"
-            defaultValue=""
+            value={imageUrl}
+            onValueChange={setImageUrl}
             className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
             labelClassName="mb-1 block text-sm font-medium"
           />

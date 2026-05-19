@@ -30,6 +30,7 @@ import heroGovQueensland from "@image/hero-gov-queensland-wordmark.png";
 import innovationImage from "@image/Innovation_Cutting_Edge_Tech.png";
 import { CASE_STUDY_SIDEBAR, buildHomeCaseStudySlots, type CaseStudyListCard } from "@/lib/case-study-mapper";
 import { useStatCountUpOnView } from "@/hooks/useStatCountUpOnView";
+import { isUploadsProxyPath } from "@/lib/media-url";
 
 const CASE_STUDY_HOME_CATEGORY_FILTERS = ["All", "ServiceNow", "Salesforce", "MuleSoft", "SharePoint", "Staffing"] as const;
 
@@ -276,16 +277,33 @@ export function MarketingHome({
           <div className="w-full overflow-hidden">
             <div className="flex w-max animate-[marquee_30s_linear_infinite] items-center gap-[18px]">
               {[...vm.trustedLogoStrip, ...vm.trustedLogoStrip].map((logo, i) => (
-                <div key={`${logo.name}-${i}`} className="flex shrink-0 items-center justify-center" style={{ width: '180px', height: '80px' }}>
-                  <Image 
-                    src={logo.image} 
-                    alt={logo.name} 
-                    width={180} 
-                    height={80} 
-                    className="object-contain !w-auto !h-auto max-w-full max-h-full" 
-                    sizes="180px"
-                    priority={false}
-                  />
+                <div
+                  key={`${logo.name}-${i}`}
+                  className="flex shrink-0 items-center justify-center"
+                  style={{ width: `${logo.width}px`, height: `${logo.height}px` }}
+                >
+                  {isUploadsProxyPath(logo.src) || logo.src.startsWith("http://") || logo.src.startsWith("https://") ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- uploads + arbitrary URLs bypass optimizer
+                    <img
+                      src={logo.src}
+                      alt={logo.name}
+                      width={logo.width}
+                      height={logo.height}
+                      className="max-h-full max-w-full object-contain"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  ) : (
+                    <Image
+                      src={logo.src}
+                      alt={logo.name}
+                      width={logo.width}
+                      height={logo.height}
+                      className="max-h-full max-w-full object-contain"
+                      sizes={`${logo.width}px`}
+                      priority={false}
+                    />
+                  )}
                 </div>
               ))}
             </div>
@@ -659,8 +677,8 @@ export function MarketingHome({
 
               {/* TIMEZONE — 6 cols (reference: light grey panel, white chips & clock cards) */}
               <div className="rounded-[24px] bg-[#f2f2f2] p-8 sm:p-10 sm:col-span-6">
-                <div className="flex flex-col gap-10 lg:flex-row lg:items-start lg:justify-between lg:gap-12">
-                  <div className="min-w-0 flex-1 lg:max-w-[520px]">
+                <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,9.25rem)] lg:items-start lg:gap-x-10 lg:gap-y-0">
+                  <div className="min-w-0">
                     <h3 className="text-[28px] font-bold leading-[36px] tracking-[-0.0025em] text-[#06091a]">
                       Time Zone Alignment — Always
                     </h3>
@@ -708,16 +726,18 @@ export function MarketingHome({
                       </div>
                     </div>
                   </div>
-                  <div className="flex w-full flex-col gap-2 lg:w-[min(100%,220px)] lg:shrink-0">
+                  <div className="flex w-full max-w-[11.5rem] flex-col gap-2 sm:max-w-[12.5rem] lg:w-[9.25rem] lg:max-w-none lg:shrink-0 lg:justify-self-end">
                     {WORLD_CLOCK_ZONES.map((z) => (
                       <div
                         key={z.city}
-                        className="flex items-center justify-between rounded-[12px] border border-[#e8e8e8] bg-white px-4 py-3"
+                        className="flex items-center gap-2 rounded-[12px] border border-[#e8e8e8] bg-white px-2.5 py-2"
                       >
-                        <span className="text-[16px] font-bold tabular-nums leading-6 text-[#111111]">
+                        <span className="w-[3.35rem] shrink-0 text-[13px] font-bold tabular-nums leading-5 text-[#111111]">
                           {worldClocksReady ? formatWorldClockTime(worldClockNow, z.timeZone) : "—:—"}
                         </span>
-                        <span className="pl-3 text-right text-[12px] font-medium leading-4 text-[#666666]">{z.city}</span>
+                        <span className="min-w-0 flex-1 text-right text-[11px] font-medium leading-4 text-[#666666]">
+                          {z.city}
+                        </span>
                       </div>
                     ))}
                   </div>

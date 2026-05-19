@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AdminImageField } from "@/components/AdminImageField";
 import { multilineToLines } from "@/lib/multiline-list";
 import { inputClass, labelClass, sectionClass } from "./form-styles";
 
@@ -77,6 +78,21 @@ function TabHeroStatsLogos({
 
   const setLogo = (i: number, patch: Record<string, unknown>) => {
     const trustedLogos = v.trustedLogos.map((p: HomeAny, j: number) => (j === i ? { ...p, ...patch } : p));
+    onChange({ ...v, trustedLogos });
+  };
+
+  const addTrustedLogo = () => {
+    const trustedLogos = [
+      ...v.trustedLogos,
+      { name: "Company name", imageKey: "home_6", imageUrl: "", width: 180, height: 80 },
+    ];
+    onChange({ ...v, trustedLogos });
+  };
+
+  const removeTrustedLogo = (i: number) => {
+    if (v.trustedLogos.length <= 1) return;
+    if (!window.confirm("Remove this logo from the homepage strip?")) return;
+    const trustedLogos = v.trustedLogos.filter((_: HomeAny, j: number) => j !== i);
     onChange({ ...v, trustedLogos });
   };
 
@@ -190,25 +206,74 @@ function TabHeroStatsLogos({
       </section>
 
       <section className={sectionClass}>
-        <h3 className="mb-4 font-semibold">Trusted logos ({v.trustedLogos.length})</h3>
-        <p className="mb-3 text-xs text-gray-500">Edit each row; width/height are numbers.</p>
-        <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h3 className="font-semibold">Trusted logos ({v.trustedLogos.length})</h3>
+            <p className="text-xs text-gray-500">
+              Upload a logo file, or leave upload empty and set <span className="font-mono">imageKey</span> (e.g. home_6) for bundled assets.
+            </p>
+          </div>
+          <button type="button" className="rounded-lg bg-black px-3 py-1.5 text-xs font-medium text-white" onClick={addTrustedLogo}>
+            Add company logo
+          </button>
+        </div>
+        <div className="max-h-[520px] space-y-4 overflow-y-auto pr-1">
           {v.trustedLogos.map((logo: HomeAny, i: number) => (
-            <div key={logo.name} className="grid gap-2 rounded border border-gray-100 p-2 sm:grid-cols-5">
-              <input className={inputClass} placeholder="Name" value={logo.name} onChange={(e) => setLogo(i, { name: e.target.value })} />
-              <input className={inputClass} placeholder="imageKey" value={logo.imageKey} onChange={(e) => setLogo(i, { imageKey: e.target.value })} />
-              <input
+            <div key={i} className="space-y-3 rounded border border-gray-100 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-medium text-gray-500">Logo {i + 1}</span>
+                <button
+                  type="button"
+                  className="text-xs font-medium text-red-600 hover:underline"
+                  onClick={() => removeTrustedLogo(i)}
+                >
+                  Remove
+                </button>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <label className={labelClass}>Company name</label>
+                  <input className={inputClass} value={logo.name} onChange={(e) => setLogo(i, { name: e.target.value })} />
+                </div>
+                <div>
+                  <label className={labelClass}>Bundled imageKey (fallback)</label>
+                  <input
+                    className={inputClass}
+                    placeholder="e.g. home_6"
+                    value={logo.imageKey ?? ""}
+                    onChange={(e) => setLogo(i, { imageKey: e.target.value })}
+                  />
+                </div>
+              </div>
+              <AdminImageField
+                name={`trustedLogoImageUrl_${i}`}
+                label="Logo upload (optional)"
+                value={typeof logo.imageUrl === "string" ? logo.imageUrl : ""}
+                onValueChange={(url) => setLogo(i, { imageUrl: url })}
                 className={inputClass}
-                type="number"
-                value={logo.width}
-                onChange={(e) => setLogo(i, { width: Number(e.target.value) })}
+                labelClassName={labelClass}
+                helpText="When set, this URL wins over imageKey on the marketing site."
               />
-              <input
-                className={inputClass}
-                type="number"
-                value={logo.height}
-                onChange={(e) => setLogo(i, { height: Number(e.target.value) })}
-              />
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <label className={labelClass}>Display width (px)</label>
+                  <input
+                    className={inputClass}
+                    type="number"
+                    value={logo.width ?? 180}
+                    onChange={(e) => setLogo(i, { width: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Display height (px)</label>
+                  <input
+                    className={inputClass}
+                    type="number"
+                    value={logo.height ?? 80}
+                    onChange={(e) => setLogo(i, { height: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
             </div>
           ))}
         </div>

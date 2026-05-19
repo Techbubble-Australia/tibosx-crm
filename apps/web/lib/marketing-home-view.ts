@@ -3,6 +3,7 @@ import { FileText, PhoneCall, Rocket, ShieldCheck } from "lucide-react";
 import { marketingHomePayload, type MarketingHomePayload } from "@/lib/data/marketing-home-payload";
 import { HOME_IMAGE_MAP } from "@/lib/home-image-map";
 import { deepMerge } from "@/lib/deep-merge";
+import { resolveMediaUrl } from "@/lib/media-url";
 import type { StaticImageData } from "next/image";
 import defaultHomeImage from "@image/techbubble_-_home_1.png";
 
@@ -154,12 +155,33 @@ export function buildMarketingHomeViewModel(content: MarketingHomePayload) {
       image: mapImage(p.imageKey, HOME_IMAGE_MAP.home_1),
       imageClass: p.imageClass,
     })),
-    trustedLogoStrip: trustedLogos.map((l) => ({
-      name: l.name,
-      image: mapImage(l.imageKey, HOME_IMAGE_MAP.home_6),
-      width: l.width,
-      height: l.height,
-    })),
+    trustedLogoStrip: trustedLogos.map((l) => {
+      const row = l as {
+        name: string;
+        imageKey?: string;
+        imageUrl?: string;
+        width?: number;
+        height?: number;
+      };
+      const custom = typeof row.imageUrl === "string" ? row.imageUrl.trim() : "";
+      const width = Number(row.width) || 180;
+      const height = Number(row.height) || 80;
+      if (custom) {
+        return {
+          name: row.name,
+          src: resolveMediaUrl(custom),
+          width,
+          height,
+        };
+      }
+      const staticImg = mapImage(String(row.imageKey || "home_6"), HOME_IMAGE_MAP.home_6);
+      return {
+        name: row.name,
+        src: staticImg.src,
+        width,
+        height,
+      };
+    }),
     engagementModels: normalizeEngagementModels(engagement.models),
     deliverySteps: howItWorks.steps.map((s) => ({
       title: s.title,

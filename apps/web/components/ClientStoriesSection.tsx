@@ -13,14 +13,19 @@ export type ClientStoryItem = {
   authorImageUrl?: string;
 };
 
+const DEFAULT_AUTO_SLIDE_MS = 3000;
+
 type Props = {
   items?: ClientStoryItem[];
+  /** Auto-advance; default {@link DEFAULT_AUTO_SLIDE_MS}. Set `0` or negative to disable. */
+  autoSlideIntervalMs?: number;
 };
 
-export function ClientStoriesSection({ items }: Props) {
+export function ClientStoriesSection({ items, autoSlideIntervalMs = DEFAULT_AUTO_SLIDE_MS }: Props) {
   const list = items && items.length > 0 ? items : [];
   const [index, setIndex] = useState(0);
   const [avatarBroken, setAvatarBroken] = useState(false);
+  const [hoverPause, setHoverPause] = useState(false);
   const t = list[index];
 
   useEffect(() => {
@@ -37,9 +42,20 @@ export function ClientStoriesSection({ items }: Props) {
     [list.length],
   );
 
+  useEffect(() => {
+    if (list.length <= 1) return;
+    const ms = autoSlideIntervalMs;
+    if (ms == null || ms <= 0) return;
+    if (hoverPause) return;
+    const id = window.setInterval(() => {
+      go(1);
+    }, ms);
+    return () => window.clearInterval(id);
+  }, [list.length, go, autoSlideIntervalMs, hoverPause]);
+
   if (!t) {
     return (
-      <section className="border-t border-[#e5e5e5] bg-white py-16">
+      <section className="border-t border-[#e5e5e5] bg-white py-16 dark:border-zinc-800 dark:bg-zinc-950">
         <div className="tb-container">
           <p className="text-center text-[16px] text-[#666666]">
             Client stories load from the API when testimonials are published in admin.
@@ -53,7 +69,11 @@ export function ClientStoriesSection({ items }: Props) {
   const showPhoto = Boolean(avatarSrc) && !avatarBroken;
 
   return (
-    <section className="bg-white py-[60px]">
+    <section
+      className="bg-white py-[60px] dark:bg-zinc-950"
+      onMouseEnter={() => setHoverPause(true)}
+      onMouseLeave={() => setHoverPause(false)}
+    >
       <div className="tb-container">
         <div className="mx-auto max-w-[1139px]">
           <div className="mb-12">

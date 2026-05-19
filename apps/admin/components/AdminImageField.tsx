@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { adminFetch } from "@/lib/admin-api";
 import { resolveAdminMediaPreviewUrl } from "@/lib/public-media-url";
 
@@ -8,6 +8,9 @@ type Props = {
   name: string;
   label: string;
   defaultValue?: string;
+  /** When set with {@link onValueChange}, the field is controlled (recommended for JSON submit). */
+  value?: string;
+  onValueChange?: (url: string) => void;
   className?: string;
   labelClassName?: string;
   helpText?: string;
@@ -17,11 +20,31 @@ export function AdminImageField({
   name,
   label,
   defaultValue = "",
+  value: valueProp,
+  onValueChange,
   className = "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black",
   labelClassName = "mb-2 block text-sm font-medium text-gray-900",
   helpText = "Paste a URL or choose a file to upload (JPEG, PNG, GIF, WebP).",
 }: Props) {
-  const [url, setUrl] = useState(defaultValue);
+  const isControlled = valueProp !== undefined;
+  const [internalUrl, setInternalUrl] = useState(defaultValue);
+
+  useEffect(() => {
+    if (!isControlled) {
+      setInternalUrl(defaultValue ?? "");
+    }
+  }, [defaultValue, isControlled]);
+
+  const url = isControlled ? (valueProp ?? "") : internalUrl;
+
+  function setUrl(next: string) {
+    if (isControlled) {
+      onValueChange?.(next);
+    } else {
+      setInternalUrl(next);
+    }
+  }
+
   const [uploading, setUploading] = useState(false);
 
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -35,12 +58,16 @@ export function AdminImageField({
         method: "POST",
         body: fd,
       });
-      const json = (await res.json().catch(() => ({}))) as { error?: string; data?: { url?: string } };
+      const json = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        data?: { url?: string };
+        url?: string;
+      };
       if (!res.ok) {
         alert(json.error || "Upload failed");
         return;
       }
-      const next = json.data?.url;
+      const next = json.data?.url ?? json.url;
       if (next) setUrl(next);
     } catch (err) {
       console.error(err);

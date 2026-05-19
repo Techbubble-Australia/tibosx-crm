@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, Save } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { buildCaseStudyPayloadFromFormData, emptyCaseStudyFormDefaults } from "@/lib/case-study-payload";
 import { AdminImageField } from "@/components/AdminImageField";
 import { AdminBannerImagesField } from "@/components/case-study/AdminBannerImagesField";
@@ -44,11 +44,22 @@ export function CaseStudyForm({
   const defaults = initialRecord ?? emptyCaseStudyFormDefaults();
   const formKey = isEdit ? String(initialRecord?.id) : "new-case-study";
 
+  const [featuredImage, setFeaturedImage] = useState(() => str(defaults as Record<string, unknown>, "featuredImage"));
+  const [contentImage, setContentImage] = useState(() => str(defaults as Record<string, unknown>, "contentImage"));
+
+  useEffect(() => {
+    const d = initialRecord ?? emptyCaseStudyFormDefaults();
+    setFeaturedImage(str(d as Record<string, unknown>, "featuredImage"));
+    setContentImage(str(d as Record<string, unknown>, "contentImage"));
+  }, [formKey, initialRecord]);
+
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setIsLoading(true);
     const form = e.currentTarget;
-    const payload = buildCaseStudyPayloadFromFormData(new FormData(form));
+    const payload = buildCaseStudyPayloadFromFormData(new FormData(form)) as Record<string, unknown>;
+    payload.featuredImage = featuredImage.trim();
+    payload.contentImage = contentImage.trim();
 
     try {
       const url = isEdit
@@ -144,7 +155,8 @@ export function CaseStudyForm({
             key={`featured-${formKey}`}
             name="featuredImage"
             label="Featured image (listing / cards)"
-            defaultValue={str(defaults as Record<string, unknown>, "featuredImage")}
+            value={featuredImage}
+            onValueChange={setFeaturedImage}
             className={inputClass}
             labelClassName={labelClass}
           />
@@ -199,7 +211,8 @@ export function CaseStudyForm({
             key={`content-${formKey}`}
             name="contentImage"
             label="Case study image (Background section)"
-            defaultValue={str(defaults as Record<string, unknown>, "contentImage")}
+            value={contentImage}
+            onValueChange={setContentImage}
             className={inputClass}
             labelClassName={labelClass}
           />

@@ -15,6 +15,7 @@ export default function EditTeamMemberPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [member, setMember] = useState<Record<string, unknown> | null>(null);
+  const [imageUrl, setImageUrl] = useState("");
 
   useEffect(() => {
     async function loadMember() {
@@ -22,7 +23,13 @@ export default function EditTeamMemberPage() {
         const res = await adminFetch("/api/admin/team/admin/all");
         const data = await res.json();
         const found = (data.data || []).find((m: { id: string }) => m.id === id);
-        setMember(found || null);
+        if (found) {
+          setMember(found);
+          setImageUrl(String((found.imageUrl as string) ?? "").trim());
+        } else {
+          setMember(null);
+          setImageUrl("");
+        }
       } catch (error) {
         console.error("Error loading team member:", error);
       } finally {
@@ -47,7 +54,7 @@ export default function EditTeamMemberPage() {
       role: formData.get("role"),
       department: formData.get("department"),
       description: String(formData.get("description") ?? ""),
-      imageUrl: formData.get("imageUrl") || "",
+      imageUrl: imageUrl.trim(),
       order: parseInt(formData.get("order") as string) || 0,
       published: formData.get("published") === "on",
       featuredLeadershipOrder,
@@ -116,7 +123,8 @@ export default function EditTeamMemberPage() {
           <AdminImageField
             name="imageUrl"
             label="Profile photo"
-            defaultValue={(member.imageUrl as string) || ""}
+            value={imageUrl}
+            onValueChange={setImageUrl}
             className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
             labelClassName="mb-1 block text-sm font-medium"
           />

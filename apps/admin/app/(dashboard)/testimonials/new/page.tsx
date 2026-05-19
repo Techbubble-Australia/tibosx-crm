@@ -10,6 +10,7 @@ import { adminFetch } from "@/lib/admin-api";
 export default function NewTestimonialPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [authorImageUrl, setAuthorImageUrl] = useState("");
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -22,7 +23,7 @@ export default function NewTestimonialPage() {
       authorTitle: formData.get("authorTitle"),
       authorCompany: formData.get("authorCompany"),
       authorInitials: formData.get("authorInitials"),
-      authorImageUrl: formData.get("authorImageUrl") || "",
+      authorImageUrl: authorImageUrl.trim(),
       order: parseInt(formData.get("order") as string) || 0,
       published: formData.get("published") === "on",
     };
@@ -96,7 +97,8 @@ export default function NewTestimonialPage() {
           <AdminImageField
             name="authorImageUrl"
             label="Author photo (optional)"
-            defaultValue=""
+            value={authorImageUrl}
+            onValueChange={setAuthorImageUrl}
             className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
             labelClassName="mb-1 block text-sm font-medium"
           />

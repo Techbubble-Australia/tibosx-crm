@@ -40,7 +40,11 @@ export async function getPublishedCaseStudies(limit = 50): Promise<CaseStudyList
   const json = await apiGet<{ data: CaseStudyListApiRow[] }>(
     `/api/case-studies?limit=${limit}&page=1`,
   );
-  return json?.data ?? [];
+  const rows = json?.data ?? [];
+  return rows.map((row) => ({
+    ...row,
+    featuredImage: resolveOptionalMediaUrl(row.featuredImage) || row.featuredImage,
+  }));
 }
 
 export async function getCaseStudyBySlug(
@@ -54,7 +58,19 @@ export async function getCaseStudyBySlug(
   const json = await apiGet<{ data: CaseStudyApiRecord }>(
     `/api/case-studies/slug/${encodeURIComponent(slug)}${q}`,
   );
-  return json?.data ?? null;
+  const row = json?.data;
+  if (!row) return null;
+  const techKeys = ["tech1Icon", "tech2Icon", "tech3Icon", "tech4Icon", "tech5Icon", "tech6Icon"] as const;
+  const techPatch = Object.fromEntries(
+    techKeys.map((k) => [k, resolveOptionalMediaUrl(row[k]) || row[k]]),
+  ) as Pick<CaseStudyApiRecord, (typeof techKeys)[number]>;
+  return {
+    ...row,
+    featuredImage: resolveOptionalMediaUrl(row.featuredImage) || row.featuredImage,
+    contentImage: resolveOptionalMediaUrl(row.contentImage) || row.contentImage,
+    bannerImages: (row.bannerImages ?? []).map((u) => resolveOptionalMediaUrl(u) || u),
+    ...techPatch,
+  };
 }
 
 export type JobApiRow = {
