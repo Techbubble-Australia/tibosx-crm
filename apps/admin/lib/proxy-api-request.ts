@@ -85,6 +85,7 @@ export async function proxyUploadsRequest(req: NextRequest, pathSegments: string
     method: req.method,
     headers,
     redirect: "manual",
+    cache: "no-store",
   };
 
   try {

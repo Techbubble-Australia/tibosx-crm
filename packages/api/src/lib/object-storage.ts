@@ -1,5 +1,5 @@
 import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import type { Readable } from "node:stream";
+import { Readable } from "node:stream";
 
 let cachedClient: S3Client | null = null;
 
@@ -81,11 +81,20 @@ function isS3NotFound(err: unknown): boolean {
   );
 }
 
-function bodyAsReadable(body: unknown): Readable | null {
+type SdkBody = {
+  pipe?: (dest: NodeJS.WritableStream) => unknown;
+  transformToByteArray?: () => Promise<Uint8Array>;
+};
+
+async function bodyToReadable(body: unknown): Promise<Readable | null> {
   if (!body || typeof body !== "object") return null;
-  const b = body as { pipe?: (dest: NodeJS.WritableStream) => unknown };
+  const b = body as SdkBody;
   if (typeof b.pipe === "function") {
     return body as Readable;
+  }
+  if (typeof b.transformToByteArray === "function") {
+    const arr = await b.transformToByteArray();
+    return Readable.from(Buffer.from(arr));
   }
   return null;
 }
@@ -103,13 +112,25 @@ export async function getUploadObjectForResponse(key: string): Promise<{
         Key: key,
       }),
     );
-    const stream = bodyAsReadable(out.Body);
-    if (!stream) return null;
+    const stream = await bodyToReadable(out.Body);
+    if (!stream) {
+      console.error("[object-storage] GetObject returned empty body for key:", key);
+      return null;
+    }
     const contentType = out.ContentType || "application/octet-stream";
     const contentLength = out.ContentLength;
     return { stream, contentType, contentLength };
   } catch (err) {
     if (isS3NotFound(err)) return null;
+    const code = typeof err === "object" && err && "$metadata" in err ? (err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode : undefined;
+    if (code === 403) {
+      console.error(
+        "[object-storage] GetObject forbidden — private bucket still needs s3:GetObject for these credentials. Key:",
+        key,
+      );
+    } else {
+      console.error("[object-storage] GetObject failed for key:", key, err);
+    }
     throw err;
   }
 }
@@ -132,11 +153,16 @@ export async function headUploadObject(key: string): Promise<{
     };
   } catch (err) {
     if (isS3NotFound(err)) return null;
+    const code =
+      typeof err === "object" && err && "$metadata" in err
+        ? (err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
+        : undefined;
+    if (code === 403) {
+      console.error("[object-storage] HeadObject forbidden for key:", key);
+    }
     throw err;
   }
 }
-
-/** Reject path traversal and empty segments. */
 export function isSafeUploadRelativePath(rel: string): boolean {
   if (!rel || rel === "." || rel.startsWith("/")) return false;
   const segments = rel.split("/");

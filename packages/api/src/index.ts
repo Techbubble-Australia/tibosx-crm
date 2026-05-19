@@ -26,6 +26,8 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+app.set("trust proxy", 1);
+
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 const absoluteUploadDir = path.resolve(uploadDir);
 if (!objectStorageConfigured() && !fs.existsSync(absoluteUploadDir)) {

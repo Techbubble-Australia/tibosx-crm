@@ -7,17 +7,27 @@ import {
   objectStorageConfigured,
 } from "../lib/object-storage";
 
+function pathnameUnderUploads(pathname: string): string {
+  const prefix = "/uploads";
+  if (!pathname.startsWith(prefix)) {
+    return "";
+  }
+  let rel = pathname.slice(prefix.length);
+  if (rel.startsWith("/")) rel = rel.slice(1);
+  return rel;
+}
+
+/**
+ * Prefer `baseUrl` + `path` (correct when mounted at `/uploads` behind proxies that rewrite
+ * {@link Request.originalUrl}).
+ */
 function extractRelativeUploadPath(req: Request): string {
+  const fromMount = pathnameUnderUploads(`${req.baseUrl || ""}${req.path || ""}`);
+  if (fromMount) return fromMount;
+
   try {
     const u = new URL(req.originalUrl, "http://localhost");
-    let pathname = u.pathname;
-    const prefix = "/uploads";
-    if (!pathname.startsWith(prefix)) {
-      return "";
-    }
-    let rel = pathname.slice(prefix.length);
-    if (rel.startsWith("/")) rel = rel.slice(1);
-    return rel;
+    return pathnameUnderUploads(u.pathname);
   } catch {
     return "";
   }
