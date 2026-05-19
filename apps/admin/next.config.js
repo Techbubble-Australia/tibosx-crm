@@ -2,7 +2,7 @@
 const nextConfig = {
   output: 'standalone',
   transpilePackages: ["@techbubble/ui", "@techbubble/database"],
-  // /api/* proxied at request time by app/api/[...path]/route.ts (runtime API_URL).
+  // /api/* and /uploads/* proxied at request time (see app/api and app/uploads routes; runtime API_URL).
 };
 
 module.exports = nextConfig;
