@@ -43,5 +43,11 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)"],
+  matcher: [
+    /*
+     * Skip static assets, API routes, and uploaded files (filenames almost always contain a dot).
+     * Also skip `/uploads/...` without an extension so those requests never hit auth middleware.
+     */
+    "/((?!api|_next/static|_next/image|favicon.ico|uploads|.*\\..*).*)",
+  ],
 };
