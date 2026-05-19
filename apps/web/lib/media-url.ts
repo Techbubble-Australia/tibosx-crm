@@ -1,8 +1,16 @@
 export const CASE_STUDY_IMAGE_PLACEHOLDER = "/images/placeholder-case-study.svg";
 
-/** Same-origin paths handled by `app/uploads/[...path]` — use `<img>` instead of `next/image` (optimizer breaks on 404 / dev). */
+/**
+ * Returns `/uploads/...` for portable stored paths (`/uploads/…`, `uploads/…`, or absolute URL whose path is `/uploads/…`).
+ * Otherwise null — caller should use {@link resolveMediaUrl} / {@link resolveOptionalMediaUrl}.
+ */
+export function sameOriginUploadsPath(src: string | null | undefined): string | null {
+  return uploadsPublicPath(normalizeMediaInput(src ?? ""));
+}
+
+/** True when the asset should be loaded with same-origin `/uploads/...` (Next proxy → API static files). */
 export function isUploadsProxyPath(src: string | null | undefined): boolean {
-  return normalizeMediaInput(src ?? "").startsWith("/uploads/");
+  return sameOriginUploadsPath(src) != null;
 }
 
 /** Trim and strip a single pair of wrapping quotes (common paste/import glitch). */

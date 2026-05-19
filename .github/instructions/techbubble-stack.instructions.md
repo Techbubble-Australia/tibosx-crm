@@ -51,8 +51,9 @@ description: "Use when working in the TechBubble monorepo, especially for web/ad
   - `ADMIN_EMAIL`
   - `ADMIN_PASSWORD`
   - `JWT_SECRET`
-  - `UPLOAD_DIR`
-  - `UPLOAD_URL`
+  - `UPLOAD_DIR` (local uploads when `OBJECT_STORAGE_*` is unset)
+  - `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_REGION`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY_ID`, `OBJECT_STORAGE_SECRET_ACCESS_KEY` (optional; S3-compatible bucket on API)
+  - `OBJECT_STORAGE_FORCE_PATH_STYLE` (optional, default true)
   - `ALLOWED_ORIGINS`
   - `NODE_ENV`
 - Prefer updating `.env.example` whenever introducing new required env vars.

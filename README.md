@@ -114,11 +114,12 @@ Set the following environment variables for each service:
 - `JWT_SECRET` - Random secret for JWT
 - `ADMIN_EMAIL` - Admin login email
 - `ADMIN_PASSWORD` - Admin login password
-- `UPLOAD_DIR` - `/app/uploads`
-- `UPLOAD_URL` - Your API domain + `/uploads`
+- **File storage (pick one):**
+  - **Railway Bucket / S3-compatible (production):** set `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_REGION` (e.g. `auto`), `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY_ID`, and `OBJECT_STORAGE_SECRET_ACCESS_KEY`. Optional: `OBJECT_STORAGE_FORCE_PATH_STYLE` (`true` by default). Uploads are stored in the bucket; the API still serves them at `GET /uploads/...` for the web and admin proxies.
+  - **Local disk (default / local dev):** set `UPLOAD_DIR` (e.g. `/app/uploads` in Docker). Omit all `OBJECT_STORAGE_*` variables.
 
 **Web & Admin Services:**
-- `API_URL` - URL of your deployed API service
+- `API_URL` - URL of your deployed API service (server-side proxy to `/uploads` and `/api`)
 
 ### 4. Deploy
 

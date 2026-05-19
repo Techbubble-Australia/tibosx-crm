@@ -34,7 +34,12 @@ services:
       - ADMIN_PASSWORD=admin123
       - PORT=3001
       - UPLOAD_DIR=/app/uploads
-      - UPLOAD_URL=http://localhost:3001/uploads
+      # Optional: Railway Bucket / S3-compatible (omit to use the uploads volume + local disk)
+      # - OBJECT_STORAGE_ENDPOINT=https://...
+      # - OBJECT_STORAGE_REGION=auto
+      # - OBJECT_STORAGE_BUCKET=...
+      # - OBJECT_STORAGE_ACCESS_KEY_ID=...
+      # - OBJECT_STORAGE_SECRET_ACCESS_KEY=...
     ports:
       - "3001:3001"
     volumes:

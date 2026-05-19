@@ -1,28 +1,35 @@
 import { Router, type IRouter } from "express";
 import multer from "multer";
 import path from "path";
-import fs from "fs";
+import { promises as fsp } from "fs";
+import { objectStorageConfigured, putUploadObject } from "../lib/object-storage";
 
 const router: IRouter = Router();
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = process.env.UPLOAD_DIR || "./uploads";
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, file.fieldname + "-" + uniqueSuffix + ext);
-  },
-});
+function makeStoredFilename(fieldname: string, originalname: string): string {
+  const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+  const ext = path.extname(originalname);
+  return `${fieldname}-${uniqueSuffix}${ext}`;
+}
+
+async function persistUploadedFile(file: Express.Multer.File, filename: string): Promise<void> {
+  const key = `uploads/${filename}`;
+  if (objectStorageConfigured()) {
+    await putUploadObject({
+      key,
+      body: file.buffer!,
+      contentType: file.mimetype || "application/octet-stream",
+    });
+    return;
+  }
+
+  const uploadDir = process.env.UPLOAD_DIR || "./uploads";
+  await fsp.mkdir(uploadDir, { recursive: true });
+  await fsp.writeFile(path.join(uploadDir, filename), file.buffer!);
+}
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
@@ -43,49 +50,55 @@ const upload = multer({
 });
 
 // Upload image endpoint
-router.post("/image", upload.single("image"), (req, res) => {
+router.post("/image", upload.single("image"), async (req, res, next) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
-    
-    /** Portable path; clients resolve with their public API base (see web `resolveMediaUrl`). */
-    const fileUrl = `/uploads/${req.file.filename}`;
+
+    const filename = makeStoredFilename(req.file.fieldname, req.file.originalname);
+    await persistUploadedFile(req.file, filename);
+
+    /** Portable path; clients resolve via same-origin `/uploads/...` (Next proxies to API). */
+    const fileUrl = `/uploads/${filename}`;
 
     res.json({
       message: "File uploaded successfully",
       data: {
         url: fileUrl,
-        filename: req.file.filename,
+        filename,
         size: req.file.size,
       },
     });
   } catch (error) {
     console.error("Error uploading file:", error);
-    res.status(500).json({ error: "Failed to upload file" });
+    next(error);
   }
 });
 
 // Upload resume endpoint
-router.post("/resume", upload.single("resume"), (req, res) => {
+router.post("/resume", upload.single("resume"), async (req, res, next) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
-    
-    const fileUrl = `/uploads/${req.file.filename}`;
+
+    const filename = makeStoredFilename(req.file.fieldname, req.file.originalname);
+    await persistUploadedFile(req.file, filename);
+
+    const fileUrl = `/uploads/${filename}`;
 
     res.json({
       message: "Resume uploaded successfully",
       data: {
         url: fileUrl,
-        filename: req.file.filename,
+        filename,
         size: req.file.size,
       },
     });
   } catch (error) {
     console.error("Error uploading resume:", error);
-    res.status(500).json({ error: "Failed to upload resume" });
+    next(error);
   }
 });
 

@@ -5,6 +5,8 @@ import morgan from "morgan";
 import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
+import { createUploadsMiddleware } from "./middleware/serve-uploads";
+import { objectStorageConfigured } from "./lib/object-storage";
 import { caseStudyRoutes } from "./routes/caseStudies";
 import { caseStudyPreviewRouter } from "./routes/caseStudyPreview";
 import { contactRoutes } from "./routes/contact";
@@ -26,10 +28,10 @@ const PORT = process.env.PORT || 3001;
 
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 const absoluteUploadDir = path.resolve(uploadDir);
-if (!fs.existsSync(absoluteUploadDir)) {
+if (!objectStorageConfigured() && !fs.existsSync(absoluteUploadDir)) {
   fs.mkdirSync(absoluteUploadDir, { recursive: true });
 }
-app.use("/uploads", express.static(absoluteUploadDir));
+app.use("/uploads", createUploadsMiddleware(absoluteUploadDir));
 
 // Middleware
 app.use(helmet());
