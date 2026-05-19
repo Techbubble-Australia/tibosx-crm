@@ -31,13 +31,33 @@ function toUploadsPath(u: string): string | null {
   return null;
 }
 
+/** When set at build time, browser loads `/uploads/*` from the public API (avoids Next proxy / disk issues). */
+function absoluteUploadsFromPublicEnv(uploadPath: string): string | null {
+  const base = process.env.NEXT_PUBLIC_API_URL?.trim().replace(/\/$/, "") ?? "";
+  if (!base.startsWith("http://") && !base.startsWith("https://")) {
+    return null;
+  }
+  if (base.startsWith("http:") && process.env.NODE_ENV === "production") {
+    return null;
+  }
+  if (typeof window !== "undefined" && window.location.protocol === "https:" && base.startsWith("http:")) {
+    return null;
+  }
+  return `${base}${uploadPath}`;
+}
+
+function sameOriginUploadsPath(uploadPath: string): string {
+  if (typeof window === "undefined") {
+    return uploadPath;
+  }
+  return `${window.location.origin}${uploadPath}`;
+}
+
 /**
- * URL for `<img src>` in the admin app (browser).
+ * URL for `<img src>` in the admin app.
  *
- * Always uses **same-origin** `/uploads/...` for stored upload paths so:
- * - No mixed-content (https admin → http API),
- * - No dependency on `NEXT_PUBLIC_API_URL` for previews,
- * - `app/uploads/[...path]` proxies to `API_URL` on the server.
+ * For stored `/uploads/...` paths: uses {@link process.env.NEXT_PUBLIC_API_URL} when set at **build** time
+ * (recommended on Docker/Railway); otherwise same-origin `/uploads/...` (proxied by Next to `API_URL`).
  *
  * Absolute `http(s)` URLs that are not under `/uploads/` are returned unchanged.
  */
@@ -48,8 +68,10 @@ export function resolveAdminMediaPreviewUrl(url: string): string {
   }
   if (raw.startsWith("http://") || raw.startsWith("https://")) {
     const asPath = toUploadsPath(raw);
-    if (asPath && typeof window !== "undefined") {
-      return `${window.location.origin}${asPath}`;
+    if (asPath) {
+      const fromEnv = absoluteUploadsFromPublicEnv(asPath);
+      if (fromEnv) return fromEnv;
+      return sameOriginUploadsPath(asPath);
     }
     return raw;
   }
@@ -61,9 +83,7 @@ export function resolveAdminMediaPreviewUrl(url: string): string {
     return path;
   }
 
-  if (typeof window === "undefined") {
-    return path;
-  }
-
-  return `${window.location.origin}${path}`;
+  const fromEnv = absoluteUploadsFromPublicEnv(path);
+  if (fromEnv) return fromEnv;
+  return sameOriginUploadsPath(path);
 }

@@ -47,10 +47,22 @@ export function AdminImageField({
   }
 
   const [uploading, setUploading] = useState(false);
+  const [localObjectUrl, setLocalObjectUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (localObjectUrl) URL.revokeObjectURL(localObjectUrl);
+    };
+  }, [localObjectUrl]);
 
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    const objectUrl = URL.createObjectURL(file);
+    setLocalObjectUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return objectUrl;
+    });
     setUploading(true);
     try {
       const fd = new FormData();
@@ -76,6 +88,10 @@ export function AdminImageField({
     } finally {
       setUploading(false);
       e.target.value = "";
+      setLocalObjectUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
     }
   }
 
@@ -106,15 +122,17 @@ export function AdminImageField({
         />
         {uploading ? <span className="text-xs text-gray-500">Uploading…</span> : null}
       </div>
-      {url ? (
+      {url || localObjectUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- admin preview of arbitrary URLs
         <img
-          key={url}
-          src={resolveAdminMediaPreviewUrl(url)}
+          key={localObjectUrl ?? url}
+          src={localObjectUrl ?? resolveAdminMediaPreviewUrl(url)}
           alt=""
           className="mt-3 h-28 max-w-full rounded-lg border border-gray-200 object-cover"
           onError={() => {
-            console.warn("[AdminImageField] preview failed for", resolveAdminMediaPreviewUrl(url));
+            if (!localObjectUrl) {
+              console.warn("[AdminImageField] preview failed for", resolveAdminMediaPreviewUrl(url));
+            }
           }}
         />
       ) : null}

@@ -50,9 +50,24 @@ function uploadsPublicPath(src: string): string | null {
 }
 
 /**
+ * Resolves a normalized `/uploads/...` path for {@link HTMLImageElement} `src`.
+ * Prefers `NEXT_PUBLIC_API_URL` when set at build time (Docker/Railway); otherwise same-origin.
+ */
+export function resolveUploadsImgSrc(uploadPath: string): string {
+  const base = process.env.NEXT_PUBLIC_API_URL?.trim().replace(/\/$/, "") ?? "";
+  if (base.startsWith("https://") || (base.startsWith("http://") && process.env.NODE_ENV !== "production")) {
+    return `${base}${uploadPath}`;
+  }
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}${uploadPath}`;
+  }
+  return uploadPath;
+}
+
+/**
  * Normalizes image URLs from CMS/API for Next/Image and <img>.
  * - Empty → local placeholder
- * - Any `/uploads/...` (or absolute URL whose path is `/uploads/...`) → same-origin `/uploads/...` (Next proxies to API)
+ * - Any `/uploads/...` (or absolute URL whose path is `/uploads/...`) → `/uploads/...` path (see {@link resolveUploadsImgSrc} for `<img>`)
  * - Other absolute http(s) → unchanged
  * - Other relative paths (e.g. /images/...) → unchanged
  */

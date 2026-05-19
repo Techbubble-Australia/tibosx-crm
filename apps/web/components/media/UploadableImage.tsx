@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- this module intentionally uses <img> for `/uploads/*` to bypass the optimizer */
 import Image from "next/image";
-import { resolveMediaUrl, sameOriginUploadsPath } from "@/lib/media-url";
+import { resolveMediaUrl, resolveUploadsImgSrc, sameOriginUploadsPath } from "@/lib/media-url";
 
 type FillProps = {
   src: string;
@@ -14,7 +14,7 @@ type FillProps = {
 };
 
 /**
- * Renders proxied `/uploads/*` with {@link HTMLImageElement} so Next's image optimizer is not invoked
+ * Renders `/uploads/*` with {@link HTMLImageElement} using {@link resolveUploadsImgSrc} so Next's image optimizer is not invoked
  * (avoids "received null" when the API file is missing or during dev chunk issues).
  */
 export function UploadableImage({ src, alt, fill, className, sizes, priority }: FillProps) {
@@ -22,7 +22,7 @@ export function UploadableImage({ src, alt, fill, className, sizes, priority }: 
   if (uploads) {
     return (
       <img
-        src={uploads}
+        src={resolveUploadsImgSrc(uploads)}
         alt={alt}
         className={["absolute inset-0 h-full w-full", className].filter(Boolean).join(" ")}
         sizes={sizes}

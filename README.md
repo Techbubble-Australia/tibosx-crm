@@ -120,6 +120,7 @@ Set the following environment variables for each service:
 
 **Web & Admin Services:**
 - `API_URL` - URL of your deployed API service (server-side proxy to `/uploads` and `/api`)
+- **`NEXT_PUBLIC_API_URL`** (recommended for production Docker/Railway) - the **public https** API base, identical to what you would open in a browser. Next.js inlines this at **`next build`**, so the browser can load `GET /uploads/...` images directly from the API (avoids broken same-origin proxying and matches object-storage URLs). Set it as a **Docker build argument** (see `Dockerfile.admin` / `Dockerfile.web`: `ARG NEXT_PUBLIC_API_URL`) or ensure the variable is present when the image is built. If unset, uploads fall back to same-origin `/uploads/...` (Next route → `API_URL`).
 
 ### 4. Deploy
 

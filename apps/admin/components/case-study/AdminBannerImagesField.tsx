@@ -14,6 +14,13 @@ type Props = {
 export function AdminBannerImagesField({ formKey, initialUrls }: Props) {
   const [urls, setUrls] = useState<string[]>(() => (initialUrls.length > 0 ? [...initialUrls] : [""]));
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  const [stagedPreview, setStagedPreview] = useState<{ index: number; url: string } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (stagedPreview) URL.revokeObjectURL(stagedPreview.url);
+    };
+  }, [stagedPreview]);
 
   const initialSig = initialUrls.join("\0");
   useEffect(() => {
@@ -42,6 +49,10 @@ export function AdminBannerImagesField({ formKey, initialUrls }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingIndex(index);
+    setStagedPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return { index, url: URL.createObjectURL(file) };
+    });
     try {
       const fd = new FormData();
       fd.append("image", file);
@@ -66,6 +77,10 @@ export function AdminBannerImagesField({ formKey, initialUrls }: Props) {
     } finally {
       setUploadingIndex(null);
       e.target.value = "";
+      setStagedPreview((prev) => {
+        if (prev) URL.revokeObjectURL(prev.url);
+        return null;
+      });
     }
   }
 
@@ -114,15 +129,19 @@ export function AdminBannerImagesField({ formKey, initialUrls }: Props) {
               }
               style={{ aspectRatio: "1136 / 307", maxHeight: "200px" }}
             >
-              {primary ? (
+              {primary || stagedPreview?.index === 0 ? (
                 // eslint-disable-next-line @next/next/no-img-element -- admin preview
                 <img
-                  key={primary}
-                  src={resolveAdminMediaPreviewUrl(primary)}
+                  key={stagedPreview?.index === 0 ? stagedPreview.url : primary}
+                  src={
+                    stagedPreview?.index === 0 ? stagedPreview.url : resolveAdminMediaPreviewUrl(primary)
+                  }
                   alt=""
                   className="h-full w-full object-cover"
                   onError={() => {
-                    console.warn("[AdminBannerImagesField] preview failed for", resolveAdminMediaPreviewUrl(primary));
+                    if (!(stagedPreview?.index === 0)) {
+                      console.warn("[AdminBannerImagesField] preview failed for", resolveAdminMediaPreviewUrl(primary));
+                    }
                   }}
                 />
               ) : (
@@ -223,18 +242,24 @@ export function AdminBannerImagesField({ formKey, initialUrls }: Props) {
                     </div>
                     <div className="p-3">
                       <div className="relative mb-3 aspect-[16/10] overflow-hidden rounded-md bg-neutral-100">
-                        {url ? (
+                        {url || stagedPreview?.index === index ? (
                           // eslint-disable-next-line @next/next/no-img-element -- admin preview
                           <img
-                            key={url}
-                            src={resolveAdminMediaPreviewUrl(url)}
+                            key={stagedPreview?.index === index ? stagedPreview.url : url}
+                            src={
+                              stagedPreview?.index === index
+                                ? stagedPreview.url
+                                : resolveAdminMediaPreviewUrl(url)
+                            }
                             alt=""
                             className="h-full w-full object-cover"
                             onError={() => {
-                              console.warn(
-                                "[AdminBannerImagesField] thumbnail preview failed for",
-                                resolveAdminMediaPreviewUrl(url),
-                              );
+                              if (!(stagedPreview?.index === index)) {
+                                console.warn(
+                                  "[AdminBannerImagesField] thumbnail preview failed for",
+                                  resolveAdminMediaPreviewUrl(url),
+                                );
+                              }
                             }}
                           />
                         ) : (
