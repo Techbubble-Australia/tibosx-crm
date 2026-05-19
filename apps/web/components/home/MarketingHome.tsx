@@ -1462,10 +1462,13 @@ function JourneySection({ journey }: { journey: MarketingHomePayload["journey"] 
 
               {/* Feature grid */}
               <div className="mt-10 grid grid-cols-2 gap-x-8 gap-y-8">
-                {step.features.map((feat) => (
+                {step.features.map((feat, fi) => (
                   <div key={feat.title} className="flex items-start gap-3">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-[#e5e5e5] bg-white">
-                      <Check className="h-[18px] w-[18px] text-[#111111]" strokeWidth={1.6} aria-hidden />
+                    <span
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-[#e5e5e5] bg-[#f7f7f7] text-[14px] font-semibold leading-5 text-[#111111]"
+                      aria-hidden
+                    >
+                      {fi + 1}
                     </span>
                     <div>
                       <p className="text-[28px] font-medium leading-9 tracking-[-0.0025em] text-[#111111]">

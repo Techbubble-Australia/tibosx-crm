@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { UploadableImage } from "@/components/media/UploadableImage";
 import { SectionPill } from "@/components/ui/SectionPill";
 
 export type ClientStoryItem = {
@@ -21,7 +20,12 @@ type Props = {
 export function ClientStoriesSection({ items }: Props) {
   const list = items && items.length > 0 ? items : [];
   const [index, setIndex] = useState(0);
+  const [avatarBroken, setAvatarBroken] = useState(false);
   const t = list[index];
+
+  useEffect(() => {
+    setAvatarBroken(false);
+  }, [index, t?.authorImageUrl]);
 
   const go = useCallback(
     (delta: number) => {
@@ -45,6 +49,9 @@ export function ClientStoriesSection({ items }: Props) {
     );
   }
 
+  const avatarSrc = t.authorImageUrl?.trim();
+  const showPhoto = Boolean(avatarSrc) && !avatarBroken;
+
   return (
     <section className="bg-white py-[60px]">
       <div className="tb-container">
@@ -65,9 +72,16 @@ export function ClientStoriesSection({ items }: Props) {
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              {t.authorImageUrl ? (
+              {showPhoto ? (
                 <div className="relative h-[62px] w-[62px] shrink-0 overflow-hidden rounded-full bg-[#e5e5e5]">
-                  <UploadableImage src={t.authorImageUrl} alt="" fill className="object-cover" sizes="62px" />
+                  <img
+                    src={avatarSrc}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                    onError={() => setAvatarBroken(true)}
+                  />
                 </div>
               ) : (
                 <div className="flex h-[62px] w-[62px] shrink-0 items-center justify-center rounded-full bg-[#e5e5e5] text-sm font-semibold text-[#111111]">
