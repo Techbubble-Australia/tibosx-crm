@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import { UploadableImage } from "@/components/media/UploadableImage";
 import { ArrowLeft, ArrowRight, Zap, Workflow, Share2, FileStack, Braces, Handshake } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getCaseStudyBySlug } from "@/lib/api/public";
@@ -101,7 +101,7 @@ export default async function CaseStudyPage({
                 </div>
                 {caseStudy.contentImage ? (
                   <div className="mt-8 aspect-video relative rounded-xl overflow-hidden ring-1 ring-black/5">
-                    <Image
+                    <UploadableImage
                       src={caseStudy.contentImage}
                       alt={caseStudy.background.title}
                       fill

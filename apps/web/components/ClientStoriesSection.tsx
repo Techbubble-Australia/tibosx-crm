@@ -1,8 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { UploadableImage } from "@/components/media/UploadableImage";
 import { SectionPill } from "@/components/ui/SectionPill";
 
 export type ClientStoryItem = {
@@ -67,7 +67,7 @@ export function ClientStoriesSection({ items }: Props) {
             <div className="flex items-center gap-4">
               {t.authorImageUrl ? (
                 <div className="relative h-[62px] w-[62px] shrink-0 overflow-hidden rounded-full bg-[#e5e5e5]">
-                  <Image src={t.authorImageUrl} alt="" fill className="object-cover" sizes="62px" />
+                  <UploadableImage src={t.authorImageUrl} alt="" fill className="object-cover" sizes="62px" />
                 </div>
               ) : (
                 <div className="flex h-[62px] w-[62px] shrink-0 items-center justify-center rounded-full bg-[#e5e5e5] text-sm font-semibold text-[#111111]">

@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { UploadableImage } from "@/components/media/UploadableImage";
 import { ArrowRight, Zap, Workflow, Share2, FileStack, Braces, Handshake, type LucideIcon } from "lucide-react";
 import { ClientStoriesSection } from "@/components/ClientStoriesSection";
 import { SectionPill } from "@/components/ui/SectionPill";
@@ -138,7 +138,7 @@ export default async function CaseStudiesPage() {
                       </div>
 
                         <div className="relative mt-[14px] h-[150px] overflow-hidden rounded-[8px]">
-                        <Image
+                        <UploadableImage
                           src={featuredStudy.image}
                           alt=""
                           fill

@@ -17,6 +17,7 @@ import type { ServicesPagePayload } from "@/components/site-content/ServicesPage
 import type { PricingPagePayload } from "@/components/site-content/PricingPageForm";
 import type { SiteFooterPayload } from "@/components/site-content/SiteFooterForm";
 import type { MarketingHomePayload } from "@site-content/marketing-home";
+import { compactNestedStringArrays } from "@/lib/multiline-list";
 
 function clone<T>(x: T): T {
   return JSON.parse(JSON.stringify(x)) as T;
@@ -75,21 +76,27 @@ export function serializeSiteContentForPersist(key: string, payload: unknown): u
       offices: offices.length > 0 ? offices : siteFooterPayload.offices,
     };
   }
-  if (key !== "marketing_home" || !payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return payload;
+
+  let out: unknown = payload;
+
+  if (key === "marketing_home" && out && typeof out === "object" && !Array.isArray(out)) {
+    const p = out as Record<string, unknown>;
+    const hero = p.hero;
+    if (hero && typeof hero === "object" && !Array.isArray(hero)) {
+      const h = hero as Record<string, unknown>;
+      const tc = h.trustChips;
+      if (typeof tc === "string") {
+        const trustChips = tc.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+        out = { ...p, hero: { ...h, trustChips } };
+      }
+    }
   }
-  const p = payload as Record<string, unknown>;
-  const hero = p.hero;
-  if (!hero || typeof hero !== "object" || Array.isArray(hero)) {
-    return payload;
+
+  if (isVisualSiteContentKey(key) && out && typeof out === "object" && !Array.isArray(out)) {
+    out = compactNestedStringArrays(out as Record<string, unknown>);
   }
-  const h = hero as Record<string, unknown>;
-  const tc = h.trustChips;
-  if (typeof tc === "string") {
-    const trustChips = tc.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-    return { ...p, hero: { ...h, trustChips } };
-  }
-  return payload;
+
+  return out;
 }
 
 function mergeLegalPages(raw: unknown): typeof legalPagesPayload {

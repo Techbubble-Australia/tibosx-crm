@@ -1,5 +1,9 @@
 import { prisma } from "../client";
 
+/** When true, FAQ home/pricing rows are wiped and re-created; job listings get a full overwrite from seed defs. Default is false so `db:seed` does not erase admin/CMS edits. */
+const forceDemoRelations =
+  process.env.FORCE_DEMO_SEED === "1" || process.env.FORCE_DEMO_SEED === "true";
+
 const jobDefs = [
   {
     slug: "senior-servicenow-developer",
@@ -152,29 +156,40 @@ export async function seedJobsFaqsTestimonialsTeam() {
     await prisma.jobListing.upsert({
       where: { slug: j.slug },
       create: { ...j, description: "", published: true },
-      update: { ...j, description: "", published: true },
+      update: forceDemoRelations
+        ? { ...j, description: "", published: true }
+        : { order: j.order, published: true },
     });
   }
 
-  await prisma.faqItem.deleteMany({ where: { category: { in: ["home", "pricing"] } } });
-  await prisma.faqItem.createMany({
-    data: [
-      ...faqRows.map((r) => ({
-        question: r.question,
-        answer: r.answer,
-        category: r.category,
-        order: r.order,
-        published: true,
-      })),
-      ...faqRows.map((r, i) => ({
-        question: r.question,
-        answer: r.answer,
-        category: "pricing",
-        order: i,
-        published: true,
-      })),
-    ],
-  });
+  const faqSeedData = [
+    ...faqRows.map((r) => ({
+      question: r.question,
+      answer: r.answer,
+      category: r.category,
+      order: r.order,
+      published: true,
+    })),
+    ...faqRows.map((r, i) => ({
+      question: r.question,
+      answer: r.answer,
+      category: "pricing",
+      order: i,
+      published: true,
+    })),
+  ];
+
+  if (forceDemoRelations) {
+    await prisma.faqItem.deleteMany({ where: { category: { in: ["home", "pricing"] } } });
+    await prisma.faqItem.createMany({ data: faqSeedData });
+  } else {
+    const existingFaq = await prisma.faqItem.count({
+      where: { category: { in: ["home", "pricing"] } },
+    });
+    if (existingFaq === 0) {
+      await prisma.faqItem.createMany({ data: faqSeedData });
+    }
+  }
 
   const testimonials = [
     {

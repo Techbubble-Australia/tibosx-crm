@@ -22,5 +22,20 @@ export function AboutPersonImage({ imageUrl, imageKey, alt, width, height, class
       />
     );
   }
+  // String URLs (uploads API, absolute URLs, /images/*) must use <img>: Next/Image remotePatterns
+  // do not reliably allow arbitrary API hosts; bundled assets stay on next/image.
+  if (typeof src === "string") {
+    return (
+      <img
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        className={className}
+        loading="lazy"
+        decoding="async"
+      />
+    );
+  }
   return <Image src={src} alt={alt} width={width} height={height} className={className} />;
 }

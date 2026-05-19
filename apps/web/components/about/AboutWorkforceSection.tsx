@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useMemo, useState } from "react";
 import type { TeamMemberPublicRow } from "@/lib/api/public";
 import { resolveOptionalMediaUrl } from "@/lib/media-url";
@@ -126,12 +125,14 @@ export function AboutWorkforceApiSection({ cms, bioFallbackByName, apiMembers }:
                   <div key={person.id} className="text-center">
                     <div className="mx-auto h-[145px] w-[145px] overflow-hidden rounded-[14px] border border-[#f7f7f7] bg-neutral-200">
                       {avatarSrc ? (
-                        <Image
+                        <img
                           src={avatarSrc}
                           alt={person.name}
                           width={145}
                           height={145}
                           className="h-full w-full object-cover"
+                          loading="lazy"
+                          decoding="async"
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-[32px] font-semibold text-[#666666]">

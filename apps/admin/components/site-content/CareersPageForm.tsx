@@ -1,5 +1,6 @@
 "use client";
 
+import { multilineToLines } from "@/lib/multiline-list";
 import { inputClass, labelClass, sectionClass } from "./form-styles";
 
 type StatNumber = { kind: "number"; value: string; label: string };
@@ -154,7 +155,7 @@ export function CareersPageForm({
           onChange={(e) =>
             onChange({
               ...value,
-              benefits: e.target.value.split("\n").map((l) => l.trim()).filter(Boolean),
+              benefits: multilineToLines(e.target.value),
             })
           }
         />

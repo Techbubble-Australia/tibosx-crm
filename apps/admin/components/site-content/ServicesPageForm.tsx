@@ -1,5 +1,6 @@
 "use client";
 
+import { multilineToLines } from "@/lib/multiline-list";
 import { inputClass, labelClass, sectionClass } from "./form-styles";
 
 type Highlight = { title: string; description: string; icon: string };
@@ -46,10 +47,6 @@ export type ServicesPagePayload = {
     checklist: string[];
   };
 };
-
-function lines(s: string): string[] {
-  return s.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-}
 
 function tagsFromCsv(s: string): string[] {
   return s.split(",").map((t) => t.trim()).filter(Boolean);
@@ -160,7 +157,7 @@ export function ServicesPageForm({
               className={inputClass}
               rows={5}
               value={value.projectServices.bullets.join("\n")}
-              onChange={(e) => setPs({ bullets: lines(e.target.value) })}
+              onChange={(e) => setPs({ bullets: multilineToLines(e.target.value) })}
             />
           </div>
           <div>
@@ -190,7 +187,7 @@ export function ServicesPageForm({
           <input className={inputClass} value={value.productDevelopment.title} onChange={(e) => setPd({ title: e.target.value })} />
           <textarea className={inputClass} rows={4} value={value.productDevelopment.intro} onChange={(e) => setPd({ intro: e.target.value })} />
           <label className={labelClass}>Bullets (one per line)</label>
-          <textarea className={inputClass} rows={5} value={value.productDevelopment.bullets.join("\n")} onChange={(e) => setPd({ bullets: lines(e.target.value) })} />
+          <textarea className={inputClass} rows={5} value={value.productDevelopment.bullets.join("\n")} onChange={(e) => setPd({ bullets: multilineToLines(e.target.value) })} />
           <p className="text-sm font-medium text-gray-700">Metrics bar (4)</p>
           {value.productDevelopment.metricsBar.map((m, i) => (
             <div key={i} className="grid gap-2 sm:grid-cols-2">
@@ -214,7 +211,7 @@ export function ServicesPageForm({
           <input className={inputClass} value={value.staffingServices.title} onChange={(e) => setSs({ title: e.target.value })} />
           <textarea className={inputClass} rows={4} value={value.staffingServices.body} onChange={(e) => setSs({ body: e.target.value })} />
           <label className={labelClass}>Bullets (one per line)</label>
-          <textarea className={inputClass} rows={5} value={value.staffingServices.bullets.join("\n")} onChange={(e) => setSs({ bullets: lines(e.target.value) })} />
+          <textarea className={inputClass} rows={5} value={value.staffingServices.bullets.join("\n")} onChange={(e) => setSs({ bullets: multilineToLines(e.target.value) })} />
           <label className={labelClass}>Tags (comma-separated)</label>
           <input className={inputClass} value={value.staffingServices.tags.join(", ")} onChange={(e) => setSs({ tags: tagsFromCsv(e.target.value) })} />
           <input className={inputClass} placeholder="Metrics card title" value={value.staffingServices.metricsTitle} onChange={(e) => setSs({ metricsTitle: e.target.value })} />
@@ -267,7 +264,7 @@ export function ServicesPageForm({
               className={inputClass}
               rows={4}
               value={value.cta.checklist.join("\n")}
-              onChange={(e) => setCta({ checklist: lines(e.target.value) })}
+              onChange={(e) => setCta({ checklist: multilineToLines(e.target.value) })}
             />
           </div>
         </div>

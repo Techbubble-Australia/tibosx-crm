@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import { UploadableImage } from "@/components/media/UploadableImage";
 
 type Props = {
   images: string[];
@@ -29,7 +29,7 @@ export function CaseStudyBannerGallery({ images, title }: Props) {
   return (
     <div>
       <div className="relative h-[307px] overflow-hidden rounded-[8px] ring-1 ring-black/5">
-        <Image
+        <UploadableImage
           key={main}
           src={main}
           alt=""
@@ -59,7 +59,7 @@ export function CaseStudyBannerGallery({ images, title }: Props) {
                   : "border-transparent opacity-80 hover:opacity-100"
               }`}
             >
-              <Image src={src} alt="" fill className="object-cover" sizes="120px" />
+              <UploadableImage src={src} alt="" fill className="object-cover" sizes="120px" />
             </button>
           ))}
         </div>

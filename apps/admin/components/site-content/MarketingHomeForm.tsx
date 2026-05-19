@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { multilineToLines } from "@/lib/multiline-list";
 import { inputClass, labelClass, sectionClass } from "./form-styles";
 
 /** Mutable homepage payload for forms (seed types use `as const` literal unions). */
@@ -368,10 +369,7 @@ function TabEngagementHow({
                   value={Array.isArray(m.bullets) ? m.bullets.join("\n") : typeof m.bullets === "string" ? m.bullets : ""}
                   onChange={(e) =>
                     setModel(i, {
-                      bullets: e.target.value
-                        .split(/\r?\n/)
-                        .map((line: string) => line.trim())
-                        .filter(Boolean),
+                      bullets: multilineToLines(e.target.value),
                     })
                   }
                 />
@@ -384,10 +382,7 @@ function TabEngagementHow({
                   value={Array.isArray(m.tags) ? m.tags.join("\n") : typeof m.tags === "string" ? m.tags : ""}
                   onChange={(e) =>
                     setModel(i, {
-                      tags: e.target.value
-                        .split(/\r?\n/)
-                        .map((line: string) => line.trim())
-                        .filter(Boolean),
+                      tags: multilineToLines(e.target.value),
                     })
                   }
                 />
@@ -495,10 +490,7 @@ function TabPlatforms({
               value={Array.isArray(plat.tags) ? plat.tags.join("\n") : (typeof plat.tags === 'string' ? plat.tags : "")}
               onChange={(e) =>
                 setPlat(pi, {
-                  tags: e.target.value
-                    .split(/\r?\n/)
-                    .map((line) => line.trim())
-                    .filter(Boolean),
+                  tags: multilineToLines(e.target.value),
                 })
               }
             />
@@ -634,7 +626,7 @@ function TabFaqCtas({
           className={inputClass}
           rows={3}
           value={Array.isArray(v.scheduleDemo.bullets) ? v.scheduleDemo.bullets.join("\n") : (typeof v.scheduleDemo.bullets === 'string' ? v.scheduleDemo.bullets : "")}
-          onChange={(e) => setSched({ bullets: e.target.value.split("\n") })}
+          onChange={(e) => setSched({ bullets: multilineToLines(e.target.value) })}
         />
       </section>
 
@@ -647,7 +639,7 @@ function TabFaqCtas({
           className={inputClass}
           rows={3}
           value={Array.isArray(v.careersCta.bullets) ? v.careersCta.bullets.join("\n") : (typeof v.careersCta.bullets === 'string' ? v.careersCta.bullets : "")}
-          onChange={(e) => setCareersCta({ bullets: e.target.value.split("\n") })}
+          onChange={(e) => setCareersCta({ bullets: multilineToLines(e.target.value) })}
         />
       </section>
 

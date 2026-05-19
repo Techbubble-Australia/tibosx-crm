@@ -31,7 +31,7 @@ export const ABOUT_BUNDLED_IMAGE_KEYS = Object.keys(ABOUT_IMAGE_MAP);
 
 /**
  * Prefer `imageUrl` (uploaded or absolute URL). Otherwise resolve `imageKey` against bundled assets.
- * Upload paths (`/uploads/...`) are rewritten to the public API origin so Next/Image can load them.
+ * Upload paths (`/uploads/...`) stay same-origin; Next proxies them to the API.
  */
 export function resolveAboutBundledImage(
   imageUrl?: string | null,

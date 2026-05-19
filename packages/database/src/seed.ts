@@ -112,7 +112,10 @@ async function main() {
   await seedJobsFaqsTestimonialsTeam();
   await seedSiteContent();
 
-  console.log("✅ Seed completed (case studies, jobs, FAQs, testimonials, team, site content)");
+  console.log(
+    "✅ Seed completed (case studies, jobs, FAQs, testimonials, team, site content). " +
+      "Demo FAQ wipe + full job overwrite only when FORCE_DEMO_SEED=1. Site JSON reset only when FORCE_SITE_CONTENT=1.",
+  );
 }
 
 main()

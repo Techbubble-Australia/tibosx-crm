@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ClientStoriesSection } from "@/components/ClientStoriesSection";
+import { UploadableImage } from "@/components/media/UploadableImage";
 import { TechnologyExpertiseSection } from "@/components/TechnologyExpertiseSection";
 import { SectionPill } from "@/components/ui/SectionPill";
 import { CountryFlag } from "@/components/ui/CountryFlag";
@@ -925,7 +926,7 @@ export function MarketingHome({
                           </span>
                         </div>
                         <div className="relative mt-4 aspect-[1136/307] w-full max-h-[240px] overflow-hidden rounded-xl bg-[#e5e5e5] md:max-h-[280px]">
-                          <Image
+                          <UploadableImage
                             src={caseStudyFeatured.image}
                             alt={caseStudyFeatured.title}
                             fill

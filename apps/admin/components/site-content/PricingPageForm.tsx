@@ -1,5 +1,6 @@
 "use client";
 
+import { multilineToLines } from "@/lib/multiline-list";
 import { inputClass, labelClass, sectionClass } from "./form-styles";
 
 type ValueStripItem = { text: string; width: string };
@@ -47,10 +48,6 @@ export type PricingPagePayload = {
     secondaryHref: string;
   };
 };
-
-function linesToArr(s: string): string[] {
-  return s.split("\n").map((l) => l.trim()).filter(Boolean);
-}
 
 export function PricingPageForm({
   value,
@@ -144,7 +141,7 @@ export function PricingPageForm({
                   className={inputClass}
                   rows={6}
                   value={m.features.join("\n")}
-                  onChange={(e) => setModel(i, { features: linesToArr(e.target.value) })}
+                  onChange={(e) => setModel(i, { features: multilineToLines(e.target.value) })}
                 />
               </div>
             </div>
@@ -176,7 +173,7 @@ export function PricingPageForm({
               className={inputClass}
               rows={4}
               value={value.rateCardSection.bullets.join("\n")}
-              onChange={(e) => setRate({ bullets: linesToArr(e.target.value) })}
+              onChange={(e) => setRate({ bullets: multilineToLines(e.target.value) })}
             />
           </div>
           <div>
@@ -185,7 +182,7 @@ export function PricingPageForm({
               className={inputClass}
               rows={3}
               value={value.rateCardSection.footerChips.join("\n")}
-              onChange={(e) => setRate({ footerChips: linesToArr(e.target.value) })}
+              onChange={(e) => setRate({ footerChips: multilineToLines(e.target.value) })}
             />
           </div>
           <input className={inputClass} placeholder="Form title" value={value.rateCardSection.formTitle} onChange={(e) => setRate({ formTitle: e.target.value })} />
@@ -204,7 +201,7 @@ export function PricingPageForm({
               className={inputClass}
               rows={3}
               value={value.faqSection.titleLines.join("\n")}
-              onChange={(e) => setFaqSec({ titleLines: linesToArr(e.target.value) })}
+              onChange={(e) => setFaqSec({ titleLines: multilineToLines(e.target.value) })}
             />
           </div>
           <textarea className={inputClass} rows={2} value={value.faqSection.asideBlurb} onChange={(e) => setFaqSec({ asideBlurb: e.target.value })} />
