@@ -32,11 +32,14 @@ function toUploadsPath(u: string): string | null {
 }
 
 /**
- * Best-effort URL for `<img src>` in the admin app (client-side).
+ * URL for `<img src>` in the admin app (browser).
  *
- * - Avoids **mixed content**: if the page is `https:` and `NEXT_PUBLIC_API_URL` is `http:`, we use
- *   same-origin `/uploads/...` so the Next proxy (server-side fetch to `API_URL`) serves bytes over HTTPS.
- * - When protocols match, we can load directly from the public API origin (one less hop).
+ * Always uses **same-origin** `/uploads/...` for stored upload paths so:
+ * - No mixed-content (https admin → http API),
+ * - No dependency on `NEXT_PUBLIC_API_URL` for previews,
+ * - `app/uploads/[...path]` proxies to `API_URL` on the server.
+ *
+ * Absolute `http(s)` URLs that are not under `/uploads/` are returned unchanged.
  */
 export function resolveAdminMediaPreviewUrl(url: string): string {
   const raw = normalizeMediaInput(url ?? "");
@@ -46,15 +49,7 @@ export function resolveAdminMediaPreviewUrl(url: string): string {
   if (raw.startsWith("http://") || raw.startsWith("https://")) {
     const asPath = toUploadsPath(raw);
     if (asPath && typeof window !== "undefined") {
-      const pageProto = window.location.protocol;
-      try {
-        const assetProto = new URL(raw).protocol;
-        if (assetProto !== pageProto) {
-          return `${window.location.origin}${asPath}`;
-        }
-      } catch {
-        /* fall through */
-      }
+      return `${window.location.origin}${asPath}`;
     }
     return raw;
   }
@@ -68,19 +63,6 @@ export function resolveAdminMediaPreviewUrl(url: string): string {
 
   if (typeof window === "undefined") {
     return path;
-  }
-
-  const pageProto = window.location.protocol;
-  const pub = (process.env.NEXT_PUBLIC_API_URL || "").trim().replace(/\/$/, "");
-  if (pub) {
-    try {
-      const apiProto = new URL(pub).protocol;
-      if (apiProto === pageProto) {
-        return `${pub}${path}`;
-      }
-    } catch {
-      /* ignore invalid NEXT_PUBLIC_API_URL */
-    }
   }
 
   return `${window.location.origin}${path}`;

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ImagePlus, Info, Loader2, Plus, Trash2, Upload } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { resolveAdminMediaPreviewUrl } from "@/lib/public-media-url";
+import { readUploadImageUrlFromJson } from "@/lib/upload-response";
 
 type Props = {
   formKey: string;
@@ -13,6 +14,11 @@ type Props = {
 export function AdminBannerImagesField({ formKey, initialUrls }: Props) {
   const [urls, setUrls] = useState<string[]>(() => (initialUrls.length > 0 ? [...initialUrls] : [""]));
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+
+  const initialSig = initialUrls.join("\0");
+  useEffect(() => {
+    setUrls(initialUrls.length > 0 ? [...initialUrls] : [""]);
+  }, [formKey, initialSig]);
 
   const primary = urls[0] ?? "";
   const thumbnails = urls.slice(1);
@@ -43,12 +49,16 @@ export function AdminBannerImagesField({ formKey, initialUrls }: Props) {
         method: "POST",
         body: fd,
       });
-      const json = (await res.json().catch(() => ({}))) as { error?: string; data?: { url?: string }; url?: string };
+      const json = await res.json().catch(() => null);
       if (!res.ok) {
-        alert(json.error || "Upload failed");
+        const err =
+          json && typeof json === "object" && "error" in json
+            ? String((json as { error?: unknown }).error)
+            : "";
+        alert(err || "Upload failed");
         return;
       }
-      const next = json.data?.url ?? json.url;
+      const next = readUploadImageUrlFromJson(json);
       if (next) setAt(index, next);
     } catch (err) {
       console.error(err);
@@ -106,7 +116,15 @@ export function AdminBannerImagesField({ formKey, initialUrls }: Props) {
             >
               {primary ? (
                 // eslint-disable-next-line @next/next/no-img-element -- admin preview
-                <img src={resolveAdminMediaPreviewUrl(primary)} alt="" className="h-full w-full object-cover" />
+                <img
+                  key={primary}
+                  src={resolveAdminMediaPreviewUrl(primary)}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  onError={() => {
+                    console.warn("[AdminBannerImagesField] preview failed for", resolveAdminMediaPreviewUrl(primary));
+                  }}
+                />
               ) : (
                 <div className="flex h-full min-h-[120px] flex-col items-center justify-center gap-2 px-4 text-center text-neutral-500">
                   <LayoutPlaceholder />
@@ -116,14 +134,15 @@ export function AdminBannerImagesField({ formKey, initialUrls }: Props) {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 overflow-x-auto">
                 <label className="mb-1.5 block text-xs font-medium text-neutral-700">Image URL</label>
                 <input
                   type="text"
                   value={primary}
                   onChange={(e) => setAt(0, e.target.value)}
-                  className={inputClass}
+                  className={`${inputClass} min-w-[min(100%,24rem)] font-mono text-xs`}
                   placeholder="https://… or /uploads/…"
+                  spellCheck={false}
                   aria-label="Primary banner image URL"
                 />
               </div>
@@ -206,21 +225,35 @@ export function AdminBannerImagesField({ formKey, initialUrls }: Props) {
                       <div className="relative mb-3 aspect-[16/10] overflow-hidden rounded-md bg-neutral-100">
                         {url ? (
                           // eslint-disable-next-line @next/next/no-img-element -- admin preview
-                          <img src={resolveAdminMediaPreviewUrl(url)} alt="" className="h-full w-full object-cover" />
+                          <img
+                            key={url}
+                            src={resolveAdminMediaPreviewUrl(url)}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            onError={() => {
+                              console.warn(
+                                "[AdminBannerImagesField] thumbnail preview failed for",
+                                resolveAdminMediaPreviewUrl(url),
+                              );
+                            }}
+                          />
                         ) : (
                           <div className="flex h-full items-center justify-center text-[10px] text-neutral-400">
                             No image
                           </div>
                         )}
                       </div>
-                      <input
-                        type="text"
-                        value={url}
-                        onChange={(e) => setAt(index, e.target.value)}
-                        className={inputClass}
-                        placeholder="Image URL or /uploads/…"
-                        aria-label={`Thumbnail ${tIdx + 1} URL`}
-                      />
+                      <div className="overflow-x-auto">
+                        <input
+                          type="text"
+                          value={url}
+                          onChange={(e) => setAt(index, e.target.value)}
+                          className={`${inputClass} min-w-[min(100%,18rem)] font-mono text-xs`}
+                          placeholder="Image URL or /uploads/…"
+                          spellCheck={false}
+                          aria-label={`Thumbnail ${tIdx + 1} URL`}
+                        />
+                      </div>
                       <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-neutral-200 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50">
                         {uploadingIndex === index ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />

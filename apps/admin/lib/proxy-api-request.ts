@@ -96,6 +96,7 @@ export async function proxyUploadsRequest(req: NextRequest, pathSegments: string
     res.headers.forEach((value, key) => {
       const low = key.toLowerCase();
       if (low === "transfer-encoding") return;
+      if (low === "cross-origin-resource-policy") return;
       out.headers.set(key, value);
     });
     return out;

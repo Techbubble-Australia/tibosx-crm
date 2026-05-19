@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { adminFetch } from "@/lib/admin-api";
 import { resolveAdminMediaPreviewUrl } from "@/lib/public-media-url";
+import { readUploadImageUrlFromJson } from "@/lib/upload-response";
 
 type Props = {
   name: string;
@@ -58,16 +59,16 @@ export function AdminImageField({
         method: "POST",
         body: fd,
       });
-      const json = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        data?: { url?: string };
-        url?: string;
-      };
+      const json = await res.json().catch(() => null);
       if (!res.ok) {
-        alert(json.error || "Upload failed");
+        const err =
+          json && typeof json === "object" && "error" in json
+            ? String((json as { error?: unknown }).error)
+            : "";
+        alert(err || "Upload failed");
         return;
       }
-      const next = json.data?.url ?? json.url;
+      const next = readUploadImageUrlFromJson(json);
       if (next) setUrl(next);
     } catch (err) {
       console.error(err);
@@ -108,9 +109,13 @@ export function AdminImageField({
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element -- admin preview of arbitrary URLs
         <img
+          key={url}
           src={resolveAdminMediaPreviewUrl(url)}
           alt=""
           className="mt-3 h-28 max-w-full rounded-lg border border-gray-200 object-cover"
+          onError={() => {
+            console.warn("[AdminImageField] preview failed for", resolveAdminMediaPreviewUrl(url));
+          }}
         />
       ) : null}
     </div>
