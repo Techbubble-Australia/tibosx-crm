@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { AdminImageField } from "@/components/AdminImageField";
+import { TeamDepartmentSelect } from "@/components/team/TeamDepartmentSelect";
 import { adminFetch } from "@/lib/admin-api";
 
 export default function NewTeamMemberPage() {
@@ -81,19 +82,11 @@ export default function NewTeamMemberPage() {
 
           <div>
             <label className="block text-sm font-medium mb-1">Department *</label>
-            <select name="department" required
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm bg-white">
-              <option value="Leadership">Leadership</option>
-              <option value="Management Team">Management Team</option>
-              <option value="Sales Team">Sales Team</option>
-              <option value="Recruitment Team">Recruitment Team</option>
-              <option value="ServiceNow Developers">ServiceNow Developers</option>
-              <option value="Salesforce Developers">Salesforce Developers</option>
-              <option value="MuleSoft Developers">MuleSoft Developers</option>
-              <option value="Workday Team">Workday Team</option>
-              <option value="Product Team">Product Team</option>
-              <option value="Other Techstack Developers">Other Techstack Developers</option>
-            </select>
+            <TeamDepartmentSelect />
+            <p className="mt-1 text-xs text-gray-500 dark:text-zinc-400">
+              Options come from Site content → About page → Workforce → Department tabs (plus any department already used on a
+              team member). Add a tab there to add a department here.
+            </p>
           </div>
 
           <AdminImageField
