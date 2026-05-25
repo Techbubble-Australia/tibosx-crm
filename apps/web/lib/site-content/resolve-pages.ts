@@ -9,6 +9,7 @@ import {
   siteFooterPayload,
   SITE_FOOTER_FLAG_CODES,
 } from "@site-content/defaults";
+import { normalizeWorkforceCmsTabs } from "@/lib/about/workforce-tabs";
 import { deepMerge } from "@/lib/deep-merge";
 
 export type ServicesPagePayload = typeof servicesPagePayload;
@@ -106,6 +107,11 @@ export function resolveAboutPage(raw: unknown): AboutPagePayload {
   if (!raw || typeof raw !== "object") return aboutPagePayload;
   const r = raw as Partial<AboutPagePayload>;
   const base = aboutPagePayload;
+  const rawWorkforce = r.workforce;
+  const resolvedTabs =
+    rawWorkforce && typeof rawWorkforce === "object" && !Array.isArray(rawWorkforce) && "tabs" in rawWorkforce
+      ? normalizeWorkforceCmsTabs((rawWorkforce as { tabs?: unknown }).tabs)
+      : base.workforce.tabs;
   return {
     ...base,
     ...r,
@@ -123,7 +129,7 @@ export function resolveAboutPage(raw: unknown): AboutPagePayload {
       ...r.workforce,
       defaultMemberBio: r.workforce?.defaultMemberBio ?? base.workforce.defaultMemberBio,
       stats: r.workforce?.stats ?? base.workforce.stats,
-      tabs: r.workforce?.tabs ?? base.workforce.tabs,
+      tabs: resolvedTabs,
       management: {
         ...base.workforce.management,
         ...r.workforce?.management,

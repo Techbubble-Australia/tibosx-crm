@@ -6,7 +6,7 @@ import { AboutAnimatedWorkforceStats } from "@/components/about/AboutAnimatedWor
 import { AboutPersonImage } from "@/components/about/AboutPersonImage";
 import { SectionPill } from "@/components/ui/SectionPill";
 import { UploadableImage } from "@/components/media/UploadableImage";
-import { orderedDepartmentsForAboutWorkforce, type WorkforceTabCms } from "@/lib/about/workforce-tabs";
+import { orderedWorkforceDeptPills, type WorkforceTabCms } from "@/lib/about/workforce-tabs";
 
 export type AboutWorkforceCms = {
   pill: string;
@@ -43,7 +43,19 @@ function memberBioText(
   return defaultMemberBio.trim();
 }
 
-/** When the API returns published team members: department pills (only non-empty depts), tab panel, bios from API with CMS fallbacks. */
+function lookupMembersByDeptCi(
+  byDept: Map<string, TeamMemberPublicRow[]>,
+  dept: string,
+): TeamMemberPublicRow[] {
+  if (byDept.has(dept)) return byDept.get(dept) ?? [];
+  const lc = dept.trim().toLowerCase();
+  for (const [k, v] of byDept) {
+    if (k.trim().toLowerCase() === lc) return v;
+  }
+  return [];
+}
+
+/** Pills are only published API departments; labels follow CMS when the tab maps to that department. */
 export function AboutWorkforceApiSection({ cms, bioFallbackByName, apiMembers }: Props) {
   const byDept = useMemo(() => {
     const m = new Map<string, TeamMemberPublicRow[]>();
@@ -59,19 +71,20 @@ export function AboutWorkforceApiSection({ cms, bioFallbackByName, apiMembers }:
   }, [apiMembers]);
 
   const depts = useMemo(() => [...byDept.keys()].sort((a, b) => a.localeCompare(b)), [byDept]);
-  const orderedDepts = useMemo(
-    () => orderedDepartmentsForAboutWorkforce(cms.tabs, depts),
-    [cms.tabs, depts],
+  const orderedPills = useMemo(() => orderedWorkforceDeptPills(cms.tabs, depts), [cms.tabs, depts]);
+  const [activeMemberDeptKey, setActiveMemberDeptKey] = useState("");
+  const activePill = useMemo(
+    () => orderedPills.find((p) => p.memberDeptKey === activeMemberDeptKey) ?? orderedPills[0],
+    [orderedPills, activeMemberDeptKey],
   );
-  const [activeDept, setActiveDept] = useState(orderedDepts[0] ?? "");
-  const activeMembers = activeDept ? (byDept.get(activeDept) ?? []) : [];
+  const activeMembers = lookupMembersByDeptCi(byDept, activePill?.memberDeptKey ?? "");
 
   useEffect(() => {
-    if (orderedDepts.length === 0) return;
-    if (!orderedDepts.includes(activeDept)) {
-      setActiveDept(orderedDepts[0] ?? "");
+    if (orderedPills.length === 0) return;
+    if (!orderedPills.some((p) => p.memberDeptKey === activeMemberDeptKey)) {
+      setActiveMemberDeptKey(orderedPills[0]!.memberDeptKey);
     }
-  }, [orderedDepts, activeDept]);
+  }, [orderedPills, activeMemberDeptKey]);
 
   const deptCount = depts.length;
   const memberTotal = apiMembers.length;
@@ -86,7 +99,7 @@ export function AboutWorkforceApiSection({ cms, bioFallbackByName, apiMembers }:
     [memberTotal, deptCount, cms.stats],
   );
 
-  if (depts.length === 0) {
+  if (orderedPills.length === 0) {
     return null;
   }
 
@@ -106,21 +119,21 @@ export function AboutWorkforceApiSection({ cms, bioFallbackByName, apiMembers }:
 
           <div className="mt-16">
             <div className="flex flex-wrap items-center gap-2">
-              {orderedDepts.map((dept) => {
-                const count = byDept.get(dept)?.length ?? 0;
-                const active = dept === activeDept;
+              {orderedPills.map((pill, idx) => {
+                const count = lookupMembersByDeptCi(byDept, pill.memberDeptKey).length;
+                const active = pill.memberDeptKey === activePill?.memberDeptKey;
                 return (
                   <button
-                    key={dept}
+                    key={`${pill.memberDeptKey}-${idx}`}
                     type="button"
-                    onClick={() => setActiveDept(dept)}
+                    onClick={() => setActiveMemberDeptKey(pill.memberDeptKey)}
                     className={`inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-[35px] border px-[23px] text-[16px] font-semibold leading-6 transition-colors dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 ${
                       active
                         ? "border-[#111111] bg-[#111111] text-white dark:border-white dark:bg-white dark:text-[#111111]"
                         : "border-[#e5e5e5] bg-white text-[#666666] hover:bg-[#f7f7f7]"
                     }`}
                   >
-                    {dept} ({count})
+                    {pill.pillLabel} ({count})
                   </button>
                 );
               })}
@@ -129,8 +142,10 @@ export function AboutWorkforceApiSection({ cms, bioFallbackByName, apiMembers }:
 
           <div className="mt-12">
             <div className="border-b border-[#e5e5e5] pb-2">
-              <h3 className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#0e0f11]">{activeDept}</h3>
-              <p className="mt-1 text-[14px] leading-5 tracking-[0.035px] text-[#666666]">{activeMembers.length} members</p>
+              <h3 className="text-[40px] font-semibold leading-[48px] tracking-[-0.1px] text-[#0e0f11]">{activePill?.pillLabel ?? ""}</h3>
+              <p className="mt-1 text-[14px] leading-5 tracking-[0.035px] text-[#666666]">
+                {activeMembers.length} member{activeMembers.length === 1 ? "" : "s"}
+              </p>
             </div>
 
             <div className="mt-8 grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4">

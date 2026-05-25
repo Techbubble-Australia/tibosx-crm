@@ -13,6 +13,9 @@ import { SectionPill } from "@/components/ui/SectionPill";
 import { AboutWorkforceApiSection, AboutWorkforceCmsFallbackSection } from "@/components/about/AboutWorkforceSection";
 import { resolveLeadershipDisplay } from "@/lib/about/resolve-leadership-display";
 
+/** Always load CMS + team from origin; avoids stale workforce tabs after Admin saves. */
+export const dynamic = "force-dynamic";
+
 export default async function AboutPage() {
   const rawAbout = await fetchSiteContentPayload<unknown>("about_page");
   const a = resolveAboutPage(rawAbout ?? {});

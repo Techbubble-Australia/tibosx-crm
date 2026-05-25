@@ -12,56 +12,146 @@ export type WorkforceTabCms = {
   active: boolean;
 };
 
-function tabMatchKey(tab: WorkforceTabCms): string {
+/** After `normalizeWorkforceCmsTabs`, always `department` + `active` (legacy label folded into `department`). */
+export type AboutWorkforceTabResolved = { department: string; active: boolean };
+
+/** Pill label (often from CMS) + canonical Team `department` for member lookup. */
+export type WorkforceDeptPill = {
+  pillLabel: string;
+  memberDeptKey: string;
+};
+
+function tabMatchKey(tab: WorkforceTabCms | AboutWorkforceTabResolved): string {
   const d = typeof tab.department === "string" ? tab.department.trim() : "";
   if (d) return d.toLowerCase();
-  return stripWorkforceTabLabelSuffix(typeof tab.label === "string" ? tab.label : "").toLowerCase();
+  const legacy =
+    "label" in tab && typeof (tab as WorkforceTabCms).label === "string" ? String((tab as WorkforceTabCms).label) : "";
+  return stripWorkforceTabLabelSuffix(legacy).toLowerCase();
 }
 
-function tabUsesExplicitDepartment(tab: WorkforceTabCms): boolean {
+function tabUsesExplicitDepartment(tab: WorkforceTabCms | AboutWorkforceTabResolved): boolean {
   return Boolean(typeof tab.department === "string" && tab.department.trim());
 }
 
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array<number>(n + 1).fill(0));
+  for (let j = 0; j <= n; j++) dp[0]![j] = j;
+  for (let i = 0; i <= m; i++) dp[i]![0] = i;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1]! === b[j - 1]! ? 0 : 1;
+      dp[i]![j] = Math.min(
+        (dp[i - 1]![j] as number) + 1,
+        (dp[i]![j - 1] as number) + 1,
+        (dp[i - 1]![j - 1] as number) + cost,
+      );
+    }
+  }
+  return dp[m]![n]!;
+}
+
+/** Legacy / non-explicit tab: substring-style match only. */
+function deptMatchesLegacyLabel(baseLc: string, apiLc: string): boolean {
+  return apiLc === baseLc || apiLc.includes(baseLc) || baseLc.includes(apiLc);
+}
+
+/** Explicit CMS `department` row: exact, substring, or small edit distance vs API department. */
+function deptMatchesExplicitInput(baseLc: string, apiLc: string): boolean {
+  if (apiLc === baseLc) return true;
+  if (apiLc.includes(baseLc) || baseLc.includes(apiLc)) return true;
+  const n = Math.max(baseLc.length, apiLc.length);
+  if (n === 0) return true;
+  const limit = Math.max(2, Math.min(5, Math.floor(n * 0.15)));
+  return levenshtein(baseLc, apiLc) <= limit;
+}
+
+/** Normalize JSON from CMS/API (legacy `label` / `widthPx` → `department` + `active`). */
+export function normalizeWorkforceCmsTabs(tabs: unknown): AboutWorkforceTabResolved[] {
+  if (!Array.isArray(tabs)) return [];
+  return tabs.map((raw) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return { department: "", active: false };
+    }
+    const t = raw as Record<string, unknown>;
+    const department =
+      (typeof t.department === "string" ? t.department.trim() : "") ||
+      stripWorkforceTabLabelSuffix(typeof t.label === "string" ? t.label : "");
+    return {
+      department,
+      active: Boolean(t.active),
+    };
+  });
+}
+
 /**
- * Order department pills using Site content → Workforce → Department tabs.
- * Tabs with `active: true` match API `department` (exact, case-insensitive) when `department` is set;
- * otherwise legacy `label` uses fuzzy match after stripping a trailing " (n)" count.
+ * Workforce pills: **only** published API departments (`memberDeptKey` ∈ apiDepartments).
+ * `pillLabel` is the CMS department text when the row matches that API bucket (so casing/typos can display as authored).
  */
-export function orderedDepartmentsForAboutWorkforce(
-  cmsTabs: WorkforceTabCms[] | undefined,
+export function orderedWorkforceDeptPills(
+  cmsTabs: readonly (WorkforceTabCms | AboutWorkforceTabResolved)[] | undefined,
   apiDepartments: string[],
-): string[] {
+): WorkforceDeptPill[] {
   const sortedApi = [...apiDepartments].sort((a, b) => a.localeCompare(b));
-  if (!cmsTabs?.length) return sortedApi;
+  if (!cmsTabs?.length) {
+    return sortedApi.map((d) => ({ pillLabel: d, memberDeptKey: d }));
+  }
 
   const hasAnyActiveTab = cmsTabs.some((t) => t.active);
-  if (!hasAnyActiveTab) return sortedApi;
+  if (!hasAnyActiveTab) {
+    return sortedApi.map((d) => ({ pillLabel: d, memberDeptKey: d }));
+  }
 
-  const matched: string[] = [];
-  const used = new Set<string>();
+  const apiLcToCanonical = new Map<string, string>();
+  for (const d of sortedApi) {
+    apiLcToCanonical.set(d.trim().toLowerCase(), d);
+  }
+
+  const matched: WorkforceDeptPill[] = [];
+  const usedMemberLc = new Set<string>();
+
+  const findApiDeptForTab = (baseLc: string, explicit: boolean): string | undefined =>
+    sortedApi.find((d) => {
+      const dl = d.trim().toLowerCase();
+      if (usedMemberLc.has(dl)) return false;
+      return explicit ? deptMatchesExplicitInput(baseLc, dl) : deptMatchesLegacyLabel(baseLc, dl);
+    });
 
   for (const tab of cmsTabs) {
     if (!tab.active) continue;
     const baseLc = tabMatchKey(tab);
     if (!baseLc) continue;
     const explicit = tabUsesExplicitDepartment(tab);
-    const found = sortedApi.find(
-      (d) =>
-        !used.has(d) &&
-        (() => {
-          const dl = d.trim().toLowerCase();
-          if (explicit) return dl === baseLc;
-          return dl === baseLc || dl.includes(baseLc) || baseLc.includes(dl);
-        })(),
-    );
-    if (found) {
-      matched.push(found);
-      used.add(found);
-    }
+    const cmsDept = typeof tab.department === "string" ? tab.department.trim() : "";
+
+    const exact = explicit ? apiLcToCanonical.get(baseLc) : undefined;
+    const found = exact ?? findApiDeptForTab(baseLc, explicit);
+    if (!found) continue;
+
+    const memLc = found.trim().toLowerCase();
+    usedMemberLc.add(memLc);
+
+    const pillLabel = explicit && cmsDept ? cmsDept : found;
+    matched.push({ pillLabel, memberDeptKey: found });
   }
 
   for (const d of sortedApi) {
-    if (!used.has(d)) matched.push(d);
+    const lc = d.trim().toLowerCase();
+    if (!usedMemberLc.has(lc)) {
+      usedMemberLc.add(lc);
+      matched.push({ pillLabel: d, memberDeptKey: d });
+    }
   }
   return matched;
+}
+
+/** @deprecated Prefer {@link orderedWorkforceDeptPills} when you need CMS pill labels. */
+export function orderedDepartmentsForAboutWorkforce(
+  cmsTabs: readonly (WorkforceTabCms | AboutWorkforceTabResolved)[] | undefined,
+  apiDepartments: string[],
+): string[] {
+  return orderedWorkforceDeptPills(cmsTabs, apiDepartments).map((p) => p.memberDeptKey);
 }

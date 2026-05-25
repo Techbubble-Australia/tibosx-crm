@@ -378,23 +378,24 @@ export function AboutPageForm({
           </section>
 
           <section className={sectionClass}>
-            <h3 className="mb-4 font-semibold">Department tabs (workforce pills)</h3>
-            <p className="mb-3 text-xs text-gray-600 dark:text-zinc-400">
-              Each row is one department string — it must match <strong>Admin → Team</strong> → member <strong>Department</strong>{" "}
-              (case-insensitive). The marketing site shows live counts from <strong>published</strong> members only. Turn on{" "}
-              <strong>Active</strong> to pin that department earlier in the pill order; inactive rows are ignored. Departments not
-              listed in any active row still appear after the active ones (alphabetically).
+            <h3 className="mb-2 font-semibold text-gray-900 dark:text-zinc-100">Department tabs (workforce pills)</h3>
+            <p className="mb-4 text-xs leading-relaxed text-gray-600 dark:text-zinc-400">
+              Each row should match <strong>Admin → Team</strong> → member <strong>Department</strong> (case-insensitive exact match, or
+              close spelling for minor typos). The marketing site only lists departments that have published members, but the{" "}
+              <strong>pill title</strong> uses the text you enter here when it maps to that department. Turn on <strong>Active</strong>{" "}
+              to pin matching departments earlier; inactive rows are ignored. Unmatched active rows do not create a pill.
+              Remaining departments follow alphabetically.
             </p>
             <datalist id="about-workforce-department-suggestions">
               {publishedDepartmentSuggestions.map((d) => (
                 <option key={d} value={d} />
               ))}
             </datalist>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {value.workforce.tabs.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-zinc-400">
-                  No rows yet — the site lists every published department in alphabetical order. Add a row to control order and
-                  which departments are prioritized.
+                <p className="rounded-lg border border-dashed border-gray-200 bg-gray-50/80 px-4 py-6 text-center text-sm text-gray-600 dark:border-zinc-600 dark:bg-zinc-900/40 dark:text-zinc-400">
+                  No rows yet — the site lists every published department in alphabetical order. Use{" "}
+                  <span className="font-medium">Add department tab</span> to control order and which departments are pinned first.
                 </p>
               ) : null}
               {value.workforce.tabs.map((t, i) => {
@@ -404,36 +405,43 @@ export function AboutPageForm({
                 return (
                   <div
                     key={i}
-                    className="grid gap-2 rounded border border-gray-100 p-2 dark:border-zinc-700 sm:grid-cols-[1fr_auto_auto_auto]"
+                    className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-zinc-600 dark:bg-zinc-900/50"
                   >
-                    <div>
-                      <label className={labelClass}>Department (exact match)</label>
-                      <input
-                        className={inputClass}
-                        list="about-workforce-department-suggestions"
-                        value={t.department}
-                        onChange={(e) => setWorkforceTab(i, { department: e.target.value })}
-                        placeholder="e.g. Management Team"
-                      />
-                      <p className="mt-1 text-xs text-gray-500 dark:text-zinc-400">
-                        Site preview: <span className="font-medium text-gray-800 dark:text-zinc-200">{preview}</span>
-                      </p>
-                    </div>
-                    <label className="flex items-end gap-2 pb-2 text-sm text-gray-700 dark:text-zinc-300">
-                      <input type="checkbox" checked={t.active} onChange={(e) => setWorkforceTab(i, { active: e.target.checked })} />
-                      Active
-                    </label>
-                    <div className="flex items-end pb-2 text-sm text-gray-600 dark:text-zinc-400">
-                      Published: <span className="ml-1 font-semibold text-gray-900 dark:text-zinc-100">{count}</span>
-                    </div>
-                    <div className="flex items-end">
-                      <button
-                        type="button"
-                        className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
-                        onClick={() => removeWorkforceTab(i)}
-                      >
-                        Remove
-                      </button>
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <label className={labelClass}>Department (exact match)</label>
+                        <input
+                          className={`${inputClass} w-full`}
+                          list="about-workforce-department-suggestions"
+                          value={t.department}
+                          onChange={(e) => setWorkforceTab(i, { department: e.target.value })}
+                          placeholder="e.g. Management Team"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-zinc-400">
+                          Site pill: <span className="font-medium text-gray-800 dark:text-zinc-200">{preview}</span>
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-4 border-t border-gray-100 pt-4 dark:border-zinc-700 lg:border-t-0 lg:pt-0">
+                        <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-800 dark:text-zinc-200">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-500 dark:border-zinc-500 dark:bg-zinc-800"
+                            checked={t.active}
+                            onChange={(e) => setWorkforceTab(i, { active: e.target.checked })}
+                          />
+                          Active
+                        </label>
+                        <span className="text-sm tabular-nums text-gray-600 dark:text-zinc-400">
+                          Published: <strong className="text-gray-900 dark:text-zinc-100">{count}</strong>
+                        </span>
+                        <button
+                          type="button"
+                          className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/50 lg:ml-2"
+                          onClick={() => removeWorkforceTab(i)}
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -441,10 +449,10 @@ export function AboutPageForm({
             </div>
             <button
               type="button"
-              className="mt-3 rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className="mt-4 inline-flex w-full items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50/50 px-4 py-3 text-sm font-medium text-gray-800 transition-colors hover:border-gray-400 hover:bg-gray-100 dark:border-zinc-600 dark:bg-zinc-900/30 dark:text-zinc-200 dark:hover:border-zinc-500 dark:hover:bg-zinc-800/50 sm:w-auto"
               onClick={addWorkforceTab}
             >
-              Add department tab
+              + Add department tab
             </button>
           </section>
 
