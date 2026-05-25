@@ -126,7 +126,7 @@ export default async function AboutPage() {
           <div className="mx-auto grid max-w-[1558px] grid-cols-1 gap-10 pt-12 sm:grid-cols-2 md:grid-cols-3">
             {leadershipMembers.map((leader, index) => (
               <div key={`${leader.name}-${index}`} className="rounded-[21px] bg-[#111111] px-[30px] pb-9 pt-12 text-white md:pt-0">
-                <div className="mx-auto mb-5 h-[241px] w-[241px] overflow-hidden rounded-[14px] border border-[#f7f7f7] bg-neutral-700 md:-mt-[45px]">
+                <div className="relative mx-auto mb-5 h-[241px] w-[241px] overflow-hidden rounded-[14px] border border-[#f7f7f7] bg-neutral-700 md:-mt-[45px]">
                   <AboutPersonImage
                     imageUrl={leader.imageUrl}
                     imageKey={leader.imageKey}

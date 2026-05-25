@@ -200,7 +200,7 @@ export function AboutWorkforceCmsFallbackSection({ cms }: { cms: AboutWorkforceC
                 const bio = (person.bio ?? "").trim() || cms.defaultMemberBio.trim();
                 return (
                   <div key={person.name} className="text-center">
-                    <div className="mx-auto h-[145px] w-[145px] overflow-hidden rounded-[14px] border border-[#f7f7f7] bg-neutral-200">
+                    <div className="relative mx-auto h-[145px] w-[145px] overflow-hidden rounded-[14px] border border-[#f7f7f7] bg-neutral-200">
                       <AboutPersonImage
                         imageUrl={person.imageUrl}
                         imageKey={person.imageKey}

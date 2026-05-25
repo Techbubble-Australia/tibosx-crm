@@ -51,17 +51,16 @@ function uploadsPublicPath(src: string): string | null {
 
 /**
  * Resolves a normalized `/uploads/...` path for {@link HTMLImageElement} `src`.
- * Prefers `NEXT_PUBLIC_API_URL` when set at build time (Docker/Railway); otherwise same-origin.
+ * When {@link process.env.NEXT_PUBLIC_API_URL} is set at build time, uses that API origin (Docker/Railway).
+ * Otherwise returns the **relative** path so server and client match (same-origin `/uploads/*` → Next proxy).
  */
 export function resolveUploadsImgSrc(uploadPath: string): string {
+  const normalized = uploadPath.startsWith("/") ? uploadPath : `/${uploadPath}`;
   const base = process.env.NEXT_PUBLIC_API_URL?.trim().replace(/\/$/, "") ?? "";
   if (base.startsWith("https://") || (base.startsWith("http://") && process.env.NODE_ENV !== "production")) {
-    return `${base}${uploadPath}`;
+    return `${base}${normalized}`;
   }
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}${uploadPath}`;
-  }
-  return uploadPath;
+  return normalized;
 }
 
 /**

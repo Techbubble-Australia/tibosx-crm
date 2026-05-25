@@ -14,7 +14,7 @@ export type ClientStoryItem = {
   authorImageUrl?: string;
 };
 
-const DEFAULT_AUTO_SLIDE_MS = 3000;
+const DEFAULT_AUTO_SLIDE_MS = 1000;
 
 type Props = {
   items?: ClientStoryItem[];
