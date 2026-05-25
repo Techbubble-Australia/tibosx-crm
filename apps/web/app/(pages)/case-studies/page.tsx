@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { UploadableImage } from "@/components/media/UploadableImage";
 import { ArrowRight, Zap, Workflow, Share2, FileStack, Braces, Handshake, type LucideIcon } from "lucide-react";
+import { ArticleBottomCta } from "@/components/case-study/ArticleBottomCta";
 import { ClientStoriesSection } from "@/components/ClientStoriesSection";
 import { SectionPill } from "@/components/ui/SectionPill";
 import { getPublishedCaseStudies, getTestimonials } from "@/lib/api/public";
@@ -334,32 +335,14 @@ export default async function CaseStudiesPage() {
 
       <ClientStoriesSection items={clientStories} />
 
-      {/* CTA */}
-      <section className="py-20 bg-gray-50">
-        <div className="tb-container">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">{cs.bottomCta.title}</h2>
-              <p className="text-gray-500">{cs.bottomCta.description}</p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Link
-                href={cs.bottomCta.primaryHref}
-                className="inline-flex items-center justify-center gap-2 bg-black text-white px-6 py-3 rounded-full font-medium hover:bg-gray-800 transition-colors"
-              >
-                {cs.bottomCta.primaryLabel}
-                <ArrowRight className="w-4 h-4" aria-hidden />
-              </Link>
-              <Link
-                href={cs.bottomCta.secondaryHref}
-                className="inline-flex items-center justify-center gap-2 border border-gray-300 bg-white text-black px-6 py-3 rounded-full font-medium hover:bg-gray-50 transition-colors"
-              >
-                {cs.bottomCta.secondaryLabel}
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+      <ArticleBottomCta
+        title={cs.bottomCta.title}
+        description={cs.bottomCta.description}
+        primaryHref={cs.bottomCta.primaryHref}
+        primaryLabel={cs.bottomCta.primaryLabel}
+        secondaryHref={cs.bottomCta.secondaryHref}
+        secondaryLabel={cs.bottomCta.secondaryLabel}
+      />
     </>
   );
 }

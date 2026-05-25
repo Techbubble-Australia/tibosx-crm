@@ -3,6 +3,7 @@ import { UploadableImage } from "@/components/media/UploadableImage";
 import { ArrowLeft, ArrowRight, Zap, Workflow, Share2, FileStack, Braces, Handshake } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getCaseStudyBySlug } from "@/lib/api/public";
+import { ArticleBottomCta } from "@/components/case-study/ArticleBottomCta";
 import { CaseStudyBannerGallery } from "@/components/case-study/CaseStudyBannerGallery";
 import { SectionPill } from "@/components/ui/SectionPill";
 import { mapCaseStudyApiToPageModel, type CaseStudyPageModel } from "@/lib/case-study-mapper";
@@ -305,34 +306,14 @@ export default async function CaseStudyPage({
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-20 bg-gray-50">
-        <div className="tb-container">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">{caseStudy.cta.title}</h2>
-              <p className="text-gray-500">
-                {caseStudy.cta.subtitle}
-              </p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Link
-                href="/contact"
-                className="inline-flex items-center justify-center gap-2 bg-black text-white px-6 py-3 rounded-full font-medium hover:bg-gray-800 transition-colors"
-              >
-                Start a Conversation
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-              <Link
-                href="/services"
-                className="inline-flex items-center justify-center gap-2 border border-gray-300 bg-white text-black px-6 py-3 rounded-full font-medium hover:bg-gray-50 transition-colors"
-              >
-                View ServiceNow Services
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+      <ArticleBottomCta
+        title={caseStudy.cta.title}
+        description={caseStudy.cta.subtitle}
+        primaryHref="/contact"
+        primaryLabel="Start a Conversation"
+        secondaryHref="/services"
+        secondaryLabel="Explore services"
+      />
     </>
   );
 }
