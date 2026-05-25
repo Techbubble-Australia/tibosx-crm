@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AdminImageField } from "@/components/AdminImageField";
+import { adminFetch } from "@/lib/admin-api";
 import { inputClass, labelClass, sectionClass } from "./form-styles";
 
 /** Must match keys in `apps/web/lib/about-bundled-media.ts`. */
@@ -21,8 +22,13 @@ const ABOUT_BUNDLED_IMAGE_KEYS = [
 
 type StatRow = { n: string; l: string; labelClass: string };
 type MissionCard = { title: string; text: string };
-type LeadershipMember = { name: string; role: string; bio: string; imageKey: string; imageUrl: string };
-type WorkforceTab = { label: string; widthPx: number; active: boolean };
+type WorkforceTab = { department: string; active: boolean };
+
+type AdminTeamListRow = {
+  id: string;
+  department?: string;
+  published?: boolean;
+};
 type ManagementPerson = { name: string; role: string; bio?: string; imageKey: string; imageUrl: string };
 type UspColumn = { title: string; body: string };
 type ValuePillar = { title: string; subtitle: string };
@@ -37,7 +43,6 @@ export type AboutPagePayload = {
     pill: string;
     title: string;
     subtitle: string;
-    members: LeadershipMember[];
   };
   workforce: {
     pill: string;
@@ -70,7 +75,7 @@ export type AboutPagePayload = {
 const TABS = [
   "Hero & stats",
   "Mission",
-  "Leadership (CMS fallbacks)",
+  "Leadership",
   "Workforce",
   "USP",
   "Values & footer CTA",
@@ -84,6 +89,40 @@ export function AboutPageForm({
   onChange: (next: AboutPagePayload) => void;
 }) {
   const [tab, setTab] = useState(0);
+  const [teamRows, setTeamRows] = useState<AdminTeamListRow[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await adminFetch("/api/admin/team/admin/all");
+        const data = (await res.json()) as { data?: AdminTeamListRow[] };
+        if (!cancelled && Array.isArray(data.data)) setTeamRows(data.data);
+      } catch (e) {
+        console.error("AboutPageForm: failed to load team for department counts", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const { publishedDeptCountsByLower, publishedDepartmentSuggestions } = useMemo(() => {
+    const byLower = new Map<string, number>();
+    const suggest = new Set<string>();
+    for (const row of teamRows) {
+      if (!row.published) continue;
+      const raw = String(row.department ?? "").trim();
+      const d = raw || "Team";
+      const k = d.toLowerCase();
+      byLower.set(k, (byLower.get(k) ?? 0) + 1);
+      if (raw) suggest.add(raw);
+    }
+    return {
+      publishedDeptCountsByLower: byLower,
+      publishedDepartmentSuggestions: [...suggest].sort((a, b) => a.localeCompare(b)),
+    };
+  }, [teamRows]);
 
   const setHero = (patch: Partial<AboutPagePayload["hero"]>) => onChange({ ...value, hero: { ...value.hero, ...patch } });
   const setMission = (patch: Partial<AboutPagePayload["mission"]>) =>
@@ -108,11 +147,6 @@ export function AboutPageForm({
     onChange({ ...value, missionCards });
   };
 
-  const setLeader = (i: number, patch: Partial<LeadershipMember>) => {
-    const members = value.leadership.members.map((m, j) => (j === i ? { ...m, ...patch } : m));
-    onChange({ ...value, leadership: { ...value.leadership, members } });
-  };
-
   const setWorkforceStat = (i: number, patch: Partial<{ n: string; l: string }>) => {
     const stats = value.workforce.stats.map((s, j) => (j === i ? { ...s, ...patch } : s));
     onChange({ ...value, workforce: { ...value.workforce, stats } });
@@ -121,6 +155,26 @@ export function AboutPageForm({
   const setWorkforceTab = (i: number, patch: Partial<WorkforceTab>) => {
     const tabs = value.workforce.tabs.map((t, j) => (j === i ? { ...t, ...patch } : t));
     onChange({ ...value, workforce: { ...value.workforce, tabs } });
+  };
+
+  const addWorkforceTab = () => {
+    onChange({
+      ...value,
+      workforce: {
+        ...value.workforce,
+        tabs: [...value.workforce.tabs, { department: "", active: false }],
+      },
+    });
+  };
+
+  const removeWorkforceTab = (i: number) => {
+    onChange({
+      ...value,
+      workforce: {
+        ...value.workforce,
+        tabs: value.workforce.tabs.filter((_, j) => j !== i),
+      },
+    });
   };
 
   const setMgmtPerson = (i: number, patch: Partial<ManagementPerson>) => {
@@ -267,7 +321,11 @@ export function AboutPageForm({
       {tab === 2 ? (
         <section className={sectionClass}>
           <h3 className="mb-4 font-semibold">Leadership</h3>
-          <div className="mb-4 space-y-3">
+          <p className="mb-4 text-sm text-gray-600">
+            The three cards under <strong>Meet the Leadership</strong> on the marketing site come from <strong>Admin → Team</strong>:
+            publish members and set leadership slots <strong>1</strong>, <strong>2</strong>, and <strong>3</strong>. Copy below only changes the section heading.
+          </p>
+          <div className="space-y-3">
             <div>
               <label className={labelClass}>Section pill</label>
               <input className={inputClass} value={value.leadership.pill} onChange={(e) => setLeadership({ pill: e.target.value })} />
@@ -280,61 +338,6 @@ export function AboutPageForm({
               <label className={labelClass}>Subtitle</label>
               <textarea className={inputClass} rows={2} value={value.leadership.subtitle} onChange={(e) => setLeadership({ subtitle: e.target.value })} />
             </div>
-          </div>
-
-          <p className="mb-3 text-sm text-gray-600">
-            Assign who appears in <strong>Meet the Leadership</strong> under <span className="font-medium">Team</span>: edit a member and set
-            leadership slot <strong>1</strong>, <strong>2</strong>, or <strong>3</strong> (published members only). All three slots must be filled for the marketing site to use team data;
-            otherwise the CMS cards below are used for the whole row.
-          </p>
-
-          <p className="mb-3 text-xs text-gray-600">
-            CMS cards: fallback when fewer than three slotted members are published, and for bundled image / bio text when a slotted member has no photo URL or description.
-          </p>
-          <div className="space-y-6">
-            {value.leadership.members.map((m, i) => (
-              <div key={i} className="rounded-lg border border-gray-200 p-4">
-                <p className="mb-3 text-sm font-semibold text-gray-800">Leader {i + 1}</p>
-                <div className="space-y-2">
-                  <div>
-                    <label className={labelClass}>Name</label>
-                    <input className={inputClass} value={m.name} onChange={(e) => setLeader(i, { name: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Role</label>
-                    <input className={inputClass} value={m.role} onChange={(e) => setLeader(i, { role: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Bio</label>
-                    <textarea className={inputClass} rows={4} value={m.bio} onChange={(e) => setLeader(i, { bio: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Bundled image key</label>
-                    <select
-                      className={inputClass}
-                      value={m.imageKey}
-                      onChange={(e) => setLeader(i, { imageKey: e.target.value })}
-                    >
-                      <option value="">— none —</option>
-                      {bundledKeyOptions.map((k) => (
-                        <option key={k} value={k}>
-                          {k}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <AdminImageField
-                    name={`about-leader-image-${i}`}
-                    label="Image URL (optional override)"
-                    value={m.imageUrl}
-                    onValueChange={(v) => setLeader(i, { imageUrl: v })}
-                    className={inputClass}
-                    labelClassName={labelClass}
-                    helpText="Paste a URL or upload. If set, this overrides the bundled image key."
-                  />
-                </div>
-              </div>
-            ))}
           </div>
         </section>
       ) : null}
@@ -376,30 +379,73 @@ export function AboutPageForm({
 
           <section className={sectionClass}>
             <h3 className="mb-4 font-semibold">Department tabs (workforce pills)</h3>
-            <p className="mb-3 text-xs text-gray-600">
-              When the site loads published team members from the API, each pill is an API <strong>department</strong> name.
-              Turn on <strong>Active</strong> for a row to include that tab in the pill order (inactive rows are skipped). Match the
-              tab label (text before an optional “ (12)” count) to the department string in Admin → Team members. Any departments
-              not covered by an active tab are still listed after the matched ones.
+            <p className="mb-3 text-xs text-gray-600 dark:text-zinc-400">
+              Each row is one department string — it must match <strong>Admin → Team</strong> → member <strong>Department</strong>{" "}
+              (case-insensitive). The marketing site shows live counts from <strong>published</strong> members only. Turn on{" "}
+              <strong>Active</strong> to pin that department earlier in the pill order; inactive rows are ignored. Departments not
+              listed in any active row still appear after the active ones (alphabetically).
             </p>
-            <div className="space-y-3">
-              {value.workforce.tabs.map((t, i) => (
-                <div key={i} className="grid gap-2 rounded border border-gray-100 p-2 sm:grid-cols-3">
-                  <input className={inputClass} value={t.label} onChange={(e) => setWorkforceTab(i, { label: e.target.value })} />
-                  <input
-                    className={inputClass}
-                    type="number"
-                    value={t.widthPx}
-                    onChange={(e) => setWorkforceTab(i, { widthPx: Number(e.target.value) })}
-                    placeholder="Width px"
-                  />
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input type="checkbox" checked={t.active} onChange={(e) => setWorkforceTab(i, { active: e.target.checked })} />
-                    Active (dark) style
-                  </label>
-                </div>
+            <datalist id="about-workforce-department-suggestions">
+              {publishedDepartmentSuggestions.map((d) => (
+                <option key={d} value={d} />
               ))}
+            </datalist>
+            <div className="space-y-3">
+              {value.workforce.tabs.length === 0 ? (
+                <p className="text-sm text-gray-500 dark:text-zinc-400">
+                  No rows yet — the site lists every published department in alphabetical order. Add a row to control order and
+                  which departments are prioritized.
+                </p>
+              ) : null}
+              {value.workforce.tabs.map((t, i) => {
+                const dTrim = t.department.trim();
+                const count = dTrim ? (publishedDeptCountsByLower.get(dTrim.toLowerCase()) ?? 0) : 0;
+                const preview = dTrim ? `${dTrim} (${count})` : "—";
+                return (
+                  <div
+                    key={i}
+                    className="grid gap-2 rounded border border-gray-100 p-2 dark:border-zinc-700 sm:grid-cols-[1fr_auto_auto_auto]"
+                  >
+                    <div>
+                      <label className={labelClass}>Department (exact match)</label>
+                      <input
+                        className={inputClass}
+                        list="about-workforce-department-suggestions"
+                        value={t.department}
+                        onChange={(e) => setWorkforceTab(i, { department: e.target.value })}
+                        placeholder="e.g. Management Team"
+                      />
+                      <p className="mt-1 text-xs text-gray-500 dark:text-zinc-400">
+                        Site preview: <span className="font-medium text-gray-800 dark:text-zinc-200">{preview}</span>
+                      </p>
+                    </div>
+                    <label className="flex items-end gap-2 pb-2 text-sm text-gray-700 dark:text-zinc-300">
+                      <input type="checkbox" checked={t.active} onChange={(e) => setWorkforceTab(i, { active: e.target.checked })} />
+                      Active
+                    </label>
+                    <div className="flex items-end pb-2 text-sm text-gray-600 dark:text-zinc-400">
+                      Published: <span className="ml-1 font-semibold text-gray-900 dark:text-zinc-100">{count}</span>
+                    </div>
+                    <div className="flex items-end">
+                      <button
+                        type="button"
+                        className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
+                        onClick={() => removeWorkforceTab(i)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+            <button
+              type="button"
+              className="mt-3 rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              onClick={addWorkforceTab}
+            >
+              Add department tab
+            </button>
           </section>
 
           <section className={sectionClass}>

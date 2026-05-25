@@ -240,29 +240,7 @@ export const aboutPagePayload = {
     title: "Meet The Leadership",
     subtitle:
       "The visionaries driving TechBubble's mission to transform businesses through technology.",
-    members: [
-      {
-        name: "Nikita T",
-        role: "Founder & Director, Australia",
-        bio: "Leads corporate strategy and client partnerships across APAC, with a focus on enterprise transformation, governance, and measurable delivery outcomes.",
-        imageKey: "about_us_1",
-        imageUrl: "",
-      },
-      {
-        name: "Jeet Bhatt",
-        role: "Founder & Director, Australia",
-        bio: "Drives growth, alliances, and operating model design—aligning global delivery with local compliance and client success at scale.",
-        imageKey: "about_us_2",
-        imageUrl: "",
-      },
-      {
-        name: "Dhruv Bhatt",
-        role: "Head of Product, Australia",
-        bio: "Owns product vision and platform roadmaps, ensuring every engagement ships secure, scalable solutions that match real business priorities.",
-        imageKey: "about_us_3",
-        imageUrl: "",
-      },
-    ],
+    members: [],
   },
   workforce: {
     pill: "Our Complete Team",
@@ -277,17 +255,8 @@ export const aboutPagePayload = {
       { n: "5", l: "Global Offices" },
       { n: "10+", l: "Years Experience" },
     ],
-    tabs: [
-      { label: "Management Team (5)", widthPx: 215, active: true },
-      { label: "Sales Team (4)", widthPx: 157, active: false },
-      { label: "Recruitment Team (4)", widthPx: 209, active: false },
-      { label: "ServiceNow Developers (16)", widthPx: 260, active: false },
-      { label: "Salesforce Developers (8)", widthPx: 243, active: false },
-      { label: "MuleSoft Developers (8)", widthPx: 232, active: false },
-      { label: "Workday Team (5)", widthPx: 183, active: false },
-      { label: "Product Team (8)", widthPx: 176, active: false },
-      { label: "Other Techstack Developers (12)", widthPx: 295, active: false },
-    ],
+    /** Department pill order on About: `active` rows first; counts on site come from published Team members. */
+    tabs: [],
     management: {
       title: "Management Team",
       memberCountLabel: "5 members",

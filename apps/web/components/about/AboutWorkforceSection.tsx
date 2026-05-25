@@ -6,15 +6,15 @@ import { AboutAnimatedWorkforceStats } from "@/components/about/AboutAnimatedWor
 import { AboutPersonImage } from "@/components/about/AboutPersonImage";
 import { SectionPill } from "@/components/ui/SectionPill";
 import { UploadableImage } from "@/components/media/UploadableImage";
-import { orderedDepartmentsForAboutWorkforce } from "@/lib/about/workforce-tabs";
+import { orderedDepartmentsForAboutWorkforce, type WorkforceTabCms } from "@/lib/about/workforce-tabs";
 
 export type AboutWorkforceCms = {
   pill: string;
   title: string;
   intro: string;
   stats: { n: string; l: string }[];
-  /** Department pills: `active` controls visibility; label (optional “ (n)” suffix) matches API `department`. */
-  tabs: { label: string; widthPx: number; active: boolean }[];
+  /** Department pills: `active` controls visibility; `department` must match Team API `department` (counts are live on site). */
+  tabs: WorkforceTabCms[];
   management: {
     title: string;
     memberCountLabel: string;

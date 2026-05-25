@@ -31,9 +31,6 @@ export default async function AboutPage() {
   }));
 
   const bioFallbackByName: Record<string, string> = {};
-  for (const m of a.leadership.members) {
-    bioFallbackByName[m.name] = m.bio;
-  }
   for (const p of a.workforce.management.people) {
     const b = (p.bio ?? "").trim();
     if (b) bioFallbackByName[p.name] = b;
@@ -49,7 +46,7 @@ export default async function AboutPage() {
     defaultMemberBio: a.workforce.defaultMemberBio,
   };
 
-  const leadershipMembers = resolveLeadershipDisplay(a.leadership, leadershipLineup);
+  const leadershipMembers = resolveLeadershipDisplay(leadershipLineup);
 
   return (
     <>

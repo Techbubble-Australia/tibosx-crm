@@ -116,7 +116,7 @@ export function resolveAboutPage(raw: unknown): AboutPagePayload {
     leadership: {
       ...base.leadership,
       ...r.leadership,
-      members: r.leadership?.members ?? base.leadership.members,
+      members: [],
     },
     workforce: {
       ...base.workforce,

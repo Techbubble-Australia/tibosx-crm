@@ -23,6 +23,23 @@ function clone<T>(x: T): T {
   return JSON.parse(JSON.stringify(x)) as T;
 }
 
+/** Legacy workforce tab labels ended with " (12)" style counts — strip for department matching. */
+function stripWorkforceTabLabelSuffix(label: string): string {
+  return label.replace(/\s*\(\d+\)\s*$/, "").trim();
+}
+
+/** Normalize stored workforce pills to `{ department, active }` (drops legacy `label` / `widthPx`). */
+function migrateWorkforceTabRow(raw: unknown): { department: string; active: boolean } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { department: "", active: false };
+  }
+  const t = raw as Record<string, unknown>;
+  const department =
+    (typeof t.department === "string" ? t.department.trim() : "") ||
+    stripWorkforceTabLabelSuffix(typeof t.label === "string" ? t.label : "");
+  return { department, active: Boolean(t.active) };
+}
+
 export const SITE_CONTENT_FORM_KEYS = [
   "announcement_bar",
   "marketing_home",
@@ -93,6 +110,29 @@ export function serializeSiteContentForPersist(key: string, payload: unknown): u
     }
   }
 
+  if (key === "about_page" && out && typeof out === "object" && !Array.isArray(out)) {
+    const p = out as Record<string, unknown>;
+    let next: Record<string, unknown> = { ...p };
+    const lead = p.leadership;
+    if (lead && typeof lead === "object" && !Array.isArray(lead)) {
+      next = { ...next, leadership: { ...(lead as Record<string, unknown>), members: [] } };
+    }
+    const wf = (next.workforce ?? p.workforce) as Record<string, unknown> | undefined;
+    if (wf && typeof wf === "object" && !Array.isArray(wf)) {
+      const tabs = wf.tabs;
+      if (Array.isArray(tabs)) {
+        next = {
+          ...next,
+          workforce: {
+            ...wf,
+            tabs: tabs.map((tab: unknown) => migrateWorkforceTabRow(tab)),
+          },
+        };
+      }
+    }
+    out = next;
+  }
+
   if (isVisualSiteContentKey(key) && out && typeof out === "object" && !Array.isArray(out)) {
     out = compactNestedStringArrays(out as Record<string, unknown>);
   }
@@ -151,5 +191,16 @@ export function normalizeSiteContentPayload(key: string, raw: unknown): unknown 
     return base;
   }
 
-  return deepMerge(base as Record<string, unknown>, raw as Record<string, unknown>);
+  const merged = deepMerge(base as Record<string, unknown>, raw as Record<string, unknown>);
+  if (key === "about_page" && merged.leadership && typeof merged.leadership === "object" && !Array.isArray(merged.leadership)) {
+    merged.leadership = { ...(merged.leadership as Record<string, unknown>), members: [] };
+  }
+  if (key === "about_page" && merged.workforce && typeof merged.workforce === "object" && !Array.isArray(merged.workforce)) {
+    const wf = merged.workforce as Record<string, unknown>;
+    const tabs = wf.tabs;
+    if (Array.isArray(tabs)) {
+      wf.tabs = tabs.map((tab: unknown) => migrateWorkforceTabRow(tab));
+    }
+  }
+  return merged;
 }
