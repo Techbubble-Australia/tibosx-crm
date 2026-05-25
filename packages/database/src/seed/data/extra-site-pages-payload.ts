@@ -308,12 +308,14 @@ export const siteFooterPayload = {
       region: "Australia (HQ)",
       entity: "Techbubble Pty Ltd",
       address: "16/126 Banks Ave, Eastgardens, Sydney NSW 2000",
+      businessNumber: "",
     },
     {
       flagCode: "us" as const,
       region: "USA",
       entity: "Techbubble USA Inc.",
       address: "1846/1007 N Orange St, WL, De 19801, USA",
+      businessNumber: "",
     },
     {
       flagCode: "in" as const,
@@ -321,6 +323,7 @@ export const siteFooterPayload = {
       entity: "Techbubble India Pvt LtD",
       address:
         "Office 713, K.P. EPITOME Nr. Siddhi Vinayak Tower, Nr. DAV School, MaKarba, Ahmedabad, Gujarat India 380051",
+      businessNumber: "",
     },
   ],
   contactInfoHeading: "Contact Info",

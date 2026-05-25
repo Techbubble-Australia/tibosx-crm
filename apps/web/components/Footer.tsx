@@ -72,7 +72,14 @@ export function Footer({ data }: { data: SiteFooterPayload }) {
                         {office.region} <span className="px-2 text-white/75">|</span> {office.entity}
                       </span>
                     </div>
-                    <p className="mt-[1px] break-words text-[12px] font-medium leading-4 text-[#666666]">{office.address}</p>
+                    <p className="mt-[1px] break-words text-[12px] font-medium leading-4 text-[#666666] dark:text-zinc-400">
+                      {office.address}
+                    </p>
+                    {office.businessNumber?.trim() ? (
+                      <p className="mt-1 break-words text-[12px] font-medium leading-4 text-[#888888] dark:text-zinc-500">
+                        {office.businessNumber.trim()}
+                      </p>
+                    ) : null}
                   </div>
                 ))}
               </div>

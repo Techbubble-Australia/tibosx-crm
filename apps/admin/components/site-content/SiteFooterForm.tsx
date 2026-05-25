@@ -6,7 +6,7 @@ import { inputClass, labelClass, sectionClass } from "./form-styles";
 export type SiteFooterPayload = typeof siteFooterPayload;
 
 function createEmptyOffice(): SiteFooterPayload["offices"][number] {
-  return { flagCode: "au", region: "", entity: "", address: "" };
+  return { flagCode: "au", region: "", entity: "", address: "", businessNumber: "" };
 }
 
 export function SiteFooterForm({
@@ -193,6 +193,19 @@ export function SiteFooterForm({
                   onChange={(e) => {
                     const next = [...value.offices];
                     next[i] = { ...o, address: e.target.value };
+                    onChange({ ...value, offices: next });
+                  }}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelClass}>Business number (optional)</label>
+                <input
+                  className={inputClass}
+                  value={o.businessNumber ?? ""}
+                  placeholder="e.g. ABN 12 345 678 901"
+                  onChange={(e) => {
+                    const next = [...value.offices];
+                    next[i] = { ...o, businessNumber: e.target.value };
                     onChange({ ...value, offices: next });
                   }}
                 />

@@ -69,6 +69,7 @@ export function serializeSiteContentForPersist(key: string, payload: unknown): u
         region: typeof o.region === "string" ? o.region.trim() : "",
         entity: typeof o.entity === "string" ? o.entity.trim() : "",
         address: typeof o.address === "string" ? o.address.trim() : "",
+        businessNumber: typeof o.businessNumber === "string" ? o.businessNumber.trim() : "",
       }))
       .filter((o) => o.region.length > 0 || o.entity.length > 0 || o.address.length > 0);
     return {

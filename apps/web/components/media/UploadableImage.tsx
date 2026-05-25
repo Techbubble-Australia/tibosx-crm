@@ -11,13 +11,15 @@ type FillProps = {
   className?: string;
   sizes?: string;
   priority?: boolean;
+  /** Fires when the image fails to load (e.g. missing upload). */
+  onError?: () => void;
 };
 
 /**
  * Renders `/uploads/*` with {@link HTMLImageElement} using {@link resolveUploadsImgSrc} so Next's image optimizer is not invoked
  * (avoids "received null" when the API file is missing or during dev chunk issues).
  */
-export function UploadableImage({ src, alt, fill, className, sizes, priority }: FillProps) {
+export function UploadableImage({ src, alt, fill, className, sizes, priority, onError }: FillProps) {
   const uploads = sameOriginUploadsPath(src);
   if (uploads) {
     return (
@@ -28,9 +30,20 @@ export function UploadableImage({ src, alt, fill, className, sizes, priority }: 
         sizes={sizes}
         loading={priority ? "eager" : "lazy"}
         decoding="async"
+        onError={() => onError?.()}
       />
     );
   }
   const resolved = resolveMediaUrl(src);
-  return <Image src={resolved} alt={alt} fill className={className} sizes={sizes} priority={priority} />;
+  return (
+    <Image
+      src={resolved}
+      alt={alt}
+      fill
+      className={className}
+      sizes={sizes}
+      priority={priority}
+      onError={() => onError?.()}
+    />
+  );
 }

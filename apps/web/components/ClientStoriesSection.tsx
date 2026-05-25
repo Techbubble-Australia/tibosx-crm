@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { SectionPill } from "@/components/ui/SectionPill";
+import { UploadableImage } from "@/components/media/UploadableImage";
 
 export type ClientStoryItem = {
   quote: string;
@@ -93,13 +94,13 @@ export function ClientStoriesSection({ items, autoSlideIntervalMs = DEFAULT_AUTO
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               {showPhoto ? (
-                <div className="relative h-[62px] w-[62px] shrink-0 overflow-hidden rounded-full bg-[#e5e5e5]">
-                  <img
-                    src={avatarSrc}
+                <div className="relative h-[62px] w-[62px] shrink-0 overflow-hidden rounded-full bg-[#e5e5e5] dark:bg-zinc-700">
+                  <UploadableImage
+                    src={avatarSrc!}
                     alt=""
-                    className="absolute inset-0 h-full w-full object-cover"
-                    loading="lazy"
-                    decoding="async"
+                    fill
+                    className="object-cover"
+                    sizes="62px"
                     onError={() => setAvatarBroken(true)}
                   />
                 </div>

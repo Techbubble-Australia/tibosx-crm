@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { adminFetch } from "@/lib/admin-api";
+import { AdminImageField } from "@/components/AdminImageField";
 import { inputClass, labelClass, sectionClass } from "./form-styles";
 
 /** Must match keys in `apps/web/lib/about-bundled-media.ts`. */
@@ -75,57 +75,6 @@ const TABS = [
   "USP",
   "Values & footer CTA",
 ] as const;
-
-function SiteImageUrlField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const [uploading, setUploading] = useState(false);
-
-  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append("image", file);
-      const res = await adminFetch("/api/upload/image", {
-        method: "POST",
-        body: fd,
-      });
-      const json = (await res.json().catch(() => ({}))) as { error?: string; data?: { url?: string } };
-      if (!res.ok) {
-        alert(json.error || "Upload failed");
-        return;
-      }
-      const next = json.data?.url;
-      if (next) onChange(next);
-    } catch (err) {
-      console.error(err);
-      alert("Upload failed");
-    } finally {
-      setUploading(false);
-      e.target.value = "";
-    }
-  }
-
-  return (
-    <div>
-      <label className={labelClass}>{label}</label>
-      <p className="mb-1 text-xs text-gray-500">Paste a URL or upload. If set, this overrides the bundled image key.</p>
-      <input className={inputClass} value={value} onChange={(e) => onChange(e.target.value)} placeholder="https://… or /uploads/…" />
-      <div className="mt-2 flex items-center gap-2">
-        <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" onChange={(e) => void onFileChange(e)} className="text-sm" />
-        {uploading ? <span className="text-xs text-gray-500">Uploading…</span> : null}
-      </div>
-    </div>
-  );
-}
 
 export function AboutPageForm({
   value,
@@ -374,7 +323,15 @@ export function AboutPageForm({
                       ))}
                     </select>
                   </div>
-                  <SiteImageUrlField label="Image URL (optional override)" value={m.imageUrl} onChange={(v) => setLeader(i, { imageUrl: v })} />
+                  <AdminImageField
+                    name={`about-leader-image-${i}`}
+                    label="Image URL (optional override)"
+                    value={m.imageUrl}
+                    onValueChange={(v) => setLeader(i, { imageUrl: v })}
+                    className={inputClass}
+                    labelClassName={labelClass}
+                    helpText="Paste a URL or upload. If set, this overrides the bundled image key."
+                  />
                 </div>
               </div>
             ))}
@@ -418,9 +375,12 @@ export function AboutPageForm({
           </section>
 
           <section className={sectionClass}>
-            <h3 className="mb-4 font-semibold">Department tabs (fallback / legacy)</h3>
+            <h3 className="mb-4 font-semibold">Department tabs (workforce pills)</h3>
             <p className="mb-3 text-xs text-gray-600">
-              When the marketing site has no published team from the API, the About page shows the Management team block only (no pills). With API data, department pills are generated from member departments.
+              When the site loads published team members from the API, each pill is an API <strong>department</strong> name.
+              Turn on <strong>Active</strong> for a row to include that tab in the pill order (inactive rows are skipped). Match the
+              tab label (text before an optional “ (12)” count) to the department string in Admin → Team members. Any departments
+              not covered by an active tab are still listed after the matched ones.
             </p>
             <div className="space-y-3">
               {value.workforce.tabs.map((t, i) => (
@@ -484,9 +444,15 @@ export function AboutPageForm({
                     </option>
                   ))}
                 </select>
-                <div className="mt-2">
-                  <SiteImageUrlField label="Image URL (optional)" value={p.imageUrl} onChange={(v) => setMgmtPerson(i, { imageUrl: v })} />
-                </div>
+                <AdminImageField
+                  name={`about-mgmt-image-${i}`}
+                  label="Image URL (optional)"
+                  value={p.imageUrl}
+                  onValueChange={(v) => setMgmtPerson(i, { imageUrl: v })}
+                  className={inputClass}
+                  labelClassName={labelClass}
+                  helpText="Paste a URL or upload. If set, this overrides the bundled image key."
+                />
               </div>
             ))}
           </section>

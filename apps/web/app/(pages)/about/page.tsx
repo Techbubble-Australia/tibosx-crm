@@ -44,6 +44,7 @@ export default async function AboutPage() {
     title: a.workforce.title,
     intro: a.workforce.intro,
     stats: a.workforce.stats,
+    tabs: a.workforce.tabs,
     management: a.workforce.management,
     defaultMemberBio: a.workforce.defaultMemberBio,
   };

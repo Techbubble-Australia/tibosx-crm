@@ -34,8 +34,9 @@ function normalizeFooterOffices(raw: unknown): SiteFooterPayload["offices"] {
     const region = typeof o.region === "string" ? o.region : "";
     const entity = typeof o.entity === "string" ? o.entity : "";
     const address = typeof o.address === "string" ? o.address : "";
+    const businessNumber = typeof o.businessNumber === "string" ? o.businessNumber.trim() : "";
     if (!region.trim() && !entity.trim() && !address.trim()) continue;
-    out.push({ flagCode, region, entity, address });
+    out.push({ flagCode, region, entity, address, businessNumber });
   }
   return out.length > 0 ? out : siteFooterPayload.offices;
 }

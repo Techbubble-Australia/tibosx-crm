@@ -1,17 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { TeamMemberPublicRow } from "@/lib/api/public";
-import { resolveOptionalMediaUrl } from "@/lib/media-url";
 import { AboutAnimatedWorkforceStats } from "@/components/about/AboutAnimatedWorkforceStats";
 import { AboutPersonImage } from "@/components/about/AboutPersonImage";
 import { SectionPill } from "@/components/ui/SectionPill";
+import { UploadableImage } from "@/components/media/UploadableImage";
+import { orderedDepartmentsForAboutWorkforce } from "@/lib/about/workforce-tabs";
 
 export type AboutWorkforceCms = {
   pill: string;
   title: string;
   intro: string;
   stats: { n: string; l: string }[];
+  /** Department pills: `active` controls visibility; label (optional “ (n)” suffix) matches API `department`. */
+  tabs: { label: string; widthPx: number; active: boolean }[];
   management: {
     title: string;
     memberCountLabel: string;
@@ -56,8 +59,19 @@ export function AboutWorkforceApiSection({ cms, bioFallbackByName, apiMembers }:
   }, [apiMembers]);
 
   const depts = useMemo(() => [...byDept.keys()].sort((a, b) => a.localeCompare(b)), [byDept]);
-  const [activeDept, setActiveDept] = useState(depts[0] ?? "");
+  const orderedDepts = useMemo(
+    () => orderedDepartmentsForAboutWorkforce(cms.tabs, depts),
+    [cms.tabs, depts],
+  );
+  const [activeDept, setActiveDept] = useState(orderedDepts[0] ?? "");
   const activeMembers = activeDept ? (byDept.get(activeDept) ?? []) : [];
+
+  useEffect(() => {
+    if (orderedDepts.length === 0) return;
+    if (!orderedDepts.includes(activeDept)) {
+      setActiveDept(orderedDepts[0] ?? "");
+    }
+  }, [orderedDepts, activeDept]);
 
   const deptCount = depts.length;
   const memberTotal = apiMembers.length;
@@ -92,7 +106,7 @@ export function AboutWorkforceApiSection({ cms, bioFallbackByName, apiMembers }:
 
           <div className="mt-16">
             <div className="flex flex-wrap items-center gap-2">
-              {depts.map((dept) => {
+              {orderedDepts.map((dept) => {
                 const count = byDept.get(dept)?.length ?? 0;
                 const active = dept === activeDept;
                 return (
@@ -100,8 +114,10 @@ export function AboutWorkforceApiSection({ cms, bioFallbackByName, apiMembers }:
                     key={dept}
                     type="button"
                     onClick={() => setActiveDept(dept)}
-                    className={`inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-[35px] border px-[23px] text-[16px] font-semibold leading-6 transition-colors ${
-                      active ? "border-[#111111] bg-[#111111] text-white" : "border-[#e5e5e5] bg-white text-[#666666] hover:bg-[#f7f7f7]"
+                    className={`inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-[35px] border px-[23px] text-[16px] font-semibold leading-6 transition-colors dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 ${
+                      active
+                        ? "border-[#111111] bg-[#111111] text-white dark:border-white dark:bg-white dark:text-[#111111]"
+                        : "border-[#e5e5e5] bg-white text-[#666666] hover:bg-[#f7f7f7]"
                     }`}
                   >
                     {dept} ({count})
@@ -120,19 +136,17 @@ export function AboutWorkforceApiSection({ cms, bioFallbackByName, apiMembers }:
             <div className="mt-8 grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4">
               {activeMembers.map((person) => {
                 const bio = memberBioText(person.name, person.description, bioFallbackByName, cms.defaultMemberBio);
-                const avatarSrc = resolveOptionalMediaUrl(person.imageUrl);
+                const avatarSrc = (person.imageUrl ?? "").trim();
                 return (
                   <div key={person.id} className="text-center">
-                    <div className="mx-auto h-[145px] w-[145px] overflow-hidden rounded-[14px] border border-[#f7f7f7] bg-neutral-200">
+                    <div className="relative mx-auto h-[145px] w-[145px] overflow-hidden rounded-[14px] border border-[#f7f7f7] bg-neutral-200 dark:border-zinc-700 dark:bg-zinc-800">
                       {avatarSrc ? (
-                        <img
+                        <UploadableImage
                           src={avatarSrc}
                           alt={person.name}
-                          width={145}
-                          height={145}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                          decoding="async"
+                          fill
+                          className="object-cover"
+                          sizes="145px"
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-[32px] font-semibold text-[#666666]">

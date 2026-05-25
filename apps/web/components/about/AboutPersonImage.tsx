@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { UploadableImage } from "@/components/media/UploadableImage";
 import { resolveAboutBundledImage } from "@/lib/about-bundled-media";
 
 type Props = {
@@ -26,15 +27,9 @@ export function AboutPersonImage({ imageUrl, imageKey, alt, width, height, class
   // do not reliably allow arbitrary API hosts; bundled assets stay on next/image.
   if (typeof src === "string") {
     return (
-      <img
-        src={src}
-        alt={alt}
-        width={width}
-        height={height}
-        className={className}
-        loading="lazy"
-        decoding="async"
-      />
+      <div className="relative overflow-hidden" style={{ width, height }}>
+        <UploadableImage src={src} alt={alt} fill className={className} sizes={`${width}px`} />
+      </div>
     );
   }
   return <Image src={src} alt={alt} width={width} height={height} className={className} />;

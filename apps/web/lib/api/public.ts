@@ -112,7 +112,7 @@ export async function getTestimonials(): Promise<TestimonialApiRow[]> {
   const rows = json?.data ?? [];
   return rows.map((row) => ({
     ...row,
-    authorImageUrl: resolveOptionalMediaUrl(row.authorImageUrl),
+    authorImageUrl: resolveOptionalMediaUrl(row.authorImageUrl) || row.authorImageUrl,
   }));
 }
 
@@ -159,7 +159,7 @@ export async function getPublishedTeam(department?: string): Promise<TeamMemberP
     department: row.department,
     description: row.description ?? "",
     order: row.order ?? 0,
-    imageUrl: resolveOptionalMediaUrl(row.imageUrl),
+    imageUrl: resolveOptionalMediaUrl(row.imageUrl) || row.imageUrl,
   }));
 }
 
@@ -184,6 +184,6 @@ export async function getPublishedLeadershipLineup(): Promise<TeamMemberPublicRo
     department: row.department,
     description: row.description ?? "",
     order: row.order ?? 0,
-    imageUrl: resolveOptionalMediaUrl(row.imageUrl),
+    imageUrl: resolveOptionalMediaUrl(row.imageUrl) || row.imageUrl,
   }));
 }
