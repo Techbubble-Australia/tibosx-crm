@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Lock, Mail, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -32,7 +30,9 @@ export default function LoginPage() {
         throw new Error(typeof data.error === "string" ? data.error : "Login failed");
       }
 
-      router.push("/case-studies");
+      // Full navigation so the new httpOnly session cookie is always sent on the next
+      // request (middleware verifies JWT with JWT_SECRET — must match the API).
+      window.location.assign("/case-studies");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
