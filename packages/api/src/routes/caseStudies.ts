@@ -5,6 +5,16 @@ import { verifyCaseStudyPreviewToken } from "../lib/caseStudyPreviewToken";
 
 const router: IRouter = Router();
 
+async function allocateDuplicateSlug(sourceSlug: string): Promise<string> {
+  let candidate = `${sourceSlug}-copy`;
+  let n = 1;
+  while (await prisma.caseStudy.findUnique({ where: { slug: candidate }, select: { id: true } })) {
+    n += 1;
+    candidate = `${sourceSlug}-copy-${n}`;
+  }
+  return candidate;
+}
+
 // Validation schema for case study
 const caseStudySchema = z.object({
   slug: z.string().min(1),
@@ -225,6 +235,35 @@ router.get("/slug/:slug", async (req, res) => {
   } catch (error) {
     console.error("Error fetching case study:", error);
     res.status(500).json({ error: "Failed to fetch case study" });
+  }
+});
+
+// POST duplicate case study (admin) — must stay above GET /:id is fine; path is /:id/duplicate
+router.post("/:id/duplicate", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const source = await prisma.caseStudy.findUnique({ where: { id } });
+    if (!source) {
+      return res.status(404).json({ error: "Case study not found" });
+    }
+
+    const newSlug = await allocateDuplicateSlug(source.slug);
+    const { id: _omitId, createdAt: _c, updatedAt: _u, ...rest } = source;
+    const caseStudy = await prisma.caseStudy.create({
+      data: {
+        ...rest,
+        slug: newSlug,
+        title: `${source.title} (Copy)`,
+        published: false,
+        featured: false,
+      },
+    });
+
+    res.status(201).json({ data: caseStudy });
+  } catch (error) {
+    console.error("Error duplicating case study:", error);
+    res.status(500).json({ error: "Failed to duplicate case study" });
   }
 });
 

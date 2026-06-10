@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Edit, Trash2, Eye } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Edit, Trash2, Eye, CopyPlus } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 
 interface CaseStudy {
@@ -21,8 +22,10 @@ const marketingSiteBase =
     : "http://localhost:3000";
 
 export default function CaseStudiesPage() {
+  const router = useRouter();
   const [caseStudies, setCaseStudies] = useState<CaseStudy[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCaseStudies();
@@ -76,6 +79,32 @@ export default function CaseStudiesPage() {
     } catch (e) {
       console.error(e);
       alert("Failed to open preview.");
+    }
+  }
+
+  async function duplicateCaseStudy(cs: CaseStudy) {
+    setDuplicatingId(cs.id);
+    try {
+      const res = await adminFetch(`/api/admin/case-studies/${encodeURIComponent(cs.id)}/duplicate`, {
+        method: "POST",
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert((payload as { error?: string }).error || "Duplicate failed");
+        return;
+      }
+      const newId = (payload as { data?: { id?: string } }).data?.id;
+      if (!newId) {
+        alert("Duplicate succeeded but no id returned.");
+        return;
+      }
+      await fetchCaseStudies();
+      router.push(`/case-studies/${newId}`);
+    } catch (error) {
+      console.error("Error duplicating case study:", error);
+      alert("Duplicate failed");
+    } finally {
+      setDuplicatingId(null);
     }
   }
 
@@ -167,6 +196,15 @@ export default function CaseStudiesPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void duplicateCaseStudy(cs)}
+                        disabled={duplicatingId === cs.id}
+                        className="p-2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-40"
+                        title="Duplicate as draft"
+                      >
+                        <CopyPlus className="w-4 h-4" />
+                      </button>
                       <button
                         type="button"
                         onClick={() => void openCaseStudyOnSite(cs)}
