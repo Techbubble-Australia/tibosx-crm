@@ -834,12 +834,12 @@ export function MarketingHome({
             {/* Office cards */}
             <div className="mt-12 grid w-full grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
               {[
-                { code: "au" as const, name: "Australia", addr: "HQ · Sydney, NSW\n, 126 Banks Ave" },
-                { code: "us" as const, name: "USA", addr: "Wilmington, Delaware\n1007 N Orange St" },
-                { code: "in" as const, name: "India", addr: "Ahmedabad, Gujarat\nK.P. Epitome Office" },
+                { code: "au" as const, name: "Australia", addr: "HQ - 126 Banks Ave\nSydney, NSW" },
+                { code: "us" as const, name: "USA", addr: "1007 N Orange St\nWilmington, Delaware" },
+                { code: "in" as const, name: "India", addr: "K.P. Epitome\nAhmedabad, Gujarat" },
                 { code: "ph" as const, name: "Philippines", addr: "SE Asia Hub\nDelivery Centre" },
-                { code: "gb" as const, name: "UK", addr: "London\nRegional Offices" },
-                { code: "ae" as const, name: "UAE", addr: "Dubai\nRegional Offices" },
+                { code: "gb" as const, name: "UK", addr: "London\nRegional Office" },
+                { code: "ae" as const, name: "UAE", addr: "Dubai\nRegional Office" },
               ].map((o) => (
                 <div
                   key={o.name}
