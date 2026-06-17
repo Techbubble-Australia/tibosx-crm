@@ -12,6 +12,7 @@ const leadershipSlotSchema = z.union([z.literal(1), z.literal(2), z.literal(3)])
 const teamMemberSchema = z.object({
   name: z.string().min(1),
   role: z.string().min(1),
+  location: z.string().default(""),
   department: z.string().min(1),
   description: z.string().default(""),
   imageUrl: z.string().default(""),
@@ -91,6 +92,7 @@ router.post("/", async (req, res) => {
         data: {
           name: data.name,
           role: data.role,
+          location: data.location,
           department: data.department,
           description: data.description,
           imageUrl: data.imageUrl,

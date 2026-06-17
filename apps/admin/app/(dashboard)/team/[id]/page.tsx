@@ -53,6 +53,7 @@ export default function EditTeamMemberPage() {
     const payload = {
       name: formData.get("name"),
       role: formData.get("role"),
+      location: String(formData.get("location") ?? ""),
       department: formData.get("department"),
       description: String(formData.get("description") ?? ""),
       imageUrl: imageUrl.trim(),
@@ -104,6 +105,12 @@ export default function EditTeamMemberPage() {
             <label className="block text-sm font-medium mb-1">Role / Title *</label>
             <input name="role" required defaultValue={member.role as string}
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Location</label>
+            <input name="location" defaultValue={(member.location as string) || ""}
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
+              placeholder="e.g. Australia, India, USA" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Department *</label>

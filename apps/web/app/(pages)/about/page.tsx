@@ -138,6 +138,9 @@ export default async function AboutPage() {
                 </div>
                 <h3 className="text-[35px] font-semibold leading-[42px] tracking-[-0.09px]">{leader.name}</h3>
                 <p className="mt-[3px] text-[14px] font-bold leading-[21px] text-white">{leader.role}</p>
+                {leader.location ? (
+                  <p className="mt-1 text-[13px] leading-5 text-white/80">{leader.location}</p>
+                ) : null}
                 <p className="mt-3 text-[12px] leading-[17.6px] text-white">{leader.bio}</p>
               </div>
             ))}

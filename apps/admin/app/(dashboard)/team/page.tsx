@@ -9,6 +9,7 @@ interface TeamMember {
   id: string;
   name: string;
   role: string;
+  location: string;
   department: string;
   imageUrl: string;
   order: number;
@@ -73,6 +74,7 @@ export default function TeamPage() {
             <tr>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Role</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Location</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Department</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Leadership</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Order</th>
@@ -83,13 +85,14 @@ export default function TeamPage() {
           <tbody className="divide-y divide-gray-100">
             {members.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">No team members yet.</td>
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-400">No team members yet.</td>
               </tr>
             ) : (
               members.map((member) => (
                 <tr key={member.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium">{member.name}</td>
                   <td className="px-4 py-3 text-gray-600">{member.role}</td>
+                  <td className="px-4 py-3 text-gray-600">{member.location?.trim() || "—"}</td>
                   <td className="px-4 py-3 text-gray-600">{member.department}</td>
                   <td className="px-4 py-3 text-gray-600">
                     {member.featuredLeadershipOrder != null ? `Slot ${member.featuredLeadershipOrder}` : "—"}

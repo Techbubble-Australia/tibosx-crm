@@ -24,6 +24,7 @@ export default function NewTeamMemberPage() {
     const payload: Record<string, unknown> = {
       name: formData.get("name"),
       role: formData.get("role"),
+      location: String(formData.get("location") ?? ""),
       department: formData.get("department"),
       description: String(formData.get("description") ?? ""),
       imageUrl: imageUrl.trim(),
@@ -77,7 +78,14 @@ export default function NewTeamMemberPage() {
             <label className="block text-sm font-medium mb-1">Role / Title *</label>
             <input name="role" required
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
-              placeholder="e.g. Founder & Director, Australia" />
+              placeholder="e.g. Founder & Director" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Location</label>
+            <input name="location"
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
+              placeholder="e.g. Australia, India, USA" />
           </div>
 
           <div>

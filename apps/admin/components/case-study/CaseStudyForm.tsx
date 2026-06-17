@@ -33,6 +33,19 @@ function bannerImagesFromRecord(record: Record<string, unknown> | null | undefin
   return v.map(String).map((s) => s.trim()).filter(Boolean);
 }
 
+function dateInputValue(record: Record<string, unknown> | null | undefined, key: string): string {
+  if (!record) return "";
+  const v = record[key];
+  if (v == null || v === "") return "";
+  try {
+    const d = new Date(String(v));
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toISOString().slice(0, 10);
+  } catch {
+    return "";
+  }
+}
+
 export function CaseStudyForm({
   initialRecord,
 }: {
@@ -137,10 +150,20 @@ export function CaseStudyForm({
             >
               <option value="ServiceNow">ServiceNow</option>
               <option value="Salesforce">Salesforce</option>
-              <option value="MuleSoft">MuleSoft</option>
+              <option value="Microsoft">Microsoft</option>
               <option value="SharePoint">SharePoint</option>
               <option value="Staffing">Staffing</option>
             </select>
+          </div>
+          <div>
+            <label className={labelClass}>Published date</label>
+            <input
+              name="publishedDate"
+              type="date"
+              defaultValue={dateInputValue(defaults as Record<string, unknown>, "publishedDate")}
+              className={inputClass}
+            />
+            <p className="mt-1 text-xs text-gray-500">Shown on case study cards. Leave empty to use the created date.</p>
           </div>
           <div>
             <label className={labelClass}>Client name</label>
@@ -503,6 +526,24 @@ export function CaseStudyForm({
             Featured (homepage / large card)
           </label>
         </div>
+        <div className="flex items-center gap-4">
+          <input
+            type="checkbox"
+            name="showInAllTab"
+            id="showInAllTab"
+            defaultChecked={
+              (defaults as Record<string, unknown>).showInAllTab !== false &&
+              String((defaults as Record<string, unknown>).showInAllTab) !== "false"
+            }
+            className="h-4 w-4"
+          />
+          <label htmlFor="showInAllTab" className="font-medium">
+            Show in &quot;All&quot; tab (homepage and All filter)
+          </label>
+        </div>
+        <p className="text-xs text-gray-500">
+          Uncheck to hide from the All tab while still showing under the case study&apos;s category filter.
+        </p>
       </section>
 
       <div className="flex items-center gap-4">

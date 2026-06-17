@@ -119,6 +119,8 @@ const caseStudySchema = z.object({
   
   published: z.boolean().default(true),
   featured: z.boolean().default(false),
+  showInAllTab: z.boolean().default(true),
+  publishedDate: z.coerce.date().nullable().optional(),
 });
 
 // GET categories (public) — register before /:id so "meta" is not captured as an id
@@ -144,7 +146,11 @@ router.get("/", async (req, res) => {
     
     const where = {
       published: true,
-      ...(category && category !== "All" ? { category: category as string } : {}),
+      ...(category && category !== "All"
+        ? { category: category as string }
+        : category === "All"
+          ? { showInAllTab: true }
+          : {}),
     };
     
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
@@ -152,7 +158,7 @@ router.get("/", async (req, res) => {
     const [caseStudies, total] = await Promise.all([
       prisma.caseStudy.findMany({
         where,
-        orderBy: [{ featured: "desc" }, { createdAt: "desc" }],
+        orderBy: [{ featured: "desc" }, { publishedDate: "desc" }, { createdAt: "desc" }],
         take: parseInt(limit as string),
         skip,
         select: {
@@ -164,12 +170,14 @@ router.get("/", async (req, res) => {
           clientName: true,
           featuredImage: true,
           featured: true,
+          showInAllTab: true,
           heroStat1Value: true,
           heroStat1Label: true,
           heroStat2Value: true,
           heroStat2Label: true,
           heroStat3Value: true,
           heroStat3Label: true,
+          publishedDate: true,
           createdAt: true,
         },
       }),
@@ -195,7 +203,7 @@ router.get("/", async (req, res) => {
 router.get("/admin/all", async (req, res) => {
   try {
     const rows = await prisma.caseStudy.findMany({
-      orderBy: [{ featured: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ featured: "desc" }, { publishedDate: "desc" }, { createdAt: "desc" }],
       select: {
         id: true,
         title: true,
@@ -203,6 +211,8 @@ router.get("/admin/all", async (req, res) => {
         category: true,
         clientName: true,
         published: true,
+        showInAllTab: true,
+        publishedDate: true,
         createdAt: true,
       },
     });

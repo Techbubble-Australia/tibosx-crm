@@ -14,7 +14,7 @@ model CaseStudy {
   slug        String   @unique
   title       String
   subtitle    String
-  category    String   // ServiceNow, Salesforce, MuleSoft, SharePoint, Staffing
+  category    String   // ServiceNow, Salesforce, Microsoft, SharePoint, Staffing
   clientName  String
   
   // Hero stats
@@ -132,6 +132,10 @@ model CaseStudy {
   // Meta
   published         Boolean  @default(true)
   featured          Boolean  @default(false)
+  /// When true, included in homepage / listing "All" tab; category tabs always show by category.
+  showInAllTab      Boolean  @default(true)
+  /// Display date on cards; falls back to createdAt when null.
+  publishedDate     DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   
@@ -191,6 +195,7 @@ model TeamMember {
   id                       String   @id @default(cuid())
   name                     String
   role                     String
+  location                 String   @default("")
   department               String   // e.g. Management Team, ServiceNow Developers, etc.
   description              String   @default("")
   imageUrl                 String   @default("")

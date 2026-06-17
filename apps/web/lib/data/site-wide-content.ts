@@ -85,7 +85,7 @@ export const servicesPagePayload = {
       "Governance, reporting, and escalation paths included",
       "48-hour replacement guarantee on eligible engagements",
     ],
-    tags: ["Salesforce", "ServiceNow", "MuleSoft", "Data", "Cloud"],
+    tags: ["Salesforce", "ServiceNow", "Microsoft", "Data", "Cloud"],
     metricsTitle: "Key Metrics",
     metrics: [
       { value: "24h", label: "Response time" },
@@ -299,7 +299,7 @@ export const aboutPagePayload = {
     columns: [
       {
         title: "Technical Expertise That Spans Industries",
-        body: "Our team is proficient across a wide spectrum of technologies, including SaaS platforms like ServiceNow, Salesforce, and MuleSoft, and programming languages such as Java, Ruby, and Laravel. Whether your business requires IT solutions for small projects or complex, large-scale initiatives, our experience and skills make us your go-to partner for any technology stack.",
+        body: "Our team is proficient across a wide spectrum of technologies, including SaaS platforms like ServiceNow, Salesforce, and Microsoft, and programming languages such as Java, Ruby, and Laravel. Whether your business requires IT solutions for small projects or complex, large-scale initiatives, our experience and skills make us your go-to partner for any technology stack.",
       },
       {
         title: "World-Class Talent, Available When You Need It",

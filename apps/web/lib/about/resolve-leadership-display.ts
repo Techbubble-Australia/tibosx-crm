@@ -3,6 +3,7 @@ import type { TeamMemberPublicRow } from "@/lib/api/public";
 export type LeadershipDisplayMember = {
   name: string;
   role: string;
+  location: string;
   bio: string;
   imageUrl: string;
   imageKey: string;
@@ -15,6 +16,7 @@ export function resolveLeadershipDisplay(leadershipLineup: TeamMemberPublicRow[]
     return {
       name: m.name,
       role: m.role,
+      location: (m.location ?? "").trim(),
       bio: (m.description ?? "").trim(),
       imageUrl,
       imageKey: "",

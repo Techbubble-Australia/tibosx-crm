@@ -32,7 +32,7 @@ import { CASE_STUDY_SIDEBAR, buildHomeCaseStudySlots, type CaseStudyListCard } f
 import { useStatCountUpOnView } from "@/hooks/useStatCountUpOnView";
 import { isUploadsProxyPath } from "@/lib/media-url";
 
-const CASE_STUDY_HOME_CATEGORY_FILTERS = ["All", "ServiceNow", "Salesforce", "MuleSoft", "SharePoint", "Staffing"] as const;
+const CASE_STUDY_HOME_CATEGORY_FILTERS = ["All", "ServiceNow", "Salesforce", "Microsoft", "SharePoint", "Staffing"] as const;
 
 export type HomePreviewJob = { slug: string; title: string; meta: string; href: string };
 export type HomeClientStory = {
@@ -105,7 +105,7 @@ export function MarketingHome({
 
   const caseStudiesFiltered = useMemo(() => {
     if (homeCaseStudyCategory === "All") {
-      return caseStudies;
+      return caseStudies.filter((c) => c.showInAllTab);
     }
     return caseStudies.filter((c) => c.category === homeCaseStudyCategory);
   }, [caseStudies, homeCaseStudyCategory]);

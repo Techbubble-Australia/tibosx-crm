@@ -1,12 +1,11 @@
 import Image from "next/image";
 import techServiceNowLogo from "@image/techbubble_-_home_17.png";
 import techSalesforceLogo from "@image/techbubble_-_home_18.png";
-import techMuleSoftLogo from "@image/techbubble_-_home_19.png";
+import techMicrosoftLogo from "@image/techbubble_-_home_24.png";
 import techSharePointLogo from "@image/techbubble_-_home_20.png";
 import techPowerBILogo from "@image/techbubble_-_home_21.png";
 import techSnowflakeLogo from "@image/techbubble_-_home_22.png";
 import techOracleLogo from "@image/techbubble_-_home_23.png";
-import techMicrosoftAILogo from "@image/techbubble_-_home_24.png";
 import techSeleniumLogo from "@image/techbubble_-_home_25.png";
 import techAzureLogo from "@image/techbubble_-_home_26.png";
 import techAwsLogo from "@image/techbubble_-_home_27.png";
@@ -20,12 +19,12 @@ import { SectionPill } from "@/components/ui/SectionPill";
 const technologyCards = [
   { name: "ServiceNow", image: techServiceNowLogo },
   { name: "Salesforce", image: techSalesforceLogo },
-  { name: "MuleSoft", image: techMuleSoftLogo },
+  { name: "Microsoft", image: techMicrosoftLogo },
   { name: "SharePoint", image: techSharePointLogo },
   { name: "Power BI", image: techPowerBILogo },
   { name: "Snowflake", image: techSnowflakeLogo },
   { name: "Oracle", image: techOracleLogo },
-  { name: "Microsoft AI", image: techMicrosoftAILogo },
+  { name: "Microsoft AI", image: techMicrosoftLogo },
   { name: "Selenium", image: techSeleniumLogo },
   { name: "Azure", image: techAzureLogo },
   { name: "AWS", image: techAwsLogo },

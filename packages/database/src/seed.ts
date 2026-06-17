@@ -69,7 +69,7 @@ const featuredCaseStudySeed: Prisma.CaseStudyCreateInput = {
   tech1Icon: "servicenow",
   tech2Name: "Integrations",
   tech2Description: "API-led connectivity patterns",
-  tech2Icon: "mulesoft",
+  tech2Icon: "microsoft",
   tech3Name: "Quality engineering",
   tech3Description: "Automated testing and release discipline",
   tech3Icon: "qa",

@@ -205,7 +205,7 @@ export const caseStudiesPagePayload = {
     titleLine1: "Case Studies by Practice",
     titleLine2: "",
     subtitle: "Explore how we've helped leading enterprises transform operations, reduce costs, and accelerate growth.",
-    categories: ["All", "ServiceNow", "Salesforce", "MuleSoft", "SharePoint", "Staffing"],
+    categories: ["All", "ServiceNow", "Salesforce", "Microsoft", "SharePoint", "Staffing"],
   },
   emptyState: {
     title: "No published case studies yet",
@@ -236,9 +236,9 @@ export const caseStudiesPagePayload = {
       },
       {
         iconKey: "Share2" as const,
-        title: "MuleSoft",
+        title: "Microsoft",
         description:
-          "Expert API-led integration services covering Anypoint Platform, API management, cloud-based solutions, and B2B integrations.",
+          "Azure, Microsoft 365, Power Platform, and Dynamics — cloud migration, integration, automation, and enterprise governance.",
         exploreLabel: "Explore Practice",
       },
       {
@@ -299,7 +299,7 @@ export const siteFooterPayload = {
     { href: "/services", label: "Product Engineering" },
     { href: "/services", label: "ServiceNow" },
     { href: "/services", label: "Salesforce" },
-    { href: "/services", label: "MuleSoft" },
+    { href: "/services", label: "Microsoft" },
   ],
   officesHeading: "Our Offices",
   offices: [

@@ -175,6 +175,11 @@ export function AboutWorkforceApiSection({ cms, bioFallbackByName, apiMembers }:
                     </div>
                     <p className="mt-2 text-[16px] font-bold leading-6 text-[#111111]">{person.name}</p>
                     <p className="mx-auto mt-0.5 max-w-[190px] text-[14px] leading-5 tracking-[0.035px] text-[#666666]">{person.role}</p>
+                    {person.location?.trim() ? (
+                      <p className="mx-auto mt-0.5 max-w-[190px] text-[13px] leading-5 tracking-[0.035px] text-[#838383] dark:text-zinc-400">
+                        {person.location.trim()}
+                      </p>
+                    ) : null}
                     {bio ? (
                       <p className="mx-auto mt-2 max-w-[220px] text-left text-[12px] font-medium leading-[17px] text-[#666666]">{bio}</p>
                     ) : null}

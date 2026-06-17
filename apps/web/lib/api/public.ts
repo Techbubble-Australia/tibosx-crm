@@ -29,10 +29,12 @@ export type CaseStudyListApiRow = {
   category: string;
   featuredImage: string;
   featured?: boolean;
+  showInAllTab?: boolean;
   heroStat1Value: string;
   heroStat1Label: string;
   heroStat2Value: string;
   heroStat2Label: string;
+  publishedDate?: string | null;
   createdAt: string;
 };
 
@@ -132,6 +134,7 @@ export type TeamMemberPublicRow = {
   id: string;
   name: string;
   role: string;
+  location: string;
   department: string;
   description: string;
   imageUrl: string;
@@ -145,6 +148,7 @@ export async function getPublishedTeam(department?: string): Promise<TeamMemberP
       id: string;
       name: string;
       role: string;
+      location?: string;
       department: string;
       description?: string;
       imageUrl: string;
@@ -156,6 +160,7 @@ export async function getPublishedTeam(department?: string): Promise<TeamMemberP
     id: row.id,
     name: row.name,
     role: row.role,
+    location: row.location ?? "",
     department: row.department,
     description: row.description ?? "",
     order: row.order ?? 0,
@@ -170,6 +175,7 @@ export async function getPublishedLeadershipLineup(): Promise<TeamMemberPublicRo
       id: string;
       name: string;
       role: string;
+      location?: string;
       department: string;
       description?: string;
       imageUrl: string;
@@ -181,6 +187,7 @@ export async function getPublishedLeadershipLineup(): Promise<TeamMemberPublicRo
     id: row.id,
     name: row.name,
     role: row.role,
+    location: row.location ?? "",
     department: row.department,
     description: row.description ?? "",
     order: row.order ?? 0,

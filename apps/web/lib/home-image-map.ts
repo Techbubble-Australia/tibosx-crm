@@ -2,7 +2,7 @@ import type { StaticImageData } from "next/image";
 import featuredVicLogo from "@image/techbubble_-_home_1.png";
 import featuredQldLogo from "@image/techbubble_-_home_2.png";
 import featuredServiceNowLogo from "@image/techbubble_-_home_3.png";
-import featuredMuleSoftLogo from "@image/techbubble_-_home_4.png";
+import featuredMicrosoftLogo from "@image/techbubble_-_home_4.png";
 import featuredSalesforceLogo from "@image/techbubble_-_home_5.png";
 import standardCharteredLogo from "@image/techbubble_-_home_6.png";
 import vhaLogo from "@image/techbubble_-_home_7.png";
@@ -20,7 +20,7 @@ export const HOME_IMAGE_MAP: Record<string, StaticImageData> = {
   home_1: featuredVicLogo,
   home_2: featuredQldLogo,
   home_3: featuredServiceNowLogo,
-  home_4: featuredMuleSoftLogo,
+  home_4: featuredMicrosoftLogo,
   home_5: featuredSalesforceLogo,
   home_6: standardCharteredLogo,
   home_7: vhaLogo,

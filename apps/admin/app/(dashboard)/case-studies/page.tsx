@@ -13,6 +13,8 @@ interface CaseStudy {
   category: string;
   clientName: string;
   published: boolean;
+  showInAllTab: boolean;
+  publishedDate: string | null;
   createdAt: string;
 }
 
@@ -156,14 +158,15 @@ export default function CaseStudiesPage() {
               <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Category</th>
               <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Client</th>
               <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Status</th>
-              <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Created</th>
+              <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">All tab</th>
+              <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Date</th>
               <th className="text-right px-6 py-4 text-sm font-medium text-gray-500">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {caseStudies.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-12 text-gray-500">
+                <td colSpan={8} className="text-center py-12 text-gray-500">
                   No case studies found. Create your first one!
                 </td>
               </tr>
@@ -192,7 +195,10 @@ export default function CaseStudiesPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">
-                    {new Date(cs.createdAt).toLocaleDateString()}
+                    {cs.showInAllTab !== false ? "Yes" : "No"}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-500">
+                    {new Date(cs.publishedDate ?? cs.createdAt).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-2">

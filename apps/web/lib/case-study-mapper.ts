@@ -276,6 +276,7 @@ export type CaseStudyListCard = {
   stat2: { value: string; label: string };
   date: string;
   featured: boolean;
+  showInAllTab: boolean;
   sidebar: { label: string; href: string }[];
 };
 
@@ -299,12 +300,15 @@ export function apiRowToListCard(row: {
   category: string;
   featuredImage: string;
   featured?: boolean;
+  showInAllTab?: boolean;
   heroStat1Value: string;
   heroStat1Label: string;
   heroStat2Value: string;
   heroStat2Label: string;
+  publishedDate?: string | null;
   createdAt: string;
 }): CaseStudyListCard {
+  const dateSource = row.publishedDate ?? row.createdAt;
   return {
     slug: row.slug,
     category: row.category,
@@ -313,8 +317,9 @@ export function apiRowToListCard(row: {
     image: resolveMediaUrl(row.featuredImage),
     stat1: { value: row.heroStat1Value, label: row.heroStat1Label },
     stat2: { value: row.heroStat2Value, label: row.heroStat2Label },
-    date: formatCaseStudyDate(row.createdAt),
+    date: formatCaseStudyDate(dateSource),
     featured: Boolean(row.featured),
+    showInAllTab: row.showInAllTab !== false,
     sidebar: CASE_STUDY_SIDEBAR,
   };
 }

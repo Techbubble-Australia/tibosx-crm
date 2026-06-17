@@ -113,6 +113,9 @@ export function buildCaseStudyPayloadFromFormData(formData: FormData): Record<st
   out.phase4Tags = splitTags(formData.get("phase4Tags") as string | null);
   out.published = formData.get("published") === "on";
   out.featured = formData.get("featured") === "on";
+  out.showInAllTab = formData.get("showInAllTab") === "on";
+  const rawDate = formData.get("publishedDate") as string | null;
+  out.publishedDate = rawDate && rawDate.trim() ? new Date(`${rawDate}T12:00:00.000Z`).toISOString() : null;
   return out;
 }
 
@@ -128,5 +131,6 @@ export function emptyCaseStudyFormDefaults(): Record<string, string | boolean | 
   out.phase4Tags = [];
   out.published = true;
   out.featured = false;
+  out.showInAllTab = true;
   return out;
 }
