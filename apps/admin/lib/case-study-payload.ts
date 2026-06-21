@@ -5,6 +5,7 @@ export const CASE_STUDY_TEXT_FIELDS = [
   "title",
   "subtitle",
   "category",
+  "subcategory",
   "clientName",
   "featuredImage",
   "contentImage",

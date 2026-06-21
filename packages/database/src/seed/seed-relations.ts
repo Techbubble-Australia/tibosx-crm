@@ -7,6 +7,7 @@ const forceDemoRelations =
 const jobDefs = [
   {
     slug: "senior-servicenow-developer",
+    referenceNumber: "JRN001",
     title: "Senior ServiceNow Developer",
     location: "Australia",
     country: "Australia",
@@ -18,6 +19,7 @@ const jobDefs = [
   },
   {
     slug: "salesforce-solutions-architect",
+    referenceNumber: "JRN002",
     title: "Salesforce Solutions Architect",
     location: "USA",
     country: "USA",
@@ -29,6 +31,7 @@ const jobDefs = [
   },
   {
     slug: "ai-ml-engineer",
+    referenceNumber: "JRN003",
     title: "AI / ML Engineer",
     location: "India",
     country: "India",
@@ -40,6 +43,7 @@ const jobDefs = [
   },
   {
     slug: "microsoft-integration-specialist",
+    referenceNumber: "JRN004",
     title: "Microsoft Integration Specialist",
     location: "Philippines",
     country: "Philippines",
@@ -51,6 +55,7 @@ const jobDefs = [
   },
   {
     slug: "senior-servicenow-consultant",
+    referenceNumber: "JRN005",
     title: "Senior ServiceNow Consultant",
     location: "Australia",
     country: "Australia",
@@ -62,6 +67,7 @@ const jobDefs = [
   },
   {
     slug: "salesforce-technical-architect",
+    referenceNumber: "JRN006",
     title: "Salesforce Technical Architect",
     location: "USA",
     country: "USA",
@@ -73,6 +79,7 @@ const jobDefs = [
   },
   {
     slug: "microsoft-integration-lead",
+    referenceNumber: "JRN007",
     title: "Microsoft Integration Lead",
     location: "Australia",
     country: "Australia",
@@ -84,6 +91,7 @@ const jobDefs = [
   },
   {
     slug: "data-engineer-azure-aws",
+    referenceNumber: "JRN008",
     title: "Data Engineer (Azure/AWS)",
     location: "India",
     country: "India",
@@ -95,6 +103,7 @@ const jobDefs = [
   },
   {
     slug: "senior-react-developer",
+    referenceNumber: "JRN009",
     title: "Senior React Developer",
     location: "Philippines",
     country: "Philippines",

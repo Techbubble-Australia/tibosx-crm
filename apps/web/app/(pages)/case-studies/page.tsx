@@ -7,6 +7,7 @@ import { ClientStoriesSection } from "@/components/ClientStoriesSection";
 import { SectionPill } from "@/components/ui/SectionPill";
 import { getPublishedCaseStudies, getTestimonials } from "@/lib/api/public";
 import { apiRowToListCard, type CaseStudyListCard } from "@/lib/case-study-mapper";
+import { displayCategoryPill } from "@/lib/display-category";
 import type { ClientStoryItem } from "@/components/ClientStoriesSection";
 import { fetchSiteContentPayload } from "@/lib/fetch-site-content";
 import { resolveCaseStudiesPage } from "@/lib/site-content/resolve-pages";
@@ -130,7 +131,7 @@ export default async function CaseStudiesPage() {
                       <div className="flex h-full flex-1 flex-col px-[33px] pb-6 pt-[26px]">
                         <div className="flex items-center justify-between">
                         <div className="inline-flex h-7 items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
-                          {featuredStudy.category.toUpperCase()}
+                          {displayCategoryPill(featuredStudy.category)}
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
@@ -191,7 +192,7 @@ export default async function CaseStudiesPage() {
                     >
                       <div className="flex items-center justify-between">
                         <div className="inline-flex h-[28px] items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
-                          {topRightStudy.category.toUpperCase()}
+                          {displayCategoryPill(topRightStudy.category)}
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
@@ -233,7 +234,7 @@ export default async function CaseStudiesPage() {
                     >
                       <div className="flex items-center justify-between">
                         <div className="inline-flex h-[28px] items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
-                          {study.category.toUpperCase()}
+                          {displayCategoryPill(study.category)}
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />

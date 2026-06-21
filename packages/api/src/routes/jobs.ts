@@ -12,17 +12,45 @@ const jobSchema = z.object({
   flag: z.string().min(1),
   type: z.string().min(1),
   workMode: z.string().min(1),
-  department: z.string().default("Engineering"),
-  description: z.string().default(""),
+  category: z.string().default(""),
+  department: z.string().default(""),
+  description: z.string().max(500_000).default(""),
   published: z.boolean().default(true),
   order: z.number().int().default(0),
 });
 
+async function allocateJobReferenceNumber(): Promise<string> {
+  const jobs = await prisma.jobListing.findMany({
+    select: { referenceNumber: true },
+  });
+  let max = 0;
+  for (const job of jobs) {
+    const match = job.referenceNumber.match(/^JRN(\d+)$/i);
+    if (match) {
+      max = Math.max(max, parseInt(match[1], 10));
+    }
+  }
+  return `JRN${String(max + 1).padStart(3, "0")}`;
+}
+
 // Public: list published jobs
-router.get("/", async (req, res) => {
+router.get("/", async (_req, res) => {
   try {
     const jobs = await prisma.jobListing.findMany({
       where: { published: true },
+      orderBy: [{ order: "asc" }, { createdAt: "desc" }],
+    });
+    res.json({ data: jobs });
+  } catch (error) {
+    console.error("Error fetching jobs:", error);
+    res.status(500).json({ error: "Failed to fetch jobs" });
+  }
+});
+
+// Admin: list all jobs (including unpublished) — must be before /:slug
+router.get("/admin/all", async (_req, res) => {
+  try {
+    const jobs = await prisma.jobListing.findMany({
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
     });
     res.json({ data: jobs });
@@ -48,24 +76,14 @@ router.get("/:slug", async (req, res) => {
   }
 });
 
-// Admin: list all jobs (including unpublished)
-router.get("/admin/all", async (req, res) => {
-  try {
-    const jobs = await prisma.jobListing.findMany({
-      orderBy: [{ order: "asc" }, { createdAt: "desc" }],
-    });
-    res.json({ data: jobs });
-  } catch (error) {
-    console.error("Error fetching jobs:", error);
-    res.status(500).json({ error: "Failed to fetch jobs" });
-  }
-});
-
 // Admin: create job
 router.post("/", async (req, res) => {
   try {
     const data = jobSchema.parse(req.body);
-    const job = await prisma.jobListing.create({ data });
+    const referenceNumber = await allocateJobReferenceNumber();
+    const job = await prisma.jobListing.create({
+      data: { ...data, referenceNumber },
+    });
     res.status(201).json({ data: job });
   } catch (error) {
     if (error instanceof z.ZodError) {

@@ -40,7 +40,7 @@ export default async function HomePage() {
   const previewJobs: HomePreviewJob[] = jobs.slice(0, 4).map((j) => ({
     slug: j.slug,
     title: j.title,
-    meta: `${j.flag} ${j.location} · ${j.type} · ${j.workMode}`,
+    meta: `${j.referenceNumber ? `${j.referenceNumber} · ` : ""}${j.flag} ${j.location} · ${j.type} · ${j.workMode}`,
     href: `/careers/${encodeURIComponent(j.slug)}`,
   }));
 

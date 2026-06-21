@@ -31,8 +31,7 @@ import innovationImage from "@image/Innovation_Cutting_Edge_Tech.png";
 import { CASE_STUDY_SIDEBAR, buildHomeCaseStudySlots, type CaseStudyListCard } from "@/lib/case-study-mapper";
 import { useStatCountUpOnView } from "@/hooks/useStatCountUpOnView";
 import { isUploadsProxyPath } from "@/lib/media-url";
-
-const CASE_STUDY_HOME_CATEGORY_FILTERS = ["All", "ServiceNow", "Salesforce", "Microsoft", "SharePoint", "Staffing"] as const;
+import { UNCATEGORIZED_LABEL } from "@/lib/display-category";
 
 export type HomePreviewJob = { slug: string; title: string; meta: string; href: string };
 export type HomeClientStory = {
@@ -82,7 +81,7 @@ function formatWorldClockTime(date: Date, timeZone: string): string {
 }
 
 function caseStudyCategoryPill(category: string): string {
-  return category.trim().toUpperCase();
+  return category.toUpperCase();
 }
 
 export function MarketingHome({
@@ -100,8 +99,17 @@ export function MarketingHome({
   const [worldClockNow, setWorldClockNow] = useState(() => new Date());
   const [worldClocksReady, setWorldClocksReady] = useState(false);
 
-  const [homeCaseStudyCategory, setHomeCaseStudyCategory] =
-    useState<(typeof CASE_STUDY_HOME_CATEGORY_FILTERS)[number]>("All");
+  const homeCategoryFilters = useMemo(() => {
+    const names = new Set(caseStudies.map((c) => c.category));
+    const sorted = Array.from(names).sort((a, b) => {
+      if (a === UNCATEGORIZED_LABEL) return 1;
+      if (b === UNCATEGORIZED_LABEL) return -1;
+      return a.localeCompare(b);
+    });
+    return ["All", ...sorted];
+  }, [caseStudies]);
+
+  const [homeCaseStudyCategory, setHomeCaseStudyCategory] = useState("All");
 
   const caseStudiesFiltered = useMemo(() => {
     if (homeCaseStudyCategory === "All") {
@@ -882,7 +890,7 @@ export function MarketingHome({
             </div>
 
             <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter case studies by category">
-              {CASE_STUDY_HOME_CATEGORY_FILTERS.map((tab) => {
+              {homeCategoryFilters.map((tab) => {
                 const active = homeCaseStudyCategory === tab;
                 return (
                   <button

@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { buildCaseStudyPayloadFromFormData, emptyCaseStudyFormDefaults } from "@/lib/case-study-payload";
 import { AdminImageField } from "@/components/AdminImageField";
 import { AdminBannerImagesField } from "@/components/case-study/AdminBannerImagesField";
+import { CaseStudyCategorySelect } from "@/components/case-study/CaseStudyCategorySelect";
 import { adminFetch } from "@/lib/admin-api";
 
 const inputClass =
@@ -140,20 +141,19 @@ export function CaseStudyForm({
             <label className={labelClass}>Slug</label>
             <input name="slug" required defaultValue={str(defaults as Record<string, unknown>, "slug")} className={inputClass} />
           </div>
-          <div>
-            <label className={labelClass}>Category</label>
-            <select
-              name="category"
-              required
-              defaultValue={str(defaults as Record<string, unknown>, "category") || "ServiceNow"}
-              className={inputClass}
+          <CaseStudyCategorySelect
+            defaultCategory={str(defaults as Record<string, unknown>, "category")}
+            defaultSubcategory={str(defaults as Record<string, unknown>, "subcategory")}
+            selectClassName={inputClass}
+            labelClassName={labelClass}
+          />
+          <div className="col-span-2">
+            <Link
+              href="/case-studies/categories"
+              className="text-xs text-gray-500 underline hover:text-gray-700"
             >
-              <option value="ServiceNow">ServiceNow</option>
-              <option value="Salesforce">Salesforce</option>
-              <option value="Microsoft">Microsoft</option>
-              <option value="SharePoint">SharePoint</option>
-              <option value="Staffing">Staffing</option>
-            </select>
+              Manage categories &amp; subcategories
+            </Link>
           </div>
           <div>
             <label className={labelClass}>Published date</label>

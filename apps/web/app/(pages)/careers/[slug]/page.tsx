@@ -2,6 +2,8 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getPublishedJobBySlug } from "@/lib/api/public";
+import { JobDescription } from "@/components/careers/JobDescription";
+import { displayCategory } from "@/lib/display-category";
 
 export default async function CareerJobDetailPage({ params }: { params: { slug: string } }) {
   const job = await getPublishedJobBySlug(params.slug);
@@ -10,6 +12,9 @@ export default async function CareerJobDetailPage({ params }: { params: { slug: 
   }
 
   const meta = `${job.flag} ${job.location} · ${job.type} · ${job.workMode}`;
+  const eyebrow = [job.referenceNumber, displayCategory(job.category), job.department || undefined]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <main className="min-h-[60vh] bg-white">
@@ -22,26 +27,16 @@ export default async function CareerJobDetailPage({ params }: { params: { slug: 
             <ArrowLeft className="h-4 w-4" aria-hidden />
             Back to careers
           </Link>
-          <p className="mt-6 text-[12px] font-semibold uppercase tracking-wider text-[#666666]">{job.department}</p>
+          {eyebrow ? (
+            <p className="mt-6 text-[12px] font-semibold uppercase tracking-wider text-[#666666]">{eyebrow}</p>
+          ) : null}
           <h1 className="mt-2 text-[36px] font-bold leading-tight tracking-[-0.02em] text-[#111111]">{job.title}</h1>
           <p className="mt-3 text-[16px] text-[#666666]">{meta}</p>
         </div>
       </section>
 
       <section className="tb-container max-w-[800px] py-12">
-        {job.description?.trim() ? (
-          <div className="prose prose-gray max-w-none text-[16px] leading-7 text-[#333]">
-            {job.description.split("\n\n").map((para, i) => (
-              <p key={i} className="mb-4">
-                {para}
-              </p>
-            ))}
-          </div>
-        ) : (
-          <p className="text-[16px] leading-7 text-[#666666]">
-            Full description coming soon. Apply below and mention this role in your message.
-          </p>
-        )}
+        <JobDescription description={job.description} />
 
         <div className="mt-10 flex flex-wrap gap-4">
           <Link

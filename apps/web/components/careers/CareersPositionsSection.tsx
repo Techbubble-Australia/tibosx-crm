@@ -116,6 +116,9 @@ export function CareersPositionsSection({ jobs }: { jobs: JobApiRow[] }) {
                 <div>
                   <p className="text-[16px] font-bold leading-6 text-[#111111]">{position.title}</p>
                   <p className="text-[14px] leading-5 tracking-[0.035px] text-[#7a7f8e]">
+                    {position.referenceNumber ? (
+                      <span className="font-mono text-[12px] text-[#999]">{position.referenceNumber} · </span>
+                    ) : null}
                     {position.flag} {position.location} · {formatType(position.type)} · {formatType(position.workMode)}
                   </p>
                 </div>

@@ -21,6 +21,7 @@ const caseStudySchema = z.object({
   title: z.string().min(1),
   subtitle: z.string().min(1),
   category: z.string().min(1),
+  subcategory: z.string().default(""),
   clientName: z.string().min(1),
   
   heroStat1Value: z.string(),

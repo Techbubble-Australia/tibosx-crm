@@ -77,12 +77,14 @@ export async function getCaseStudyBySlug(
 
 export type JobApiRow = {
   slug: string;
+  referenceNumber: string;
   title: string;
   location: string;
   country: string;
   flag: string;
   type: string;
   workMode: string;
+  category: string;
   department: string;
 };
 

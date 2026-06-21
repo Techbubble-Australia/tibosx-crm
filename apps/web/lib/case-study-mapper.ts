@@ -1,4 +1,5 @@
 import { resolveMediaUrl } from "@/lib/media-url";
+import { displayCategory } from "@/lib/display-category";
 
 /** Flat API payload from GET /api/case-studies/slug/:slug */
 export type CaseStudyApiRecord = {
@@ -205,7 +206,7 @@ export function mapCaseStudyApiToPageModel(data: CaseStudyApiRecord): CaseStudyP
     slug: data.slug,
     title: data.title,
     subtitle: data.subtitle,
-    category: data.category,
+    category: displayCategory(data.category),
     bannerImages,
     contentImage,
     heroStats: [
@@ -311,7 +312,7 @@ export function apiRowToListCard(row: {
   const dateSource = row.publishedDate ?? row.createdAt;
   return {
     slug: row.slug,
-    category: row.category,
+    category: displayCategory(row.category),
     title: row.title,
     description: row.subtitle,
     image: resolveMediaUrl(row.featuredImage),

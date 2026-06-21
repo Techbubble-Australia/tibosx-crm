@@ -11,6 +11,7 @@ interface CaseStudy {
   title: string;
   slug: string;
   category: string;
+  subcategory?: string;
   clientName: string;
   published: boolean;
   showInAllTab: boolean;
@@ -141,13 +142,21 @@ export default function CaseStudiesPage() {
           <h2 className="text-lg font-semibold">All Case Studies</h2>
           <p className="text-gray-500 text-sm">Manage your case studies</p>
         </div>
-        <Link
-          href="/case-studies/new"
-          className="inline-flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Add New
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/case-studies/categories"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+          >
+            Categories &amp; Subcategories
+          </Link>
+          <Link
+            href="/case-studies/new"
+            className="inline-flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add New
+          </Link>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -181,6 +190,9 @@ export default function CaseStudiesPage() {
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                       {cs.category}
                     </span>
+                    {cs.subcategory ? (
+                      <span className="mt-1 block text-xs text-gray-500">{cs.subcategory}</span>
+                    ) : null}
                   </td>
                   <td className="px-6 py-4 text-sm">{cs.clientName}</td>
                   <td className="px-6 py-4">
