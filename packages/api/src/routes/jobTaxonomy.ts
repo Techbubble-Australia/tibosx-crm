@@ -7,50 +7,57 @@ const nameSchema = z.object({
   order: z.number().int().default(0),
 });
 
-function createTaxonomyRouter(model: "jobCategory" | "jobDepartment", jobField: "category" | "department") {
+type TaxonomyRow = { id: string; name: string; order: number };
+
+type TaxonomyStore = {
+  label: string;
+  jobField: "category" | "department";
+  findMany: () => Promise<TaxonomyRow[]>;
+  create: (data: { name: string; order: number }) => Promise<TaxonomyRow>;
+  findUnique: (id: string) => Promise<TaxonomyRow | null>;
+  update: (id: string, data: { name?: string; order?: number }) => Promise<TaxonomyRow>;
+  delete: (id: string) => Promise<void>;
+};
+
+function buildTaxonomyRouter(store: TaxonomyStore): IRouter {
   const router: IRouter = Router();
 
   router.get("/", async (_req, res) => {
     try {
-      const items = await prisma[model].findMany({
-        orderBy: [{ order: "asc" }, { name: "asc" }],
-      });
+      const items = await store.findMany();
       res.json({ data: items });
     } catch (error) {
-      console.error(`Error fetching job ${jobField}:`, error);
-      res.status(500).json({ error: `Failed to fetch ${jobField}` });
+      console.error(`Error fetching job ${store.label}:`, error);
+      res.status(500).json({ error: `Failed to fetch ${store.label}` });
     }
   });
 
   router.post("/", async (req, res) => {
     try {
       const data = nameSchema.parse(req.body);
-      const item = await prisma[model].create({ data });
+      const item = await store.create(data);
       res.status(201).json({ data: item });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Validation error", details: error.errors });
       }
-      console.error(`Error creating job ${jobField}:`, error);
-      res.status(500).json({ error: `Failed to create ${jobField}` });
+      console.error(`Error creating job ${store.label}:`, error);
+      res.status(500).json({ error: `Failed to create ${store.label}` });
     }
   });
 
   router.put("/:id", async (req, res) => {
     try {
       const data = nameSchema.partial().parse(req.body);
-      const existing = await prisma[model].findUnique({ where: { id: req.params.id } });
+      const existing = await store.findUnique(req.params.id);
       if (!existing) {
         return res.status(404).json({ error: "Not found" });
       }
-      const item = await prisma[model].update({
-        where: { id: req.params.id },
-        data,
-      });
+      const item = await store.update(req.params.id, data);
       if (data.name && data.name !== existing.name) {
         await prisma.jobListing.updateMany({
-          where: { [jobField]: existing.name },
-          data: { [jobField]: data.name },
+          where: { [store.jobField]: existing.name },
+          data: { [store.jobField]: data.name },
         });
       }
       res.json({ data: item });
@@ -58,27 +65,50 @@ function createTaxonomyRouter(model: "jobCategory" | "jobDepartment", jobField: 
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Validation error", details: error.errors });
       }
-      console.error(`Error updating job ${jobField}:`, error);
-      res.status(500).json({ error: `Failed to update ${jobField}` });
+      console.error(`Error updating job ${store.label}:`, error);
+      res.status(500).json({ error: `Failed to update ${store.label}` });
     }
   });
 
   router.delete("/:id", async (req, res) => {
     try {
-      const existing = await prisma[model].findUnique({ where: { id: req.params.id } });
+      const existing = await store.findUnique(req.params.id);
       if (!existing) {
         return res.status(404).json({ error: "Not found" });
       }
-      await prisma[model].delete({ where: { id: req.params.id } });
+      await store.delete(req.params.id);
       res.json({ message: "Deleted" });
     } catch (error) {
-      console.error(`Error deleting job ${jobField}:`, error);
-      res.status(500).json({ error: `Failed to delete ${jobField}` });
+      console.error(`Error deleting job ${store.label}:`, error);
+      res.status(500).json({ error: `Failed to delete ${store.label}` });
     }
   });
 
   return router;
 }
 
-export const jobCategoryRoutes = createTaxonomyRouter("jobCategory", "category");
-export const jobDepartmentRoutes = createTaxonomyRouter("jobDepartment", "department");
+export const jobCategoryRoutes = buildTaxonomyRouter({
+  label: "category",
+  jobField: "category",
+  findMany: () =>
+    prisma.jobCategory.findMany({
+      orderBy: [{ order: "asc" }, { name: "asc" }],
+    }),
+  create: (data) => prisma.jobCategory.create({ data }),
+  findUnique: (id) => prisma.jobCategory.findUnique({ where: { id } }),
+  update: (id, data) => prisma.jobCategory.update({ where: { id }, data }),
+  delete: (id) => prisma.jobCategory.delete({ where: { id } }).then(() => undefined),
+});
+
+export const jobDepartmentRoutes = buildTaxonomyRouter({
+  label: "department",
+  jobField: "department",
+  findMany: () =>
+    prisma.jobDepartment.findMany({
+      orderBy: [{ order: "asc" }, { name: "asc" }],
+    }),
+  create: (data) => prisma.jobDepartment.create({ data }),
+  findUnique: (id) => prisma.jobDepartment.findUnique({ where: { id } }),
+  update: (id, data) => prisma.jobDepartment.update({ where: { id }, data }),
+  delete: (id) => prisma.jobDepartment.delete({ where: { id } }).then(() => undefined),
+});

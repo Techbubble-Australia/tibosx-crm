@@ -26,7 +26,7 @@ async function allocateJobReferenceNumber(): Promise<string> {
   let max = 0;
   for (const job of jobs) {
     const match = job.referenceNumber.match(/^JRN(\d+)$/i);
-    if (match) {
+    if (match?.[1]) {
       max = Math.max(max, parseInt(match[1], 10));
     }
   }
