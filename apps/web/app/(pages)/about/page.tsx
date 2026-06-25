@@ -33,19 +33,12 @@ export default async function AboutPage() {
     authorImageUrl: t.authorImageUrl || undefined,
   }));
 
-  const bioFallbackByName: Record<string, string> = {};
-  for (const p of a.workforce.management.people) {
-    const b = (p.bio ?? "").trim();
-    if (b) bioFallbackByName[p.name] = b;
-  }
-
   const cmsWorkforce = {
     pill: a.workforce.pill,
     title: a.workforce.title,
     intro: a.workforce.intro,
     stats: a.workforce.stats,
     tabs: a.workforce.tabs,
-    management: a.workforce.management,
     defaultMemberBio: a.workforce.defaultMemberBio,
   };
 
@@ -149,7 +142,7 @@ export default async function AboutPage() {
       </section>
 
       {teamRows.length > 0 ? (
-        <AboutWorkforceApiSection cms={cmsWorkforce} bioFallbackByName={bioFallbackByName} apiMembers={teamRows} />
+        <AboutWorkforceApiSection cms={cmsWorkforce} apiMembers={teamRows} />
       ) : (
         <AboutWorkforceCmsFallbackSection cms={cmsWorkforce} />
       )}

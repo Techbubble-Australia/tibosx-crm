@@ -1,0 +1,94 @@
+export type JobLocationEntry = {
+  countryCode: string;
+  country: string;
+  flag: string;
+  label?: string;
+};
+
+export type JobLocationLegacyFields = {
+  location: string;
+  country: string;
+  flag: string;
+  locations?: JobLocationEntry[];
+};
+
+export function normalizeJobLocations(job: JobLocationLegacyFields): JobLocationEntry[] {
+  if (Array.isArray(job.locations) && job.locations.length > 0) {
+    return job.locations;
+  }
+
+  const country = job.country?.trim() ?? "";
+  const flag = job.flag?.trim() ?? "";
+  const location = job.location?.trim() ?? "";
+  if (!country && !flag && !location) return [];
+
+  return [
+    {
+      countryCode: "",
+      country: country || location,
+      flag,
+      label: location && location !== country ? location : "",
+    },
+  ];
+}
+
+export function formatJobLocationsSummary(entries: readonly JobLocationEntry[]): {
+  flags: string;
+  locationText: string;
+} {
+  const flags = entries
+    .map((e) => e.flag.trim())
+    .filter(Boolean)
+    .join(" ");
+  const locationText = entries
+    .map((e) => e.label?.trim() || e.country.trim())
+    .filter(Boolean)
+    .join(" · ");
+  return { flags, locationText };
+}
+
+export function formatJobMetaLine(
+  job: JobLocationLegacyFields & { type: string; workMode: string },
+): string {
+  const entries = normalizeJobLocations(job);
+  const { flags, locationText } = formatJobLocationsSummary(entries);
+  const place = [flags, locationText].filter(Boolean).join(" ").trim();
+  const formatType = (s: string) => {
+    const t = s.trim();
+    if (!t) return t;
+    return t.replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+  return [place, formatType(job.type), formatType(job.workMode)].filter(Boolean).join(" · ");
+}
+
+export function jobMatchesLocationFilter(job: JobLocationLegacyFields, filterKey: string): boolean {
+  const key = filterKey.trim().toLowerCase();
+  if (!key) return true;
+  return normalizeJobLocations(job).some((e) => {
+    const code = e.countryCode.trim().toLowerCase();
+    const country = e.country.trim().toLowerCase();
+    return code === key || country === key;
+  });
+}
+
+export function collectJobLocationFilterOptions(
+  jobs: readonly JobLocationLegacyFields[],
+): { key: string; label: string; flag: string }[] {
+  const seen = new Set<string>();
+  const out: { key: string; label: string; flag: string }[] = [];
+
+  for (const job of jobs) {
+    for (const entry of normalizeJobLocations(job)) {
+      const key = (entry.countryCode.trim() || entry.country.trim()).toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        key,
+        label: entry.country.trim() || entry.label?.trim() || key,
+        flag: entry.flag.trim(),
+      });
+    }
+  }
+
+  return out.sort((a, b) => a.label.localeCompare(b.label));
+}

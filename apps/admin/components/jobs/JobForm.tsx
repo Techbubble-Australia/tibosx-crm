@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
-import { CountryFlagPicker } from "@/components/CountryFlagPicker";
 import { HtmlEditor } from "@/components/HtmlEditor";
+import { JobLocationsField } from "@/components/jobs/JobLocationsField";
 import { adminFetch } from "@/lib/admin-api";
+import { jobLocationsFromDefaults, type JobLocationEntry } from "@/lib/job-locations";
 
 export type JobFormDefaults = {
   id?: string;
@@ -21,6 +22,7 @@ export type JobFormDefaults = {
   order?: number;
   published?: boolean;
   referenceNumber?: string;
+  locations?: JobLocationEntry[];
 };
 
 type TaxonomyItem = { id: string; name: string };
@@ -54,6 +56,7 @@ export function JobForm({
   const [categories, setCategories] = useState<TaxonomyItem[]>([]);
   const [departments, setDepartments] = useState<TaxonomyItem[]>([]);
   const [description, setDescription] = useState(defaults.description ?? "");
+  const [locations, setLocations] = useState<JobLocationEntry[]>(() => jobLocationsFromDefaults(defaults));
 
   useEffect(() => {
     async function loadTaxonomy() {
@@ -75,12 +78,15 @@ export function JobForm({
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const validLocations = locations.filter((row) => row.countryCode.trim() && row.country.trim());
+    if (validLocations.length === 0) {
+      alert("Add at least one country for this role.");
+      return;
+    }
     const formData = new FormData(e.currentTarget);
     const payload: Record<string, unknown> = {
       title: formData.get("title"),
-      location: formData.get("location"),
-      country: formData.get("country"),
-      flag: formData.get("flag"),
+      locations: validLocations,
       type: formData.get("type"),
       workMode: formData.get("workMode"),
       category: formData.get("category"),
@@ -126,25 +132,11 @@ export function JobForm({
           />
         </div>
 
-        <div>
-          <label className={labelClass}>Location *</label>
-          <input
-            name="location"
-            required
-            defaultValue={defaults.location ?? ""}
-            className={inputClass}
-            placeholder="e.g. Sydney · Remote (APAC)"
-          />
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Shown on the careers listing next to the flag.
-          </p>
-        </div>
-
-        <CountryFlagPicker
-          defaultFlag={defaults.flag ?? ""}
-          defaultCountry={defaults.country ?? ""}
-          selectClassName={inputClass}
-          labelClassName={labelClass}
+        <JobLocationsField
+          value={locations}
+          onChange={setLocations}
+          inputClass={inputClass}
+          labelClass={labelClass}
         />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

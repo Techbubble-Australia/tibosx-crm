@@ -1,28 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AdminImageField } from "@/components/AdminImageField";
+import Link from "next/link";
 import { adminFetch } from "@/lib/admin-api";
 import { inputClass, labelClass, sectionClass } from "./form-styles";
 
-/** Must match keys in `apps/web/lib/about-bundled-media.ts`. */
-const ABOUT_BUNDLED_IMAGE_KEYS = [
-  "about_us_1",
-  "about_us_2",
-  "about_us_3",
-  "about_us_4",
-  "about_us_5",
-  "about_us_6",
-  "about_us_7",
-  "about_us_8",
-  "about_us_9",
-  "about_us_10",
-  "about_us_11",
-] as const;
-
 type StatRow = { n: string; l: string; labelClass: string };
 type MissionCard = { title: string; text: string };
-type WorkforceTab = { department: string; active: boolean };
+type WorkforceTab = { label: string; department: string; active: boolean };
 
 type AdminTeamListRow = {
   id: string;
@@ -162,7 +147,7 @@ export function AboutPageForm({
       ...value,
       workforce: {
         ...value.workforce,
-        tabs: [...value.workforce.tabs, { department: "", active: false }],
+        tabs: [...value.workforce.tabs, { label: "", department: "", active: false }],
       },
     });
   };
@@ -174,14 +159,6 @@ export function AboutPageForm({
         ...value.workforce,
         tabs: value.workforce.tabs.filter((_, j) => j !== i),
       },
-    });
-  };
-
-  const setMgmtPerson = (i: number, patch: Partial<ManagementPerson>) => {
-    const people = value.workforce.management.people.map((p, j) => (j === i ? { ...p, ...patch } : p));
-    onChange({
-      ...value,
-      workforce: { ...value.workforce, management: { ...value.workforce.management, people } },
     });
   };
 
@@ -205,8 +182,6 @@ export function AboutPageForm({
       },
     });
   };
-
-  const bundledKeyOptions = ABOUT_BUNDLED_IMAGE_KEYS;
 
   return (
     <div className="space-y-4">
@@ -351,9 +326,13 @@ export function AboutPageForm({
               <input className={inputClass} value={value.workforce.title} onChange={(e) => setWorkforce({ title: e.target.value })} placeholder="Title" />
               <textarea className={inputClass} rows={3} value={value.workforce.intro} onChange={(e) => setWorkforce({ intro: e.target.value })} placeholder="Intro" />
               <div>
-                <label className={labelClass}>Default member bio (API)</label>
-                <p className="mb-1 text-xs text-gray-500">
-                  Shown when a published team member has no Admin description. Use name-specific text under Management team below when possible.
+                <label className={labelClass}>Default member bio</label>
+                <p className="mb-1 text-xs text-gray-500 dark:text-zinc-400">
+                  Shown when a published team member has no description in{" "}
+                  <Link href="/team" className="font-medium text-gray-800 underline underline-offset-2 dark:text-zinc-200">
+                    Admin → Team
+                  </Link>
+                  .
                 </p>
                 <textarea
                   className={inputClass}
@@ -378,13 +357,12 @@ export function AboutPageForm({
           </section>
 
           <section className={sectionClass}>
-            <h3 className="mb-2 font-semibold text-gray-900 dark:text-zinc-100">Department tabs (workforce pills)</h3>
+            <h3 className="mb-2 font-semibold text-gray-900 dark:text-zinc-100">Team tabs</h3>
             <p className="mb-4 text-xs leading-relaxed text-gray-600 dark:text-zinc-400">
-              Each row should match <strong>Admin → Team</strong> → member <strong>Department</strong> (case-insensitive exact match, or
-              close spelling for minor typos). The marketing site only lists departments that have published members, but the{" "}
-              <strong>pill title</strong> uses the text you enter here when it maps to that department. Turn on <strong>Active</strong>{" "}
-              to pin matching departments earlier; inactive rows are ignored. Unmatched active rows do not create a pill.
-              Remaining departments follow alphabetically.
+              Set the <strong>tab name</strong> visitors see on the About page, and the <strong>team department</strong> it should match
+              from <strong>Admin → Team</strong> (case-insensitive exact match, or close spelling for minor typos). Only departments with
+              published members appear on the site. Turn on <strong>Active</strong> to pin matching tabs earlier; inactive rows are ignored.
+              Unmatched active rows do not create a tab. Remaining departments follow alphabetically.
             </p>
             <datalist id="about-workforce-department-suggestions">
               {publishedDepartmentSuggestions.map((d) => (
@@ -394,31 +372,43 @@ export function AboutPageForm({
             <div className="space-y-4">
               {value.workforce.tabs.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-gray-200 bg-gray-50/80 px-4 py-6 text-center text-sm text-gray-600 dark:border-zinc-600 dark:bg-zinc-900/40 dark:text-zinc-400">
-                  No rows yet — the site lists every published department in alphabetical order. Use{" "}
-                  <span className="font-medium">Add department tab</span> to control order and which departments are pinned first.
+                  No team tabs yet — the site lists every published department in alphabetical order. Use{" "}
+                  <span className="font-medium">Add team tab</span> to control order and which tabs are pinned first.
                 </p>
               ) : null}
               {value.workforce.tabs.map((t, i) => {
                 const dTrim = t.department.trim();
                 const count = dTrim ? (publishedDeptCountsByLower.get(dTrim.toLowerCase()) ?? 0) : 0;
-                const preview = dTrim ? `${dTrim} (${count})` : "—";
+                const displayName = (t.label ?? "").trim() || dTrim;
+                const preview = displayName ? `${displayName} (${count})` : "—";
                 return (
                   <div
                     key={i}
                     className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-zinc-600 dark:bg-zinc-900/50"
                   >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
-                      <div className="min-w-0 flex-1 space-y-2">
-                        <label className={labelClass}>Department (exact match)</label>
-                        <input
-                          className={`${inputClass} w-full`}
-                          list="about-workforce-department-suggestions"
-                          value={t.department}
-                          onChange={(e) => setWorkforceTab(i, { department: e.target.value })}
-                          placeholder="e.g. Management Team"
-                        />
+                      <div className="min-w-0 flex-1 space-y-4">
+                        <div className="space-y-2">
+                          <label className={labelClass}>Tab name</label>
+                          <input
+                            className={`${inputClass} w-full`}
+                            value={t.label ?? ""}
+                            onChange={(e) => setWorkforceTab(i, { label: e.target.value })}
+                            placeholder="e.g. Leadership"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className={labelClass}>Match team department</label>
+                          <input
+                            className={`${inputClass} w-full`}
+                            list="about-workforce-department-suggestions"
+                            value={t.department}
+                            onChange={(e) => setWorkforceTab(i, { department: e.target.value })}
+                            placeholder="e.g. Management Team"
+                          />
+                        </div>
                         <p className="text-xs text-gray-500 dark:text-zinc-400">
-                          Site pill: <span className="font-medium text-gray-800 dark:text-zinc-200">{preview}</span>
+                          Site tab: <span className="font-medium text-gray-800 dark:text-zinc-200">{preview}</span>
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-4 border-t border-gray-100 pt-4 dark:border-zinc-700 lg:border-t-0 lg:pt-0">
@@ -452,63 +442,37 @@ export function AboutPageForm({
               className="mt-4 inline-flex w-full items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50/50 px-4 py-3 text-sm font-medium text-gray-800 transition-colors hover:border-gray-400 hover:bg-gray-100 dark:border-zinc-600 dark:bg-zinc-900/30 dark:text-zinc-200 dark:hover:border-zinc-500 dark:hover:bg-zinc-800/50 sm:w-auto"
               onClick={addWorkforceTab}
             >
-              + Add department tab
+              + Add team tab
             </button>
           </section>
 
           <section className={sectionClass}>
-            <h3 className="mb-4 font-semibold">Management team</h3>
-            <div className="mb-3 space-y-2">
-              <input
-                className={inputClass}
-                value={value.workforce.management.title}
-                onChange={(e) =>
-                  setWorkforce({ management: { ...value.workforce.management, title: e.target.value } })
-                }
-                placeholder="Section title"
-              />
-              <input
-                className={inputClass}
-                value={value.workforce.management.memberCountLabel}
-                onChange={(e) =>
-                  setWorkforce({ management: { ...value.workforce.management, memberCountLabel: e.target.value } })
-                }
-                placeholder="e.g. 5 members"
-              />
-            </div>
-            {value.workforce.management.people.map((p, i) => (
-              <div key={i} className="mb-4 rounded-lg border border-gray-100 p-3">
-                <p className="mb-2 text-sm font-medium">Person {i + 1}</p>
-                <input className={inputClass} value={p.name} onChange={(e) => setMgmtPerson(i, { name: e.target.value })} placeholder="Name" />
-                <input className={`${inputClass} mt-2`} value={p.role} onChange={(e) => setMgmtPerson(i, { role: e.target.value })} placeholder="Role" />
-                <label className={`${labelClass} mt-2`}>Placeholder bio (when API description empty, matched by name)</label>
-                <textarea
-                  className={inputClass}
-                  rows={2}
-                  value={p.bio ?? ""}
-                  onChange={(e) => setMgmtPerson(i, { bio: e.target.value })}
-                  placeholder="Optional CMS fallback bio"
-                />
-                <label className={`${labelClass} mt-2`}>Bundled image key</label>
-                <select className={inputClass} value={p.imageKey} onChange={(e) => setMgmtPerson(i, { imageKey: e.target.value })}>
-                  <option value="">— none —</option>
-                  {bundledKeyOptions.map((k) => (
-                    <option key={k} value={k}>
-                      {k}
-                    </option>
-                  ))}
-                </select>
-                <AdminImageField
-                  name={`about-mgmt-image-${i}`}
-                  label="Image URL (optional)"
-                  value={p.imageUrl}
-                  onValueChange={(v) => setMgmtPerson(i, { imageUrl: v })}
-                  className={inputClass}
-                  labelClassName={labelClass}
-                  helpText="Paste a URL or upload. If set, this overrides the bundled image key."
-                />
-              </div>
-            ))}
+            <h3 className="mb-2 font-semibold text-gray-900 dark:text-zinc-100">Team members</h3>
+            <p className="text-sm leading-relaxed text-gray-600 dark:text-zinc-400">
+              Workforce profiles on the About page come from published entries in{" "}
+              <Link href="/team" className="font-medium text-gray-900 underline underline-offset-2 dark:text-zinc-100">
+                Admin → Team
+              </Link>
+              . Assign each member to a department that matches a{" "}
+              <span className="font-medium text-gray-800 dark:text-zinc-200">team tab</span> above so they appear under the
+              correct tab.
+            </p>
+            {teamRows.some((m) => m.published) ? (
+              <p className="mt-3 text-sm text-gray-600 dark:text-zinc-400">
+                <span className="font-medium text-gray-900 dark:text-zinc-100">
+                  {teamRows.filter((m) => m.published).length} published
+                </span>{" "}
+                team member{teamRows.filter((m) => m.published).length === 1 ? "" : "s"} will show on the site.
+              </p>
+            ) : (
+              <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
+                No published team members yet — publish at least one in{" "}
+                <Link href="/team" className="font-medium underline underline-offset-2">
+                  Admin → Team
+                </Link>{" "}
+                for the workforce section to appear on the About page.
+              </p>
+            )}
           </section>
         </div>
       ) : null}

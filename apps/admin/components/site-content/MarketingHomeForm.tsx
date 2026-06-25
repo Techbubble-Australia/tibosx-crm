@@ -15,7 +15,7 @@ const tabs = [
   "Our services & how it works",
   "Platforms",
   "Journey",
-  "FAQ & CTAs",
+  "CTAs",
 ] as const;
 
 export function MarketingHomeForm({
@@ -49,7 +49,7 @@ export function MarketingHomeForm({
       {tab === 1 ? <TabEngagementHow v={v} onChange={onChange} /> : null}
       {tab === 2 ? <TabPlatforms v={v} onChange={onChange} /> : null}
       {tab === 3 ? <TabJourney v={v} onChange={onChange} /> : null}
-      {tab === 4 ? <TabFaqCtas v={v} onChange={onChange} /> : null}
+      {tab === 4 ? <TabCtas v={v} onChange={onChange} /> : null}
     </div>
   );
 }
@@ -640,31 +640,25 @@ function TabJourney({
   );
 }
 
-function TabFaqCtas({
+function TabCtas({
   v,
   onChange,
 }: {
   v: HomePayload;
   onChange: (n: HomePayload) => void;
 }) {
-  const setAside = (patch: Record<string, unknown>) => onChange({ ...v, faqAside: { ...v.faqAside, ...patch } });
   const setBand = (patch: Record<string, unknown>) => onChange({ ...v, careersBand: { ...v.careersBand, ...patch } });
   const setSched = (patch: Record<string, unknown>) =>
     onChange({ ...v, scheduleDemo: { ...v.scheduleDemo, ...patch } });
   const setCareersCta = (patch: Record<string, unknown>) =>
     onChange({ ...v, careersCta: { ...v.careersCta, ...patch } });
-  const setFaq = (i: number, patch: Record<string, unknown>) => {
-    const faqItems = v.faqItems.map((f: HomeAny, j: number) => (j === i ? { ...f, ...patch } : f));
-    onChange({ ...v, faqItems });
-  };
 
   return (
     <div className="space-y-6">
-      <section className={sectionClass}>
-        <h3 className="mb-4 font-semibold">FAQ aside</h3>
-        <textarea className={inputClass} rows={2} value={v.faqAside.blurb} onChange={(e) => setAside({ blurb: e.target.value })} />
-        <input className={inputClass} value={v.faqAside.ctaLabel} onChange={(e) => setAside({ ctaLabel: e.target.value })} />
-      </section>
+      <p className="text-sm text-gray-600 dark:text-zinc-400">
+        FAQ content is managed separately in{" "}
+        <span className="font-medium text-gray-900 dark:text-zinc-100">Admin → FAQs</span> (e.g. on the Pricing page).
+      </p>
 
       <section className={sectionClass}>
         <h3 className="mb-4 font-semibold">Careers band</h3>
@@ -706,18 +700,6 @@ function TabFaqCtas({
           value={Array.isArray(v.careersCta.bullets) ? v.careersCta.bullets.join("\n") : (typeof v.careersCta.bullets === 'string' ? v.careersCta.bullets : "")}
           onChange={(e) => setCareersCta({ bullets: multilineToLines(e.target.value) })}
         />
-      </section>
-
-      <section className={sectionClass}>
-        <h3 className="mb-4 font-semibold">FAQ items</h3>
-        <div className="space-y-4">
-          {v.faqItems.map((f: HomeAny, i: number) => (
-            <div key={i} className="space-y-2 rounded border border-gray-100 p-3">
-              <input className={inputClass} value={f.question} onChange={(e) => setFaq(i, { question: e.target.value })} />
-              <textarea className={inputClass} rows={4} value={f.answer} onChange={(e) => setFaq(i, { answer: e.target.value })} />
-            </div>
-          ))}
-        </div>
       </section>
     </div>
   );

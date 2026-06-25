@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getPublishedJobBySlug } from "@/lib/api/public";
 import { JobDescription } from "@/components/careers/JobDescription";
 import { displayCategory } from "@/lib/display-category";
+import { formatJobMetaLine } from "@/lib/job-locations";
 
 export default async function CareerJobDetailPage({ params }: { params: { slug: string } }) {
   const job = await getPublishedJobBySlug(params.slug);
@@ -11,7 +12,7 @@ export default async function CareerJobDetailPage({ params }: { params: { slug: 
     notFound();
   }
 
-  const meta = `${job.flag} ${job.location} · ${job.type} · ${job.workMode}`;
+  const meta = formatJobMetaLine(job);
   const eyebrow = [job.referenceNumber, displayCategory(job.category), job.department || undefined]
     .filter(Boolean)
     .join(" · ");

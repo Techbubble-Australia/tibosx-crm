@@ -224,7 +224,9 @@ model JobListing {
   title           String
   location        String
   country         String
-  flag            String   // emoji flag
+  flag            String   // emoji flag (primary / first location for legacy consumers)
+  /// [{ countryCode, country, flag, label? }] — multi-country roles; when set, drives public display.
+  locations       Json?
   type            String   // full-time | contract | part-time
   workMode        String   // remote | hybrid | onsite
   category        String   @default("")

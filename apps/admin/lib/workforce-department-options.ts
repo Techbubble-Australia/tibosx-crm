@@ -4,7 +4,7 @@ import type { AboutPagePayload } from "@/components/site-content/AboutPageForm";
 
 /**
  * Departments for Team member forms:
- * 1) Site content → About page → Workforce → Department tabs (order preserved, de-duped case-insensitively)
+ * 1) Site content → About page → Workforce → Team tabs (order preserved, de-duped case-insensitively)
  * 2) Any `department` already on a team member (so legacy values stay selectable)
  * 3) Optional `currentDepartment` if not already included (e.g. edge-case before team list reflects)
  */

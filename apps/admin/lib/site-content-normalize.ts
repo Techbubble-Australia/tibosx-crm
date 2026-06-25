@@ -28,16 +28,17 @@ function stripWorkforceTabLabelSuffix(label: string): string {
   return label.replace(/\s*\(\d+\)\s*$/, "").trim();
 }
 
-/** Normalize stored workforce pills to `{ department, active }` (drops legacy `label` / `widthPx`). */
-function migrateWorkforceTabRow(raw: unknown): { department: string; active: boolean } {
+/** Normalize stored workforce tabs to `{ department, label, active }` (drops legacy `widthPx`). */
+function migrateWorkforceTabRow(raw: unknown): { department: string; label: string; active: boolean } {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    return { department: "", active: false };
+    return { department: "", label: "", active: false };
   }
   const t = raw as Record<string, unknown>;
-  const department =
-    (typeof t.department === "string" ? t.department.trim() : "") ||
-    stripWorkforceTabLabelSuffix(typeof t.label === "string" ? t.label : "");
-  return { department, active: Boolean(t.active) };
+  const rawLabel = typeof t.label === "string" ? t.label.trim() : "";
+  const rawDepartment = typeof t.department === "string" ? t.department.trim() : "";
+  const department = rawDepartment || stripWorkforceTabLabelSuffix(rawLabel);
+  const label = rawDepartment ? rawLabel : "";
+  return { department, label, active: Boolean(t.active) };
 }
 
 export const SITE_CONTENT_FORM_KEYS = [

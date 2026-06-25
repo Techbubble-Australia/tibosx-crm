@@ -92,8 +92,8 @@ export default function NewTeamMemberPage() {
             <label className="block text-sm font-medium mb-1">Department *</label>
             <TeamDepartmentSelect />
             <p className="mt-1 text-xs text-gray-500 dark:text-zinc-400">
-              Options come from Site content → About page → Workforce → Department tabs (plus any department already used on a
-              team member). Add a tab there to add a department here.
+              Options come from Site content → About page → Workforce → Team tabs (plus any department already used on a
+              team member). Add a team tab there to add a department here.
             </p>
           </div>
 

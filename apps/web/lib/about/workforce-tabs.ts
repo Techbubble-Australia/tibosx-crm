@@ -4,16 +4,17 @@ export function stripWorkforceTabLabelSuffix(label: string): string {
 }
 
 export type WorkforceTabCms = {
+  /** Visitor-facing pill title on the About page. Falls back to {@link department} or the API department name. */
+  label?: string;
   /** Exact Team member `Department` string (case-insensitive match on site). */
   department?: string;
-  /** @deprecated Legacy CMS label; use {@link department}. */
-  label?: string;
+  /** @deprecated Legacy layout field — ignored on save. */
   widthPx?: number;
   active: boolean;
 };
 
-/** After `normalizeWorkforceCmsTabs`, always `department` + `active` (legacy label folded into `department`). */
-export type AboutWorkforceTabResolved = { department: string; active: boolean };
+/** After `normalizeWorkforceCmsTabs`, always `department`, `label`, and `active`. */
+export type AboutWorkforceTabResolved = { department: string; label: string; active: boolean };
 
 /** Pill label (often from CMS) + canonical Team `department` for member lookup. */
 export type WorkforceDeptPill = {
@@ -21,12 +22,31 @@ export type WorkforceDeptPill = {
   memberDeptKey: string;
 };
 
+/** Shown under Meet the Leadership — never as a workforce team tab. */
+const WORKFORCE_EXCLUDED_DEPARTMENTS_LC = new Set(["leadership"]);
+
+export function isWorkforceExcludedDepartment(department: string): boolean {
+  return WORKFORCE_EXCLUDED_DEPARTMENTS_LC.has(department.trim().toLowerCase());
+}
+
+export function filterWorkforceDepartments(departments: readonly string[]): string[] {
+  return departments.filter((d) => !isWorkforceExcludedDepartment(d));
+}
+
 function tabMatchKey(tab: WorkforceTabCms | AboutWorkforceTabResolved): string {
   const d = typeof tab.department === "string" ? tab.department.trim() : "";
   if (d) return d.toLowerCase();
+  /** Legacy rows stored only `label` before `department` existed. */
   const legacy =
     "label" in tab && typeof (tab as WorkforceTabCms).label === "string" ? String((tab as WorkforceTabCms).label) : "";
   return stripWorkforceTabLabelSuffix(legacy).toLowerCase();
+}
+
+function tabDisplayLabel(tab: WorkforceTabCms | AboutWorkforceTabResolved): string {
+  const label = "label" in tab && typeof tab.label === "string" ? tab.label.trim() : "";
+  if (label) return label;
+  const department = typeof tab.department === "string" ? tab.department.trim() : "";
+  return department;
 }
 
 function tabUsesExplicitDepartment(tab: WorkforceTabCms | AboutWorkforceTabResolved): boolean {
@@ -69,19 +89,21 @@ function deptMatchesExplicitInput(baseLc: string, apiLc: string): boolean {
   return levenshtein(baseLc, apiLc) <= limit;
 }
 
-/** Normalize JSON from CMS/API (legacy `label` / `widthPx` → `department` + `active`). */
+/** Normalize JSON from CMS/API (legacy single-field rows → `department` + optional `label`). */
 export function normalizeWorkforceCmsTabs(tabs: unknown): AboutWorkforceTabResolved[] {
   if (!Array.isArray(tabs)) return [];
   return tabs.map((raw) => {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-      return { department: "", active: false };
+      return { department: "", label: "", active: false };
     }
     const t = raw as Record<string, unknown>;
-    const department =
-      (typeof t.department === "string" ? t.department.trim() : "") ||
-      stripWorkforceTabLabelSuffix(typeof t.label === "string" ? t.label : "");
+    const rawLabel = typeof t.label === "string" ? t.label.trim() : "";
+    const rawDepartment = typeof t.department === "string" ? t.department.trim() : "";
+    const department = rawDepartment || stripWorkforceTabLabelSuffix(rawLabel);
+    const label = rawDepartment ? rawLabel : "";
     return {
       department,
+      label,
       active: Boolean(t.active),
     };
   });
@@ -95,7 +117,7 @@ export function orderedWorkforceDeptPills(
   cmsTabs: readonly (WorkforceTabCms | AboutWorkforceTabResolved)[] | undefined,
   apiDepartments: string[],
 ): WorkforceDeptPill[] {
-  const sortedApi = [...apiDepartments].sort((a, b) => a.localeCompare(b));
+  const sortedApi = filterWorkforceDepartments(apiDepartments).sort((a, b) => a.localeCompare(b));
   if (!cmsTabs?.length) {
     return sortedApi.map((d) => ({ pillLabel: d, memberDeptKey: d }));
   }
@@ -125,7 +147,7 @@ export function orderedWorkforceDeptPills(
     const baseLc = tabMatchKey(tab);
     if (!baseLc) continue;
     const explicit = tabUsesExplicitDepartment(tab);
-    const cmsDept = typeof tab.department === "string" ? tab.department.trim() : "";
+    const cmsDisplay = tabDisplayLabel(tab);
 
     const exact = explicit ? apiLcToCanonical.get(baseLc) : undefined;
     const found = exact ?? findApiDeptForTab(baseLc, explicit);
@@ -134,7 +156,7 @@ export function orderedWorkforceDeptPills(
     const memLc = found.trim().toLowerCase();
     usedMemberLc.add(memLc);
 
-    const pillLabel = explicit && cmsDept ? cmsDept : found;
+    const pillLabel = cmsDisplay || found;
     matched.push({ pillLabel, memberDeptKey: found });
   }
 

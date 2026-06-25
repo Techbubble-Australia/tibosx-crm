@@ -128,10 +128,6 @@ export function buildMarketingHomeViewModel(content: MarketingHomePayload) {
     marketingHomePayload.journey as unknown as JsonObject,
     content.journey,
   ) as MarketingHomePayload["journey"];
-  const faqAside = mergeHomeObject(
-    marketingHomePayload.faqAside as unknown as JsonObject,
-    content.faqAside,
-  ) as MarketingHomePayload["faqAside"];
   const scheduleDemo = mergeHomeObject(
     marketingHomePayload.scheduleDemo as unknown as JsonObject,
     content.scheduleDemo,
@@ -147,7 +143,6 @@ export function buildMarketingHomeViewModel(content: MarketingHomePayload) {
   const featuredPartners = pickHomeArray(content.featuredPartners, marketingHomePayload.featuredPartners);
   const trustedLogos = pickHomeArray(content.trustedLogos, marketingHomePayload.trustedLogos);
   const platforms = pickHomeArray(content.platforms, marketingHomePayload.platforms);
-  const faqItems = pickHomeArray(content.faqItems, marketingHomePayload.faqItems);
 
   return {
     featuredPartnerCard: featuredPartners.map((p) => ({
@@ -192,7 +187,6 @@ export function buildMarketingHomeViewModel(content: MarketingHomePayload) {
       ...p,
       tags: normalizePlatformTags((p as { tags?: unknown }).tags),
     })),
-    faqItems: faqItems.map((f) => ({ question: f.question, answer: f.answer })),
     statsStrip,
     hero: (() => {
       const h = heroBase;
@@ -220,7 +214,6 @@ export function buildMarketingHomeViewModel(content: MarketingHomePayload) {
     },
     platformsIntro,
     journey,
-    faqAside,
     scheduleDemo,
     careersBand,
     careersCta,

@@ -75,6 +75,13 @@ export async function getCaseStudyBySlug(
   };
 }
 
+export type JobLocationEntry = {
+  countryCode: string;
+  country: string;
+  flag: string;
+  label?: string;
+};
+
 export type JobApiRow = {
   slug: string;
   referenceNumber: string;
@@ -82,6 +89,7 @@ export type JobApiRow = {
   location: string;
   country: string;
   flag: string;
+  locations?: JobLocationEntry[];
   type: string;
   workMode: string;
   category: string;

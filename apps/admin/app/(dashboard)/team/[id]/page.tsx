@@ -119,7 +119,7 @@ export default function EditTeamMemberPage() {
               currentDepartment={String(member.department ?? "")}
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-zinc-400">
-              Options come from Site content → About → Workforce → Department tabs (plus existing team departments).
+              Options come from Site content → About → Workforce → Team tabs (plus existing team departments).
             </p>
           </div>
           <AdminImageField

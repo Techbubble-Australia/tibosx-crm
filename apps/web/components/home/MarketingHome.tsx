@@ -13,8 +13,6 @@ import {
   Star,
   ChevronDown,
   Mail,
-  Minus,
-  Plus,
   Zap,
   Shield,
   Clock,
@@ -93,7 +91,6 @@ export function MarketingHome({
   const vm = useMemo(() => buildMarketingHomeViewModel(content), [content]);
   const [engagementId, setEngagementId] = useState<string>(vm.engagementModels[0]!.id);
   const [platformId, setPlatformId] = useState<string>(vm.platforms[0]!.id);
-  const [faqOpenIndex, setFaqOpenIndex] = useState<number>(0);
   const statsNumberStrings = useMemo(() => vm.statsStrip.items.map((s) => s.n), [vm.statsStrip.items]);
   const { ref: statsSectionRef, formatAt: formatStatAt } = useStatCountUpOnView<HTMLElement>(statsNumberStrings);
   const [worldClockNow, setWorldClockNow] = useState(() => new Date());
@@ -1118,69 +1115,6 @@ export function MarketingHome({
                 Explore All Case Studies
                 <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
               </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-      {/* FAQ */}
-      <section className="bg-[#e5e5e5] py-16 md:py-[112px]">
-        <div className="tb-container">
-          <div className="mx-auto grid max-w-[1136px] grid-cols-1 gap-10 lg:grid-cols-[360px_1fr] lg:gap-[72px]">
-            <div>
-              <SectionPill label="FAQ" className="mb-[6px]" />
-              <h2 className="max-w-[385px] text-3xl font-bold leading-tight tracking-[-0.28px] text-[#111111] md:text-5xl lg:text-[56px] lg:leading-[64px]">
-                Questions we
-                <br />
-                hear all the
-                <br />
-                time
-              </h2>
-              <p className="mt-4 max-w-[369px] text-[18px] leading-7 text-[#666666]">
-                {vm.faqAside.blurb}
-              </p>
-              <Link
-                href="/contact"
-                className="mt-[31px] inline-flex h-[43px] w-[125px] items-center justify-center gap-2 whitespace-nowrap rounded-[18px] bg-[#111111] px-4 text-[14px] font-semibold text-white"
-              >
-                {vm.faqAside.ctaLabel}
-                <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
-              </Link>
-            </div>
-            <div className="space-y-[8.83px]">
-              {vm.faqItems.map((item, idx) => {
-                const open = faqOpenIndex === idx;
-                return (
-                  <div
-                    key={item.question}
-                    className="overflow-hidden rounded-[16px] border border-[#f7f7f7] bg-white"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setFaqOpenIndex(open ? -1 : idx)}
-                      className={`flex w-full items-start justify-between text-left ${open ? "px-[22px] pb-0 pt-[19px]" : "px-[22px] py-[18px]"}`}
-                    >
-                      <span className={`pr-6 text-[16px] font-bold leading-6 ${open ? "text-[#111111]" : "text-[#666666]"}`}>
-                        {item.question}
-                      </span>
-                      <span
-                        className={`flex shrink-0 items-center justify-center rounded-[14px] ${open ? "h-[39.6px] w-[39.6px] border border-[#111111] bg-[#111111]" : "h-7 w-7 border border-[#e5e5e5] bg-[#fafafa]"}`}
-                        aria-hidden
-                      >
-                        {open ? (
-                          <Minus className="h-[19.8px] w-[19.8px] text-white" strokeWidth={2} />
-                        ) : (
-                          <Plus className="h-[14px] w-[14px] text-[#666666]" strokeWidth={2} />
-                        )}
-                      </span>
-                    </button>
-                    {open ? (
-                      <div className="px-[22px] pb-[19px] pt-0">
-                        <p className="max-w-[658px] text-[16px] leading-6 text-[#666666]">{item.answer}</p>
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
             </div>
           </div>
         </div>
