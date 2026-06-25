@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
-import { prisma } from "@techbubble/database";
+import { prisma, type JobListing, type Prisma } from "@techbubble/database";
 import {
   jobLocationEntrySchema,
   normalizeJobLocations,
@@ -62,8 +62,8 @@ function prepareJobWriteData(body: z.infer<typeof jobSchema>): Record<string, un
   };
 }
 
-function serializeJob(job: Record<string, unknown>) {
-  const locations = normalizeJobLocations(job as Parameters<typeof normalizeJobLocations>[0]);
+function serializeJob(job: JobListing) {
+  const locations = normalizeJobLocations(job);
   const legacy = syncLegacyLocationFields(locations);
   return {
     ...job,
@@ -95,7 +95,7 @@ router.get("/", async (_req, res) => {
       where: { published: true },
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
     });
-    res.json({ data: jobs.map((job) => serializeJob(job as Record<string, unknown>)) });
+    res.json({ data: jobs.map((job: JobListing) => serializeJob(job)) });
   } catch (error) {
     console.error("Error fetching jobs:", error);
     res.status(500).json({ error: "Failed to fetch jobs" });
@@ -108,7 +108,7 @@ router.get("/admin/all", async (_req, res) => {
     const jobs = await prisma.jobListing.findMany({
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
     });
-    res.json({ data: jobs.map((job) => serializeJob(job as Record<string, unknown>)) });
+    res.json({ data: jobs.map((job: JobListing) => serializeJob(job)) });
   } catch (error) {
     console.error("Error fetching jobs:", error);
     res.status(500).json({ error: "Failed to fetch jobs" });
@@ -124,7 +124,7 @@ router.get("/:slug", async (req, res) => {
     if (!job || !job.published) {
       return res.status(404).json({ error: "Job not found" });
     }
-    res.json({ data: serializeJob(job as Record<string, unknown>) });
+    res.json({ data: serializeJob(job) });
   } catch (error) {
     console.error("Error fetching job:", error);
     res.status(500).json({ error: "Failed to fetch job" });
@@ -138,9 +138,9 @@ router.post("/", async (req, res) => {
     const writeData = prepareJobWriteData(data);
     const referenceNumber = await allocateJobReferenceNumber();
     const job = await prisma.jobListing.create({
-      data: { ...writeData, referenceNumber } as Parameters<typeof prisma.jobListing.create>[0]["data"],
+      data: { ...writeData, referenceNumber } as Prisma.JobListingCreateInput,
     });
-    res.status(201).json({ data: serializeJob(job as Record<string, unknown>) });
+    res.status(201).json({ data: serializeJob(job) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
@@ -162,9 +162,9 @@ router.put("/:id", async (req, res) => {
     const writeData = prepareJobWriteData(jobSchema.parse(merged));
     const job = await prisma.jobListing.update({
       where: { id: req.params.id },
-      data: writeData as Parameters<typeof prisma.jobListing.update>[0]["data"],
+      data: writeData as Prisma.JobListingUpdateInput,
     });
-    res.json({ data: serializeJob(job as Record<string, unknown>) });
+    res.json({ data: serializeJob(job) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });

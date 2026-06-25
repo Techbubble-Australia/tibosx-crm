@@ -256,7 +256,7 @@ export const aboutPagePayload = {
       { n: "10+", l: "Years Experience" },
     ],
     /** Department pill order on About: `active` rows first; counts on site come from published Team members. */
-    tabs: [] as { department: string; active: boolean }[],
+    tabs: [] as { label?: string; department: string; active: boolean }[],
     management: {
       title: "Management Team",
       memberCountLabel: "5 members",

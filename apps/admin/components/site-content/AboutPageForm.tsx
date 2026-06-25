@@ -7,7 +7,7 @@ import { inputClass, labelClass, sectionClass } from "./form-styles";
 
 type StatRow = { n: string; l: string; labelClass: string };
 type MissionCard = { title: string; text: string };
-type WorkforceTab = { label: string; department: string; active: boolean };
+type WorkforceTab = { label?: string; department: string; active: boolean };
 
 type AdminTeamListRow = {
   id: string;

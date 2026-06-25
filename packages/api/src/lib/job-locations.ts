@@ -10,9 +10,9 @@ export const jobLocationEntrySchema = z.object({
 export type JobLocationEntry = z.infer<typeof jobLocationEntrySchema>;
 
 export type JobLocationLegacyFields = {
-  location: string;
-  country: string;
-  flag: string;
+  location?: string;
+  country?: string;
+  flag?: string;
   locations?: unknown;
 };
 
