@@ -106,6 +106,53 @@ function pickHomeArray<T>(value: unknown, fallback: readonly T[]): T[] {
   return [...fallback];
 }
 
+function pickHomeLogoArray<T>(value: unknown, fallback: readonly T[]): T[] {
+  if (Array.isArray(value)) {
+    return value as T[];
+  }
+  return [...fallback];
+}
+
+type HomeLogoRow = {
+  name: string;
+  imageKey?: string;
+  imageUrl?: string;
+  width?: number;
+  height?: number;
+};
+
+function resolveHomeLogoStrip(logos: HomeLogoRow[], defaultImageKey: string) {
+  return logos.flatMap((row) => {
+    const custom = typeof row.imageUrl === "string" ? row.imageUrl.trim() : "";
+    const imageKey = typeof row.imageKey === "string" ? row.imageKey.trim() : "";
+    if (!custom && !imageKey) {
+      return [];
+    }
+
+    const width = Number(row.width) || 180;
+    const height = Number(row.height) || 80;
+    const name = typeof row.name === "string" && row.name.trim() ? row.name.trim() : "Supplier logo";
+
+    if (custom) {
+      return [{ name, src: resolveMediaUrl(custom), width, height }];
+    }
+
+    const bundled = HOME_IMAGE_MAP[imageKey] ?? HOME_IMAGE_MAP[defaultImageKey];
+    if (!bundled) {
+      return [];
+    }
+
+    return [
+      {
+        name,
+        src: mapImage(imageKey, bundled).src,
+        width,
+        height,
+      },
+    ];
+  });
+}
+
 export function buildMarketingHomeViewModel(content: MarketingHomePayload) {
   const engagement = mergeHomeObject(
     marketingHomePayload.engagement as unknown as JsonObject,
@@ -141,6 +188,10 @@ export function buildMarketingHomeViewModel(content: MarketingHomePayload) {
     content.careersCta,
   ) as MarketingHomePayload["careersCta"];
   const featuredPartners = pickHomeArray(content.featuredPartners, marketingHomePayload.featuredPartners);
+  const governmentSupplierLogos = pickHomeLogoArray(
+    content.governmentSupplierLogos,
+    marketingHomePayload.governmentSupplierLogos,
+  );
   const trustedLogos = pickHomeArray(content.trustedLogos, marketingHomePayload.trustedLogos);
   const platforms = pickHomeArray(content.platforms, marketingHomePayload.platforms);
 
@@ -150,33 +201,8 @@ export function buildMarketingHomeViewModel(content: MarketingHomePayload) {
       image: mapImage(p.imageKey, HOME_IMAGE_MAP.home_1),
       imageClass: p.imageClass,
     })),
-    trustedLogoStrip: trustedLogos.map((l) => {
-      const row = l as {
-        name: string;
-        imageKey?: string;
-        imageUrl?: string;
-        width?: number;
-        height?: number;
-      };
-      const custom = typeof row.imageUrl === "string" ? row.imageUrl.trim() : "";
-      const width = Number(row.width) || 180;
-      const height = Number(row.height) || 80;
-      if (custom) {
-        return {
-          name: row.name,
-          src: resolveMediaUrl(custom),
-          width,
-          height,
-        };
-      }
-      const staticImg = mapImage(String(row.imageKey || "home_6"), HOME_IMAGE_MAP.home_6);
-      return {
-        name: row.name,
-        src: staticImg.src,
-        width,
-        height,
-      };
-    }),
+    governmentSupplierStrip: resolveHomeLogoStrip(governmentSupplierLogos, "gov_nsw"),
+    trustedLogoStrip: resolveHomeLogoStrip(trustedLogos, "home_6"),
     engagementModels: normalizeEngagementModels(engagement.models),
     deliverySteps: howItWorks.steps.map((s) => ({
       title: s.title,

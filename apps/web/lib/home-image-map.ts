@@ -15,6 +15,9 @@ import techMahindraLogo from "@image/techbubble_-_home_13.png";
 import finxlLogo from "@image/techbubble_-_home_14.png";
 import endeavourLogo from "@image/techbubble_-_home_15.png";
 import techOracleLogo from "@image/techbubble_-_home_23.png";
+import heroGovNsw from "@image/hero-gov-nsw-approved-supplier.png";
+import heroGovVictoria from "@image/hero-gov-victoria-approved-supplier.png";
+import heroGovQueensland from "@image/hero-gov-queensland-wordmark.png";
 
 export const HOME_IMAGE_MAP: Record<string, StaticImageData> = {
   home_1: featuredVicLogo,
@@ -33,4 +36,7 @@ export const HOME_IMAGE_MAP: Record<string, StaticImageData> = {
   home_14: finxlLogo,
   home_15: endeavourLogo,
   home_23: techOracleLogo,
+  gov_nsw: heroGovNsw,
+  gov_victoria: heroGovVictoria,
+  gov_queensland: heroGovQueensland,
 };

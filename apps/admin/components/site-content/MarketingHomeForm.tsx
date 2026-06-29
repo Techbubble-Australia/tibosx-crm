@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { AdminImageField } from "@/components/AdminImageField";
 import { multilineToLines } from "@/lib/multiline-list";
 import { inputClass, labelClass, sectionClass } from "./form-styles";
@@ -79,6 +80,41 @@ function TabHeroStatsLogos({
   const setLogo = (i: number, patch: Record<string, unknown>) => {
     const trustedLogos = v.trustedLogos.map((p: HomeAny, j: number) => (j === i ? { ...p, ...patch } : p));
     onChange({ ...v, trustedLogos });
+  };
+
+  const govLogos: HomeAny[] = Array.isArray(v.governmentSupplierLogos) ? v.governmentSupplierLogos : [];
+
+  const setGovLogo = (i: number, patch: Record<string, unknown>) => {
+    const governmentSupplierLogos = govLogos.map((p: HomeAny, j: number) => (j === i ? { ...p, ...patch } : p));
+    onChange({ ...v, governmentSupplierLogos });
+  };
+
+  const addGovLogo = () => {
+    onChange({
+      ...v,
+      governmentSupplierLogos: [
+        ...govLogos,
+        { name: "", imageKey: "", imageUrl: "", width: 200, height: 89 },
+      ],
+    });
+  };
+
+  const removeGovLogo = (i: number) => {
+    if (!window.confirm("Remove this logo from the government supplier strip?")) return;
+    onChange({
+      ...v,
+      governmentSupplierLogos: govLogos.filter((_: HomeAny, j: number) => j !== i),
+    });
+  };
+
+  const moveGovLogo = (from: number, direction: "up" | "down") => {
+    const to = direction === "up" ? from - 1 : from + 1;
+    if (to < 0 || to >= govLogos.length) return;
+    const governmentSupplierLogos = [...govLogos];
+    const [item] = governmentSupplierLogos.splice(from, 1);
+    if (!item) return;
+    governmentSupplierLogos.splice(to, 0, item);
+    onChange({ ...v, governmentSupplierLogos });
   };
 
   const addTrustedLogo = () => {
@@ -190,6 +226,133 @@ function TabHeroStatsLogos({
             </div>
           ))}
         </div>
+      </section>
+
+      <section className={sectionClass}>
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h3 className="font-semibold text-gray-900 dark:text-zinc-100">
+              Government supplier strip ({govLogos.length})
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-zinc-400">
+              Add as many logos as you need — they appear left-to-right (wrapping on smaller screens) in the white card
+              above <span className="font-medium">Trusted by leading companies</span>. Upload a file for each logo, or set{" "}
+              <span className="font-mono">imageKey</span> for bundled assets (e.g. gov_nsw, gov_victoria, gov_queensland).
+            </p>
+          </div>
+          <button
+            type="button"
+            className="rounded-lg bg-black px-3 py-1.5 text-xs font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+            onClick={addGovLogo}
+          >
+            Add logo
+          </button>
+        </div>
+        <div className="max-h-[640px] space-y-4 overflow-y-auto pr-1">
+          {govLogos.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-gray-200 bg-gray-50/80 px-4 py-6 text-center text-sm text-gray-600 dark:border-zinc-600 dark:bg-zinc-900/40 dark:text-zinc-400">
+              No logos — the government strip is hidden on the homepage. Use <span className="font-medium">Add logo</span>{" "}
+              to show it again.
+            </p>
+          ) : null}
+          {govLogos.map((logo: HomeAny, i: number) => {
+            const reorderBtnClass =
+              "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800";
+            return (
+              <div key={i} className="flex gap-3 rounded border border-gray-100 p-3 dark:border-zinc-700">
+                <div className="flex shrink-0 flex-col items-center gap-1">
+                  <span className="text-xs font-medium tabular-nums text-gray-500 dark:text-zinc-400">#{i + 1}</span>
+                  <button
+                    type="button"
+                    className={reorderBtnClass}
+                    aria-label={`Move government logo ${i + 1} up`}
+                    disabled={i === 0}
+                    onClick={() => moveGovLogo(i, "up")}
+                  >
+                    <ChevronUp className="h-4 w-4" aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    className={reorderBtnClass}
+                    aria-label={`Move government logo ${i + 1} down`}
+                    disabled={i === govLogos.length - 1}
+                    onClick={() => moveGovLogo(i, "down")}
+                  >
+                    <ChevronDown className="h-4 w-4" aria-hidden />
+                  </button>
+                </div>
+                <div className="min-w-0 flex-1 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">Logo {i + 1}</span>
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-red-600 hover:underline dark:text-red-400"
+                      onClick={() => removeGovLogo(i)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <label className={labelClass}>Alt text</label>
+                      <input
+                        className={inputClass}
+                        value={logo.name ?? ""}
+                        onChange={(e) => setGovLogo(i, { name: e.target.value })}
+                        placeholder="e.g. NSW Government approved supplier"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Bundled imageKey (fallback)</label>
+                      <input
+                        className={inputClass}
+                        placeholder="e.g. gov_nsw"
+                        value={logo.imageKey ?? ""}
+                        onChange={(e) => setGovLogo(i, { imageKey: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <AdminImageField
+                    name={`govSupplierLogoImageUrl_${i}`}
+                    label="Logo upload (optional)"
+                    value={typeof logo.imageUrl === "string" ? logo.imageUrl : ""}
+                    onValueChange={(url) => setGovLogo(i, { imageUrl: url })}
+                    className={inputClass}
+                    labelClassName={labelClass}
+                    helpText="When set, this URL wins over imageKey on the marketing site."
+                  />
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <label className={labelClass}>Display width (px)</label>
+                      <input
+                        className={inputClass}
+                        type="number"
+                        value={logo.width ?? 238}
+                        onChange={(e) => setGovLogo(i, { width: Number(e.target.value) })}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Display height (px)</label>
+                      <input
+                        className={inputClass}
+                        type="number"
+                        value={logo.height ?? 89}
+                        onChange={(e) => setGovLogo(i, { height: Number(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          className="mt-4 inline-flex w-full items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50/50 px-4 py-3 text-sm font-medium text-gray-800 transition-colors hover:border-gray-400 hover:bg-gray-100 dark:border-zinc-600 dark:bg-zinc-900/30 dark:text-zinc-200 dark:hover:border-zinc-500 dark:hover:bg-zinc-800/50 sm:w-auto"
+          onClick={addGovLogo}
+        >
+          + Add logo
+        </button>
       </section>
 
       <section className={sectionClass}>

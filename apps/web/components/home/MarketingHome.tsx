@@ -22,9 +22,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { MarketingHomePayload } from "@/lib/data/marketing-home-payload";
 import { buildMarketingHomeViewModel } from "@/lib/marketing-home-view";
 import heroNetworkPattern from "@image/home-hero-network.svg";
-import heroGovNsw from "@image/hero-gov-nsw-approved-supplier.png";
-import heroGovVictoria from "@image/hero-gov-victoria-approved-supplier.png";
-import heroGovQueensland from "@image/hero-gov-queensland-wordmark.png";
 import innovationImage from "@image/Innovation_Cutting_Edge_Tech.png";
 import { CASE_STUDY_SIDEBAR, buildHomeCaseStudySlots, type CaseStudyListCard } from "@/lib/case-study-mapper";
 import { useStatCountUpOnView } from "@/hooks/useStatCountUpOnView";
@@ -69,6 +66,62 @@ const WORLD_CLOCK_ZONES = [
   { city: "Ahmedabad", timeZone: "Asia/Kolkata" },
 ] as const;
 
+const GOV_SUPPLIER_STRIP_MAX_WIDTH = 1139;
+const GOV_SUPPLIER_STRIP_GAP_PX = 81;
+const GOV_SUPPLIER_STRIP_INNER_PADDING_PX = 64;
+
+type GovSupplierLogo = { name: string; src: string; width: number; height: number };
+
+type GovSupplierLogoLayout = GovSupplierLogo & {
+  displayWidth: number;
+  displayHeight: number;
+  slotMaxWidth: number;
+};
+
+/** Keeps the Figma row inside max-w-[1139px]; shrinks logos only when count > 3 on desktop row layout. */
+function layoutGovernmentSupplierLogos(
+  logos: readonly GovSupplierLogo[],
+  compactRow: boolean,
+): GovSupplierLogoLayout[] {
+  if (logos.length === 0) return [];
+
+  const toLayout = (logo: GovSupplierLogo, scale: number): GovSupplierLogoLayout => {
+    const displayWidth = Math.max(1, Math.round(logo.width * scale));
+    const displayHeight = Math.max(1, Math.round(logo.height * scale));
+    return {
+      ...logo,
+      displayWidth,
+      displayHeight,
+      slotMaxWidth: displayWidth,
+    };
+  };
+
+  if (logos.length <= 3 || !compactRow) {
+    return logos.map((logo) => toLayout(logo, 1));
+  }
+
+  const innerMax = GOV_SUPPLIER_STRIP_MAX_WIDTH - GOV_SUPPLIER_STRIP_INNER_PADDING_PX;
+  const totalGaps = (logos.length - 1) * GOV_SUPPLIER_STRIP_GAP_PX;
+  const totalLogoWidth = logos.reduce((sum, logo) => sum + logo.width, 0);
+  const scale = Math.min(1, (innerMax - totalGaps) / totalLogoWidth);
+
+  return logos.map((logo) => toLayout(logo, scale));
+}
+
+function useMinWidth(minWidthPx: number): boolean {
+  const [matches, setMatches] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia(`(min-width: ${minWidthPx}px)`);
+    const onChange = () => setMatches(media.matches);
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, [minWidthPx]);
+
+  return matches;
+}
+
 function formatWorldClockTime(date: Date, timeZone: string): string {
   return new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
@@ -89,6 +142,11 @@ export function MarketingHome({
   caseStudies,
 }: MarketingHomeProps) {
   const vm = useMemo(() => buildMarketingHomeViewModel(content), [content]);
+  const isGovSupplierRow = useMinWidth(640);
+  const governmentSupplierLogos = useMemo(
+    () => layoutGovernmentSupplierLogos(vm.governmentSupplierStrip, isGovSupplierRow),
+    [vm.governmentSupplierStrip, isGovSupplierRow],
+  );
   const [engagementId, setEngagementId] = useState<string>(vm.engagementModels[0]!.id);
   const [platformId, setPlatformId] = useState<string>(vm.platforms[0]!.id);
   const statsNumberStrings = useMemo(() => vm.statsStrip.items.map((s) => s.n), [vm.statsStrip.items]);
@@ -226,47 +284,52 @@ export function MarketingHome({
             </div>
           </div>
 
-          {/* Government supplier strip — Figma: flush card, static row, rounded top */}
-          <div className="relative z-[1] mx-auto mt-12 w-full max-w-[1139px] px-0 sm:px-2">
-            <div
-              className="pointer-events-none absolute bottom-full left-0 right-0 h-20"
-              aria-hidden
-            />
-            <div className="rounded-t-[20px] border border-b-0 border-[#E5E5E5] bg-white/95 shadow-[0px_8px_32px_rgba(0,0,0,0.09)] backdrop-blur-[6px] supports-[backdrop-filter]:bg-white/90">
-              <div className="flex min-h-[142px] flex-col items-center justify-center gap-10 px-4 py-6 sm:flex-row sm:gap-[81px] sm:px-6 md:px-8">
-                <div className="flex h-[89px] w-full max-w-[238px] shrink-0 items-center justify-center">
-                  <Image
-                    src={heroGovNsw}
-                    alt="NSW Government approved supplier — ICT Services Scheme, Advanced Register"
-                    width={238}
-                    height={89}
-                    className="h-[89px] w-auto max-w-full object-contain"
-                    sizes="(max-width: 768px) 90vw, 238px"
-                  />
-                </div>
-                <div className="flex h-[89px] w-full max-w-[242px] shrink-0 items-center justify-center overflow-hidden rounded-md">
-                  <Image
-                    src={heroGovVictoria}
-                    alt="Victoria State Government — Approved Supplier, Buying for Victoria"
-                    width={242}
-                    height={89}
-                    className="h-[89px] w-auto max-w-full object-contain"
-                    sizes="(max-width: 768px) 90vw, 242px"
-                  />
-                </div>
-                <div className="flex h-[89px] w-full max-w-[280px] shrink-0 items-center justify-center overflow-hidden rounded-md">
-                  <Image
-                    src={heroGovQueensland}
-                    alt="Queensland Government"
-                    width={280}
-                    height={89}
-                    className="h-[89px] w-auto max-w-full object-contain object-left"
-                    sizes="(max-width: 768px) 90vw, 280px"
-                  />
+          {/* Government supplier strip — fixed-width card; logos scale down when count > 3 */}
+          {governmentSupplierLogos.length > 0 ? (
+            <div className="relative z-[1] mx-auto mt-12 w-full max-w-[1139px] px-0 sm:px-2">
+              <div className="pointer-events-none absolute bottom-full left-0 right-0 h-20" aria-hidden />
+              <div className="rounded-t-[20px] border border-b-0 border-[#E5E5E5] bg-white/95 shadow-[0px_8px_32px_rgba(0,0,0,0.09)] backdrop-blur-[6px] supports-[backdrop-filter]:bg-white/90 dark:border-zinc-700 dark:bg-zinc-900/95 dark:supports-[backdrop-filter]:bg-zinc-900/90">
+                <div className="flex min-h-[142px] flex-col items-center justify-center gap-10 px-4 py-6 sm:flex-row sm:flex-nowrap sm:gap-[81px] sm:px-6 md:px-8">
+                  {governmentSupplierLogos.map((logo, i) => (
+                    <div
+                      key={`gov-${logo.name}-${i}`}
+                      className="flex w-full shrink-0 items-center justify-center overflow-hidden rounded-md"
+                      style={{
+                        height: `${logo.displayHeight}px`,
+                        maxWidth: `${logo.slotMaxWidth}px`,
+                      }}
+                    >
+                      {isUploadsProxyPath(logo.src) ||
+                      logo.src.startsWith("http://") ||
+                      logo.src.startsWith("https://") ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- uploads + arbitrary URLs bypass optimizer
+                        <img
+                          src={logo.src}
+                          alt={logo.name}
+                          width={logo.displayWidth}
+                          height={logo.displayHeight}
+                          className="h-auto w-auto max-w-full object-contain"
+                          style={{ maxHeight: `${logo.displayHeight}px` }}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : (
+                        <Image
+                          src={logo.src}
+                          alt={logo.name}
+                          width={logo.displayWidth}
+                          height={logo.displayHeight}
+                          className="h-auto w-auto max-w-full object-contain"
+                          style={{ maxHeight: `${logo.displayHeight}px` }}
+                          sizes={`(max-width: 768px) 90vw, ${logo.displayWidth}px`}
+                        />
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
-          </div>
+          ) : null}
         </div>
       </section>
 

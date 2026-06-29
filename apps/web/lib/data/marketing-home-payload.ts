@@ -39,6 +39,26 @@ export const marketingHomePayload = {
     { id: "microsoft", imageKey: "home_4", imageClass: "w-[204px]" },
     { id: "sfdc", imageKey: "home_5", imageClass: "w-[177px]" },
   ],
+  governmentSupplierLogos: [
+    {
+      name: "NSW Government approved supplier — ICT Services Scheme, Advanced Register",
+      imageKey: "gov_nsw",
+      width: 238,
+      height: 89,
+    },
+    {
+      name: "Victoria State Government — Approved Supplier, Buying for Victoria",
+      imageKey: "gov_victoria",
+      width: 242,
+      height: 89,
+    },
+    {
+      name: "Queensland Government",
+      imageKey: "gov_queensland",
+      width: 280,
+      height: 89,
+    },
+  ],
   trustedLogos: [
     { name: "Standard Chartered", imageKey: "home_6", width: 174, height: 68 },
     { name: "VHA Home HealthCare", imageKey: "home_7", width: 160, height: 68 },
