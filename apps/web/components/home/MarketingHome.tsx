@@ -25,7 +25,7 @@ import heroNetworkPattern from "@image/home-hero-network.svg";
 import innovationImage from "@image/Innovation_Cutting_Edge_Tech.png";
 import { CASE_STUDY_SIDEBAR, buildHomeCaseStudySlots, type CaseStudyListCard } from "@/lib/case-study-mapper";
 import { useStatCountUpOnView } from "@/hooks/useStatCountUpOnView";
-import { isUploadsProxyPath } from "@/lib/media-url";
+import { isUploadsProxyPath, resolveMediaUrl, resolveUploadsImgSrc, sameOriginUploadsPath } from "@/lib/media-url";
 import { UNCATEGORIZED_LABEL } from "@/lib/display-category";
 
 export type HomePreviewJob = { slug: string; title: string; meta: string; href: string };
@@ -133,6 +133,21 @@ function formatWorldClockTime(date: Date, timeZone: string): string {
 
 function caseStudyCategoryPill(category: string): string {
   return category.toUpperCase();
+}
+
+function homeLogoImageSrc(src: string): string {
+  const uploads = sameOriginUploadsPath(src);
+  if (uploads) {
+    return resolveUploadsImgSrc(uploads);
+  }
+  if (src.startsWith("http://") || src.startsWith("https://")) {
+    return src;
+  }
+  return resolveMediaUrl(src);
+}
+
+function shouldUseNativeImgForLogo(src: string): boolean {
+  return isUploadsProxyPath(src) || src.startsWith("http://") || src.startsWith("https://");
 }
 
 export function MarketingHome({
@@ -299,12 +314,10 @@ export function MarketingHome({
                         maxWidth: `${logo.slotMaxWidth}px`,
                       }}
                     >
-                      {isUploadsProxyPath(logo.src) ||
-                      logo.src.startsWith("http://") ||
-                      logo.src.startsWith("https://") ? (
+                      {shouldUseNativeImgForLogo(logo.src) ? (
                         // eslint-disable-next-line @next/next/no-img-element -- uploads + arbitrary URLs bypass optimizer
                         <img
-                          src={logo.src}
+                          src={homeLogoImageSrc(logo.src)}
                           alt={logo.name}
                           width={logo.displayWidth}
                           height={logo.displayHeight}
@@ -350,10 +363,10 @@ export function MarketingHome({
                   className="flex shrink-0 items-center justify-center"
                   style={{ width: `${logo.width}px`, height: `${logo.height}px` }}
                 >
-                  {isUploadsProxyPath(logo.src) || logo.src.startsWith("http://") || logo.src.startsWith("https://") ? (
+                  {shouldUseNativeImgForLogo(logo.src) ? (
                     // eslint-disable-next-line @next/next/no-img-element -- uploads + arbitrary URLs bypass optimizer
                     <img
-                      src={logo.src}
+                      src={homeLogoImageSrc(logo.src)}
                       alt={logo.name}
                       width={logo.width}
                       height={logo.height}
