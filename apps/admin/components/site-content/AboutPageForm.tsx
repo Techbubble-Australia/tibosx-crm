@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { inputClass, labelClass, sectionClass } from "./form-styles";
 
@@ -160,6 +161,16 @@ export function AboutPageForm({
         tabs: value.workforce.tabs.filter((_, j) => j !== i),
       },
     });
+  };
+
+  const moveWorkforceTab = (from: number, direction: "up" | "down") => {
+    const to = direction === "up" ? from - 1 : from + 1;
+    if (to < 0 || to >= value.workforce.tabs.length) return;
+    const tabs = [...value.workforce.tabs];
+    const [item] = tabs.splice(from, 1);
+    if (!item) return;
+    tabs.splice(to, 0, item);
+    onChange({ ...value, workforce: { ...value.workforce, tabs } });
   };
 
   const setUspCol = (i: number, patch: Partial<UspColumn>) => {
@@ -361,8 +372,9 @@ export function AboutPageForm({
             <p className="mb-4 text-xs leading-relaxed text-gray-600 dark:text-zinc-400">
               Set the <strong>tab name</strong> visitors see on the About page, and the <strong>team department</strong> it should match
               from <strong>Admin → Team</strong> (case-insensitive exact match, or close spelling for minor typos). Only departments with
-              published members appear on the site. Turn on <strong>Active</strong> to pin matching tabs earlier; inactive rows are ignored.
-              Unmatched active rows do not create a tab. Remaining departments follow alphabetically.
+              published members appear on the site. Use the <strong>order</strong> controls to set tab sequence; turn on{" "}
+              <strong>Active</strong> to include a row on the site (inactive rows are ignored). Unmatched active rows do
+              not create a tab. Remaining departments follow alphabetically.
             </p>
             <datalist id="about-workforce-department-suggestions">
               {publishedDepartmentSuggestions.map((d) => (
@@ -381,13 +393,39 @@ export function AboutPageForm({
                 const count = dTrim ? (publishedDeptCountsByLower.get(dTrim.toLowerCase()) ?? 0) : 0;
                 const displayName = (t.label ?? "").trim() || dTrim;
                 const preview = displayName ? `${displayName} (${count})` : "—";
+                const reorderBtnClass =
+                  "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800";
                 return (
                   <div
                     key={i}
                     className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-zinc-600 dark:bg-zinc-900/50"
                   >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
-                      <div className="min-w-0 flex-1 space-y-4">
+                      <div className="flex min-w-0 flex-1 gap-3">
+                        <div className="flex shrink-0 flex-col items-center gap-1">
+                          <span className="text-xs font-medium tabular-nums text-gray-500 dark:text-zinc-400">
+                            #{i + 1}
+                          </span>
+                          <button
+                            type="button"
+                            className={reorderBtnClass}
+                            aria-label={`Move tab ${i + 1} up`}
+                            disabled={i === 0}
+                            onClick={() => moveWorkforceTab(i, "up")}
+                          >
+                            <ChevronUp className="h-4 w-4" aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            className={reorderBtnClass}
+                            aria-label={`Move tab ${i + 1} down`}
+                            disabled={i === value.workforce.tabs.length - 1}
+                            onClick={() => moveWorkforceTab(i, "down")}
+                          >
+                            <ChevronDown className="h-4 w-4" aria-hidden />
+                          </button>
+                        </div>
+                        <div className="min-w-0 flex-1 space-y-4">
                         <div className="space-y-2">
                           <label className={labelClass}>Tab name</label>
                           <input
@@ -410,6 +448,7 @@ export function AboutPageForm({
                         <p className="text-xs text-gray-500 dark:text-zinc-400">
                           Site tab: <span className="font-medium text-gray-800 dark:text-zinc-200">{preview}</span>
                         </p>
+                        </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-4 border-t border-gray-100 pt-4 dark:border-zinc-700 lg:border-t-0 lg:pt-0">
                         <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-800 dark:text-zinc-200">
