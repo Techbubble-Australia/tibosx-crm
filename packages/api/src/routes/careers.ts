@@ -1,6 +1,10 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
+import multer from "multer";
+import path from "path";
+import { promises as fsp } from "fs";
 import { prisma } from "@techbubble/database";
+import { objectStorageConfigured, putUploadObject } from "../lib/object-storage";
 
 const router: IRouter = Router();
 
@@ -13,6 +17,64 @@ const careerSchema = z.object({
   company: z.string().optional(),
   resumeUrl: z.string().optional(),
   message: z.string().optional(),
+});
+
+function makeStoredFilename(fieldname: string, originalname: string): string {
+  const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+  const ext = path.extname(originalname);
+  return `${fieldname}-${uniqueSuffix}${ext}`;
+}
+
+async function persistUploadedFile(file: Express.Multer.File, filename: string): Promise<void> {
+  const key = `uploads/${filename}`;
+  if (objectStorageConfigured()) {
+    await putUploadObject({
+      key,
+      body: file.buffer!,
+      contentType: file.mimetype || "application/octet-stream",
+    });
+    return;
+  }
+
+  const uploadDir = process.env.UPLOAD_DIR || "./uploads";
+  await fsp.mkdir(uploadDir, { recursive: true });
+  await fsp.writeFile(path.join(uploadDir, filename), file.buffer!);
+}
+
+const resumeUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowedExt = /\.(pdf|doc|docx)$/i.test(ext);
+    const mt = (file.mimetype || "").toLowerCase();
+    const allowedMt =
+      mt === "application/pdf" ||
+      mt === "application/msword" ||
+      mt === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    if (allowedExt && allowedMt) {
+      return cb(null, true);
+    }
+    cb(new Error("Only PDF, DOC, and DOCX files are allowed"));
+  },
+});
+
+router.post("/upload-resume", resumeUpload.single("resume"), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+    const filename = makeStoredFilename(req.file.fieldname, req.file.originalname);
+    await persistUploadedFile(req.file, filename);
+    const fileUrl = `/uploads/${filename}`;
+    res.json({
+      message: "Resume uploaded successfully",
+      data: { url: fileUrl, filename, size: req.file.size },
+    });
+  } catch (error) {
+    console.error("Error uploading resume:", error);
+    next(error);
+  }
 });
 
 router.post("/apply", async (req, res) => {

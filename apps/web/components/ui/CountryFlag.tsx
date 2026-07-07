@@ -1,23 +1,20 @@
-import { cn } from "@/lib/utils";
-import type { SiteFooterFlagCode } from "@site-content/defaults";
+"use client";
 
-export type CountryFlagCode = SiteFooterFlagCode;
+import { cn } from "@/lib/utils";
 
 type CountryFlagProps = {
-  code: CountryFlagCode;
-  /** Pixel size (square); SVG assets are 1:1 */
+  code: string;
   height?: number;
   className?: string;
-  /** When false, exposed as `role="img"` with this label. When true, `aria-hidden` (caption nearby). */
   decorative?: boolean;
-  /** Accessible name when `decorative` is false */
   label?: string;
 };
 
-/**
- * Static SVG from `/public/flags/` — reliable across OS/fonts (emoji flags often render as tofu).
- */
+/** Static SVG from `/public/flags/{code}.svg` (lowercase ISO 3166-1 alpha-2). */
 export function CountryFlag({ code, height = 28, className, decorative = false, label }: CountryFlagProps) {
+  const normalized = code.trim().toLowerCase();
+  if (!/^[a-z]{2}$/.test(normalized)) return null;
+
   const size = height;
   return (
     <span
@@ -27,7 +24,16 @@ export function CountryFlag({ code, height = 28, className, decorative = false, 
       className={cn("inline-flex shrink-0 items-center overflow-hidden", className)}
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- small static SVG asset */}
-      <img src={`/flags/${code}.svg`} width={size} height={size} alt="" className="block object-cover" />
+      <img
+        src={`/flags/${normalized}.svg`}
+        width={size}
+        height={size}
+        alt=""
+        className="block rounded-sm object-cover"
+        onError={(e) => {
+          (e.target as HTMLImageElement).style.display = "none";
+        }}
+      />
     </span>
   );
 }

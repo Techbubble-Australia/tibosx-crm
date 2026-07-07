@@ -10,8 +10,8 @@ export async function seedAdminUser(): Promise<void> {
 
   await prisma.adminUser.upsert({
     where: { email },
-    create: { email, passwordHash, role: "admin" },
-    update: { passwordHash, role: "admin" },
+    create: { email, passwordHash, role: "admin", active: true, name: "Admin" },
+    update: { passwordHash, role: "admin", active: true },
   });
 
   console.log(`✅ Admin user ready: ${email} (set ADMIN_EMAIL / ADMIN_PASSWORD to change)`);

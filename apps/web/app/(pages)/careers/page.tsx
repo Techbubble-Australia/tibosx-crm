@@ -6,6 +6,7 @@ import { getPublishedJobs } from "@/lib/api/public";
 import { fetchSiteContentPayload } from "@/lib/fetch-site-content";
 import { resolveCareersPage } from "@/lib/site-content/resolve-pages";
 import { CareersPositionsSection } from "@/components/careers/CareersPositionsSection";
+import { CareersApplyForm } from "@/components/careers/CareersApplyForm";
 import { SectionPill } from "@/components/ui/SectionPill";
 
 const CAREERS_ICONS: Record<string, LucideIcon> = {
@@ -157,62 +158,7 @@ export default async function CareersPage() {
                 Our team will review and reach out within 48 hours.
               </p>
 
-              <form className="mt-8 space-y-[14px]">
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    type="text"
-                    placeholder="First Name"
-                    className="h-[46px] rounded-[14px] border border-white/15 bg-white/[0.08] px-[17px] text-[14px] text-white placeholder:text-white/35 focus:outline-none"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Last Name"
-                    className="h-[46px] rounded-[14px] border border-white/15 bg-white/[0.08] px-[17px] text-[14px] text-white placeholder:text-white/35 focus:outline-none"
-                  />
-                </div>
-
-                <input
-                  type="email"
-                  placeholder="Email"
-                  className="h-[46px] w-full rounded-[14px] border border-white/15 bg-white/[0.08] px-[17px] text-[14px] text-white placeholder:text-white/35 focus:outline-none"
-                />
-                <input
-                  type="tel"
-                  placeholder="Phone Number"
-                  className="h-[46px] w-full rounded-[14px] border border-white/15 bg-white/[0.08] px-[17px] text-[14px] text-white placeholder:text-white/35 focus:outline-none"
-                />
-                <input
-                  type="text"
-                  placeholder="Position interested in *"
-                  className="h-[46px] w-full rounded-[14px] border border-white/15 bg-white/[0.08] px-[17px] text-[14px] text-white placeholder:text-white/35 focus:outline-none"
-                />
-                <input
-                  type="text"
-                  placeholder="Company Name"
-                  className="h-[46px] w-full rounded-[14px] border border-white/15 bg-white/[0.08] px-[17px] text-[14px] text-white placeholder:text-white/35 focus:outline-none"
-                />
-
-                <div className="flex h-[100px] items-center justify-center rounded-[14px] border border-white/15 bg-white/[0.08] text-center">
-                  <div>
-                    <p className="text-[14px] font-normal leading-5 tracking-[0.035px] text-white/35">Upload your resume</p>
-                    <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-white/35">PDF, DOC, DOCX (max 5MB)</p>
-                  </div>
-                </div>
-
-                <input
-                  type="text"
-                  placeholder="Tell us about yourself..."
-                  className="h-12 w-full rounded-[14px] border border-white/15 bg-white/[0.08] px-[21px] text-[14px] text-white placeholder:text-white/60 focus:outline-none"
-                />
-
-                <button
-                  type="submit"
-                  className="mt-[18px] inline-flex h-12 w-full items-center justify-center gap-2 rounded-[18px] bg-white text-[16px] font-semibold leading-6 text-[#111111]"
-                >
-                  Submit Application
-                  <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
-                </button>
-              </form>
+              <CareersApplyForm />
             </div>
           </div>
         </div>

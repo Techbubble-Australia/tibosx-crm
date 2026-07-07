@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 
 interface TeamMember {
@@ -17,11 +17,48 @@ interface TeamMember {
   featuredLeadershipOrder: number | null;
 }
 
+type SortKey = "name" | "role" | "location" | "department" | "featuredLeadershipOrder" | "order" | "published";
+type SortDir = "asc" | "desc";
+
+function SortHeader({
+  label,
+  sortKey,
+  activeKey,
+  dir,
+  onSort,
+}: {
+  label: string;
+  sortKey: SortKey;
+  activeKey: SortKey;
+  dir: SortDir;
+  onSort: (key: SortKey) => void;
+}) {
+  const active = activeKey === sortKey;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(sortKey)}
+      className="inline-flex items-center gap-1 font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
+    >
+      {label}
+      {active ? (
+        dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />
+      ) : (
+        <span className="inline-block h-3.5 w-3.5 opacity-0" aria-hidden />
+      )}
+    </button>
+  );
+}
+
 export default function TeamPage() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [sortKey, setSortKey] = useState<SortKey>("order");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
-  useEffect(() => { fetchMembers(); }, []);
+  useEffect(() => {
+    void fetchMembers();
+  }, []);
 
   async function fetchMembers() {
     try {
@@ -35,12 +72,54 @@ export default function TeamPage() {
     }
   }
 
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  const sortedMembers = useMemo(() => {
+    const list = [...members];
+    list.sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "name":
+          cmp = a.name.localeCompare(b.name);
+          break;
+        case "role":
+          cmp = a.role.localeCompare(b.role);
+          break;
+        case "location":
+          cmp = (a.location || "").localeCompare(b.location || "");
+          break;
+        case "department":
+          cmp = a.department.localeCompare(b.department);
+          break;
+        case "featuredLeadershipOrder": {
+          const av = a.featuredLeadershipOrder ?? 999;
+          const bv = b.featuredLeadershipOrder ?? 999;
+          cmp = av - bv;
+          break;
+        }
+        case "order":
+          cmp = a.order - b.order;
+          break;
+        case "published":
+          cmp = Number(b.published) - Number(a.published);
+          break;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return list;
+  }, [members, sortKey, sortDir]);
+
   async function deleteMember(id: string) {
     if (!confirm("Delete this team member?")) return;
     try {
-      const res = await adminFetch(`/api/admin/team/${id}`, {
-        method: "DELETE",
-      });
+      const res = await adminFetch(`/api/admin/team/${id}`, { method: "DELETE" });
       if (res.ok) setMembers(members.filter((m) => m.id !== id));
     } catch (error) {
       console.error("Error deleting team member:", error);
@@ -49,67 +128,99 @@ export default function TeamPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin w-8 h-8 border-2 border-black border-t-transparent rounded-full" />
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-black border-t-transparent dark:border-white" />
       </div>
     );
   }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Team Members</h2>
-          <p className="text-gray-500 text-sm">Manage team member profiles shown on the About page</p>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Team Members</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Manage team member profiles shown on the About page</p>
         </div>
-        <Link href="/team/new" className="inline-flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors">
-          <Plus className="w-4 h-4" />
+        <Link
+          href="/team/new"
+          className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black"
+        >
+          <Plus className="h-4 w-4" />
           Add Member
         </Link>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
             <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Role</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Location</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Department</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Leadership</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Order</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600">Actions</th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Name" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Role" sortKey="role" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Location" sortKey="location" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Department" sortKey="department" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Leadership" sortKey="featuredLeadershipOrder" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Order" sortKey="order" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Status" sortKey="published" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
+              <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
-            {members.length === 0 ? (
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            {sortedMembers.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-400">No team members yet.</td>
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
+                  No team members yet.
+                </td>
               </tr>
             ) : (
-              members.map((member) => (
-                <tr key={member.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">{member.name}</td>
-                  <td className="px-4 py-3 text-gray-600">{member.role}</td>
-                  <td className="px-4 py-3 text-gray-600">{member.location?.trim() || "—"}</td>
-                  <td className="px-4 py-3 text-gray-600">{member.department}</td>
-                  <td className="px-4 py-3 text-gray-600">
+              sortedMembers.map((member) => (
+                <tr key={member.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{member.name}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{member.role}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{member.location?.trim() || "—"}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{member.department}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                     {member.featuredLeadershipOrder != null ? `Slot ${member.featuredLeadershipOrder}` : "—"}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{member.order}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{member.order}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${member.published ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                        member.published
+                          ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                          : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+                      }`}
+                    >
                       {member.published ? "Published" : "Draft"}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex items-center gap-2">
-                      <Link href={`/team/${member.id}`} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-black">
-                        <Edit className="w-4 h-4" />
+                      <Link
+                        href={`/team/${member.id}`}
+                        className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-black dark:hover:bg-gray-800 dark:hover:text-white"
+                      >
+                        <Edit className="h-4 w-4" />
                       </Link>
-                      <button onClick={() => deleteMember(member.id)} className="p-1.5 rounded hover:bg-red-50 text-gray-500 hover:text-red-600">
-                        <Trash2 className="w-4 h-4" />
+                      <button
+                        type="button"
+                        onClick={() => void deleteMember(member.id)}
+                        className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   </td>

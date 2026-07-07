@@ -19,8 +19,10 @@ const jobSchema = z.object({
   locations: z.array(jobLocationEntrySchema).min(1).optional(),
   type: z.string().min(1),
   workMode: z.string().min(1),
-  category: z.string().default(""),
-  department: z.string().default(""),
+  category: z.string().min(1, "Category is required"),
+  technology: z.string().min(1, "Technology is required"),
+  department: z.string().min(1, "Department is required"),
+  clientId: z.string().min(1, "Client is required"),
   description: z.string().max(500_000).default(""),
   published: z.boolean().default(true),
   order: z.number().int().default(0),
@@ -62,16 +64,36 @@ function prepareJobWriteData(body: z.infer<typeof jobSchema>): Record<string, un
   };
 }
 
-function serializeJob(job: JobListing) {
+function serializeJob(job: JobListing, options?: { includeClient?: boolean }) {
   const locations = normalizeJobLocations(job);
   const legacy = syncLegacyLocationFields(locations);
-  return {
-    ...job,
+  const { clientId, ...rest } = job;
+  const base = {
+    ...rest,
     location: legacy.location,
     country: legacy.country,
     flag: legacy.flag,
     locations,
+    likeCount: job.likeCount ?? 0,
   };
+  if (options?.includeClient) {
+    return { ...base, clientId };
+  }
+  return base;
+}
+
+function mergeJobUpdate(
+  existing: JobListing,
+  data: Partial<z.infer<typeof jobSchema>>,
+): z.infer<typeof jobSchema> {
+  const merged = { ...existing, ...data } as Record<string, unknown>;
+  for (const field of ["category", "department", "technology"] as const) {
+    const incoming = data[field];
+    if (incoming === "" && existing[field]) {
+      merged[field] = existing[field];
+    }
+  }
+  return jobSchema.parse(merged);
 }
 
 async function allocateJobReferenceNumber(): Promise<string> {
@@ -108,10 +130,45 @@ router.get("/admin/all", async (_req, res) => {
     const jobs = await prisma.jobListing.findMany({
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
     });
-    res.json({ data: jobs.map((job: JobListing) => serializeJob(job)) });
+    res.json({ data: jobs.map((job: JobListing) => serializeJob(job, { includeClient: true })) });
   } catch (error) {
     console.error("Error fetching jobs:", error);
     res.status(500).json({ error: "Failed to fetch jobs" });
+  }
+});
+
+// Public: like a job (must be before /:slug generic if we use same param - actually POST /:slug/like)
+router.post("/:slug/like", async (req, res) => {
+  try {
+    const visitorKey = (req.body?.visitorKey ?? req.headers["x-visitor-key"]) as string | undefined;
+    if (!visitorKey || typeof visitorKey !== "string" || visitorKey.length < 8) {
+      return res.status(400).json({ error: "visitorKey is required" });
+    }
+
+    const job = await prisma.jobListing.findUnique({ where: { slug: req.params.slug } });
+    if (!job || !job.published) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const existing = await prisma.jobLike.findUnique({
+      where: { jobId_visitorKey: { jobId: job.id, visitorKey } },
+    });
+    if (existing) {
+      return res.json({ data: { likeCount: job.likeCount, alreadyLiked: true } });
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.jobLike.create({ data: { jobId: job.id, visitorKey } });
+      return tx.jobListing.update({
+        where: { id: job.id },
+        data: { likeCount: { increment: 1 } },
+      });
+    });
+
+    res.json({ data: { likeCount: updated.likeCount, alreadyLiked: false } });
+  } catch (error) {
+    console.error("Error liking job:", error);
+    res.status(500).json({ error: "Failed to like job" });
   }
 });
 
@@ -140,7 +197,7 @@ router.post("/", async (req, res) => {
     const job = await prisma.jobListing.create({
       data: { ...writeData, referenceNumber } as Prisma.JobListingCreateInput,
     });
-    res.status(201).json({ data: serializeJob(job) });
+    res.status(201).json({ data: serializeJob(job, { includeClient: true }) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
@@ -158,13 +215,13 @@ router.put("/:id", async (req, res) => {
     if (!existing) {
       return res.status(404).json({ error: "Job not found" });
     }
-    const merged = { ...existing, ...data };
-    const writeData = prepareJobWriteData(jobSchema.parse(merged));
+    const merged = mergeJobUpdate(existing, data);
+    const writeData = prepareJobWriteData(merged);
     const job = await prisma.jobListing.update({
       where: { id: req.params.id },
       data: writeData as Prisma.JobListingUpdateInput,
     });
-    res.json({ data: serializeJob(job) });
+    res.json({ data: serializeJob(job, { includeClient: true }) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });

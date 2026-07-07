@@ -3,7 +3,6 @@ import Link from "next/link";
 import { Linkedin, Facebook, Instagram, Clock, type LucideIcon } from "lucide-react";
 import footerLogo from "@image/techbubble_-_home_36.png";
 import { CountryFlag } from "@/components/ui/CountryFlag";
-import type { CountryFlagCode } from "@/components/ui/CountryFlag";
 import type { SiteFooterPayload } from "@/lib/site-content/resolve-pages";
 
 const SOCIAL_ICONS: Record<string, LucideIcon> = {
@@ -67,7 +66,7 @@ export function Footer({ data }: { data: SiteFooterPayload }) {
                 {data.offices.map((office) => (
                   <div key={`${office.region}-${office.entity}`} className="break-words">
                     <div className="flex flex-wrap items-center gap-2 text-[14px] font-semibold leading-5 text-white min-w-0">
-                      <CountryFlag code={office.flagCode as CountryFlagCode} height={18} label={office.region} />
+                      <CountryFlag code={office.flagCode} height={18} label={office.region} />
                       <span className="break-words">
                         {office.region} <span className="px-2 text-white/75">|</span> {office.entity}
                       </span>

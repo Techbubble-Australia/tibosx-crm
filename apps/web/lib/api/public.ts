@@ -93,11 +93,14 @@ export type JobApiRow = {
   type: string;
   workMode: string;
   category: string;
+  technology: string;
   department: string;
+  likeCount?: number;
 };
 
 export type JobDetailApiRow = JobApiRow & {
   description: string;
+  likeCount: number;
 };
 
 export async function getPublishedJobs(): Promise<JobApiRow[]> {

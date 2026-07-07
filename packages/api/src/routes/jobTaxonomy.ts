@@ -11,7 +11,7 @@ type TaxonomyRow = { id: string; name: string; order: number };
 
 type TaxonomyStore = {
   label: string;
-  jobField: "category" | "department";
+  jobField: "category" | "department" | "technology";
   findMany: () => Promise<TaxonomyRow[]>;
   create: (data: { name: string; order: number }) => Promise<TaxonomyRow>;
   findUnique: (id: string) => Promise<TaxonomyRow | null>;
@@ -111,4 +111,17 @@ export const jobDepartmentRoutes = buildTaxonomyRouter({
   findUnique: (id) => prisma.jobDepartment.findUnique({ where: { id } }),
   update: (id, data) => prisma.jobDepartment.update({ where: { id }, data }),
   delete: (id) => prisma.jobDepartment.delete({ where: { id } }).then(() => undefined),
+});
+
+export const jobTechnologyRoutes = buildTaxonomyRouter({
+  label: "technology",
+  jobField: "technology",
+  findMany: () =>
+    prisma.jobTechnology.findMany({
+      orderBy: [{ order: "asc" }, { name: "asc" }],
+    }),
+  create: (data) => prisma.jobTechnology.create({ data }),
+  findUnique: (id) => prisma.jobTechnology.findUnique({ where: { id } }),
+  update: (id, data) => prisma.jobTechnology.update({ where: { id }, data }),
+  delete: (id) => prisma.jobTechnology.delete({ where: { id } }).then(() => undefined),
 });

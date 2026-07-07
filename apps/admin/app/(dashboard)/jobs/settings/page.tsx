@@ -22,8 +22,13 @@ export default function JobSettingsPage() {
       <div className="space-y-6">
         <TaxonomyManager
           apiPath="/api/admin/job-categories"
-          title="Job Categories"
-          description="Shown above Department on the job form (e.g. Platform Consulting, Development)."
+          title="Categories"
+          description="Required category for job listings (e.g. ServiceNow, Salesforce, Microsoft)."
+        />
+        <TaxonomyManager
+          apiPath="/api/admin/job-technologies"
+          title="Technologies"
+          description="Required technology for job listings (e.g. ServiceNow, Azure, AI/ML)."
         />
         <TaxonomyManager
           apiPath="/api/admin/job-departments"

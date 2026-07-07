@@ -4,6 +4,75 @@ import { prisma } from "../client";
 const forceDemoRelations =
   process.env.FORCE_DEMO_SEED === "1" || process.env.FORCE_DEMO_SEED === "true";
 
+const DEFAULT_CLIENT_ID = "default-client-internal";
+
+const categoryDefs = [
+  { name: "ServiceNow", order: 0 },
+  { name: "Salesforce", order: 1 },
+  { name: "Microsoft", order: 2 },
+  { name: "Engineering", order: 3 },
+];
+
+const technologyDefs = [
+  { name: "ServiceNow", order: 0 },
+  { name: "Salesforce", order: 1 },
+  { name: "Microsoft", order: 2 },
+  { name: "Azure", order: 3 },
+  { name: "AI/ML", order: 4 },
+];
+
+const departmentDefs = [{ name: "Engineering", order: 0 }];
+
+async function seedJobTaxonomies() {
+  for (const c of categoryDefs) {
+    await prisma.jobCategory.upsert({
+      where: { name: c.name },
+      create: { name: c.name, order: c.order },
+      update: { order: c.order },
+    });
+  }
+  for (const t of technologyDefs) {
+    await prisma.jobTechnology.upsert({
+      where: { name: t.name },
+      create: { name: t.name, order: t.order },
+      update: { order: t.order },
+    });
+  }
+  for (const d of departmentDefs) {
+    await prisma.jobDepartment.upsert({
+      where: { name: d.name },
+      create: { name: d.name, order: d.order },
+      update: { order: d.order },
+    });
+  }
+}
+
+async function seedDefaultClient() {
+  await prisma.client.upsert({
+    where: { id: DEFAULT_CLIENT_ID },
+    create: { id: DEFAULT_CLIENT_ID, name: "Internal", order: 0, active: true },
+    update: { name: "Internal", active: true },
+  });
+}
+
+function inferCategory(title: string): string {
+  const t = title.toLowerCase();
+  if (t.includes("servicenow")) return "ServiceNow";
+  if (t.includes("salesforce")) return "Salesforce";
+  if (t.includes("microsoft") || t.includes("azure")) return "Microsoft";
+  return "Engineering";
+}
+
+function inferTechnology(title: string): string {
+  const t = title.toLowerCase();
+  if (t.includes("servicenow")) return "ServiceNow";
+  if (t.includes("salesforce")) return "Salesforce";
+  if (t.includes("azure")) return "Azure";
+  if (t.includes("microsoft")) return "Microsoft";
+  if (t.includes("ai") || t.includes("ml")) return "AI/ML";
+  return "ServiceNow";
+}
+
 const jobDefs = [
   {
     slug: "senior-servicenow-developer",
@@ -161,13 +230,35 @@ const faqRows = [
 ];
 
 export async function seedJobsFaqsTestimonialsTeam() {
+  await seedJobTaxonomies();
+  await seedDefaultClient();
+
   for (const j of jobDefs) {
+    const category = inferCategory(j.title);
+    const technology = inferTechnology(j.title);
+    const countryCodeMap: Record<string, string> = {
+      Australia: "au",
+      USA: "us",
+      India: "in",
+      Philippines: "ph",
+    };
+    const countryCode = countryCodeMap[j.country] ?? "";
+    const locations = countryCode
+      ? [{ countryCode, country: j.country, flag: j.flag, label: j.location !== j.country ? j.location : "" }]
+      : undefined;
+    const base = {
+      ...j,
+      category,
+      technology,
+      clientId: DEFAULT_CLIENT_ID,
+      description: "",
+      published: true,
+      ...(locations ? { locations } : {}),
+    };
     await prisma.jobListing.upsert({
       where: { slug: j.slug },
-      create: { ...j, description: "", published: true },
-      update: forceDemoRelations
-        ? { ...j, description: "", published: true }
-        : { order: j.order, published: true },
+      create: base,
+      update: forceDemoRelations ? base : { order: j.order, published: true },
     });
   }
 

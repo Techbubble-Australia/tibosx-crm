@@ -6,10 +6,10 @@ import { ArrowRight, ChevronDown } from "lucide-react";
 import type { JobApiRow } from "@/lib/api/public";
 import {
   collectJobLocationFilterOptions,
-  formatJobLocationsSummary,
   jobMatchesLocationFilter,
   normalizeJobLocations,
 } from "@/lib/job-locations";
+import { JobLocationFlags } from "@/components/careers/JobLocationFlags";
 import { SectionPill } from "@/components/ui/SectionPill";
 
 function formatType(s: string): string {
@@ -114,7 +114,10 @@ export function CareersPositionsSection({ jobs }: { jobs: JobApiRow[] }) {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {filtered.map((position) => {
               const entries = normalizeJobLocations(position);
-              const { flags, locationText } = formatJobLocationsSummary(entries);
+              const locationText = entries
+                .map((e) => e.label?.trim() || e.country.trim())
+                .filter(Boolean)
+                .join(" · ");
               return (
                 <Link
                   key={position.slug}
@@ -137,15 +140,20 @@ export function CareersPositionsSection({ jobs }: { jobs: JobApiRow[] }) {
                   </div>
 
                   <div className="mt-4 space-y-2">
-                    {flags || locationText ? (
-                      <p className="text-[14px] leading-5 text-[#7a7f8e] dark:text-zinc-400">
-                        {flags ? <span className="mr-1.5">{flags}</span> : null}
-                        {locationText}
+                    {entries.length > 0 || locationText ? (
+                      <p className="flex flex-wrap items-center gap-1 text-[14px] leading-5 text-[#7a7f8e] dark:text-zinc-400">
+                        <JobLocationFlags locations={entries} flagHeight={18} />
+                        {locationText ? <span>{locationText}</span> : null}
                       </p>
                     ) : null}
                     <p className="text-[13px] font-medium leading-5 text-[#666666] dark:text-zinc-400">
                       {formatType(position.type)} · {formatType(position.workMode)}
                     </p>
+                    {(position.technology || "").trim() ? (
+                      <p className="text-[12px] font-semibold uppercase tracking-wide text-[#111111] dark:text-zinc-200">
+                        {position.technology}
+                      </p>
+                    ) : null}
                     {(position.department || "").trim() ? (
                       <p className="text-[12px] font-medium uppercase tracking-wide text-[#999] dark:text-zinc-500">
                         {(position.department || "General").trim()}

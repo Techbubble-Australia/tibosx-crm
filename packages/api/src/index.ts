@@ -14,14 +14,17 @@ import { careerRoutes } from "./routes/careers";
 import { uploadRoutes } from "./routes/upload";
 import { authRoutes } from "./routes/auth";
 import { jobRoutes } from "./routes/jobs";
-import { jobCategoryRoutes, jobDepartmentRoutes } from "./routes/jobTaxonomy";
+import { jobCategoryRoutes, jobDepartmentRoutes, jobTechnologyRoutes } from "./routes/jobTaxonomy";
 import { caseStudyCategoryRoutes } from "./routes/caseStudyCategories";
 import { teamRoutes } from "./routes/team";
 import { testimonialPublicRoutes } from "./routes/testimonials-public";
 import { testimonialAdminRoutes } from "./routes/testimonials-admin";
 import { faqRoutes } from "./routes/faqs";
 import { siteContentPublicRoutes, siteContentAdminRoutes } from "./routes/siteContent";
+import { clientRoutes } from "./routes/clients";
+import { adminUserRoutes } from "./routes/adminUsers";
 import { authMiddleware } from "./middleware/auth";
+import { requireRole, blockViewerMutations } from "./middleware/requireRole";
 
 dotenv.config();
 
@@ -60,6 +63,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api/job-categories", jobCategoryRoutes);
 app.use("/api/job-departments", jobDepartmentRoutes);
+app.use("/api/job-technologies", jobTechnologyRoutes);
 app.use("/api/case-study-categories", caseStudyCategoryRoutes);
 app.use("/api/team", teamRoutes);
 app.use("/api/testimonials", testimonialPublicRoutes);
@@ -67,19 +71,24 @@ app.use("/api/faqs", faqRoutes);
 app.use("/api/site-content", siteContentPublicRoutes);
 
 // Protected routes (admin only)
-app.use("/api/admin/case-studies", authMiddleware, caseStudyPreviewRouter);
-app.use("/api/admin/case-studies", authMiddleware, caseStudyRoutes);
-app.use("/api/admin/jobs", authMiddleware, jobRoutes);
-app.use("/api/admin/job-categories", authMiddleware, jobCategoryRoutes);
-app.use("/api/admin/job-departments", authMiddleware, jobDepartmentRoutes);
-app.use("/api/admin/case-study-categories", authMiddleware, caseStudyCategoryRoutes);
-app.use("/api/admin/team", authMiddleware, teamRoutes);
-app.use("/api/admin/testimonials", authMiddleware, testimonialAdminRoutes);
-app.use("/api/admin/faqs", authMiddleware, faqRoutes);
-app.use("/api/admin/site-content", authMiddleware, siteContentAdminRoutes);
+const adminAuth = [authMiddleware, blockViewerMutations];
+
+app.use("/api/admin/case-studies", ...adminAuth, caseStudyPreviewRouter);
+app.use("/api/admin/case-studies", ...adminAuth, caseStudyRoutes);
+app.use("/api/admin/jobs", ...adminAuth, jobRoutes);
+app.use("/api/admin/job-categories", ...adminAuth, jobCategoryRoutes);
+app.use("/api/admin/job-departments", ...adminAuth, jobDepartmentRoutes);
+app.use("/api/admin/job-technologies", ...adminAuth, jobTechnologyRoutes);
+app.use("/api/admin/case-study-categories", ...adminAuth, caseStudyCategoryRoutes);
+app.use("/api/admin/team", ...adminAuth, teamRoutes);
+app.use("/api/admin/testimonials", ...adminAuth, testimonialAdminRoutes);
+app.use("/api/admin/faqs", ...adminAuth, faqRoutes);
+app.use("/api/admin/site-content", ...adminAuth, siteContentAdminRoutes);
 app.use("/api/admin/career-applications", authMiddleware, careerRoutes);
 app.use("/api/admin/contact-submissions", authMiddleware, contactRoutes);
-app.use("/api/upload", authMiddleware, uploadRoutes);
+app.use("/api/admin/clients", authMiddleware, requireRole("admin"), clientRoutes);
+app.use("/api/admin/users", authMiddleware, requireRole("admin"), adminUserRoutes);
+app.use("/api/upload", ...adminAuth, uploadRoutes);
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

@@ -217,30 +217,71 @@ model JobDepartment {
   @@index([order])
 }
 
+model JobTechnology {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([order])
+}
+
+model Client {
+  id        String       @id @default(cuid())
+  name      String       @unique
+  order     Int          @default(0)
+  active    Boolean      @default(true)
+  jobs      JobListing[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([order])
+  @@index([active])
+}
+
 model JobListing {
-  id              String   @id @default(cuid())
-  slug            String   @unique
-  referenceNumber String   @unique
+  id              String    @id @default(cuid())
+  slug            String    @unique
+  referenceNumber String    @unique
   title           String
   location        String
   country         String
-  flag            String   // emoji flag (primary / first location for legacy consumers)
+  flag            String    // emoji flag (primary / first location for legacy consumers)
   /// [{ countryCode, country, flag, label? }] — multi-country roles; when set, drives public display.
   locations       Json?
-  type            String   // full-time | contract | part-time
-  workMode        String   // remote | hybrid | onsite
-  category        String   @default("")
-  department      String   @default("")
-  description     String   @default("") @db.Text
-  published       Boolean  @default(true)
-  order           Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  type            String    // full-time | contract | part-time
+  workMode        String    // remote | hybrid | onsite
+  category        String
+  technology      String
+  department      String
+  clientId        String
+  client          Client    @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  description     String    @default("") @db.Text
+  likeCount       Int       @default(0)
+  published       Boolean   @default(true)
+  order           Int       @default(0)
+  likes           JobLike[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([published])
   @@index([order])
   @@index([category])
+  @@index([technology])
   @@index([department])
+  @@index([clientId])
+}
+
+model JobLike {
+  id         String     @id @default(cuid())
+  jobId      String
+  job        JobListing @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  visitorKey String
+  createdAt  DateTime   @default(now())
+
+  @@unique([jobId, visitorKey])
+  @@index([jobId])
 }
 
 model TeamMember {
@@ -309,8 +350,10 @@ model SiteContent {
 model AdminUser {
   id           String   @id @default(cuid())
   email        String   @unique
+  name         String?
   passwordHash String
-  role         String   @default("admin")
+  role         String   @default("admin") // admin | editor | viewer
+  active       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

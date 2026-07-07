@@ -41,6 +41,13 @@ export function HtmlEditor({
     onChange?.(next);
   }, [onChange]);
 
+  /** Expose latest HTML for parent form submit (hidden input can lag one tick). */
+  useEffect(() => {
+    if (controlledValue !== undefined) {
+      setInternal(controlledValue);
+    }
+  }, [controlledValue]);
+
   function insertLink() {
     const url = window.prompt("Enter URL (https://…)");
     if (!url?.trim()) return;

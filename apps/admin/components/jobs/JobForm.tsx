@@ -17,7 +17,9 @@ export type JobFormDefaults = {
   type?: string;
   workMode?: string;
   category?: string;
+  technology?: string;
   department?: string;
+  clientId?: string;
   description?: string;
   order?: number;
   published?: boolean;
@@ -26,6 +28,7 @@ export type JobFormDefaults = {
 };
 
 type TaxonomyItem = { id: string; name: string };
+type ClientItem = { id: string; name: string; active: boolean };
 
 type Props = {
   mode: "create" | "edit";
@@ -54,27 +57,49 @@ export function JobForm({
 }: Props) {
   const [title, setTitle] = useState(defaults.title ?? "");
   const [categories, setCategories] = useState<TaxonomyItem[]>([]);
+  const [technologies, setTechnologies] = useState<TaxonomyItem[]>([]);
   const [departments, setDepartments] = useState<TaxonomyItem[]>([]);
+  const [clients, setClients] = useState<ClientItem[]>([]);
+  const [taxonomyReady, setTaxonomyReady] = useState(false);
   const [description, setDescription] = useState(defaults.description ?? "");
   const [locations, setLocations] = useState<JobLocationEntry[]>(() => jobLocationsFromDefaults(defaults));
+  const [category, setCategory] = useState(defaults.category ?? "");
+  const [technology, setTechnology] = useState(defaults.technology ?? "");
+  const [department, setDepartment] = useState(defaults.department ?? "");
+  const [clientId, setClientId] = useState(defaults.clientId ?? "");
 
   useEffect(() => {
     async function loadTaxonomy() {
       try {
-        const [catRes, deptRes] = await Promise.all([
+        const [catRes, techRes, deptRes, clientRes] = await Promise.all([
           adminFetch("/api/admin/job-categories"),
+          adminFetch("/api/admin/job-technologies"),
           adminFetch("/api/admin/job-departments"),
+          adminFetch("/api/admin/clients"),
         ]);
         const catData = await catRes.json();
+        const techData = await techRes.json();
         const deptData = await deptRes.json();
+        const clientData = await clientRes.json();
         setCategories(catData.data ?? []);
+        setTechnologies(techData.data ?? []);
         setDepartments(deptData.data ?? []);
+        setClients((clientData.data ?? []).filter((c: ClientItem) => c.active));
       } catch (e) {
         console.error(e);
+      } finally {
+        setTaxonomyReady(true);
       }
     }
     void loadTaxonomy();
   }, []);
+
+  useEffect(() => {
+    if (defaults.category) setCategory(defaults.category);
+    if (defaults.technology) setTechnology(defaults.technology);
+    if (defaults.department) setDepartment(defaults.department);
+    if (defaults.clientId) setClientId(defaults.clientId);
+  }, [defaults.category, defaults.technology, defaults.department, defaults.clientId]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -83,15 +108,34 @@ export function JobForm({
       alert("Add at least one country for this role.");
       return;
     }
+    if (!category.trim()) {
+      alert("Category is required.");
+      return;
+    }
+    if (!technology.trim()) {
+      alert("Technology is required.");
+      return;
+    }
+    if (!department.trim()) {
+      alert("Department is required.");
+      return;
+    }
+    if (!clientId.trim()) {
+      alert("Client is required.");
+      return;
+    }
+
     const formData = new FormData(e.currentTarget);
     const payload: Record<string, unknown> = {
       title: formData.get("title"),
       locations: validLocations,
       type: formData.get("type"),
       workMode: formData.get("workMode"),
-      category: formData.get("category"),
-      department: formData.get("department"),
-      description: formData.get("description"),
+      category,
+      technology,
+      department,
+      clientId,
+      description,
       order: parseInt(formData.get("order") as string, 10) || 0,
       published: formData.get("published") === "on",
     };
@@ -100,9 +144,6 @@ export function JobForm({
     }
     await onSubmit(payload);
   }
-
-  const defaultCategory = defaults.category ?? "";
-  const defaultDepartment = defaults.department ?? "";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -158,45 +199,119 @@ export function JobForm({
           </div>
         </div>
 
-        <div>
-          <label className={labelClass}>Job Category</label>
-          <select name="category" defaultValue={defaultCategory} className={inputClass}>
-            <option value="">Select category…</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.name}>
-                {c.name}
-              </option>
-            ))}
-            {defaultCategory && !categories.some((c) => c.name === defaultCategory) ? (
-              <option value={defaultCategory}>{defaultCategory} (current)</option>
-            ) : null}
-          </select>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            <Link href="/jobs/settings" className="underline hover:text-gray-700">
-              Manage job categories
-            </Link>
-          </p>
-        </div>
+        {taxonomyReady ? (
+          <>
+            <div>
+              <label className={labelClass}>Category *</label>
+              <select
+                name="category"
+                required
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">Select category…</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
+                {category && !categories.some((c) => c.name === category) ? (
+                  <option value={category}>{category} (current)</option>
+                ) : null}
+              </select>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <Link href="/jobs/settings" className="underline hover:text-gray-700">
+                  Manage categories
+                </Link>
+              </p>
+            </div>
 
-        <div>
-          <label className={labelClass}>Department *</label>
-          <select name="department" required defaultValue={defaultDepartment} className={inputClass}>
-            <option value="">Select department…</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.name}>
-                {d.name}
-              </option>
-            ))}
-            {defaultDepartment && !departments.some((d) => d.name === defaultDepartment) ? (
-              <option value={defaultDepartment}>{defaultDepartment} (current)</option>
-            ) : null}
-          </select>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            <Link href="/jobs/settings" className="underline hover:text-gray-700">
-              Manage departments
-            </Link>
-          </p>
-        </div>
+            <div>
+              <label className={labelClass}>Technology *</label>
+              <select
+                name="technology"
+                required
+                value={technology}
+                onChange={(e) => setTechnology(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">Select technology…</option>
+                {technologies.map((t) => (
+                  <option key={t.id} value={t.name}>
+                    {t.name}
+                  </option>
+                ))}
+                {technology && !technologies.some((t) => t.name === technology) ? (
+                  <option value={technology}>{technology} (current)</option>
+                ) : null}
+              </select>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <Link href="/jobs/settings" className="underline hover:text-gray-700">
+                  Manage technologies
+                </Link>
+              </p>
+            </div>
+
+            <div>
+              <label className={labelClass}>Department *</label>
+              <select
+                name="department"
+                required
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">Select department…</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.name}>
+                    {d.name}
+                  </option>
+                ))}
+                {department && !departments.some((d) => d.name === department) ? (
+                  <option value={department}>{department} (current)</option>
+                ) : null}
+              </select>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <Link href="/jobs/settings" className="underline hover:text-gray-700">
+                  Manage departments
+                </Link>
+              </p>
+            </div>
+
+            <div>
+              <label className={labelClass}>Client *</label>
+              <select
+                name="clientId"
+                required
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">Select client…</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+                {clientId && !clients.some((c) => c.id === clientId) ? (
+                  <option value={clientId}>Current client</option>
+                ) : null}
+              </select>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Internal only — not shown on the public careers site.{" "}
+                <Link href="/clients" className="underline hover:text-gray-700">
+                  Manage clients
+                </Link>
+              </p>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading form options…
+          </div>
+        )}
 
         <div>
           <label className={labelClass}>Description</label>
@@ -236,7 +351,7 @@ export function JobForm({
       <div className="flex gap-3">
         <button
           type="submit"
-          disabled={isLoading}
+          disabled={isLoading || !taxonomyReady}
           className="inline-flex items-center gap-2 rounded-lg bg-black px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-200"
         >
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

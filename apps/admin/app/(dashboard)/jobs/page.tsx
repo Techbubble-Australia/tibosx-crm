@@ -16,6 +16,7 @@ interface JobListing {
   type: string;
   workMode: string;
   category: string;
+  technology: string;
   department: string;
   published: boolean;
   createdAt: string;
@@ -95,8 +96,9 @@ export default function JobsPage() {
               <th className="px-4 py-3 text-left font-medium text-gray-600">Country</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">Location</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">Type</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600">Category</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600">Department</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Category</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Technology</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Department</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
               <th className="px-4 py-3 text-right font-medium text-gray-600">Actions</th>
             </tr>
@@ -104,7 +106,7 @@ export default function JobsPage() {
           <tbody className="divide-y divide-gray-100">
             {jobs.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
                   No job listings yet. Add one to get started.
                 </td>
               </tr>
@@ -123,8 +125,9 @@ export default function JobsPage() {
                   <td className="px-4 py-3 text-gray-600">
                     {job.type} · {job.workMode}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{job.category || "—"}</td>
-                  <td className="px-4 py-3 text-gray-600">{job.department}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.category || "—"}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.technology || "—"}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.department}</td>
                   <td className="px-4 py-3">
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
