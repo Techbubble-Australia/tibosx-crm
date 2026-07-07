@@ -11,10 +11,18 @@ interface CareerApplication {
   email: string;
   phone?: string;
   position: string;
-  company?: string;
+  salaryExpectation?: number | null;
   resumeUrl?: string;
   message?: string;
   createdAt: string;
+}
+
+function formatSalaryAud(amount: number): string {
+  return new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency: "AUD",
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
 export default function CareerApplicationsPage() {
@@ -71,7 +79,9 @@ export default function CareerApplicationsPage() {
                   <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
                     <a href={`mailto:${app.email}`} className="hover:text-black hover:underline">{app.email}</a>
                     {app.phone && <span>{app.phone}</span>}
-                    {app.company && <span>{app.company}</span>}
+                    {app.salaryExpectation != null && app.salaryExpectation > 0 ? (
+                      <span>Salary: {formatSalaryAud(app.salaryExpectation)}</span>
+                    ) : null}
                   </div>
                   {app.message && (
                     <p className="mt-3 text-sm text-gray-600 border-t border-gray-100 pt-3">{app.message}</p>

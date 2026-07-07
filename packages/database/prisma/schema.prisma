@@ -160,16 +160,17 @@ model ContactSubmission {
 }
 
 model CareerApplication {
-  id          String   @id @default(cuid())
-  firstName   String
-  lastName    String
-  email       String
-  phone       String?
-  position    String
-  company     String?
-  resumeUrl   String?
-  message     String?
-  createdAt   DateTime @default(now())
+  id                String   @id @default(cuid())
+  firstName         String
+  lastName          String
+  email             String
+  phone             String?
+  position          String
+  company           String?
+  salaryExpectation Int?
+  resumeUrl         String?
+  message           String?
+  createdAt         DateTime @default(now())
 }
 
 model CaseStudyCategory {

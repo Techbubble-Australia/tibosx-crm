@@ -5,6 +5,8 @@ import path from "path";
 import { promises as fsp } from "fs";
 import { prisma } from "@techbubble/database";
 import { objectStorageConfigured, putUploadObject } from "../lib/object-storage";
+import { PHONE_REGEX, PHONE_VALIDATION_MESSAGE } from "../lib/validation";
+import { sendCareerApplicationEmail } from "../lib/mail";
 
 const router: IRouter = Router();
 
@@ -12,10 +14,10 @@ const careerSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Valid email is required"),
-  phone: z.string().optional(),
+  phone: z.string().regex(PHONE_REGEX, PHONE_VALIDATION_MESSAGE),
   position: z.string().min(1, "Position is required"),
-  company: z.string().optional(),
-  resumeUrl: z.string().optional(),
+  salaryExpectation: z.coerce.number().int().positive("Salary expectation is required"),
+  resumeUrl: z.string().min(1, "Resume is required"),
   message: z.string().optional(),
 });
 
@@ -80,14 +82,33 @@ router.post("/upload-resume", resumeUpload.single("resume"), async (req, res, ne
 router.post("/apply", async (req, res) => {
   try {
     const validatedData = careerSchema.parse(req.body);
-    
+
     const application = await prisma.careerApplication.create({
       data: validatedData,
     });
-    
-    res.status(201).json({ 
+
+    try {
+      await sendCareerApplicationEmail({
+        firstName: validatedData.firstName,
+        lastName: validatedData.lastName,
+        email: validatedData.email,
+        phone: validatedData.phone,
+        position: validatedData.position,
+        salaryExpectation: validatedData.salaryExpectation,
+        resumeUrl: validatedData.resumeUrl,
+        message: validatedData.message,
+      });
+    } catch (emailError) {
+      console.error("Error sending career application email:", emailError);
+      return res.status(500).json({
+        error: "Your application was saved but we could not notify HR. Please contact hr@techbubble.com.au directly.",
+        data: { id: application.id },
+      });
+    }
+
+    res.status(201).json({
       message: "Thank you for your application. Our team will review and reach out within 48 hours.",
-      data: { id: application.id }
+      data: { id: application.id },
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

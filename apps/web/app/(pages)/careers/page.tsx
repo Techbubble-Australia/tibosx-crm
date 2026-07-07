@@ -158,7 +158,7 @@ export default async function CareersPage() {
                 Our team will review and reach out within 48 hours.
               </p>
 
-              <CareersApplyForm />
+              <CareersApplyForm positions={jobs.map((j) => j.title)} />
             </div>
           </div>
         </div>
