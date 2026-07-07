@@ -1,9 +1,74 @@
 import { z } from "zod";
 
+/** ISO 3166-1 alpha-2 codes supported by public flag SVG assets. */
+const EMOJI_TO_CODE: Record<string, string> = {
+  "🇦🇺": "AU",
+  "🇺🇸": "US",
+  "🇮🇳": "IN",
+  "🇵🇭": "PH",
+  "🇬🇧": "GB",
+  "🇦🇪": "AE",
+};
+
+const NAME_TO_CODE: Record<string, string> = {
+  australia: "AU",
+  usa: "US",
+  us: "US",
+  "united states": "US",
+  "united states of america": "US",
+  india: "IN",
+  philippines: "PH",
+  "united kingdom": "GB",
+  uk: "GB",
+  uae: "AE",
+  "united arab emirates": "AE",
+};
+
+const PLACE_TO_CODE: Record<string, string> = {
+  sydney: "AU",
+  brisbane: "AU",
+  melbourne: "AU",
+  "north sydney": "AU",
+  mumbai: "IN",
+  bangalore: "IN",
+  manila: "PH",
+  london: "GB",
+  dubai: "AE",
+};
+
+function resolveCountryCode(flag: string, countryOrPlace: string, placeLabel?: string): string {
+  const f = flag.trim();
+  if (f && EMOJI_TO_CODE[f]) return EMOJI_TO_CODE[f];
+
+  const candidates = [countryOrPlace, placeLabel ?? ""]
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+
+  for (const key of candidates) {
+    if (NAME_TO_CODE[key]) return NAME_TO_CODE[key];
+    if (PLACE_TO_CODE[key]) return PLACE_TO_CODE[key];
+    for (const part of key.split(/\s*(?:,|&|·|\/|\band\b)\s*/i)) {
+      const p = part.trim();
+      if (NAME_TO_CODE[p]) return NAME_TO_CODE[p];
+      if (PLACE_TO_CODE[p]) return PLACE_TO_CODE[p];
+    }
+  }
+  return "";
+}
+
+function enrichLocationEntry(entry: JobLocationEntry): JobLocationEntry {
+  const code = entry.countryCode?.trim().toUpperCase() ?? "";
+  if (/^[A-Z]{2}$/.test(code)) {
+    return { ...entry, countryCode: code };
+  }
+  const resolved = resolveCountryCode(entry.flag, entry.country, entry.label);
+  return resolved ? { ...entry, countryCode: resolved } : entry;
+}
+
 export const jobLocationEntrySchema = z.object({
-  countryCode: z.string().length(2),
+  countryCode: z.string().min(0).default(""),
   country: z.string().min(1),
-  flag: z.string().min(1),
+  flag: z.string().min(0).default(""),
   label: z.string().optional().default(""),
 });
 
@@ -21,7 +86,7 @@ export function parseJobLocations(raw: unknown): JobLocationEntry[] {
   const out: JobLocationEntry[] = [];
   for (const row of raw) {
     const parsed = jobLocationEntrySchema.safeParse(row);
-    if (parsed.success) out.push(parsed.data);
+    if (parsed.success) out.push(enrichLocationEntry(parsed.data));
   }
   return out;
 }
@@ -37,12 +102,12 @@ export function normalizeJobLocations(job: JobLocationLegacyFields): JobLocation
   if (!country && !flag && !location) return [];
 
   return [
-    {
+    enrichLocationEntry({
       countryCode: "",
       country: country || location,
       flag,
       label: location && location !== country ? location : "",
-    },
+    }),
   ];
 }
 

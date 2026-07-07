@@ -1,4 +1,5 @@
 import type { JobLocationEntry } from "@/lib/api/public";
+import { resolveCountryCode, SUPPORTED_FLAG_CODES } from "@/lib/resolve-country-code";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 
 type Props = {
@@ -7,24 +8,39 @@ type Props = {
   className?: string;
 };
 
-export function JobLocationFlags({ locations, flagHeight = 20, className }: Props) {
-  const codes = locations
-    .map((e) => e.countryCode.trim().toLowerCase())
-    .filter((c) => /^[a-z]{2}$/.test(c));
+function resolveEntryCode(entry: JobLocationEntry): string {
+  const raw = entry.countryCode?.trim().toLowerCase() ?? "";
+  if (/^[a-z]{2}$/.test(raw)) return raw;
+  return resolveCountryCode(entry.flag, entry.country, entry.label);
+}
 
-  const unique = [...new Set(codes)];
-  if (unique.length === 0) return null;
+export function JobLocationFlags({ locations, flagHeight = 20, className }: Props) {
+  const codes: string[] = [];
+  const emojiFallbacks: string[] = [];
+
+  for (const entry of locations) {
+    const code = resolveEntryCode(entry);
+    if (code && SUPPORTED_FLAG_CODES.has(code) && !codes.includes(code)) {
+      codes.push(code);
+      continue;
+    }
+    const emoji = entry.flag?.trim();
+    if (emoji && !emojiFallbacks.includes(emoji)) {
+      emojiFallbacks.push(emoji);
+    }
+  }
+
+  if (codes.length === 0 && emojiFallbacks.length === 0) return null;
 
   return (
-    <span className={className}>
-      {unique.map((code) => (
-        <CountryFlag
-          key={code}
-          code={code}
-          height={flagHeight}
-          decorative
-          className="mr-1.5 inline-flex"
-        />
+    <span className={`inline-flex flex-wrap items-center gap-1.5 ${className ?? ""}`}>
+      {codes.map((code) => (
+        <CountryFlag key={code} code={code} height={flagHeight} decorative className="inline-flex" />
+      ))}
+      {emojiFallbacks.map((emoji) => (
+        <span key={emoji} className="text-base leading-none" aria-hidden>
+          {emoji}
+        </span>
       ))}
     </span>
   );

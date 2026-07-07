@@ -1,3 +1,5 @@
+import { resolveCountryCode } from "./resolve-country-code";
+
 export type JobLocationEntry = {
   countryCode: string;
   country: string;
@@ -12,9 +14,18 @@ export type JobLocationLegacyFields = {
   locations?: JobLocationEntry[];
 };
 
+function enrichLocationEntry(entry: JobLocationEntry): JobLocationEntry {
+  const code = entry.countryCode?.trim().toLowerCase() ?? "";
+  if (/^[a-z]{2}$/.test(code)) {
+    return { ...entry, countryCode: code };
+  }
+  const resolved = resolveCountryCode(entry.flag, entry.country, entry.label);
+  return resolved ? { ...entry, countryCode: resolved } : entry;
+}
+
 export function normalizeJobLocations(job: JobLocationLegacyFields): JobLocationEntry[] {
   if (Array.isArray(job.locations) && job.locations.length > 0) {
-    return job.locations;
+    return job.locations.map(enrichLocationEntry);
   }
 
   const country = job.country?.trim() ?? "";
@@ -22,14 +33,13 @@ export function normalizeJobLocations(job: JobLocationLegacyFields): JobLocation
   const location = job.location?.trim() ?? "";
   if (!country && !flag && !location) return [];
 
-  return [
-    {
-      countryCode: "",
-      country: country || location,
-      flag,
-      label: location && location !== country ? location : "",
-    },
-  ];
+  const entry = enrichLocationEntry({
+    countryCode: "",
+    country: country || location,
+    flag,
+    label: location && location !== country ? location : "",
+  });
+  return [entry];
 }
 
 export function formatJobLocationsSummary(entries: readonly JobLocationEntry[]): {
