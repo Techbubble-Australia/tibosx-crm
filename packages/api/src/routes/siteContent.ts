@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { prisma } from "@techbubble/database";
+import { sanitizeMuleSoftInValue } from "../lib/sanitize-mulesoft";
 
 const publicRouter: IRouter = Router();
 const adminRouter: IRouter = Router();
@@ -20,7 +21,13 @@ publicRouter.get("/:key", async (req, res) => {
       return res.status(404).json({ error: "Not found" });
     }
     res.set("Cache-Control", "no-store");
-    res.json({ data: { key: row.key, label: row.label, payload: row.payload } });
+    res.json({
+      data: {
+        key: row.key,
+        label: row.label,
+        payload: sanitizeMuleSoftInValue(row.payload),
+      },
+    });
   } catch (error) {
     console.error("Error fetching site content:", error);
     res.status(500).json({ error: "Failed to fetch site content" });
@@ -50,7 +57,12 @@ adminRouter.get("/:key", async (req, res) => {
     if (!row) {
       return res.status(404).json({ error: "Not found" });
     }
-    res.json({ data: row });
+    res.json({
+      data: {
+        ...row,
+        payload: sanitizeMuleSoftInValue(row.payload),
+      },
+    });
   } catch (error) {
     console.error("Error fetching site content:", error);
     res.status(500).json({ error: "Failed to fetch site content" });
@@ -61,16 +73,17 @@ adminRouter.get("/:key", async (req, res) => {
 adminRouter.put("/:key", async (req, res) => {
   try {
     const body = upsertSchema.parse(req.body);
+    const sanitizedPayload = sanitizeMuleSoftInValue(body.payload) as object;
     const row = await prisma.siteContent.upsert({
       where: { key: req.params.key },
       create: {
         key: req.params.key,
         label: body.label ?? "",
-        payload: body.payload as object,
+        payload: sanitizedPayload,
       },
       update: {
         ...(body.label !== undefined ? { label: body.label } : {}),
-        payload: body.payload as object,
+        payload: sanitizedPayload,
       },
     });
     res.json({ data: row });

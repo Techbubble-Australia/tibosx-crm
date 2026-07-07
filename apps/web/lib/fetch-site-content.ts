@@ -1,4 +1,5 @@
 import { getServerApiBaseUrl } from "@/lib/server-api";
+import { sanitizeMuleSoftInValue } from "@/lib/sanitize-mulesoft";
 
 export async function fetchSiteContentPayload<T>(key: string): Promise<T | null> {
   try {
@@ -7,7 +8,9 @@ export async function fetchSiteContentPayload<T>(key: string): Promise<T | null>
     });
     if (!res.ok) return null;
     const json = (await res.json()) as { data?: { payload?: T } };
-    return json.data?.payload ?? null;
+    const payload = json.data?.payload;
+    if (payload == null) return null;
+    return sanitizeMuleSoftInValue(payload) as T;
   } catch {
     return null;
   }
