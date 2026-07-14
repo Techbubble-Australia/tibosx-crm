@@ -38,15 +38,37 @@ export type CaseStudyListApiRow = {
   createdAt: string;
 };
 
-export async function getPublishedCaseStudies(limit = 50): Promise<CaseStudyListApiRow[]> {
-  const json = await apiGet<{ data: CaseStudyListApiRow[] }>(
-    `/api/case-studies?limit=${limit}&page=1`,
-  );
-  const rows = json?.data ?? [];
-  return rows.map((row) => ({
-    ...row,
-    featuredImage: resolveOptionalMediaUrl(row.featuredImage) || row.featuredImage,
-  }));
+export async function getPublishedCaseStudies(limit?: number): Promise<CaseStudyListApiRow[]> {
+  const pageSize = 100;
+  const all: CaseStudyListApiRow[] = [];
+  let page = 1;
+  let totalPages = 1;
+
+  while (page <= totalPages) {
+    const json = await apiGet<{
+      data: CaseStudyListApiRow[];
+      pagination?: { pages?: number };
+    }>(`/api/case-studies?limit=${pageSize}&page=${page}`);
+
+    const rows = json?.data ?? [];
+    all.push(
+      ...rows.map((row) => ({
+        ...row,
+        featuredImage: resolveOptionalMediaUrl(row.featuredImage) || row.featuredImage,
+      })),
+    );
+
+    totalPages = json?.pagination?.pages ?? 1;
+    if (rows.length === 0) {
+      break;
+    }
+    if (limit !== undefined && all.length >= limit) {
+      return all.slice(0, limit);
+    }
+    page += 1;
+  }
+
+  return limit !== undefined ? all.slice(0, limit) : all;
 }
 
 export async function getCaseStudyBySlug(

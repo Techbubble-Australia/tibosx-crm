@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { UploadableImage } from "@/components/media/UploadableImage";
-import { buildHomeCaseStudySlots, type CaseStudyListCard } from "@/lib/case-study-mapper";
+import { buildCaseStudiesListingSlots, type CaseStudyListCard } from "@/lib/case-study-mapper";
 import { displayCategoryPill } from "@/lib/display-category";
 
 type EmptyState = {
@@ -41,7 +41,7 @@ export function CaseStudiesPracticeSection({
   );
 
   const { featured: featuredStudy, secondary: topRightStudy, grid: lowerStudies } = useMemo(
-    () => buildHomeCaseStudySlots(filtered),
+    () => buildCaseStudiesListingSlots(filtered),
     [filtered],
   );
 

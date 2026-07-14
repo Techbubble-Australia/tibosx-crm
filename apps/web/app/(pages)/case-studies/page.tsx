@@ -21,7 +21,7 @@ const CASE_STUDY_TILE_ICONS: Record<string, LucideIcon> = {
 
 export default async function CaseStudiesPage() {
   const [rows, testimonialRows, rawCs] = await Promise.all([
-    getPublishedCaseStudies(50),
+    getPublishedCaseStudies(),
     getTestimonials(),
     fetchSiteContentPayload<unknown>("case_studies_page"),
   ]);

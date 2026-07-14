@@ -18,7 +18,7 @@ export default async function HomePage() {
     fetchSiteContentPayload<unknown>("marketing_home"),
     getTestimonials(),
     getPublishedJobs(),
-    getPublishedCaseStudies(24),
+    getPublishedCaseStudies(),
   ]);
 
   const content: MarketingHomePayload =

@@ -325,6 +325,27 @@ export function apiRowToListCard(row: {
   };
 }
 
+/** Case studies listing page: featured + secondary + all remaining grid cards. */
+export function buildCaseStudiesListingSlots(cards: CaseStudyListCard[]): {
+  featured: CaseStudyListCard | null;
+  secondary: CaseStudyListCard | null;
+  grid: CaseStudyListCard[];
+} {
+  if (cards.length === 0) {
+    return { featured: null, secondary: null, grid: [] };
+  }
+  const featured = cards.find((c) => c.featured) ?? cards[0] ?? null;
+  if (!featured) {
+    return { featured: null, secondary: null, grid: [] };
+  }
+  const rest = cards.filter((c) => c.slug !== featured.slug);
+  return {
+    featured,
+    secondary: rest[0] ?? null,
+    grid: rest.slice(1),
+  };
+}
+
 /** Homepage layout: one featured (prefer `featured: true`), one secondary column card, up to three grid cards. */
 export function buildHomeCaseStudySlots(cards: CaseStudyListCard[]): {
   featured: CaseStudyListCard | null;
