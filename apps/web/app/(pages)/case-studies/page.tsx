@@ -1,13 +1,12 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import { UploadableImage } from "@/components/media/UploadableImage";
 import { ArrowRight, Zap, Workflow, Share2, FileStack, Braces, Handshake, type LucideIcon } from "lucide-react";
 import { ArticleBottomCta } from "@/components/case-study/ArticleBottomCta";
+import { CaseStudiesPracticeSection } from "@/components/case-study/CaseStudiesPracticeSection";
 import { ClientStoriesSection } from "@/components/ClientStoriesSection";
 import { SectionPill } from "@/components/ui/SectionPill";
 import { getPublishedCaseStudies, getTestimonials } from "@/lib/api/public";
-import { apiRowToListCard, type CaseStudyListCard } from "@/lib/case-study-mapper";
-import { displayCategoryPill } from "@/lib/display-category";
+import { apiRowToListCard } from "@/lib/case-study-mapper";
 import type { ClientStoryItem } from "@/components/ClientStoriesSection";
 import { fetchSiteContentPayload } from "@/lib/fetch-site-content";
 import { resolveCaseStudiesPage } from "@/lib/site-content/resolve-pages";
@@ -28,12 +27,7 @@ export default async function CaseStudiesPage() {
   ]);
   const cs = resolveCaseStudiesPage(rawCs);
 
-  const caseStudies: CaseStudyListCard[] = rows.map(apiRowToListCard);
-
-  const featuredStudy = caseStudies.find((s) => s.featured) ?? caseStudies[0];
-  const rest = featuredStudy ? caseStudies.filter((s) => s.slug !== featuredStudy.slug) : [];
-  const topRightStudy = rest[0];
-  const lowerStudies = rest.slice(1, 4);
+  const caseStudies = rows.map(apiRowToListCard);
 
   const clientStories: ClientStoryItem[] = testimonialRows.map((t) => ({
     quote: t.quote,
@@ -95,181 +89,11 @@ export default async function CaseStudiesPage() {
             </h2>
             <p className="mt-1 max-w-[898px] text-[18px] leading-7 text-[#666666]">{cs.practiceSection.subtitle}</p>
 
-            <div className="mt-8 flex flex-wrap gap-2">
-              {cs.practiceSection.categories.map((cat, index) => (
-                <button
-                  key={cat}
-                  className={`inline-flex h-10 items-center rounded-[35px] border border-[#e5e5e5] px-[23px] text-[16px] font-semibold leading-6 transition-colors ${
-                    index === 0 ? "bg-[#111111] text-white" : "bg-white text-[#666666] hover:bg-[#f7f7f7]"
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-
-            {caseStudies.length === 0 ? (
-              <div className="mt-12 rounded-[24px] border border-dashed border-[#e5e5e5] bg-[#fafafa] px-8 py-16 text-center">
-                <p className="text-[18px] font-semibold text-[#111111]">{cs.emptyState.title}</p>
-                <p className="mt-2 text-[16px] leading-6 text-[#666666]">{cs.emptyState.body}</p>
-                <Link
-                  href={cs.emptyState.ctaHref}
-                  className="mt-6 inline-flex h-11 items-center justify-center rounded-full bg-[#111111] px-6 text-[14px] font-semibold text-white"
-                >
-                  {cs.emptyState.ctaLabel}
-                </Link>
-              </div>
-            ) : featuredStudy ? (
-              <div className="mt-8">
-                <div
-                  className={`grid gap-4 ${topRightStudy ? "grid-cols-1 lg:grid-cols-[746px_1fr]" : "grid-cols-1 max-w-[746px]"}`}
-                >
-                  <Link
-                    href={`/case-studies/${featuredStudy.slug}`}
-                      className="group flex min-h-[400px] overflow-hidden rounded-[24px] border border-[#e5e5e5] bg-white lg:h-[547px]"
-                  >
-                      <div className="flex h-full flex-1 flex-col px-[33px] pb-6 pt-[26px]">
-                        <div className="flex items-center justify-between">
-                        <div className="inline-flex h-7 items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
-                          {displayCategoryPill(featuredStudy.category)}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                          <span className="text-[12px] font-medium leading-4 text-[#666666]">{featuredStudy.date}</span>
-                        </div>
-                      </div>
-
-                        <div className="relative mt-[14px] h-[150px] overflow-hidden rounded-[8px]">
-                        <UploadableImage
-                          src={featuredStudy.image}
-                          alt=""
-                          fill
-                          className="object-cover object-center"
-                          sizes="(max-width: 1200px) 100vw, 451px"
-                        />
-                      </div>
-
-                      <h3 className="mt-[18px] line-clamp-3 text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">
-                        {featuredStudy.title}
-                      </h3>
-                      <p className="mt-[6px] line-clamp-5 text-[16px] leading-6 text-[#666666]">
-                        {featuredStudy.description}
-                      </p>
-
-                      <div className="mt-auto flex items-end justify-between border-t border-[#e5e5e5] pt-[21px]">
-                        <div>
-                          <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">{featuredStudy.stat1.value}</p>
-                          <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">{featuredStudy.stat1.label}</p>
-                        </div>
-                        <div>
-                          <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">{featuredStudy.stat2.value}</p>
-                          <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">{featuredStudy.stat2.label}</p>
-                        </div>
-                        <span className="inline-flex h-[43px] w-[95px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold leading-5 text-white">
-                          Read
-                          <ArrowRight className="h-[18px] w-[18px]" />
-                        </span>
-                      </div>
-                    </div>
-
-                      <div className="hidden w-[228px] shrink-0 bg-[#111111] px-[25px] pt-[49px] text-white lg:block">
-                      <p className="text-[12px] font-bold leading-4">ON THIS CASE STUDY</p>
-                      <div className="mt-[15px]">
-                        {featuredStudy.sidebar?.map((item, idx) => (
-                          <div key={item.label} className={`flex h-[42px] items-center border-[#e5e5e5] ${idx < 5 ? "border-b" : ""}`}>
-                            <span className={`mr-[10px] h-[14px] w-[3px] rounded-[2px] ${idx === featuredStudy.sidebar.length - 1 ? "bg-[#086eff]" : "bg-white"}`} />
-                            <span className="text-[12px] font-medium leading-4 text-white">{item.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </Link>
-
-                  {topRightStudy ? (
-                    <Link
-                      href={`/case-studies/${topRightStudy.slug}`}
-                        className="group flex flex-col rounded-[24px] border border-[#e5e5e5] bg-white px-[30px] pb-[30px] pt-9 lg:h-[547px]"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="inline-flex h-[28px] items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
-                          {displayCategoryPill(topRightStudy.category)}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                          <span className="text-[12px] font-medium leading-4 text-[#666666]">{topRightStudy.date}</span>
-                        </div>
-                      </div>
-
-                      <h3 className="mt-[13px] line-clamp-3 text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">
-                        {topRightStudy.title}
-                      </h3>
-                      <p className="mt-4 line-clamp-6 text-[16px] leading-6 text-[#666666]">
-                        {topRightStudy.description}
-                      </p>
-
-                      <div className="mt-auto flex items-end justify-between border-t border-[#e5e5e5] pt-[21px]">
-                        <div>
-                          <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">{topRightStudy.stat1.value}</p>
-                          <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">{topRightStudy.stat1.label}</p>
-                        </div>
-                        <div>
-                          <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">{topRightStudy.stat2.value}</p>
-                          <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">{topRightStudy.stat2.label}</p>
-                        </div>
-                        <span className="inline-flex h-[43px] w-[95px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold leading-5 text-white">
-                          Read
-                          <ArrowRight className="h-[18px] w-[18px]" />
-                        </span>
-                      </div>
-                    </Link>
-                  ) : null}
-                </div>
-
-                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {lowerStudies.map((study) => (
-                    <Link
-                      key={study.slug}
-                      href={`/case-studies/${study.slug}`}
-                      className="group flex h-[494px] flex-col rounded-[24px] border border-[#e2e7f4] bg-white px-9 pb-6 pt-9"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="inline-flex h-[28px] items-center rounded-[2px] bg-[#f7f7f7] px-3 text-[12px] font-bold leading-4 text-[#666666]">
-                          {displayCategoryPill(study.category)}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="h-1.5 w-1.5 rounded-[3px] bg-[#111111]" aria-hidden />
-                          <span className="text-[12px] font-medium leading-4 text-[#666666]">{study.date}</span>
-                        </div>
-                      </div>
-
-                      <h3 className="mt-[12px] line-clamp-3 text-[28px] font-bold leading-9 tracking-[-0.07px] text-[#06091a]">
-                        {study.title}
-                      </h3>
-                      <p className="mt-[12px] line-clamp-6 text-[16px] leading-6 text-[#666666]">
-                        {study.description}
-                      </p>
-
-                      <span className="mt-[21px] block h-px w-full bg-[#e5e5e5]" aria-hidden />
-
-                      <div className="mt-auto flex items-end justify-between pt-[21px]">
-                        <div>
-                          <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">{study.stat1.value}</p>
-                          <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">{study.stat1.label}</p>
-                        </div>
-                        <div>
-                          <p className="text-[28px] font-medium leading-9 tracking-[-0.07px] text-[#111111]">{study.stat2.value}</p>
-                          <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-[#666666]">{study.stat2.label}</p>
-                        </div>
-                        <span className="inline-flex h-[43px] w-[95px] items-center justify-center gap-2 rounded-[18px] bg-[#111111] text-[14px] font-semibold leading-5 text-white">
-                          Read
-                          <ArrowRight className="h-[18px] w-[18px]" />
-                        </span>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ) : null}
+            <CaseStudiesPracticeSection
+              caseStudies={caseStudies}
+              categories={cs.practiceSection.categories}
+              emptyState={cs.emptyState}
+            />
           </div>
         </div>
       </section>
