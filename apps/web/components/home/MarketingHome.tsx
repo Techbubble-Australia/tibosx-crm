@@ -23,10 +23,9 @@ import type { MarketingHomePayload } from "@/lib/data/marketing-home-payload";
 import { buildMarketingHomeViewModel } from "@/lib/marketing-home-view";
 import heroNetworkPattern from "@image/home-hero-network.svg";
 import innovationImage from "@image/Innovation_Cutting_Edge_Tech.png";
-import { CASE_STUDY_SIDEBAR, buildHomeCaseStudySlots, type CaseStudyListCard } from "@/lib/case-study-mapper";
+import { CASE_STUDY_SIDEBAR, buildCaseStudyCategoryFilters, buildHomeCaseStudySlots, type CaseStudyListCard } from "@/lib/case-study-mapper";
 import { useStatCountUpOnView } from "@/hooks/useStatCountUpOnView";
 import { isUploadsProxyPath, resolveMediaUrl, resolveUploadsImgSrc, sameOriginUploadsPath } from "@/lib/media-url";
-import { UNCATEGORIZED_LABEL } from "@/lib/display-category";
 
 export type HomePreviewJob = { slug: string; title: string; meta: string; href: string };
 export type HomeClientStory = {
@@ -43,6 +42,7 @@ type MarketingHomeProps = {
   testimonials: HomeClientStory[];
   previewJobs: HomePreviewJob[];
   caseStudies: CaseStudyListCard[];
+  categoryOrder?: string[];
 };
 
 /** Shape used by the homepage platform tab UI (view-model normalizes `tags` to `string[]`). */
@@ -155,6 +155,7 @@ export function MarketingHome({
   testimonials,
   previewJobs,
   caseStudies,
+  categoryOrder = [],
 }: MarketingHomeProps) {
   const vm = useMemo(() => buildMarketingHomeViewModel(content), [content]);
   const isGovSupplierRow = useMinWidth(640);
@@ -169,15 +170,10 @@ export function MarketingHome({
   const [worldClockNow, setWorldClockNow] = useState(() => new Date());
   const [worldClocksReady, setWorldClocksReady] = useState(false);
 
-  const homeCategoryFilters = useMemo(() => {
-    const names = new Set(caseStudies.map((c) => c.category));
-    const sorted = Array.from(names).sort((a, b) => {
-      if (a === UNCATEGORIZED_LABEL) return 1;
-      if (b === UNCATEGORIZED_LABEL) return -1;
-      return a.localeCompare(b);
-    });
-    return ["All", ...sorted];
-  }, [caseStudies]);
+  const homeCategoryFilters = useMemo(
+    () => buildCaseStudyCategoryFilters(caseStudies, categoryOrder),
+    [caseStudies, categoryOrder],
+  );
 
   const [homeCaseStudyCategory, setHomeCaseStudyCategory] = useState("All");
 

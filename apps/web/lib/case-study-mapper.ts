@@ -1,5 +1,5 @@
 import { resolveMediaUrl } from "@/lib/media-url";
-import { displayCategory } from "@/lib/display-category";
+import { displayCategory, UNCATEGORIZED_LABEL } from "@/lib/display-category";
 
 /** Flat API payload from GET /api/case-studies/slug/:slug */
 export type CaseStudyApiRecord = {
@@ -323,6 +323,31 @@ export function apiRowToListCard(row: {
     showInAllTab: row.showInAllTab !== false,
     sidebar: CASE_STUDY_SIDEBAR,
   };
+}
+
+/** Filter tabs: "All" plus categories that have published case studies, respecting optional taxonomy order. */
+export function buildCaseStudyCategoryFilters(
+  cards: CaseStudyListCard[],
+  preferredOrder: string[] = [],
+): string[] {
+  const fromCards = new Set(cards.map((c) => c.category));
+  const ordered: string[] = [];
+
+  for (const name of preferredOrder) {
+    if (name === "All") continue;
+    if (fromCards.has(name)) {
+      ordered.push(name);
+      fromCards.delete(name);
+    }
+  }
+
+  const remaining = Array.from(fromCards).sort((a, b) => {
+    if (a === UNCATEGORIZED_LABEL) return 1;
+    if (b === UNCATEGORIZED_LABEL) return -1;
+    return a.localeCompare(b);
+  });
+
+  return ["All", ...ordered, ...remaining];
 }
 
 /** Case studies listing page: featured + secondary + all remaining grid cards. */

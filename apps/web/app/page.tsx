@@ -2,7 +2,7 @@ import { MarketingHome } from "@/components/home/MarketingHome";
 import { marketingHomePayload, type MarketingHomePayload } from "@/lib/data/marketing-home-payload";
 import { deepMerge } from "@/lib/deep-merge";
 import { fetchSiteContentPayload } from "@/lib/fetch-site-content";
-import { getPublishedCaseStudies, getPublishedJobs, getTestimonials } from "@/lib/api/public";
+import { getPublishedCaseStudies, getCaseStudyCategories, getPublishedJobs, getTestimonials } from "@/lib/api/public";
 import { apiRowToListCard } from "@/lib/case-study-mapper";
 import { formatJobMetaLine } from "@/lib/job-locations";
 import type { HomeClientStory, HomePreviewJob } from "@/components/home/MarketingHome";
@@ -14,11 +14,12 @@ function cloneMarketingHomeDefaults(): MarketingHomePayload {
 }
 
 export default async function HomePage() {
-  const [rawHome, testimonialRows, jobs, caseStudyRows] = await Promise.all([
+  const [rawHome, testimonialRows, jobs, caseStudyRows, taxonomyCategories] = await Promise.all([
     fetchSiteContentPayload<unknown>("marketing_home"),
     getTestimonials(),
     getPublishedJobs(),
     getPublishedCaseStudies(),
+    getCaseStudyCategories(),
   ]);
 
   const content: MarketingHomePayload =
@@ -46,6 +47,9 @@ export default async function HomePage() {
   }));
 
   const caseStudies = caseStudyRows.map(apiRowToListCard);
+  const categoryOrder = taxonomyCategories
+    .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name))
+    .map((c) => c.name);
 
   return (
     <MarketingHome
@@ -53,6 +57,7 @@ export default async function HomePage() {
       testimonials={testimonials}
       previewJobs={previewJobs}
       caseStudies={caseStudies}
+      categoryOrder={categoryOrder}
     />
   );
 }

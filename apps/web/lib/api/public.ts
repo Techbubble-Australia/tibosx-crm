@@ -71,6 +71,17 @@ export async function getPublishedCaseStudies(limit?: number): Promise<CaseStudy
   return limit !== undefined ? all.slice(0, limit) : all;
 }
 
+export type CaseStudyCategoryApiRow = {
+  id: string;
+  name: string;
+  order: number;
+};
+
+export async function getCaseStudyCategories(): Promise<CaseStudyCategoryApiRow[]> {
+  const json = await apiGet<{ data: CaseStudyCategoryApiRow[] }>("/api/case-study-categories");
+  return json?.data ?? [];
+}
+
 export async function getCaseStudyBySlug(
   slug: string,
   previewToken?: string,

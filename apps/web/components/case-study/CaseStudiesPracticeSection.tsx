@@ -1,10 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { UploadableImage } from "@/components/media/UploadableImage";
-import { buildCaseStudiesListingSlots, type CaseStudyListCard } from "@/lib/case-study-mapper";
+import {
+  buildCaseStudiesListingSlots,
+  buildCaseStudyCategoryFilters,
+  type CaseStudyListCard,
+} from "@/lib/case-study-mapper";
 import { displayCategoryPill } from "@/lib/display-category";
 
 type EmptyState = {
@@ -16,7 +20,7 @@ type EmptyState = {
 
 type CaseStudiesPracticeSectionProps = {
   caseStudies: CaseStudyListCard[];
-  categories: string[];
+  categoryOrder?: string[];
   emptyState: EmptyState;
 };
 
@@ -29,11 +33,20 @@ function filterCaseStudies(cards: CaseStudyListCard[], category: string): CaseSt
 
 export function CaseStudiesPracticeSection({
   caseStudies,
-  categories,
+  categoryOrder = [],
   emptyState,
 }: CaseStudiesPracticeSectionProps) {
-  const tabs = categories.length > 0 ? categories : ["All"];
-  const [activeCategory, setActiveCategory] = useState(tabs[0] ?? "All");
+  const tabs = useMemo(
+    () => buildCaseStudyCategoryFilters(caseStudies, categoryOrder),
+    [caseStudies, categoryOrder],
+  );
+  const [activeCategory, setActiveCategory] = useState("All");
+
+  useEffect(() => {
+    if (!tabs.includes(activeCategory)) {
+      setActiveCategory("All");
+    }
+  }, [tabs, activeCategory]);
 
   const filtered = useMemo(
     () => filterCaseStudies(caseStudies, activeCategory),

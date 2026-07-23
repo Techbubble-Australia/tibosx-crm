@@ -5,7 +5,7 @@ import { ArticleBottomCta } from "@/components/case-study/ArticleBottomCta";
 import { CaseStudiesPracticeSection } from "@/components/case-study/CaseStudiesPracticeSection";
 import { ClientStoriesSection } from "@/components/ClientStoriesSection";
 import { SectionPill } from "@/components/ui/SectionPill";
-import { getPublishedCaseStudies, getTestimonials } from "@/lib/api/public";
+import { getPublishedCaseStudies, getCaseStudyCategories, getTestimonials } from "@/lib/api/public";
 import { apiRowToListCard } from "@/lib/case-study-mapper";
 import type { ClientStoryItem } from "@/components/ClientStoriesSection";
 import { fetchSiteContentPayload } from "@/lib/fetch-site-content";
@@ -20,14 +20,23 @@ const CASE_STUDY_TILE_ICONS: Record<string, LucideIcon> = {
 };
 
 export default async function CaseStudiesPage() {
-  const [rows, testimonialRows, rawCs] = await Promise.all([
+  const [rows, testimonialRows, rawCs, taxonomyCategories] = await Promise.all([
     getPublishedCaseStudies(),
     getTestimonials(),
     fetchSiteContentPayload<unknown>("case_studies_page"),
+    getCaseStudyCategories(),
   ]);
   const cs = resolveCaseStudiesPage(rawCs);
 
   const caseStudies = rows.map(apiRowToListCard);
+  const categoryOrder = [
+    ...taxonomyCategories
+      .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name))
+      .map((c) => c.name),
+    ...cs.practiceSection.categories.filter(
+      (name) => name !== "All" && !taxonomyCategories.some((c) => c.name === name),
+    ),
+  ];
 
   const clientStories: ClientStoryItem[] = testimonialRows.map((t) => ({
     quote: t.quote,
@@ -91,7 +100,7 @@ export default async function CaseStudiesPage() {
 
             <CaseStudiesPracticeSection
               caseStudies={caseStudies}
-              categories={cs.practiceSection.categories}
+              categoryOrder={categoryOrder}
               emptyState={cs.emptyState}
             />
           </div>
