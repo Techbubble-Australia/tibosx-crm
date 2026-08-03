@@ -94,11 +94,11 @@ export default function JobsPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
-            href="/jobs/settings"
+            href="/settings/categories"
             className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-800"
           >
             <Settings className="h-4 w-4" />
-            Categories &amp; Departments
+            Taxonomy settings
           </Link>
           <Link
             href="/jobs/new"

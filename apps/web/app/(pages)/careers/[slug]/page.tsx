@@ -5,8 +5,7 @@ import { getPublishedJobBySlug } from "@/lib/api/public";
 import { JobDescription } from "@/components/careers/JobDescription";
 import { JobDetailActions } from "@/components/careers/JobDetailActions";
 import { JobLocationFlags } from "@/components/careers/JobLocationFlags";
-import { displayCategory } from "@/lib/display-category";
-import { normalizeJobLocations } from "@/lib/job-locations";
+import { normalizeJobLocations, formatLocationEntryDisplay } from "@/lib/job-locations";
 
 function formatType(s: string): string {
   const t = s.trim();
@@ -22,13 +21,13 @@ export default async function CareerJobDetailPage({ params }: { params: { slug: 
 
   const locations = normalizeJobLocations(job);
   const locationText = locations
-    .map((e) => e.label?.trim() || e.country.trim())
+    .map((e) => formatLocationEntryDisplay(e))
     .filter(Boolean)
     .join(" · ");
   const meta = [locationText, formatType(job.type), formatType(job.workMode)].filter(Boolean).join(" · ");
-  const eyebrow = [job.referenceNumber, displayCategory(job.category), job.technology, job.department || undefined]
-    .filter(Boolean)
-    .join(" · ");
+  const categoryTech = [job.category?.trim(), job.technology?.trim()].filter(Boolean).join(" - ");
+  const listingType = (job.listingType || "Internal").trim();
+  const eyebrow = [job.referenceNumber, categoryTech, listingType].filter(Boolean).join(" · ");
 
   return (
     <main className="min-h-[60vh] bg-white dark:bg-neutral-950">

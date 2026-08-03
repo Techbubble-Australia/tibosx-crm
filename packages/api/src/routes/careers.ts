@@ -6,9 +6,17 @@ import { promises as fsp } from "fs";
 import { prisma } from "@techbubble/database";
 import { objectStorageConfigured, putUploadObject } from "../lib/object-storage";
 import { PHONE_REGEX, PHONE_VALIDATION_MESSAGE } from "../lib/validation";
+import {
+  SALARY_CURRENCIES,
+  SALARY_MODES,
+  formatSalaryExpectation,
+  parseSalaryRateInput,
+} from "../lib/careers-form";
 import { sendCareerApplicationEmail } from "../lib/mail";
 
 const router: IRouter = Router();
+
+const currencyCodes = SALARY_CURRENCIES.map((c) => c.code);
 
 const careerSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -16,8 +24,12 @@ const careerSchema = z.object({
   email: z.string().email("Valid email is required"),
   phone: z.string().regex(PHONE_REGEX, PHONE_VALIDATION_MESSAGE),
   position: z.string().min(1, "Position is required"),
-  salaryExpectation: z.coerce.number().int().positive("Salary expectation is required"),
-  resumeUrl: z.string().min(1, "Resume is required"),
+  country: z.string().min(1, "Country is required"),
+  visaStatus: z.string().min(1, "Visa status is required"),
+  salaryCurrency: z.string().refine((v) => currencyCodes.includes(v), "Currency is required"),
+  salaryRate: z.coerce.number().int().positive("Salary rate is required"),
+  salaryMode: z.enum(SALARY_MODES, { message: "Salary mode is required" }),
+  documentUrls: z.array(z.string().min(1)).min(1, "At least one document is required"),
   message: z.string().optional(),
 });
 
@@ -43,9 +55,9 @@ async function persistUploadedFile(file: Express.Multer.File, filename: string):
   await fsp.writeFile(path.join(uploadDir, filename), file.buffer!);
 }
 
-const resumeUpload = multer({
+const documentUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 5 * 1024 * 1024, files: 10 },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     const allowedExt = /\.(pdf|doc|docx)$/i.test(ext);
@@ -61,7 +73,11 @@ const resumeUpload = multer({
   },
 });
 
-router.post("/upload-resume", resumeUpload.single("resume"), async (req, res, next) => {
+function formatZodError(error: z.ZodError): string {
+  return error.errors.map((e) => e.message).join(". ");
+}
+
+router.post("/upload-resume", documentUpload.single("resume"), async (req, res, next) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
@@ -70,21 +86,80 @@ router.post("/upload-resume", resumeUpload.single("resume"), async (req, res, ne
     await persistUploadedFile(req.file, filename);
     const fileUrl = `/uploads/${filename}`;
     res.json({
-      message: "Resume uploaded successfully",
+      message: "Document uploaded successfully",
       data: { url: fileUrl, filename, size: req.file.size },
     });
   } catch (error) {
-    console.error("Error uploading resume:", error);
+    console.error("Error uploading document:", error);
     next(error);
   }
 });
 
+router.post(
+  "/upload-documents",
+  documentUpload.array("documents", 10),
+  async (req, res, next) => {
+    try {
+      const files = req.files as Express.Multer.File[] | undefined;
+      if (!files?.length) {
+        return res.status(400).json({ error: "No files uploaded" });
+      }
+
+      const uploaded = await Promise.all(
+        files.map(async (file) => {
+          const filename = makeStoredFilename(file.fieldname, file.originalname);
+          await persistUploadedFile(file, filename);
+          return {
+            url: `/uploads/${filename}`,
+            filename,
+            size: file.size,
+            originalName: file.originalname,
+          };
+        }),
+      );
+
+      res.json({
+        message: "Documents uploaded successfully",
+        data: { files: uploaded },
+      });
+    } catch (error) {
+      console.error("Error uploading documents:", error);
+      next(error);
+    }
+  },
+);
+
 router.post("/apply", async (req, res) => {
   try {
-    const validatedData = careerSchema.parse(req.body);
+    const body = { ...req.body };
+    if (typeof body.salaryRate === "string") {
+      body.salaryRate = parseSalaryRateInput(body.salaryRate);
+    }
+    const validatedData = careerSchema.parse(body);
+
+    const salaryExpectationLabel = formatSalaryExpectation(
+      validatedData.salaryCurrency,
+      validatedData.salaryRate,
+      validatedData.salaryMode,
+    );
 
     const application = await prisma.careerApplication.create({
-      data: validatedData,
+      data: {
+        firstName: validatedData.firstName,
+        lastName: validatedData.lastName,
+        email: validatedData.email,
+        phone: validatedData.phone,
+        position: validatedData.position,
+        country: validatedData.country,
+        visaStatus: validatedData.visaStatus,
+        salaryCurrency: validatedData.salaryCurrency,
+        salaryRate: validatedData.salaryRate,
+        salaryMode: validatedData.salaryMode,
+        salaryExpectation: validatedData.salaryRate,
+        resumeUrl: validatedData.documentUrls[0],
+        documentUrls: validatedData.documentUrls,
+        message: validatedData.message,
+      },
     });
 
     try {
@@ -94,8 +169,10 @@ router.post("/apply", async (req, res) => {
         email: validatedData.email,
         phone: validatedData.phone,
         position: validatedData.position,
-        salaryExpectation: validatedData.salaryExpectation,
-        resumeUrl: validatedData.resumeUrl,
+        country: validatedData.country,
+        visaStatus: validatedData.visaStatus,
+        salaryExpectationLabel,
+        documentUrls: validatedData.documentUrls,
         message: validatedData.message,
       });
     } catch (emailError) {
@@ -112,9 +189,9 @@ router.post("/apply", async (req, res) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
-        error: "Validation error", 
-        details: error.errors 
+      return res.status(400).json({
+        error: formatZodError(error),
+        details: error.errors,
       });
     }
     console.error("Error saving career application:", error);

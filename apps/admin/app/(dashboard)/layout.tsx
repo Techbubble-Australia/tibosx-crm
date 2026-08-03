@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FileText,
   LogOut,
@@ -15,25 +15,85 @@ import {
   FileStack,
   Building2,
   Shield,
+  Database,
+  Globe,
+  Settings,
+  LayoutDashboard,
+  UserCircle,
+  ChevronDown,
+  Layers,
+  Cpu,
+  Building,
 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 
-const navItems = [
-  { href: "/pages", label: "Site pages", icon: FileStack, roles: ["admin", "editor", "viewer"] },
-  { href: "/case-studies", label: "Case Studies", icon: FileText, roles: ["admin", "editor", "viewer"] },
-  { href: "/jobs", label: "Job Listings", icon: Briefcase, roles: ["admin", "editor", "viewer"] },
-  { href: "/clients", label: "Clients", icon: Building2, roles: ["admin"] },
-  { href: "/team", label: "Team Members", icon: Users, roles: ["admin", "editor", "viewer"] },
-  { href: "/testimonials", label: "Testimonials", icon: MessageSquare, roles: ["admin", "editor", "viewer"] },
-  { href: "/faqs", label: "FAQs", icon: HelpCircle, roles: ["admin", "editor", "viewer"] },
-  { href: "/career-applications", label: "Career Applications", icon: UserCheck, roles: ["admin", "editor", "viewer"] },
-  { href: "/contact-submissions", label: "Contact Submissions", icon: Mail, roles: ["admin", "editor", "viewer"] },
-  { href: "/users", label: "Users", icon: Shield, roles: ["admin"] },
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof FileText;
+  roles: string[];
+};
+
+type NavGroup = {
+  id: string;
+  label: string;
+  icon: typeof Database;
+  roles: string[];
+  items: NavItem[];
+};
+
+const navGroups: NavGroup[] = [
+  {
+    id: "database",
+    label: "Database",
+    icon: Database,
+    roles: ["admin", "editor", "viewer"],
+    items: [
+      { href: "/database/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "editor", "viewer"] },
+      { href: "/database/profiles", label: "Profiles", icon: UserCircle, roles: ["admin", "editor", "viewer"] },
+      { href: "/database/career-applications", label: "Career applications", icon: UserCheck, roles: ["admin", "editor", "viewer"] },
+    ],
+  },
+  {
+    id: "website",
+    label: "Website",
+    icon: Globe,
+    roles: ["admin", "editor", "viewer"],
+    items: [
+      { href: "/pages", label: "Site pages", icon: FileStack, roles: ["admin", "editor", "viewer"] },
+      { href: "/jobs", label: "Job Listings", icon: Briefcase, roles: ["admin", "editor", "viewer"] },
+      { href: "/case-studies", label: "Case Studies", icon: FileText, roles: ["admin", "editor", "viewer"] },
+      { href: "/testimonials", label: "Testimonials", icon: MessageSquare, roles: ["admin", "editor", "viewer"] },
+      { href: "/faqs", label: "FAQs", icon: HelpCircle, roles: ["admin", "editor", "viewer"] },
+      { href: "/contact-submissions", label: "Contact Submissions", icon: Mail, roles: ["admin", "editor", "viewer"] },
+    ],
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    icon: Settings,
+    roles: ["admin", "editor", "viewer"],
+    items: [
+      { href: "/settings/categories", label: "Category", icon: Layers, roles: ["admin", "editor", "viewer"] },
+      { href: "/settings/technologies", label: "Technology", icon: Cpu, roles: ["admin", "editor", "viewer"] },
+      { href: "/settings/departments", label: "Department", icon: Building, roles: ["admin", "editor", "viewer"] },
+      { href: "/team", label: "Team members", icon: Users, roles: ["admin", "editor", "viewer"] },
+      { href: "/clients", label: "Client", icon: Building2, roles: ["admin"] },
+      { href: "/users", label: "Users", icon: Shield, roles: ["admin"] },
+    ],
+  },
 ];
 
 function headerTitle(pathname: string): string {
-  const hit = navItems.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
-  return hit?.label ?? "Admin";
+  for (const group of navGroups) {
+    const hit = group.items.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
+    if (hit) return hit.label;
+  }
+  return "Admin";
+}
+
+function groupIsActive(group: NavGroup, pathname: string): boolean {
+  return group.items.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
 }
 
 export default function DashboardLayout({
@@ -43,6 +103,7 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const [userRole, setUserRole] = useState<string>("admin");
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     void adminFetch("/api/auth/me")
@@ -54,13 +115,38 @@ export default function DashboardLayout({
       .catch(() => undefined);
   }, []);
 
-  const visibleNav = navItems.filter((item) => item.roles.includes(userRole));
+  useEffect(() => {
+    setOpenGroups((prev) => {
+      const next = { ...prev };
+      for (const group of navGroups) {
+        if (groupIsActive(group, pathname)) {
+          next[group.id] = true;
+        }
+      }
+      return next;
+    });
+  }, [pathname]);
+
+  const visibleGroups = useMemo(
+    () =>
+      navGroups
+        .map((group) => ({
+          ...group,
+          items: group.items.filter((item) => item.roles.includes(userRole)),
+        }))
+        .filter((group) => group.roles.includes(userRole) && group.items.length > 0),
+    [userRole],
+  );
+
+  function toggleGroup(id: string) {
+    setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
 
   return (
     <div className="flex min-h-screen">
       <aside className="flex w-64 flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
         <div className="p-6">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/database/dashboard" className="flex items-center gap-2">
             <div className="grid grid-cols-2 gap-0.5">
               <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
               <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
@@ -72,23 +158,54 @@ export default function DashboardLayout({
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Admin Panel</p>
         </div>
 
-        <nav className="flex-1 px-3">
-          {visibleNav.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname.startsWith(item.href);
+        <nav className="flex-1 space-y-1 px-3">
+          {visibleGroups.map((group) => {
+            const GroupIcon = group.icon;
+            const isOpen = openGroups[group.id] ?? false;
+            const groupActive = groupIsActive(group, pathname);
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`mb-1 flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
-                  isActive
-                    ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
-                }`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span>{item.label}</span>
-              </Link>
+              <div key={group.id} className="mb-2">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.id)}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${
+                    groupActive
+                      ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100"
+                      : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <GroupIcon className="h-4 w-4 shrink-0" />
+                    {group.label}
+                  </span>
+                  <ChevronDown
+                    className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                    aria-hidden
+                  />
+                </button>
+                {isOpen ? (
+                  <div className="mt-1 space-y-0.5 pl-2">
+                    {group.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                            isActive
+                              ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100"
+                              : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                          }`}
+                        >
+                          <Icon className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                          <span>{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
             );
           })}
         </nav>

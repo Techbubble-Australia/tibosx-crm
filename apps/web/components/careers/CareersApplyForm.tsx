@@ -1,30 +1,55 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, X } from "lucide-react";
+import type { JobApiRow } from "@/lib/api/public";
+import { normalizeJobLocations } from "@/lib/job-locations";
+import {
+  SALARY_CURRENCIES,
+  SALARY_MODES,
+  countriesForJobTitle,
+  formatSalaryRateDisplay,
+  parseSalaryRateInput,
+  type JobApplyOption,
+} from "@/lib/careers-form";
 
 /** Must match packages/api/src/lib/validation.ts PHONE_REGEX */
 const PHONE_PATTERN = String.raw`^\+?[\d\s().-]{8,20}$`;
 
 type CareersApplyFormProps = {
-  positions: string[];
+  jobs: JobApiRow[];
 };
 
-function CareersApplyFormInner({ positions }: CareersApplyFormProps) {
+function buildJobApplyOptions(jobs: JobApiRow[]): JobApplyOption[] {
+  return jobs.map((job) => {
+    const entries = normalizeJobLocations(job);
+    const countries = [...new Set(entries.map((e) => e.country.trim()).filter(Boolean))];
+    return { title: job.title, countries };
+  });
+}
+
+function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
   const searchParams = useSearchParams();
   const positionParam = searchParams.get("position") ?? "";
-  const uniquePositions = [...new Set(positions.map((p) => p.trim()).filter(Boolean))].sort((a, b) =>
+  const jobOptions = useMemo(() => buildJobApplyOptions(jobs), [jobs]);
+  const uniquePositions = [...new Set(jobs.map((j) => j.title.trim()).filter(Boolean))].sort((a, b) =>
     a.localeCompare(b),
   );
+
   const [position, setPosition] = useState(positionParam);
-  const [resumeName, setResumeName] = useState("");
+  const [country, setCountry] = useState("");
+  const [salaryRateInput, setSalaryRateInput] = useState("");
+  const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
-    if (positionParam) setPosition(positionParam);
-  }, [positionParam]);
+    if (positionParam) {
+      setPosition(positionParam);
+      setCountry(countriesForJobTitle(positionParam, jobOptions));
+    }
+  }, [positionParam, jobOptions]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && (window.location.hash === "#apply" || positionParam)) {
@@ -32,34 +57,60 @@ function CareersApplyFormInner({ positions }: CareersApplyFormProps) {
     }
   }, [positionParam]);
 
+  function handlePositionChange(next: string) {
+    setPosition(next);
+    setCountry(countriesForJobTitle(next, jobOptions));
+  }
+
+  function handleDocumentsChange(fileList: FileList | null) {
+    if (!fileList?.length) {
+      setDocumentFiles([]);
+      return;
+    }
+    setDocumentFiles(Array.from(fileList));
+  }
+
+  function removeDocument(index: number) {
+    setDocumentFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setStatus("loading");
     setErrorMsg("");
+
     const form = e.currentTarget;
     const formData = new FormData(form);
 
     try {
-      const resumeFile = formData.get("resume") as File | null;
-      if (!resumeFile || resumeFile.size === 0) {
-        throw new Error("Resume is required");
+      if (documentFiles.length === 0) {
+        throw new Error("At least one document is required");
+      }
+
+      if (!country.trim()) {
+        throw new Error("Country is required — select a position first");
       }
 
       const uploadData = new FormData();
-      uploadData.append("resume", resumeFile);
-      const uploadRes = await fetch("/api/careers/upload-resume", {
+      documentFiles.forEach((file) => uploadData.append("documents", file));
+      const uploadRes = await fetch("/api/careers/upload-documents", {
         method: "POST",
         body: uploadData,
       });
       const uploadJson = await uploadRes.json();
-      if (!uploadRes.ok) throw new Error(uploadJson.error || "Resume upload failed");
-      const resumeUrl = uploadJson.data?.url as string | undefined;
-      if (!resumeUrl) throw new Error("Resume upload failed");
+      if (!uploadRes.ok) {
+        throw new Error(uploadJson.error || "Document upload failed");
+      }
 
-      const salaryRaw = formData.get("salaryExpectation");
-      const salaryExpectation = Number(salaryRaw);
-      if (!Number.isFinite(salaryExpectation) || salaryExpectation <= 0) {
-        throw new Error("Salary expectation is required");
+      const uploadedFiles = uploadJson.data?.files as Array<{ url: string }> | undefined;
+      const documentUrls = uploadedFiles?.map((f) => f.url).filter(Boolean) ?? [];
+      if (documentUrls.length === 0) {
+        throw new Error("Document upload failed");
+      }
+
+      const salaryRate = parseSalaryRateInput(salaryRateInput);
+      if (salaryRate <= 0) {
+        throw new Error("Salary rate is required");
       }
 
       const payload = {
@@ -68,9 +119,13 @@ function CareersApplyFormInner({ positions }: CareersApplyFormProps) {
         email: formData.get("email"),
         phone: formData.get("phone"),
         position: formData.get("position"),
-        salaryExpectation,
+        country: country.trim(),
+        visaStatus: formData.get("visaStatus"),
+        salaryCurrency: formData.get("salaryCurrency"),
+        salaryRate,
+        salaryMode: formData.get("salaryMode"),
+        documentUrls,
         message: formData.get("message") || undefined,
-        resumeUrl,
       };
 
       const res = await fetch("/api/careers/apply", {
@@ -79,12 +134,25 @@ function CareersApplyFormInner({ positions }: CareersApplyFormProps) {
         body: JSON.stringify(payload),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Submission failed");
+      if (!res.ok) {
+        const detailText =
+          Array.isArray(json.details)
+            ? json.details.map((d: { message?: string }) => d.message).filter(Boolean).join(". ")
+            : "";
+        throw new Error(detailText || json.error || "Submission failed");
+      }
 
       setStatus("success");
       form.reset();
-      setResumeName("");
-      if (positionParam) setPosition(positionParam);
+      setSalaryRateInput("");
+      setDocumentFiles([]);
+      if (positionParam) {
+        setPosition(positionParam);
+        setCountry(countriesForJobTitle(positionParam, jobOptions));
+      } else {
+        setPosition("");
+        setCountry("");
+      }
     } catch (err) {
       setStatus("error");
       setErrorMsg(err instanceof Error ? err.message : "Something went wrong");
@@ -139,7 +207,7 @@ function CareersApplyFormInner({ positions }: CareersApplyFormProps) {
         name="position"
         required
         value={position}
-        onChange={(e) => !positionLocked && setPosition(e.target.value)}
+        onChange={(e) => !positionLocked && handlePositionChange(e.target.value)}
         disabled={positionLocked}
         className={`${fieldClass} appearance-none ${positionLocked ? "cursor-default opacity-90" : ""}`}
       >
@@ -158,33 +226,99 @@ function CareersApplyFormInner({ positions }: CareersApplyFormProps) {
         ))}
       </select>
 
-      <input
-        name="salaryExpectation"
-        type="number"
-        required
-        min={1}
-        step={1}
-        inputMode="numeric"
-        placeholder="Salary expectation (AUD) *"
-        className={fieldClass}
-      />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <select
+          name="salaryCurrency"
+          required
+          defaultValue="AUD"
+          className={`${fieldClass} appearance-none`}
+        >
+          <option value="" disabled className="bg-[#111111] text-white/60">
+            Currency *
+          </option>
+          {SALARY_CURRENCIES.map((c) => (
+            <option key={c.code} value={c.code} className="bg-[#111111] text-white">
+              {c.label}
+            </option>
+          ))}
+        </select>
+        <input
+          name="salaryRate"
+          type="text"
+          required
+          inputMode="numeric"
+          value={salaryRateInput}
+          onChange={(e) => setSalaryRateInput(formatSalaryRateDisplay(e.target.value))}
+          placeholder="Rate *"
+          className={fieldClass}
+        />
+        <select name="salaryMode" required className={`${fieldClass} appearance-none`}>
+          <option value="" disabled className="bg-[#111111] text-white/60">
+            Mode *
+          </option>
+          {SALARY_MODES.map((mode) => (
+            <option key={mode} value={mode} className="bg-[#111111] text-white">
+              {mode}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <input type="hidden" name="country" value={country} />
+        <input
+          type="text"
+          readOnly
+          value={country}
+          placeholder="Country"
+          className={`${fieldClass} cursor-default opacity-90`}
+          aria-readonly="true"
+          tabIndex={-1}
+        />
+        <input
+          name="visaStatus"
+          type="text"
+          required
+          placeholder="Visa status *"
+          className={fieldClass}
+        />
+      </div>
 
       <label className="flex min-h-[100px] cursor-pointer flex-col items-center justify-center rounded-[14px] border border-white/15 bg-white/[0.08] px-4 py-4 text-center">
         <input
-          name="resume"
+          name="documents"
           type="file"
-          required
+          required={documentFiles.length === 0}
+          multiple
           accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           className="sr-only"
-          onChange={(e) => setResumeName(e.target.files?.[0]?.name ?? "")}
+          onChange={(e) => handleDocumentsChange(e.target.files)}
         />
         <p className="text-[14px] font-normal leading-5 tracking-[0.035px] text-white/35">
-          {resumeName ? resumeName : "Upload your resume *"}
+          Add Documents (resume, visa copies etc.) *
         </p>
         <p className="text-[10px] font-medium leading-[14px] tracking-[0.1px] text-white/35">
-          PDF, DOC, DOCX (max 5MB)
+          PDF, DOC, DOCX (max 5MB each, up to 10 files)
         </p>
       </label>
+
+      {documentFiles.length > 0 ? (
+        <ul className="space-y-1 rounded-[14px] border border-white/10 bg-white/[0.04] px-3 py-2">
+          {documentFiles.map((file, index) => (
+            <li key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 text-[13px] text-white/80">
+              <span className="truncate">{file.name}</span>
+              <button
+                type="button"
+                onClick={() => removeDocument(index)}
+                className="shrink-0 rounded p-1 text-white/50 hover:text-white"
+                aria-label={`Remove ${file.name}`}
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       <input
         name="message"
@@ -217,10 +351,10 @@ function CareersApplyFormInner({ positions }: CareersApplyFormProps) {
   );
 }
 
-export function CareersApplyForm({ positions }: CareersApplyFormProps) {
+export function CareersApplyForm({ jobs }: CareersApplyFormProps) {
   return (
     <Suspense fallback={<div className="mt-8 h-48 animate-pulse rounded-[14px] bg-white/10" />}>
-      <CareersApplyFormInner positions={positions} />
+      <CareersApplyFormInner jobs={jobs} />
     </Suspense>
   );
 }

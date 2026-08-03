@@ -8,13 +8,15 @@ export type WorkforceTabCms = {
   label?: string;
   /** Exact Team member `Department` string (case-insensitive match on site). */
   department?: string;
+  /** Tab display order — lower numbers appear first among active CMS tabs. */
+  order?: number;
   /** @deprecated Legacy layout field — ignored on save. */
   widthPx?: number;
   active: boolean;
 };
 
-/** After `normalizeWorkforceCmsTabs`, always `department`, `label`, and `active`. */
-export type AboutWorkforceTabResolved = { department: string; label: string; active: boolean };
+/** After `normalizeWorkforceCmsTabs`, always `department`, `label`, `active`, and optional `order`. */
+export type AboutWorkforceTabResolved = { department: string; label: string; active: boolean; order?: number };
 
 /** Pill label (often from CMS) + canonical Team `department` for member lookup. */
 export type WorkforceDeptPill = {
@@ -89,23 +91,35 @@ function deptMatchesExplicitInput(baseLc: string, apiLc: string): boolean {
   return levenshtein(baseLc, apiLc) <= limit;
 }
 
-/** Normalize JSON from CMS/API (legacy single-field rows → `department` + optional `label`). */
+/** Normalize JSON from CMS/API (legacy single-field rows → `department` + optional `label` + `order`). */
 export function normalizeWorkforceCmsTabs(tabs: unknown): AboutWorkforceTabResolved[] {
   if (!Array.isArray(tabs)) return [];
-  return tabs.map((raw) => {
+  return tabs.map((raw, index) => {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-      return { department: "", label: "", active: false };
+      return { department: "", label: "", active: false, order: index + 1 };
     }
     const t = raw as Record<string, unknown>;
     const rawLabel = typeof t.label === "string" ? t.label.trim() : "";
     const rawDepartment = typeof t.department === "string" ? t.department.trim() : "";
     const department = rawDepartment || stripWorkforceTabLabelSuffix(rawLabel);
     const label = rawDepartment ? rawLabel : "";
+    const orderRaw = typeof t.order === "number" ? t.order : index + 1;
     return {
       department,
       label,
       active: Boolean(t.active),
+      order: orderRaw,
     };
+  });
+}
+
+function sortCmsTabsByOrder(
+  tabs: readonly (WorkforceTabCms | AboutWorkforceTabResolved)[],
+): (WorkforceTabCms | AboutWorkforceTabResolved)[] {
+  return [...tabs].sort((a, b) => {
+    const ao = typeof a.order === "number" ? a.order : 0;
+    const bo = typeof b.order === "number" ? b.order : 0;
+    return ao - bo;
   });
 }
 
@@ -122,7 +136,9 @@ export function orderedWorkforceDeptPills(
     return sortedApi.map((d) => ({ pillLabel: d, memberDeptKey: d }));
   }
 
-  const hasAnyActiveTab = cmsTabs.some((t) => t.active);
+  const sortedTabs = sortCmsTabsByOrder(cmsTabs);
+
+  const hasAnyActiveTab = sortedTabs.some((t) => t.active);
   if (!hasAnyActiveTab) {
     return sortedApi.map((d) => ({ pillLabel: d, memberDeptKey: d }));
   }
@@ -142,7 +158,7 @@ export function orderedWorkforceDeptPills(
       return explicit ? deptMatchesExplicitInput(baseLc, dl) : deptMatchesLegacyLabel(baseLc, dl);
     });
 
-  for (const tab of cmsTabs) {
+  for (const tab of sortedTabs) {
     if (!tab.active) continue;
     const baseLc = tabMatchKey(tab);
     if (!baseLc) continue;

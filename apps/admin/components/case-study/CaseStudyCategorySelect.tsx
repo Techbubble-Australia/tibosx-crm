@@ -1,38 +1,40 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { adminFetch } from "@/lib/admin-api";
 
-export type CaseStudyCategoryRow = {
-  id: string;
-  name: string;
-  order: number;
-  subcategories: { id: string; name: string; order: number }[];
-};
+type TaxonomyItem = { id: string; name: string };
 
 type Props = {
   defaultCategory?: string;
-  defaultSubcategory?: string;
+  defaultTechnology?: string;
   selectClassName?: string;
   labelClassName?: string;
 };
 
 export function CaseStudyCategorySelect({
   defaultCategory = "",
-  defaultSubcategory = "",
+  defaultTechnology = "",
   selectClassName = "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black",
   labelClassName = "mb-2 block text-sm font-medium",
 }: Props) {
-  const [categories, setCategories] = useState<CaseStudyCategoryRow[]>([]);
+  const [categories, setCategories] = useState<TaxonomyItem[]>([]);
+  const [technologies, setTechnologies] = useState<TaxonomyItem[]>([]);
   const [category, setCategory] = useState(defaultCategory);
-  const [subcategory, setSubcategory] = useState(defaultSubcategory);
+  const [technology, setTechnology] = useState(defaultTechnology);
 
   useEffect(() => {
     async function load() {
       try {
-        const res = await adminFetch("/api/admin/case-study-categories");
-        const data = await res.json();
-        setCategories(data.data ?? []);
+        const [catRes, techRes] = await Promise.all([
+          adminFetch("/api/admin/job-categories"),
+          adminFetch("/api/admin/job-technologies"),
+        ]);
+        const catData = await catRes.json();
+        const techData = await techRes.json();
+        setCategories(catData.data ?? []);
+        setTechnologies(techData.data ?? []);
       } catch (e) {
         console.error(e);
       }
@@ -42,13 +44,8 @@ export function CaseStudyCategorySelect({
 
   useEffect(() => {
     setCategory(defaultCategory);
-    setSubcategory(defaultSubcategory);
-  }, [defaultCategory, defaultSubcategory]);
-
-  const subcategories = useMemo(() => {
-    const cat = categories.find((c) => c.name === category);
-    return cat?.subcategories ?? [];
-  }, [categories, category]);
+    setTechnology(defaultTechnology);
+  }, [defaultCategory, defaultTechnology]);
 
   return (
     <>
@@ -58,10 +55,7 @@ export function CaseStudyCategorySelect({
           name="category"
           required
           value={category}
-          onChange={(e) => {
-            setCategory(e.target.value);
-            setSubcategory("");
-          }}
+          onChange={(e) => setCategory(e.target.value)}
           className={selectClassName}
         >
           <option value="">Select category…</option>
@@ -74,27 +68,35 @@ export function CaseStudyCategorySelect({
             <option value={category}>{category} (current)</option>
           ) : null}
         </select>
+        <p className="mt-1 text-xs text-gray-500">
+          <Link href="/settings/categories" className="underline hover:text-gray-700">
+            Manage categories
+          </Link>
+        </p>
       </div>
       <div>
-        <label className={labelClassName}>Subcategory</label>
+        <label className={labelClassName}>Technology</label>
         <select
           name="subcategory"
-          value={subcategory}
-          onChange={(e) => setSubcategory(e.target.value)}
+          value={technology}
+          onChange={(e) => setTechnology(e.target.value)}
           className={selectClassName}
-          disabled={!category}
         >
           <option value="">None</option>
-          {subcategories.map((s) => (
-            <option key={s.id} value={s.name}>
-              {s.name}
+          {technologies.map((t) => (
+            <option key={t.id} value={t.name}>
+              {t.name}
             </option>
           ))}
-          {subcategory && !subcategories.some((s) => s.name === subcategory) ? (
-            <option value={subcategory}>{subcategory} (current)</option>
+          {technology && !technologies.some((t) => t.name === technology) ? (
+            <option value={technology}>{technology} (current)</option>
           ) : null}
         </select>
-        <p className="mt-1 text-xs text-gray-500">Optional — e.g. SharePoint under Microsoft.</p>
+        <p className="mt-1 text-xs text-gray-500">
+          <Link href="/settings/technologies" className="underline hover:text-gray-700">
+            Manage technologies
+          </Link>
+        </p>
       </div>
     </>
   );

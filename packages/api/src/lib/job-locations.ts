@@ -70,6 +70,7 @@ export const jobLocationEntrySchema = z.object({
   country: z.string().min(1),
   flag: z.string().min(0).default(""),
   label: z.string().optional().default(""),
+  cities: z.array(z.string()).optional().default([]),
 });
 
 export type JobLocationEntry = z.infer<typeof jobLocationEntrySchema>;
@@ -111,6 +112,16 @@ export function normalizeJobLocations(job: JobLocationLegacyFields): JobLocation
   ];
 }
 
+export function formatLocationEntryDisplay(entry: JobLocationEntry): string {
+  const cities = (entry.cities ?? []).map((c) => c.trim()).filter(Boolean);
+  if (cities.length > 0) {
+    return cities.join(" and ");
+  }
+  const label = entry.label?.trim() ?? "";
+  if (label) return label;
+  return entry.country.trim();
+}
+
 export function formatJobLocationsSummary(entries: readonly JobLocationEntry[]): {
   flags: string;
   locationText: string;
@@ -121,7 +132,7 @@ export function formatJobLocationsSummary(entries: readonly JobLocationEntry[]):
     .filter(Boolean)
     .join(" ");
   const locationText = entries
-    .map((e) => e.label?.trim() || e.country.trim())
+    .map((e) => formatLocationEntryDisplay(e))
     .filter(Boolean)
     .join(" · ");
   const countryKeys = [

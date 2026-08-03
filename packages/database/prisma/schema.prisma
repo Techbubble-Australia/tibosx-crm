@@ -167,8 +167,15 @@ model CareerApplication {
   phone             String?
   position          String
   company           String?
+  country           String?
+  visaStatus        String?
+  salaryCurrency    String?
+  salaryRate        Int?
+  salaryMode        String?
   salaryExpectation Int?
   resumeUrl         String?
+  /// Uploaded document URLs (resume, visa copies, etc.)
+  documentUrls      Json?
   message           String?
   createdAt         DateTime @default(now())
 }
@@ -249,9 +256,11 @@ model JobListing {
   location        String
   country         String
   flag            String    // emoji flag (primary / first location for legacy consumers)
-  /// [{ countryCode, country, flag, label? }] — multi-country roles; when set, drives public display.
+  /// [{ countryCode, country, flag, label?, cities? }] — multi-country roles; when set, drives public display.
   locations       Json?
-  type            String    // full-time | contract | part-time
+  type            String    // full-time | contract | part-time (employment type)
+  /// Internal | External for Client — shown on public job cards
+  listingType     String    @default("Internal")
   workMode        String    // remote | hybrid | onsite
   category        String
   technology      String

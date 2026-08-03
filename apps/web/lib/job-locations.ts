@@ -5,7 +5,18 @@ export type JobLocationEntry = {
   country: string;
   flag: string;
   label?: string;
+  cities?: string[];
 };
+
+export function formatLocationEntryDisplay(entry: JobLocationEntry): string {
+  const cities = (entry.cities ?? []).map((c) => c.trim()).filter(Boolean);
+  if (cities.length > 0) {
+    return cities.join(" and ");
+  }
+  const label = entry.label?.trim() ?? "";
+  if (label) return label;
+  return entry.country.trim();
+}
 
 export type JobLocationLegacyFields = {
   location: string;
@@ -51,7 +62,7 @@ export function formatJobLocationsSummary(entries: readonly JobLocationEntry[]):
     .filter(Boolean)
     .join(" ");
   const locationText = entries
-    .map((e) => e.label?.trim() || e.country.trim())
+    .map((e) => formatLocationEntryDisplay(e))
     .filter(Boolean)
     .join(" · ");
   return { flags, locationText };

@@ -8,7 +8,7 @@ import { inputClass, labelClass, sectionClass } from "./form-styles";
 
 type StatRow = { n: string; l: string; labelClass: string };
 type MissionCard = { title: string; text: string };
-type WorkforceTab = { label?: string; department: string; active: boolean };
+type WorkforceTab = { label?: string; department: string; active: boolean; order?: number };
 
 type AdminTeamListRow = {
   id: string;
@@ -144,11 +144,13 @@ export function AboutPageForm({
   };
 
   const addWorkforceTab = () => {
+    const nextOrder =
+      value.workforce.tabs.reduce((max, tab) => Math.max(max, tab.order ?? 0), 0) + 1;
     onChange({
       ...value,
       workforce: {
         ...value.workforce,
-        tabs: [...value.workforce.tabs, { label: "", department: "", active: false }],
+        tabs: [...value.workforce.tabs, { label: "", department: "", active: false, order: nextOrder }],
       },
     });
   };
@@ -167,9 +169,10 @@ export function AboutPageForm({
     const to = direction === "up" ? from - 1 : from + 1;
     if (to < 0 || to >= value.workforce.tabs.length) return;
     const tabs = [...value.workforce.tabs];
-    const [item] = tabs.splice(from, 1);
-    if (!item) return;
-    tabs.splice(to, 0, item);
+    const fromOrder = tabs[from]?.order ?? from + 1;
+    const toOrder = tabs[to]?.order ?? to + 1;
+    tabs[from] = { ...tabs[from]!, order: toOrder };
+    tabs[to] = { ...tabs[to]!, order: fromOrder };
     onChange({ ...value, workforce: { ...value.workforce, tabs } });
   };
 
@@ -370,11 +373,11 @@ export function AboutPageForm({
           <section className={sectionClass}>
             <h3 className="mb-2 font-semibold text-gray-900 dark:text-zinc-100">Team tabs</h3>
             <p className="mb-4 text-xs leading-relaxed text-gray-600 dark:text-zinc-400">
-              Set the <strong>tab name</strong> visitors see on the About page, and the <strong>team department</strong> it should match
-              from <strong>Admin → Team</strong> (case-insensitive exact match, or close spelling for minor typos). Only departments with
-              published members appear on the site. Use the <strong>order</strong> controls to set tab sequence; turn on{" "}
-              <strong>Active</strong> to include a row on the site (inactive rows are ignored). Unmatched active rows do
-              not create a tab. Remaining departments follow alphabetically.
+              Set the <strong>tab name</strong> visitors see on the About page, the <strong>team department</strong> it should match
+              from <strong>Settings → Team members</strong> (case-insensitive exact match, or close spelling for minor typos). Use{" "}
+              <strong>Order</strong> to control tab sequence (lower numbers appear first). Turn on <strong>Active</strong> to include a
+              row on the site (inactive rows are ignored). Unmatched active rows do not create a tab. Remaining departments follow
+              alphabetically.
             </p>
             <datalist id="about-workforce-department-suggestions">
               {publishedDepartmentSuggestions.map((d) => (
@@ -426,14 +429,30 @@ export function AboutPageForm({
                           </button>
                         </div>
                         <div className="min-w-0 flex-1 space-y-4">
-                        <div className="space-y-2">
-                          <label className={labelClass}>Tab name</label>
-                          <input
-                            className={`${inputClass} w-full`}
-                            value={t.label ?? ""}
-                            onChange={(e) => setWorkforceTab(i, { label: e.target.value })}
-                            placeholder="e.g. Leadership"
-                          />
+                        <div className="grid gap-4 sm:grid-cols-[auto_1fr]">
+                          <div className="space-y-2">
+                            <label className={labelClass}>Order</label>
+                            <input
+                              type="number"
+                              min={1}
+                              className={`${inputClass} w-20`}
+                              value={t.order ?? i + 1}
+                              onChange={(e) => {
+                                const parsed = parseInt(e.target.value, 10);
+                                setWorkforceTab(i, { order: Number.isFinite(parsed) ? parsed : i + 1 });
+                              }}
+                              aria-label={`Tab order ${i + 1}`}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className={labelClass}>Tab name</label>
+                            <input
+                              className={`${inputClass} w-full`}
+                              value={t.label ?? ""}
+                              onChange={(e) => setWorkforceTab(i, { label: e.target.value })}
+                              placeholder="e.g. Leadership"
+                            />
+                          </div>
                         </div>
                         <div className="space-y-2">
                           <label className={labelClass}>Match team department</label>

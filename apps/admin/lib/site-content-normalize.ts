@@ -28,17 +28,18 @@ function stripWorkforceTabLabelSuffix(label: string): string {
   return label.replace(/\s*\(\d+\)\s*$/, "").trim();
 }
 
-/** Normalize stored workforce tabs to `{ department, label, active }` (drops legacy `widthPx`). */
-function migrateWorkforceTabRow(raw: unknown): { department: string; label: string; active: boolean } {
+/** Normalize stored workforce tabs to `{ department, label, active, order }` (drops legacy `widthPx`). */
+function migrateWorkforceTabRow(raw: unknown, index = 0): { department: string; label: string; active: boolean; order: number } {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    return { department: "", label: "", active: false };
+    return { department: "", label: "", active: false, order: index + 1 };
   }
   const t = raw as Record<string, unknown>;
   const rawLabel = typeof t.label === "string" ? t.label.trim() : "";
   const rawDepartment = typeof t.department === "string" ? t.department.trim() : "";
   const department = rawDepartment || stripWorkforceTabLabelSuffix(rawLabel);
   const label = rawDepartment ? rawLabel : "";
-  return { department, label, active: Boolean(t.active) };
+  const order = typeof t.order === "number" && Number.isFinite(t.order) ? t.order : index + 1;
+  return { department, label, active: Boolean(t.active), order };
 }
 
 export const SITE_CONTENT_FORM_KEYS = [
@@ -126,7 +127,7 @@ export function serializeSiteContentForPersist(key: string, payload: unknown): u
           ...next,
           workforce: {
             ...wf,
-            tabs: tabs.map((tab: unknown) => migrateWorkforceTabRow(tab)),
+            tabs: tabs.map((tab: unknown, index: number) => migrateWorkforceTabRow(tab, index)),
           },
         };
       }
@@ -200,7 +201,7 @@ export function normalizeSiteContentPayload(key: string, raw: unknown): unknown 
     const wf = merged.workforce as Record<string, unknown>;
     const tabs = wf.tabs;
     if (Array.isArray(tabs)) {
-      wf.tabs = tabs.map((tab: unknown) => migrateWorkforceTabRow(tab));
+      wf.tabs = tabs.map((tab: unknown, index: number) => migrateWorkforceTabRow(tab, index));
     }
   }
   return merged;

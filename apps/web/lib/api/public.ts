@@ -124,6 +124,7 @@ export type JobApiRow = {
   flag: string;
   locations?: JobLocationEntry[];
   type: string;
+  listingType?: string;
   workMode: string;
   category: string;
   technology: string;

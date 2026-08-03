@@ -15,6 +15,7 @@ export type JobFormDefaults = {
   country?: string;
   flag?: string;
   type?: string;
+  listingType?: string;
   workMode?: string;
   category?: string;
   technology?: string;
@@ -128,8 +129,13 @@ export function JobForm({
     const formData = new FormData(e.currentTarget);
     const payload: Record<string, unknown> = {
       title: formData.get("title"),
-      locations: validLocations,
+      locations: validLocations.map((row) => ({
+        ...row,
+        cities: row.cities ?? [],
+        label: "",
+      })),
       type: formData.get("type"),
+      listingType: formData.get("listingType"),
       workMode: formData.get("workMode"),
       category,
       technology,
@@ -199,111 +205,131 @@ export function JobForm({
           </div>
         </div>
 
+        <div>
+          <label className={labelClass}>Type *</label>
+          <select
+            name="listingType"
+            required
+            defaultValue={defaults.listingType ?? "Internal"}
+            className={inputClass}
+          >
+            <option value="Internal">Internal</option>
+            <option value="External for Client">External for Client</option>
+          </select>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Shown on public job cards (Internal vs External for Client).
+          </p>
+        </div>
+
         {taxonomyReady ? (
           <>
-            <div>
-              <label className={labelClass}>Category *</label>
-              <select
-                name="category"
-                required
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className={inputClass}
-              >
-                <option value="">Select category…</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.name}>
-                    {c.name}
-                  </option>
-                ))}
-                {category && !categories.some((c) => c.name === category) ? (
-                  <option value={category}>{category} (current)</option>
-                ) : null}
-              </select>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                <Link href="/jobs/settings" className="underline hover:text-gray-700">
-                  Manage categories
-                </Link>
-              </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className={labelClass}>Category *</label>
+                <select
+                  name="category"
+                  required
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">Select category…</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                  {category && !categories.some((c) => c.name === category) ? (
+                    <option value={category}>{category} (current)</option>
+                  ) : null}
+                </select>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  <Link href="/settings/categories" className="underline hover:text-gray-700 dark:hover:text-gray-300">
+                    Manage categories
+                  </Link>
+                </p>
+              </div>
+
+              <div>
+                <label className={labelClass}>Technology *</label>
+                <select
+                  name="technology"
+                  required
+                  value={technology}
+                  onChange={(e) => setTechnology(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">Select technology…</option>
+                  {technologies.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name}
+                    </option>
+                  ))}
+                  {technology && !technologies.some((t) => t.name === technology) ? (
+                    <option value={technology}>{technology} (current)</option>
+                  ) : null}
+                </select>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  <Link href="/settings/technologies" className="underline hover:text-gray-700 dark:hover:text-gray-300">
+                    Manage technologies
+                  </Link>
+                </p>
+              </div>
             </div>
 
-            <div>
-              <label className={labelClass}>Technology *</label>
-              <select
-                name="technology"
-                required
-                value={technology}
-                onChange={(e) => setTechnology(e.target.value)}
-                className={inputClass}
-              >
-                <option value="">Select technology…</option>
-                {technologies.map((t) => (
-                  <option key={t.id} value={t.name}>
-                    {t.name}
-                  </option>
-                ))}
-                {technology && !technologies.some((t) => t.name === technology) ? (
-                  <option value={technology}>{technology} (current)</option>
-                ) : null}
-              </select>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                <Link href="/jobs/settings" className="underline hover:text-gray-700">
-                  Manage technologies
-                </Link>
-              </p>
-            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className={labelClass}>Department *</label>
+                <select
+                  name="department"
+                  required
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">Select department…</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.name}>
+                      {d.name}
+                    </option>
+                  ))}
+                  {department && !departments.some((d) => d.name === department) ? (
+                    <option value={department}>{department} (current)</option>
+                  ) : null}
+                </select>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  <Link href="/settings/departments" className="underline hover:text-gray-700 dark:hover:text-gray-300">
+                    Manage departments
+                  </Link>
+                </p>
+              </div>
 
-            <div>
-              <label className={labelClass}>Department *</label>
-              <select
-                name="department"
-                required
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                className={inputClass}
-              >
-                <option value="">Select department…</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.name}>
-                    {d.name}
-                  </option>
-                ))}
-                {department && !departments.some((d) => d.name === department) ? (
-                  <option value={department}>{department} (current)</option>
-                ) : null}
-              </select>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                <Link href="/jobs/settings" className="underline hover:text-gray-700">
-                  Manage departments
-                </Link>
-              </p>
-            </div>
-
-            <div>
-              <label className={labelClass}>Client *</label>
-              <select
-                name="clientId"
-                required
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                className={inputClass}
-              >
-                <option value="">Select client…</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-                {clientId && !clients.some((c) => c.id === clientId) ? (
-                  <option value={clientId}>Current client</option>
-                ) : null}
-              </select>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Internal only — not shown on the public careers site.{" "}
-                <Link href="/clients" className="underline hover:text-gray-700">
-                  Manage clients
-                </Link>
-              </p>
+              <div>
+                <label className={labelClass}>Client *</label>
+                <select
+                  name="clientId"
+                  required
+                  value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">Select client…</option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                  {clientId && !clients.some((c) => c.id === clientId) ? (
+                    <option value={clientId}>Current client</option>
+                  ) : null}
+                </select>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Internal only — not shown on the public careers site.{" "}
+                  <Link href="/clients" className="underline hover:text-gray-700 dark:hover:text-gray-300">
+                    Manage clients
+                  </Link>
+                </p>
+              </div>
             </div>
           </>
         ) : (

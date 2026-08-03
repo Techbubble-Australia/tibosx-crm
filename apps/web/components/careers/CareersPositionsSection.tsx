@@ -6,6 +6,7 @@ import { ArrowRight, ChevronDown } from "lucide-react";
 import type { JobApiRow } from "@/lib/api/public";
 import {
   collectJobLocationFilterOptions,
+  formatLocationEntryDisplay,
   jobMatchesLocationFilter,
   normalizeJobLocations,
 } from "@/lib/job-locations";
@@ -115,9 +116,13 @@ export function CareersPositionsSection({ jobs }: { jobs: JobApiRow[] }) {
             {filtered.map((position) => {
               const entries = normalizeJobLocations(position);
               const locationText = entries
-                .map((e) => e.label?.trim() || e.country.trim())
+                .map((e) => formatLocationEntryDisplay(e))
                 .filter(Boolean)
                 .join(" · ");
+              const categoryTech = [position.category?.trim(), position.technology?.trim()]
+                .filter(Boolean)
+                .join(" - ");
+              const listingType = (position.listingType || "Internal").trim();
               return (
                 <Link
                   key={position.slug}
@@ -149,14 +154,14 @@ export function CareersPositionsSection({ jobs }: { jobs: JobApiRow[] }) {
                     <p className="text-[13px] font-medium leading-5 text-[#666666] dark:text-zinc-400">
                       {formatType(position.type)} · {formatType(position.workMode)}
                     </p>
-                    {(position.technology || "").trim() ? (
+                    {categoryTech ? (
                       <p className="text-[12px] font-semibold uppercase tracking-wide text-[#111111] dark:text-zinc-200">
-                        {position.technology}
+                        {categoryTech}
                       </p>
                     ) : null}
-                    {(position.department || "").trim() ? (
+                    {listingType ? (
                       <p className="text-[12px] font-medium uppercase tracking-wide text-[#999] dark:text-zinc-500">
-                        {(position.department || "General").trim()}
+                        {listingType}
                       </p>
                     ) : null}
                   </div>

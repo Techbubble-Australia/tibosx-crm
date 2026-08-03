@@ -5,6 +5,7 @@ export type JobLocationEntry = {
   country: string;
   flag: string;
   label?: string;
+  cities?: string[];
 };
 
 export type JobLocationLegacyFields = {
@@ -32,6 +33,9 @@ export function jobLocationsFromDefaults(defaults: JobLocationLegacyFields): Job
       country,
       flag,
       label: location && location !== country ? location : "",
+      cities: location && location !== country
+        ? location.split(/\s*(?:,|&| and )\s*/i).map((s) => s.trim()).filter(Boolean)
+        : [],
     },
   ];
 }

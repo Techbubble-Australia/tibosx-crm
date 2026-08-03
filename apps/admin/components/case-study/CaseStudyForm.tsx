@@ -143,17 +143,17 @@ export function CaseStudyForm({
           </div>
           <CaseStudyCategorySelect
             defaultCategory={str(defaults as Record<string, unknown>, "category")}
-            defaultSubcategory={str(defaults as Record<string, unknown>, "subcategory")}
+            defaultTechnology={str(defaults as Record<string, unknown>, "subcategory")}
             selectClassName={inputClass}
             labelClassName={labelClass}
           />
           <div className="col-span-2">
-            <Link
-              href="/case-studies/categories"
-              className="text-xs text-gray-500 underline hover:text-gray-700"
-            >
-              Manage categories &amp; subcategories
-            </Link>
+            <p className="text-xs text-gray-500">
+              Category and technology options are managed in{" "}
+              <Link href="/settings/categories" className="underline hover:text-gray-700">Settings → Category</Link>
+              {" "}and{" "}
+              <Link href="/settings/technologies" className="underline hover:text-gray-700">Technology</Link>.
+            </p>
           </div>
           <div>
             <label className={labelClass}>Published date</label>

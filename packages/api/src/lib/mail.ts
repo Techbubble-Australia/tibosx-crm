@@ -6,8 +6,10 @@ export type CareerApplicationEmailData = {
   email: string;
   phone: string;
   position: string;
-  salaryExpectation: number;
-  resumeUrl: string;
+  country: string;
+  visaStatus: string;
+  salaryExpectationLabel: string;
+  documentUrls: string[];
   message?: string | null;
 };
 
@@ -31,22 +33,23 @@ export function buildResumeAbsoluteUrl(resumePath: string): string {
   return `${base}${path}`;
 }
 
-function formatSalaryAud(amount: number): string {
-  return new Intl.NumberFormat("en-AU", {
-    style: "currency",
-    currency: "AUD",
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
+function buildEmailHtml(data: CareerApplicationEmailData): string {
+  const documentLinks = data.documentUrls
+    .map((url, index) => {
+      const absolute = buildResumeAbsoluteUrl(url);
+      return `<li><a href="${escapeHtml(absolute)}">Document ${index + 1}</a></li>`;
+    })
+    .join("");
 
-function buildEmailHtml(data: CareerApplicationEmailData, resumeAbsoluteUrl: string): string {
   const lines = [
     `<p><strong>Name:</strong> ${escapeHtml(data.firstName)} ${escapeHtml(data.lastName)}</p>`,
     `<p><strong>Email:</strong> <a href="mailto:${escapeHtml(data.email)}">${escapeHtml(data.email)}</a></p>`,
     `<p><strong>Phone:</strong> ${escapeHtml(data.phone)}</p>`,
     `<p><strong>Position:</strong> ${escapeHtml(data.position)}</p>`,
-    `<p><strong>Salary expectation:</strong> ${escapeHtml(formatSalaryAud(data.salaryExpectation))}</p>`,
-    `<p><strong>Resume:</strong> <a href="${escapeHtml(resumeAbsoluteUrl)}">${escapeHtml(resumeAbsoluteUrl)}</a></p>`,
+    `<p><strong>Country:</strong> ${escapeHtml(data.country)}</p>`,
+    `<p><strong>Visa status:</strong> ${escapeHtml(data.visaStatus)}</p>`,
+    `<p><strong>Salary expectation:</strong> ${escapeHtml(data.salaryExpectationLabel)}</p>`,
+    `<p><strong>Documents:</strong></p><ul>${documentLinks}</ul>`,
   ];
   if (data.message?.trim()) {
     lines.push(`<p><strong>Message:</strong></p><p>${escapeHtml(data.message.trim())}</p>`);
@@ -68,7 +71,6 @@ export async function sendCareerApplicationEmail(data: CareerApplicationEmailDat
     throw new Error("RESEND_API_KEY is not configured");
   }
 
-  const resumeAbsoluteUrl = buildResumeAbsoluteUrl(data.resumeUrl);
   const applicantName = `${data.firstName} ${data.lastName}`.trim();
 
   const { error } = await resend.emails.send({
@@ -76,7 +78,7 @@ export async function sendCareerApplicationEmail(data: CareerApplicationEmailDat
     to: [getHrEmail()],
     replyTo: data.email,
     subject: `New career application: ${data.position} — ${applicantName}`,
-    html: buildEmailHtml(data, resumeAbsoluteUrl),
+    html: buildEmailHtml(data),
   });
 
   if (error) {

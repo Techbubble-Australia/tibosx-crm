@@ -7,6 +7,7 @@ import {
   parseJobLocations,
   syncLegacyLocationFields,
 } from "../lib/job-locations";
+import { JOB_LISTING_TYPES } from "../lib/careers-form";
 
 const router: IRouter = Router();
 
@@ -18,6 +19,7 @@ const jobSchema = z.object({
   flag: z.string().min(1).optional(),
   locations: z.array(jobLocationEntrySchema).min(1).optional(),
   type: z.string().min(1),
+  listingType: z.enum(JOB_LISTING_TYPES).default("Internal"),
   workMode: z.string().min(1),
   category: z.string().min(1, "Category is required"),
   technology: z.string().min(1, "Technology is required"),
