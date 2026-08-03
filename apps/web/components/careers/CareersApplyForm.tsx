@@ -21,6 +21,16 @@ type CareersApplyFormProps = {
   jobs: JobApiRow[];
 };
 
+function readFormString(formData: FormData, key: string): string {
+  const value = formData.get(key);
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function readOptionalMessage(formData: FormData): string | undefined {
+  const value = readFormString(formData, "message");
+  return value.length > 0 ? value : undefined;
+}
+
 function buildJobApplyOptions(jobs: JobApiRow[]): JobApplyOption[] {
   return jobs.map((job) => {
     const entries = normalizeJobLocations(job);
@@ -114,19 +124,23 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
       }
 
       const payload = {
-        firstName: formData.get("firstName"),
-        lastName: formData.get("lastName"),
-        email: formData.get("email"),
-        phone: formData.get("phone"),
-        position: formData.get("position"),
+        firstName: readFormString(formData, "firstName"),
+        lastName: readFormString(formData, "lastName"),
+        email: readFormString(formData, "email"),
+        phone: readFormString(formData, "phone"),
+        position: position.trim(),
         country: country.trim(),
-        visaStatus: formData.get("visaStatus"),
-        salaryCurrency: formData.get("salaryCurrency"),
+        visaStatus: readFormString(formData, "visaStatus"),
+        salaryCurrency: readFormString(formData, "salaryCurrency"),
         salaryRate,
-        salaryMode: formData.get("salaryMode"),
+        salaryMode: readFormString(formData, "salaryMode"),
         documentUrls,
-        message: formData.get("message") || undefined,
+        message: readOptionalMessage(formData),
       };
+
+      if (!payload.position) {
+        throw new Error("Position is required");
+      }
 
       const res = await fetch("/api/careers/apply", {
         method: "POST",
@@ -203,13 +217,14 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
         className={fieldClass}
       />
 
+      <input type="hidden" name="position" value={position} />
       <select
-        name="position"
-        required
+        required={!positionLocked}
         value={position}
         onChange={(e) => !positionLocked && handlePositionChange(e.target.value)}
         disabled={positionLocked}
         className={`${fieldClass} appearance-none ${positionLocked ? "cursor-default opacity-90" : ""}`}
+        aria-label="Position"
       >
         <option value="" disabled className="bg-[#111111] text-white/60">
           Select a position *

@@ -30,7 +30,10 @@ const careerSchema = z.object({
   salaryRate: z.coerce.number().int().positive("Salary rate is required"),
   salaryMode: z.enum(SALARY_MODES, { message: "Salary mode is required" }),
   documentUrls: z.array(z.string().min(1)).min(1, "At least one document is required"),
-  message: z.string().optional(),
+  message: z.preprocess(
+    (v) => (v === null || v === undefined || v === "" ? undefined : String(v)),
+    z.string().optional(),
+  ),
 });
 
 function makeStoredFilename(fieldname: string, originalname: string): string {
@@ -74,7 +77,12 @@ const documentUpload = multer({
 });
 
 function formatZodError(error: z.ZodError): string {
-  return error.errors.map((e) => e.message).join(". ");
+  return error.errors
+    .map((e) => {
+      const path = e.path.length > 0 ? `${e.path.join(".")}: ` : "";
+      return `${path}${e.message}`;
+    })
+    .join(". ");
 }
 
 router.post("/upload-resume", documentUpload.single("resume"), async (req, res, next) => {
