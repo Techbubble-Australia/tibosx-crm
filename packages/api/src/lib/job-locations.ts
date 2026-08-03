@@ -108,6 +108,7 @@ export function normalizeJobLocations(job: JobLocationLegacyFields): JobLocation
       country: country || location,
       flag,
       label: location && location !== country ? location : "",
+      cities: [],
     }),
   ];
 }

@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
-import type { CaseStudyCategoryRow } from "@/components/case-study/CaseStudyCategorySelect";
+
+type CaseStudyCategoryRow = {
+  id: string;
+  name: string;
+  order: number;
+  subcategories: { id: string; name: string; order: number }[];
+};
 
 export default function CaseStudyCategoriesPage() {
   const [categories, setCategories] = useState<CaseStudyCategoryRow[]>([]);

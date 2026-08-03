@@ -16,7 +16,7 @@ import { sendCareerApplicationEmail } from "../lib/mail";
 
 const router: IRouter = Router();
 
-const currencyCodes = SALARY_CURRENCIES.map((c) => c.code);
+const salaryCurrencyCodes = SALARY_CURRENCIES.map((c) => c.code) as [string, ...string[]];
 
 const careerSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -26,7 +26,7 @@ const careerSchema = z.object({
   position: z.string().min(1, "Position is required"),
   country: z.string().min(1, "Country is required"),
   visaStatus: z.string().min(1, "Visa status is required"),
-  salaryCurrency: z.string().refine((v) => currencyCodes.includes(v), "Currency is required"),
+  salaryCurrency: z.enum(salaryCurrencyCodes, { message: "Currency is required" }),
   salaryRate: z.coerce.number().int().positive("Salary rate is required"),
   salaryMode: z.enum(SALARY_MODES, { message: "Salary mode is required" }),
   documentUrls: z.array(z.string().min(1)).min(1, "At least one document is required"),
