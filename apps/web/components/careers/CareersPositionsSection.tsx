@@ -10,6 +10,7 @@ import {
   jobMatchesLocationFilter,
   normalizeJobLocations,
 } from "@/lib/job-locations";
+import { JobCategoryTechnology } from "@/components/careers/JobCategoryTechnology";
 import { JobLocationFlags } from "@/components/careers/JobLocationFlags";
 import { SectionPill } from "@/components/ui/SectionPill";
 
@@ -119,9 +120,6 @@ export function CareersPositionsSection({ jobs }: { jobs: JobApiRow[] }) {
                 .map((e) => formatLocationEntryDisplay(e))
                 .filter(Boolean)
                 .join(" · ");
-              const categoryTech = [position.category?.trim(), position.technology?.trim()]
-                .filter(Boolean)
-                .join(" - ");
               return (
                 <Link
                   key={position.slug}
@@ -153,11 +151,10 @@ export function CareersPositionsSection({ jobs }: { jobs: JobApiRow[] }) {
                     <p className="text-[13px] font-medium leading-5 text-[#666666] dark:text-zinc-400">
                       {formatType(position.type)} · {formatType(position.workMode)}
                     </p>
-                    {categoryTech ? (
-                      <p className="text-[12px] font-semibold uppercase tracking-wide text-[#111111] dark:text-zinc-200">
-                        {categoryTech}
-                      </p>
-                    ) : null}
+                    <JobCategoryTechnology
+                      category={position.category}
+                      technology={position.technology}
+                    />
                   </div>
                 </Link>
               );

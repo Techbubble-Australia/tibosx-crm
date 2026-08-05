@@ -59,7 +59,8 @@ export function JobLocationsField({ value, onChange, inputClass, labelClass }: P
       <div>
         <label className={labelClass}>Locations *</label>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Select a country, then choose one or more cities. If no city is selected, the country name is shown on job cards.
+          Use one row per country. Select multiple cities in that row when needed. Use &quot;Add country&quot; only for a
+          different country (e.g. Australia and India). If no city is selected, the country name is shown on job cards.
         </p>
       </div>
 
@@ -83,11 +84,15 @@ export function JobLocationsField({ value, onChange, inputClass, labelClass }: P
                   aria-label={`Country ${index + 1}`}
                 >
                   <option value="">Select country…</option>
-                  {options.map((o) => (
-                    <option key={o.code} value={o.code}>
-                      {o.flag} {o.name}
-                    </option>
-                  ))}
+                  {options.map((o) => {
+                    const usedElsewhere = rows.some((r, i) => i !== index && r.countryCode === o.code);
+                    return (
+                      <option key={o.code} value={o.code} disabled={usedElsewhere}>
+                        {o.flag} {o.name}
+                        {usedElsewhere ? " (already added)" : ""}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div className="flex items-end">

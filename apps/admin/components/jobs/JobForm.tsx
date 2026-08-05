@@ -136,6 +136,14 @@ export function JobForm({
       alert("Add at least one country for this role.");
       return;
     }
+    const countryCodes = validLocations.map((row) => row.countryCode.trim().toLowerCase());
+    const duplicateCountry = countryCodes.find((code, index) => countryCodes.indexOf(code) !== index);
+    if (duplicateCountry) {
+      alert(
+        "Each country should appear only once. Remove the duplicate row and select all cities for that country in a single row.",
+      );
+      return;
+    }
     if (!category.trim()) {
       alert("Category is required.");
       return;

@@ -6,6 +6,7 @@ import { JobDescription } from "@/components/careers/JobDescription";
 import { JobDetailActions } from "@/components/careers/JobDetailActions";
 import { JobLocationFlags } from "@/components/careers/JobLocationFlags";
 import { normalizeJobLocations, formatLocationEntryDisplay } from "@/lib/job-locations";
+import { formatJobCategoryTechnology } from "@/lib/job-taxonomy";
 
 function formatType(s: string): string {
   const t = s.trim();
@@ -25,7 +26,7 @@ export default async function CareerJobDetailPage({ params }: { params: { slug: 
     .filter(Boolean)
     .join(" · ");
   const meta = [locationText, formatType(job.type), formatType(job.workMode)].filter(Boolean).join(" · ");
-  const categoryTech = [job.category?.trim(), job.technology?.trim()].filter(Boolean).join(" - ");
+  const categoryTech = formatJobCategoryTechnology(job.category, job.technology);
   const eyebrow = [job.referenceNumber, categoryTech].filter(Boolean).join(" · ");
 
   return (
