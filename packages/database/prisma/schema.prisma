@@ -259,7 +259,7 @@ model JobListing {
   /// [{ countryCode, country, flag, label?, cities? }] — multi-country roles; when set, drives public display.
   locations       Json?
   type            String    // full-time | contract | part-time (employment type)
-  /// Internal | External for Client — shown on public job cards
+  /// Internal | External for Client — admin-only; never exposed on the public site
   listingType     String    @default("Internal")
   workMode        String    // remote | hybrid | onsite
   category        String

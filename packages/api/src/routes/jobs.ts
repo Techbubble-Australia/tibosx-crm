@@ -66,22 +66,55 @@ function prepareJobWriteData(body: z.infer<typeof jobSchema>): Record<string, un
   };
 }
 
-function serializeJob(job: JobListing, options?: { includeClient?: boolean }) {
+function serializePublicJob(job: JobListing) {
   const locations = normalizeJobLocations(job);
   const legacy = syncLegacyLocationFields(locations);
-  const { clientId, ...rest } = job;
-  const base = {
-    ...rest,
+  return {
+    slug: job.slug,
+    referenceNumber: job.referenceNumber,
+    title: job.title,
     location: legacy.location,
     country: legacy.country,
     flag: legacy.flag,
     locations,
+    type: job.type,
+    workMode: job.workMode,
+    category: job.category,
+    technology: job.technology,
+    department: job.department,
+    description: job.description,
     likeCount: job.likeCount ?? 0,
+    published: job.published,
+    order: job.order,
   };
-  if (options?.includeClient) {
-    return { ...base, clientId };
-  }
-  return base;
+}
+
+function serializeAdminJob(job: JobListing) {
+  const locations = normalizeJobLocations(job);
+  const legacy = syncLegacyLocationFields(locations);
+  return {
+    id: job.id,
+    slug: job.slug,
+    referenceNumber: job.referenceNumber,
+    title: job.title,
+    location: legacy.location,
+    country: legacy.country,
+    flag: legacy.flag,
+    locations,
+    type: job.type,
+    listingType: job.listingType,
+    workMode: job.workMode,
+    category: job.category,
+    technology: job.technology,
+    department: job.department,
+    clientId: job.clientId,
+    description: job.description,
+    likeCount: job.likeCount ?? 0,
+    published: job.published,
+    order: job.order,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+  };
 }
 
 function mergeJobUpdate(
@@ -119,7 +152,7 @@ router.get("/", async (_req, res) => {
       where: { published: true },
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
     });
-    res.json({ data: jobs.map((job: JobListing) => serializeJob(job)) });
+    res.json({ data: jobs.map((job: JobListing) => serializePublicJob(job)) });
   } catch (error) {
     console.error("Error fetching jobs:", error);
     res.status(500).json({ error: "Failed to fetch jobs" });
@@ -132,7 +165,7 @@ router.get("/admin/all", async (_req, res) => {
     const jobs = await prisma.jobListing.findMany({
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
     });
-    res.json({ data: jobs.map((job: JobListing) => serializeJob(job, { includeClient: true })) });
+    res.json({ data: jobs.map((job: JobListing) => serializeAdminJob(job)) });
   } catch (error) {
     console.error("Error fetching jobs:", error);
     res.status(500).json({ error: "Failed to fetch jobs" });
@@ -183,7 +216,7 @@ router.get("/:slug", async (req, res) => {
     if (!job || !job.published) {
       return res.status(404).json({ error: "Job not found" });
     }
-    res.json({ data: serializeJob(job) });
+    res.json({ data: serializePublicJob(job) });
   } catch (error) {
     console.error("Error fetching job:", error);
     res.status(500).json({ error: "Failed to fetch job" });
@@ -199,7 +232,7 @@ router.post("/", async (req, res) => {
     const job = await prisma.jobListing.create({
       data: { ...writeData, referenceNumber } as Prisma.JobListingCreateInput,
     });
-    res.status(201).json({ data: serializeJob(job, { includeClient: true }) });
+    res.status(201).json({ data: serializeAdminJob(job) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
@@ -223,7 +256,7 @@ router.put("/:id", async (req, res) => {
       where: { id: req.params.id },
       data: writeData as Prisma.JobListingUpdateInput,
     });
-    res.json({ data: serializeJob(job, { includeClient: true }) });
+    res.json({ data: serializeAdminJob(job) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });

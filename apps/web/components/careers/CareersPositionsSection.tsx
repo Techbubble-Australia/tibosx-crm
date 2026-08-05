@@ -122,7 +122,6 @@ export function CareersPositionsSection({ jobs }: { jobs: JobApiRow[] }) {
               const categoryTech = [position.category?.trim(), position.technology?.trim()]
                 .filter(Boolean)
                 .join(" - ");
-              const listingType = (position.listingType || "Internal").trim();
               return (
                 <Link
                   key={position.slug}
@@ -157,11 +156,6 @@ export function CareersPositionsSection({ jobs }: { jobs: JobApiRow[] }) {
                     {categoryTech ? (
                       <p className="text-[12px] font-semibold uppercase tracking-wide text-[#111111] dark:text-zinc-200">
                         {categoryTech}
-                      </p>
-                    ) : null}
-                    {listingType ? (
-                      <p className="text-[12px] font-medium uppercase tracking-wide text-[#999] dark:text-zinc-500">
-                        {listingType}
                       </p>
                     ) : null}
                   </div>

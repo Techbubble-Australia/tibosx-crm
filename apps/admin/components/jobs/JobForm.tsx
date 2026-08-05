@@ -48,6 +48,27 @@ const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
 const labelClass = "mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100";
 
+/** Public job-card placement — must not be used as department or client. */
+const JOB_LISTING_TYPE_OPTIONS = ["Internal", "External for Client"] as const;
+
+function isListingTypeValue(value: string): value is (typeof JOB_LISTING_TYPE_OPTIONS)[number] {
+  return (JOB_LISTING_TYPE_OPTIONS as readonly string[]).includes(value);
+}
+
+function resolveListingFields(defaults: JobFormDefaults): { listingType: string; department: string } {
+  let listingType = defaults.listingType?.trim() || "Internal";
+  let department = defaults.department?.trim() ?? "";
+
+  if (department && isListingTypeValue(department)) {
+    if (!defaults.listingType || defaults.listingType === "Internal") {
+      listingType = department;
+    }
+    department = "";
+  }
+
+  return { listingType, department };
+}
+
 export function JobForm({
   mode,
   defaults = {},
@@ -64,10 +85,14 @@ export function JobForm({
   const [taxonomyReady, setTaxonomyReady] = useState(false);
   const [description, setDescription] = useState(defaults.description ?? "");
   const [locations, setLocations] = useState<JobLocationEntry[]>(() => jobLocationsFromDefaults(defaults));
+  const initialListing = resolveListingFields(defaults);
   const [category, setCategory] = useState(defaults.category ?? "");
   const [technology, setTechnology] = useState(defaults.technology ?? "");
-  const [department, setDepartment] = useState(defaults.department ?? "");
+  const [department, setDepartment] = useState(initialListing.department);
+  const [listingType, setListingType] = useState(initialListing.listingType);
   const [clientId, setClientId] = useState(defaults.clientId ?? "");
+
+  const departmentOptions = departments.filter((d) => !isListingTypeValue(d.name));
 
   useEffect(() => {
     async function loadTaxonomy() {
@@ -98,9 +123,11 @@ export function JobForm({
   useEffect(() => {
     if (defaults.category) setCategory(defaults.category);
     if (defaults.technology) setTechnology(defaults.technology);
-    if (defaults.department) setDepartment(defaults.department);
     if (defaults.clientId) setClientId(defaults.clientId);
-  }, [defaults.category, defaults.technology, defaults.department, defaults.clientId]);
+    const resolved = resolveListingFields(defaults);
+    setListingType(resolved.listingType);
+    setDepartment(resolved.department);
+  }, [defaults.category, defaults.technology, defaults.department, defaults.clientId, defaults.listingType]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -118,7 +145,11 @@ export function JobForm({
       return;
     }
     if (!department.trim()) {
-      alert("Department is required.");
+      alert("Department is required (e.g. Technology, Engineering). Use Listing type for Internal / External for Client.");
+      return;
+    }
+    if (isListingTypeValue(department)) {
+      alert('Use the "Listing type" field for Internal or External for Client — not Department.');
       return;
     }
     if (!clientId.trim()) {
@@ -135,7 +166,7 @@ export function JobForm({
         label: "",
       })),
       type: formData.get("type"),
-      listingType: formData.get("listingType"),
+      listingType,
       workMode: formData.get("workMode"),
       category,
       technology,
@@ -186,7 +217,7 @@ export function JobForm({
           labelClass={labelClass}
         />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className={labelClass}>Employment Type *</label>
             <select name="type" required defaultValue={defaults.type ?? "Full-time"} className={inputClass}>
@@ -194,6 +225,7 @@ export function JobForm({
               <option value="Contract">Contract</option>
               <option value="Part-time">Part-time</option>
             </select>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Contract, full-time, etc.</p>
           </div>
           <div>
             <label className={labelClass}>Work Mode *</label>
@@ -203,22 +235,25 @@ export function JobForm({
               <option value="Onsite">Onsite</option>
             </select>
           </div>
-        </div>
-
-        <div>
-          <label className={labelClass}>Type *</label>
-          <select
-            name="listingType"
-            required
-            defaultValue={defaults.listingType ?? "Internal"}
-            className={inputClass}
-          >
-            <option value="Internal">Internal</option>
-            <option value="External for Client">External for Client</option>
-          </select>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Shown on public job cards (Internal vs External for Client).
-          </p>
+          <div className="sm:col-span-2 lg:col-span-1">
+            <label className={labelClass}>Listing type *</label>
+            <select
+              name="listingType"
+              required
+              value={listingType}
+              onChange={(e) => setListingType(e.target.value)}
+              className={inputClass}
+            >
+              {JOB_LISTING_TYPE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Shown on public job cards. Not the same as Department or Client.
+            </p>
+          </div>
         </div>
 
         {taxonomyReady ? (
@@ -288,16 +323,17 @@ export function JobForm({
                   className={inputClass}
                 >
                   <option value="">Select department…</option>
-                  {departments.map((d) => (
+                  {departmentOptions.map((d) => (
                     <option key={d.id} value={d.name}>
                       {d.name}
                     </option>
                   ))}
-                  {department && !departments.some((d) => d.name === department) ? (
+                  {department && !departmentOptions.some((d) => d.name === department) ? (
                     <option value={department}>{department} (current)</option>
                   ) : null}
                 </select>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Team or function (e.g. Technology). For Internal / External for Client, use Listing type above.{" "}
                   <Link href="/settings/departments" className="underline hover:text-gray-700 dark:hover:text-gray-300">
                     Manage departments
                   </Link>
@@ -324,7 +360,7 @@ export function JobForm({
                   ) : null}
                 </select>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Internal only — not shown on the public careers site.{" "}
+                  Hiring organisation (admin only). Not the same as Listing type.{" "}
                   <Link href="/clients" className="underline hover:text-gray-700 dark:hover:text-gray-300">
                     Manage clients
                   </Link>

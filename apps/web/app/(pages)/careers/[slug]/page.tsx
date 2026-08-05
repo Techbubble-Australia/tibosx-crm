@@ -26,8 +26,7 @@ export default async function CareerJobDetailPage({ params }: { params: { slug: 
     .join(" · ");
   const meta = [locationText, formatType(job.type), formatType(job.workMode)].filter(Boolean).join(" · ");
   const categoryTech = [job.category?.trim(), job.technology?.trim()].filter(Boolean).join(" - ");
-  const listingType = (job.listingType || "Internal").trim();
-  const eyebrow = [job.referenceNumber, categoryTech, listingType].filter(Boolean).join(" · ");
+  const eyebrow = [job.referenceNumber, categoryTech].filter(Boolean).join(" · ");
 
   return (
     <main className="min-h-[60vh] bg-white dark:bg-neutral-950">
