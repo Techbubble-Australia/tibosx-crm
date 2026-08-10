@@ -14,11 +14,11 @@ const categoryDefs = [
 ];
 
 const technologyDefs = [
-  { name: "ServiceNow", order: 0 },
-  { name: "Salesforce", order: 1 },
-  { name: "Microsoft", order: 2 },
-  { name: "Azure", order: 3 },
-  { name: "AI/ML", order: 4 },
+  { name: "ServiceNow", categoryName: "ServiceNow", order: 0 },
+  { name: "Salesforce", categoryName: "Salesforce", order: 1 },
+  { name: "Microsoft", categoryName: "Microsoft", order: 2 },
+  { name: "Azure", categoryName: "Microsoft", order: 3 },
+  { name: "AI/ML", categoryName: "Engineering", order: 4 },
 ];
 
 const departmentDefs = [{ name: "Engineering", order: 0 }];
@@ -31,10 +31,18 @@ async function seedJobTaxonomies() {
       update: { order: c.order },
     });
   }
+
+  const categories = await prisma.jobCategory.findMany();
+  const categoryIdByName = new Map(categories.map((category) => [category.name, category.id]));
+
   for (const t of technologyDefs) {
+    const categoryId = categoryIdByName.get(t.categoryName);
+    if (!categoryId) {
+      continue;
+    }
     await prisma.jobTechnology.upsert({
-      where: { name: t.name },
-      create: { name: t.name, order: t.order },
+      where: { categoryId_name: { categoryId, name: t.name } },
+      create: { name: t.name, categoryId, order: t.order },
       update: { order: t.order },
     });
   }
@@ -50,8 +58,15 @@ async function seedJobTaxonomies() {
 async function seedDefaultClient() {
   await prisma.client.upsert({
     where: { id: DEFAULT_CLIENT_ID },
-    create: { id: DEFAULT_CLIENT_ID, name: "Internal", order: 0, active: true },
-    update: { name: "Internal", active: true },
+    create: {
+      id: DEFAULT_CLIENT_ID,
+      name: "Internal",
+      website: "",
+      country: "Australia",
+      order: 0,
+      active: true,
+    },
+    update: { name: "Internal", country: "Australia", active: true },
   });
 }
 
