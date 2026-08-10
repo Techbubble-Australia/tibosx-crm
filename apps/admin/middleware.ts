@@ -2,11 +2,19 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { ADMIN_SESSION_COOKIE } from "@/lib/auth-cookie";
+import { MFA_SETUP_REQUIRED_PURPOSE } from "@/lib/auth-constants";
+import { defaultLandingPath } from "@/lib/admin-roles";
 
 function jwtSecretKey() {
   return new TextEncoder().encode(
     process.env.JWT_SECRET || "your-secret-key-change-in-production",
   );
+}
+
+const MFA_SETUP_PATH = "/settings/security";
+
+function isMfaSetupPath(pathname: string): boolean {
+  return pathname === MFA_SETUP_PATH || pathname.startsWith(`${MFA_SETUP_PATH}/`);
 }
 
 export async function middleware(request: NextRequest) {
@@ -16,8 +24,13 @@ export async function middleware(request: NextRequest) {
     const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
     if (token) {
       try {
-        await jwtVerify(token, jwtSecretKey());
-        return NextResponse.redirect(new URL("/case-studies", request.url));
+        const { payload } = await jwtVerify(token, jwtSecretKey());
+        const purpose = typeof payload.purpose === "string" ? payload.purpose : undefined;
+        if (purpose === MFA_SETUP_REQUIRED_PURPOSE) {
+          return NextResponse.redirect(new URL(`${MFA_SETUP_PATH}?mfa=required`, request.url));
+        }
+        const role = typeof payload.role === "string" ? payload.role : "website";
+        return NextResponse.redirect(new URL(defaultLandingPath(role), request.url));
       } catch {
         const res = NextResponse.next();
         res.cookies.delete(ADMIN_SESSION_COOKIE);
@@ -33,7 +46,11 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    await jwtVerify(token, jwtSecretKey());
+    const { payload } = await jwtVerify(token, jwtSecretKey());
+    const purpose = typeof payload.purpose === "string" ? payload.purpose : undefined;
+    if (purpose === MFA_SETUP_REQUIRED_PURPOSE && !isMfaSetupPath(pathname)) {
+      return NextResponse.redirect(new URL(`${MFA_SETUP_PATH}?mfa=required`, request.url));
+    }
     return NextResponse.next();
   } catch {
     const res = NextResponse.redirect(new URL("/login", request.url));

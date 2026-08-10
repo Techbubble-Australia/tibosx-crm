@@ -7,6 +7,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-producti
 export const ADMIN_SESSION_COOKIE = "admin_session";
 
 export const MFA_PENDING_PURPOSE = "mfa_pending";
+export const MFA_SETUP_REQUIRED_PURPOSE = "mfa_setup_required";
 
 export interface AuthUser {
   id: string;
@@ -16,6 +17,7 @@ export interface AuthUser {
 
 export interface AuthRequest extends Request {
   user?: AuthUser;
+  mfaSetupRequired?: boolean;
 }
 
 interface JwtPayload extends AuthUser {
@@ -59,6 +61,7 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
       return res.status(401).json({ error: "Unauthorized: MFA verification required" });
     }
     req.user = { id: decoded.id, email: decoded.email, role: decoded.role };
+    req.mfaSetupRequired = decoded.purpose === MFA_SETUP_REQUIRED_PURPOSE;
     next();
   } catch {
     return res.status(401).json({ error: "Unauthorized: Invalid token" });
@@ -71,6 +74,10 @@ export const generateToken = (payload: AuthUser) => {
 
 export const generateMfaPendingToken = (payload: AuthUser) => {
   return jwt.sign({ ...payload, purpose: MFA_PENDING_PURPOSE }, JWT_SECRET, { expiresIn: "5m" });
+};
+
+export const generateMfaSetupRequiredToken = (payload: AuthUser) => {
+  return jwt.sign({ ...payload, purpose: MFA_SETUP_REQUIRED_PURPOSE }, JWT_SECRET, { expiresIn: "2h" });
 };
 
 export function verifyMfaPendingToken(token: string): AuthUser | null {

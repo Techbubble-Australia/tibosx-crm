@@ -25,6 +25,7 @@ import { clientRoutes } from "./routes/clients";
 import { profileRoutes } from "./routes/profiles";
 import { adminUserRoutes } from "./routes/adminUsers";
 import { authMiddleware } from "./middleware/auth";
+import { requireMfaEnrolled } from "./middleware/requireMfaEnrolled";
 import { requireRole, requireModule, blockModuleMutations } from "./middleware/requireRole";
 
 dotenv.config();
@@ -71,10 +72,8 @@ app.use("/api/testimonials", testimonialPublicRoutes);
 app.use("/api/faqs", faqRoutes);
 app.use("/api/site-content", siteContentPublicRoutes);
 
-// Protected routes (module-scoped)
-const websiteWrite = [authMiddleware, blockModuleMutations("website")];
-const recruitmentWrite = [authMiddleware, blockModuleMutations("recruitment")];
-const salesWrite = [authMiddleware, blockModuleMutations("sales")];
+// Protected routes (module-scoped; MFA enrollment required)
+const websiteWrite = [authMiddleware, requireMfaEnrolled, blockModuleMutations("website")];
 
 app.use("/api/admin/case-studies", ...websiteWrite, caseStudyPreviewRouter);
 app.use("/api/admin/case-studies", ...websiteWrite, caseStudyRoutes);
@@ -87,11 +86,11 @@ app.use("/api/admin/team", ...websiteWrite, teamRoutes);
 app.use("/api/admin/testimonials", ...websiteWrite, testimonialAdminRoutes);
 app.use("/api/admin/faqs", ...websiteWrite, faqRoutes);
 app.use("/api/admin/site-content", ...websiteWrite, siteContentAdminRoutes);
-app.use("/api/admin/career-applications", authMiddleware, requireModule("recruitment"), careerRoutes);
-app.use("/api/admin/profiles", authMiddleware, requireModule("recruitment"), profileRoutes);
-app.use("/api/admin/contact-submissions", authMiddleware, requireModule("website"), contactRoutes);
-app.use("/api/admin/clients", authMiddleware, requireModule("sales"), clientRoutes);
-app.use("/api/admin/users", authMiddleware, requireRole("admin"), adminUserRoutes);
+app.use("/api/admin/career-applications", authMiddleware, requireMfaEnrolled, requireModule("recruitment"), careerRoutes);
+app.use("/api/admin/profiles", authMiddleware, requireMfaEnrolled, requireModule("recruitment"), profileRoutes);
+app.use("/api/admin/contact-submissions", authMiddleware, requireMfaEnrolled, requireModule("website"), contactRoutes);
+app.use("/api/admin/clients", authMiddleware, requireMfaEnrolled, requireModule("sales"), clientRoutes);
+app.use("/api/admin/users", authMiddleware, requireMfaEnrolled, requireRole("admin"), adminUserRoutes);
 app.use("/api/upload", ...websiteWrite, uploadRoutes);
 
 // Error handler

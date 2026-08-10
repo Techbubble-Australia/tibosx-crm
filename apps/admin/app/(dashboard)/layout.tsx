@@ -26,6 +26,7 @@ import {
   Target,
 } from "lucide-react";
 import { AdminSessionProvider, useAdminSession } from "@/contexts/AdminSessionContext";
+import { MfaEnrollmentGuard } from "@/components/MfaEnrollmentGuard";
 import { roleLabel } from "@/lib/admin-roles";
 
 type NavItem = {
@@ -243,7 +244,9 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <AdminSessionProvider>
-      <DashboardChrome>{children}</DashboardChrome>
+      <MfaEnrollmentGuard>
+        <DashboardChrome>{children}</DashboardChrome>
+      </MfaEnrollmentGuard>
     </AdminSessionProvider>
   );
 }

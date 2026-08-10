@@ -40,6 +40,15 @@ export async function POST(req: Request) {
     });
   }
 
+  if (data?.data?.requiresMfaSetup && typeof data?.data?.token === "string") {
+    const response = NextResponse.json({
+      requiresMfaSetup: true,
+      user: data.data.user,
+    });
+    response.cookies.set(ADMIN_SESSION_COOKIE, data.data.token, sessionCookieOptions());
+    return response;
+  }
+
   const token = data?.data?.token;
   if (typeof token !== "string") {
     return NextResponse.json({ error: "Invalid login response" }, { status: 502 });

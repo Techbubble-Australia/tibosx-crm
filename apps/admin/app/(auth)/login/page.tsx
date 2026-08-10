@@ -50,7 +50,12 @@ export default function LoginPage() {
         return;
       }
 
-      window.location.assign(defaultLandingPath(data?.data?.user?.role ?? "website"));
+      if (data.requiresMfaSetup) {
+        window.location.assign("/settings/security?mfa=required");
+        return;
+      }
+
+      window.location.assign(defaultLandingPath(data?.user?.role ?? "website"));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -80,7 +85,7 @@ export default function LoginPage() {
         throw new Error(typeof data.error === "string" ? data.error : "MFA verification failed");
       }
 
-      window.location.assign(defaultLandingPath(data?.data?.user?.role ?? "website"));
+      window.location.assign(defaultLandingPath(data?.user?.role ?? "website"));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "MFA verification failed");
     } finally {

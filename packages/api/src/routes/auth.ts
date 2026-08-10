@@ -6,6 +6,7 @@ import {
   authMiddleware,
   generateToken,
   generateMfaPendingToken,
+  generateMfaSetupRequiredToken,
   verifyMfaPendingToken,
   type AuthRequest,
 } from "../middleware/auth";
@@ -28,10 +29,6 @@ const mfaCodeSchema = z.object({
 
 const mfaVerifyLoginSchema = mfaCodeSchema.extend({
   mfaToken: z.string().min(1),
-});
-
-const mfaDisableSchema = mfaCodeSchema.extend({
-  password: z.string().min(1),
 });
 
 function publicUser(user: { id: string; email: string; role: string; mfaEnabled: boolean }) {
@@ -76,16 +73,17 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    const token = generateToken({
+    const setupToken = generateMfaSetupRequiredToken({
       id: user.id,
       email: user.email,
       role: user.role,
     });
 
-    res.json({
-      message: "Login successful",
+    return res.json({
+      message: "MFA setup required",
       data: {
-        token,
+        requiresMfaSetup: true,
+        token: setupToken,
         user: publicUser(user),
       },
     });
@@ -239,12 +237,23 @@ router.post("/mfa/confirm", authMiddleware, async (req: AuthRequest, res) => {
         mfaEnabled: true,
         mfaEnrolledAt: new Date(),
       },
-      select: { mfaEnabled: true, mfaEnrolledAt: true },
+      select: { id: true, email: true, role: true, mfaEnabled: true, mfaEnrolledAt: true },
+    });
+
+    const token = generateToken({
+      id: updated.id,
+      email: updated.email,
+      role: updated.role,
     });
 
     res.json({
       message: "MFA enabled",
       data: {
+        token,
+        user: {
+          ...publicUser(updated),
+          mfaEnrolledAt: updated.mfaEnrolledAt?.toISOString() ?? null,
+        },
         mfaEnabled: updated.mfaEnabled,
         mfaEnrolledAt: updated.mfaEnrolledAt?.toISOString() ?? null,
       },
@@ -259,47 +268,10 @@ router.post("/mfa/confirm", authMiddleware, async (req: AuthRequest, res) => {
 });
 
 router.post("/mfa/disable", authMiddleware, async (req: AuthRequest, res) => {
-  try {
-    const u = req.user;
-    if (!u) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const { password, code } = mfaDisableSchema.parse(req.body);
-    const user = await prisma.adminUser.findUnique({ where: { id: u.id } });
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const validPassword = await bcrypt.compare(password, user.passwordHash);
-    if (!validPassword) {
-      return res.status(401).json({ error: "Invalid password" });
-    }
-
-    if (user.mfaEnabled && user.totpSecretEnc) {
-      const validCode = await verifyUserTotpCode(user.totpSecretEnc, code);
-      if (!validCode) {
-        return res.status(401).json({ error: "Invalid verification code" });
-      }
-    }
-
-    await prisma.adminUser.update({
-      where: { id: user.id },
-      data: {
-        mfaEnabled: false,
-        totpSecretEnc: null,
-        mfaEnrolledAt: null,
-      },
-    });
-
-    res.json({ message: "MFA disabled" });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: "Validation error", details: error.errors });
-    }
-    console.error("MFA disable error:", error);
-    res.status(500).json({ error: "Failed to disable MFA" });
-  }
+  return res.status(403).json({
+    error: "MFA cannot be disabled. Two-factor authentication is required for all TBOS users.",
+    code: "MFA_MANDATORY",
+  });
 });
 
 export { router as authRoutes };

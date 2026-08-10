@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
-import { Loader2, ShieldCheck, ShieldOff } from "lucide-react";
+import { Loader2, ShieldCheck } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
+import { defaultLandingPath } from "@/lib/admin-roles";
 
 type MfaStatus = {
   mfaEnabled: boolean;
@@ -15,17 +17,33 @@ type SetupPayload = {
   secret: string;
 };
 
-export default function SecuritySettingsPage() {
+export default function SecuritySettingsPageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        </div>
+      }
+    >
+      <SecuritySettingsPage />
+    </Suspense>
+  );
+}
+
+function SecuritySettingsPage() {
+  const searchParams = useSearchParams();
+  const mfaRequired = searchParams.get("mfa") === "required";
+
   const [status, setStatus] = useState<MfaStatus | null>(null);
   const [setup, setSetup] = useState<SetupPayload | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [confirmCode, setConfirmCode] = useState("");
-  const [disablePassword, setDisablePassword] = useState("");
-  const [disableCode, setDisableCode] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [autoSetupStarted, setAutoSetupStarted] = useState(false);
 
   async function loadStatus() {
     setIsLoading(true);
@@ -84,57 +102,34 @@ export default function SecuritySettingsPage() {
     }
   }
 
+  useEffect(() => {
+    if (isLoading || autoSetupStarted || status?.mfaEnabled) {
+      return;
+    }
+    setAutoSetupStarted(true);
+    void startSetup();
+  }, [isLoading, autoSetupStarted, status?.mfaEnabled]);
+
   async function confirmSetup(e: React.FormEvent) {
     e.preventDefault();
     setIsSubmitting(true);
     setError("");
     setMessage("");
     try {
-      const res = await adminFetch("/api/auth/mfa/confirm", {
+      const res = await fetch("/api/auth/mfa/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ code: confirmCode.replace(/\s/g, "") }),
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "Failed to enable MFA");
       }
-      setSetup(null);
-      setConfirmCode("");
-      setMessage("Two-factor authentication is now enabled.");
-      await loadStatus();
+      const role = typeof data?.user?.role === "string" ? data.user.role : "website";
+      window.location.assign(defaultLandingPath(role));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to enable MFA");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function disableMfa(e: React.FormEvent) {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setError("");
-    setMessage("");
-    try {
-      const res = await adminFetch("/api/auth/mfa/disable", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          password: disablePassword,
-          code: disableCode.replace(/\s/g, ""),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(typeof data.error === "string" ? data.error : "Failed to disable MFA");
-      }
-      setDisablePassword("");
-      setDisableCode("");
-      setSetup(null);
-      setMessage("Two-factor authentication has been disabled.");
-      await loadStatus();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to disable MFA");
     } finally {
       setIsSubmitting(false);
     }
@@ -153,9 +148,15 @@ export default function SecuritySettingsPage() {
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Security</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Protect your admin account with a time-based one-time password (TOTP) from an authenticator app.
+          Two-factor authentication is required for all TBOS users.
         </p>
       </div>
+
+      {mfaRequired || !status?.mfaEnabled ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+          You must set up two-factor authentication before you can access TBOS.
+        </div>
+      ) : null}
 
       {error ? (
         <div className="rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-950/40 dark:text-red-300">{error}</div>
@@ -172,8 +173,8 @@ export default function SecuritySettingsPage() {
             <h3 className="font-medium text-gray-900 dark:text-gray-100">Two-factor authentication (MFA)</h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {status?.mfaEnabled
-                ? `Enabled${status.mfaEnrolledAt ? ` since ${new Date(status.mfaEnrolledAt).toLocaleString()}` : ""}.`
-                : "Not enabled. We recommend enabling MFA for all admin users."}
+                ? `Enabled${status.mfaEnrolledAt ? ` since ${new Date(status.mfaEnrolledAt).toLocaleString()}` : ""}. MFA cannot be disabled.`
+                : "Set up an authenticator app to continue."}
             </p>
           </div>
           {status?.mfaEnabled ? (
@@ -181,12 +182,7 @@ export default function SecuritySettingsPage() {
               <ShieldCheck className="h-3.5 w-3.5" />
               Enabled
             </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-              <ShieldOff className="h-3.5 w-3.5" />
-              Disabled
-            </span>
-          )}
+          ) : null}
         </div>
 
         {!status?.mfaEnabled ? (
@@ -199,7 +195,7 @@ export default function SecuritySettingsPage() {
                 className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-200"
               >
                 {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-                Enable MFA
+                Set up MFA
               </button>
             ) : (
               <div className="space-y-4">
@@ -249,60 +245,16 @@ export default function SecuritySettingsPage() {
                     disabled={isSubmitting}
                     className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-200"
                   >
-                    Confirm and enable
+                    Confirm and continue
                   </button>
                 </form>
               </div>
             )}
           </div>
         ) : (
-          <form onSubmit={disableMfa} className="mt-6 space-y-4 max-w-md" autoComplete="off">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              To disable MFA, confirm your password and enter a current authenticator code.
-            </p>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
-              <input
-                type="password"
-                value={disablePassword}
-                onChange={(e) => setDisablePassword(e.target.value)}
-                required
-                autoComplete="current-password"
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Authenticator code
-              </label>
-              <input
-                id="mfa-disable-code"
-                name="mfa-totp-code"
-                value={disableCode}
-                onChange={(e) => setDisableCode(e.target.value.replace(/[^\d\s]/g, ""))}
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                data-lpignore="true"
-                data-1p-ignore
-                pattern="[0-9\s]{6,8}"
-                maxLength={8}
-                required
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
-                placeholder="123456"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
-            >
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldOff className="h-4 w-4" />}
-              Disable MFA
-            </button>
-          </form>
+          <p className="mt-6 text-sm text-gray-500 dark:text-gray-400">
+            Two-factor authentication is mandatory for all accounts and cannot be turned off.
+          </p>
         )}
       </div>
     </div>
