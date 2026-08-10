@@ -3,16 +3,15 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth";
+import { ADMIN_ROLES_LIST, assertCanModifyAdminUser } from "../lib/admin-roles";
 
 const router: IRouter = Router();
-
-const ROLES = ["admin", "editor", "viewer"] as const;
 
 const createSchema = z.object({
   email: z.string().email(),
   name: z.string().max(200).optional(),
   password: z.string().min(8),
-  role: z.enum(ROLES).default("editor"),
+  role: z.enum(ADMIN_ROLES_LIST).default("editor"),
   active: z.boolean().default(true),
 });
 
@@ -20,7 +19,7 @@ const updateSchema = z.object({
   email: z.string().email().optional(),
   name: z.string().max(200).optional().nullable(),
   password: z.string().min(8).optional(),
-  role: z.enum(ROLES).optional(),
+  role: z.enum(ADMIN_ROLES_LIST).optional(),
   active: z.boolean().optional(),
 });
 
@@ -30,6 +29,8 @@ function sanitizeUser(row: {
   name: string | null;
   role: string;
   active: boolean;
+  mfaEnabled: boolean;
+  mfaEnrolledAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -39,24 +40,30 @@ function sanitizeUser(row: {
     name: row.name,
     role: row.role,
     active: row.active,
+    mfaEnabled: row.mfaEnabled,
+    mfaEnrolledAt: row.mfaEnrolledAt?.toISOString() ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
 }
 
+const userSelect = {
+  id: true,
+  email: true,
+  name: true,
+  role: true,
+  active: true,
+  mfaEnabled: true,
+  mfaEnrolledAt: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 router.get("/", async (_req, res) => {
   try {
     const rows = await prisma.adminUser.findMany({
       orderBy: { email: "asc" },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        active: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: userSelect,
     });
     res.json({ data: rows.map(sanitizeUser) });
   } catch (error) {
@@ -69,15 +76,7 @@ router.get("/:id", async (req, res) => {
   try {
     const row = await prisma.adminUser.findUnique({
       where: { id: req.params.id },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        active: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: userSelect,
     });
     if (!row) return res.status(404).json({ error: "Not found" });
     res.json({ data: sanitizeUser(row) });
@@ -99,15 +98,7 @@ router.post("/", async (req, res) => {
         role: data.role,
         active: data.active,
       },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        active: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: userSelect,
     });
     res.status(201).json({ data: sanitizeUser(row) });
   } catch (error) {
@@ -125,6 +116,14 @@ router.put("/:id", async (req: AuthRequest, res) => {
     const existing = await prisma.adminUser.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: "Not found" });
 
+    const guardError = await assertCanModifyAdminUser(req.user?.id ?? "", req.params.id ?? "", {
+      role: data.role,
+      active: data.active,
+    });
+    if (guardError) {
+      return res.status(400).json({ error: guardError });
+    }
+
     const updateData: Record<string, unknown> = {};
     if (data.email !== undefined) updateData.email = data.email;
     if (data.name !== undefined) updateData.name = data.name;
@@ -137,15 +136,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
     const row = await prisma.adminUser.update({
       where: { id: req.params.id },
       data: updateData,
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        active: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: userSelect,
     });
     res.json({ data: sanitizeUser(row) });
   } catch (error) {
@@ -165,10 +156,10 @@ router.delete("/:id", async (req: AuthRequest, res) => {
     const target = await prisma.adminUser.findUnique({ where: { id: req.params.id } });
     if (!target) return res.status(404).json({ error: "Not found" });
 
-    if (target.role === "admin") {
+    if (target.role === "admin" && target.active) {
       const adminCount = await prisma.adminUser.count({ where: { role: "admin", active: true } });
       if (adminCount <= 1) {
-        return res.status(400).json({ error: "Cannot delete the last active admin" });
+        return res.status(400).json({ error: "Cannot delete the last active administrator" });
       }
     }
 

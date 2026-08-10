@@ -1,13 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Lock, Mail, Loader2 } from "lucide-react";
+import { Lock, Mail, Loader2, ShieldCheck } from "lucide-react";
+
+type LoginStep = "credentials" | "mfa";
 
 export default function LoginPage() {
+  const [step, setStep] = useState<LoginStep>("credentials");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [mfaToken, setMfaToken] = useState("");
+  const [emailHint, setEmailHint] = useState("");
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function onCredentialsSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setIsLoading(true);
     setError("");
@@ -30,8 +35,13 @@ export default function LoginPage() {
         throw new Error(typeof data.error === "string" ? data.error : "Login failed");
       }
 
-      // Full navigation so the new httpOnly session cookie is always sent on the next
-      // request (middleware verifies JWT with JWT_SECRET — must match the API).
+      if (data.requiresMfa && typeof data.mfaToken === "string") {
+        setMfaToken(data.mfaToken);
+        setEmailHint(typeof data.user?.email === "string" ? data.user.email : email);
+        setStep("mfa");
+        return;
+      }
+
       window.location.assign("/case-studies");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -40,77 +50,162 @@ export default function LoginPage() {
     }
   }
 
+  async function onMfaSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    const formData = new FormData(e.currentTarget);
+    const code = (formData.get("code") as string).replace(/\s/g, "");
+
+    try {
+      const res = await fetch("/api/auth/mfa/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ mfaToken, code }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "MFA verification failed");
+      }
+
+      window.location.assign("/case-studies");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "MFA verification failed");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-lg">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-4">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 dark:bg-neutral-950">
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg dark:bg-neutral-900">
+        <div className="mb-8 text-center">
+          <div className="mb-4 flex items-center justify-center gap-2">
             <div className="grid grid-cols-2 gap-0.5">
-              <div className="w-2 h-2 bg-black rounded-full"></div>
-              <div className="w-2 h-2 bg-black rounded-full"></div>
-              <div className="w-2 h-2 bg-black rounded-full"></div>
-              <div className="w-2 h-2 bg-black rounded-full"></div>
+              <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
+              <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
+              <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
+              <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
             </div>
-            <span className="font-semibold text-lg tracking-tight text-gray-900">TECHBUBBLE</span>
+            <span className="text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100">TECHBUBBLE</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Admin Login</h1>
-          <p className="text-gray-500 mt-2">Sign in to manage content</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            {step === "mfa" ? "Two-factor authentication" : "Admin Login"}
+          </h1>
+          <p className="mt-2 text-gray-500 dark:text-gray-400">
+            {step === "mfa"
+              ? `Enter the 6-digit code from your authenticator app for ${emailHint}.`
+              : "Sign in to manage content"}
+          </p>
         </div>
 
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-lg text-sm">
+        {error ? (
+          <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-950/40 dark:text-red-300">
             {error}
           </div>
+        ) : null}
+
+        {step === "credentials" ? (
+          <form onSubmit={onCredentialsSubmit} className="space-y-4">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">Email</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  className="w-full rounded-lg border border-gray-200 bg-white py-3 pl-10 pr-4 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-neutral-950 dark:text-gray-100 dark:focus:ring-white"
+                  placeholder="you@company.com"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">Password</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  name="password"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  className="w-full rounded-lg border border-gray-200 bg-white py-3 pl-10 pr-4 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-neutral-950 dark:text-gray-100 dark:focus:ring-white"
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-black py-3 font-medium text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                "Sign In"
+              )}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={onMfaSubmit} className="space-y-4">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                Verification code
+              </label>
+              <div className="relative">
+                <ShieldCheck className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  name="code"
+                  type="text"
+                  required
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  pattern="[0-9\s]{6,8}"
+                  maxLength={8}
+                  className="w-full rounded-lg border border-gray-200 bg-white py-3 pl-10 pr-4 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-neutral-950 dark:text-gray-100 dark:focus:ring-white"
+                  placeholder="123456"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-black py-3 font-medium text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                "Verify and continue"
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setStep("credentials");
+                setMfaToken("");
+                setError("");
+              }}
+              className="w-full text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+            >
+              Back to sign in
+            </button>
+          </form>
         )}
-
-        <form onSubmit={onSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2 text-gray-900">Email</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                name="email"
-                type="email"
-                required
-                autoComplete="email"
-                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
-                placeholder="you@company.com"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2 text-gray-900">Password</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                name="password"
-                type="password"
-                required
-                autoComplete="current-password"
-                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
-                placeholder="••••••••"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Signing in...
-              </>
-            ) : (
-              "Sign In"
-            )}
-          </button>
-        </form>
-
-        
       </div>
     </div>
   );

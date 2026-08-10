@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus, Edit, Trash2, Settings, Search } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
+import { useAdminSession } from "@/contexts/AdminSessionContext";
 
 interface JobListing {
   id: string;
@@ -39,6 +40,7 @@ function jobSearchHaystack(job: JobListing): string {
 }
 
 export default function JobsPage() {
+  const { canMutate } = useAdminSession();
   const [jobs, setJobs] = useState<JobListing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -93,20 +95,24 @@ export default function JobsPage() {
           <p className="text-sm text-gray-500 dark:text-gray-400">Manage open positions on the careers page</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link
-            href="/settings/categories"
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-800"
-          >
-            <Settings className="h-4 w-4" />
-            Taxonomy settings
-          </Link>
-          <Link
-            href="/jobs/new"
-            className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
-          >
-            <Plus className="h-4 w-4" />
-            Add Job
-          </Link>
+          {canMutate ? (
+            <>
+              <Link
+                href="/settings/categories"
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-800"
+              >
+                <Settings className="h-4 w-4" />
+                Taxonomy settings
+              </Link>
+              <Link
+                href="/jobs/new"
+                className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+              >
+                <Plus className="h-4 w-4" />
+                Add Job
+              </Link>
+            </>
+          ) : null}
         </div>
       </div>
 
@@ -190,21 +196,25 @@ export default function JobsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="inline-flex items-center gap-2">
-                      <Link
-                        href={`/jobs/${job.id}`}
-                        className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-black dark:hover:bg-gray-800 dark:hover:text-white"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => void deleteJob(job.id)}
-                        className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+                    {canMutate ? (
+                      <div className="inline-flex items-center gap-2">
+                        <Link
+                          href={`/jobs/${job.id}`}
+                          className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-black dark:hover:bg-gray-800 dark:hover:text-white"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => void deleteJob(job.id)}
+                          className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400">View only</span>
+                    )}
                   </td>
                 </tr>
               ))

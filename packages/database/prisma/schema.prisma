@@ -364,6 +364,10 @@ model AdminUser {
   passwordHash String
   role         String   @default("admin") // admin | editor | viewer
   active       Boolean  @default(true)
+  /// AES-256-GCM encrypted TOTP secret (set during MFA enrollment).
+  totpSecretEnc String?
+  mfaEnabled    Boolean  @default(false)
+  mfaEnrolledAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

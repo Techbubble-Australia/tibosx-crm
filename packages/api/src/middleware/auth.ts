@@ -6,12 +6,20 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-producti
 /** Cookie set by the admin Next.js app after login (httpOnly). */
 export const ADMIN_SESSION_COOKIE = "admin_session";
 
+export const MFA_PENDING_PURPOSE = "mfa_pending";
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  role: string;
+}
+
 export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: string;
-  };
+  user?: AuthUser;
+}
+
+interface JwtPayload extends AuthUser {
+  purpose?: string;
 }
 
 function getCookie(req: Request, name: string): string | undefined {
@@ -43,17 +51,36 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as AuthRequest["user"];
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
     if (!decoded?.id || !decoded?.email) {
       return res.status(401).json({ error: "Unauthorized: Invalid token payload" });
     }
-    req.user = decoded;
+    if (decoded.purpose === MFA_PENDING_PURPOSE) {
+      return res.status(401).json({ error: "Unauthorized: MFA verification required" });
+    }
+    req.user = { id: decoded.id, email: decoded.email, role: decoded.role };
     next();
   } catch {
     return res.status(401).json({ error: "Unauthorized: Invalid token" });
   }
 };
 
-export const generateToken = (payload: { id: string; email: string; role: string }) => {
+export const generateToken = (payload: AuthUser) => {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
 };
+
+export const generateMfaPendingToken = (payload: AuthUser) => {
+  return jwt.sign({ ...payload, purpose: MFA_PENDING_PURPOSE }, JWT_SECRET, { expiresIn: "5m" });
+};
+
+export function verifyMfaPendingToken(token: string): AuthUser | null {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    if (decoded.purpose !== MFA_PENDING_PURPOSE || !decoded.id || !decoded.email) {
+      return null;
+    }
+    return { id: decoded.id, email: decoded.email, role: decoded.role };
+  } catch {
+    return null;
+  }
+}

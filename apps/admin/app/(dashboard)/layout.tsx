@@ -25,7 +25,8 @@ import {
   Cpu,
   Building,
 } from "lucide-react";
-import { adminFetch } from "@/lib/admin-api";
+import { AdminSessionProvider, useAdminSession } from "@/contexts/AdminSessionContext";
+import { roleLabel } from "@/lib/admin-roles";
 
 type NavItem = {
   href: string;
@@ -74,12 +75,13 @@ const navGroups: NavGroup[] = [
     icon: Settings,
     roles: ["admin", "editor", "viewer"],
     items: [
-      { href: "/settings/categories", label: "Category", icon: Layers, roles: ["admin", "editor", "viewer"] },
-      { href: "/settings/technologies", label: "Technology", icon: Cpu, roles: ["admin", "editor", "viewer"] },
-      { href: "/settings/departments", label: "Department", icon: Building, roles: ["admin", "editor", "viewer"] },
+      { href: "/settings/categories", label: "Category", icon: Layers, roles: ["admin", "editor"] },
+      { href: "/settings/technologies", label: "Technology", icon: Cpu, roles: ["admin", "editor"] },
+      { href: "/settings/departments", label: "Department", icon: Building, roles: ["admin", "editor"] },
+      { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin", "editor", "viewer"] },
       { href: "/team", label: "Team members", icon: Users, roles: ["admin", "editor", "viewer"] },
       { href: "/clients", label: "Client", icon: Building2, roles: ["admin"] },
-      { href: "/users", label: "Users", icon: Shield, roles: ["admin"] },
+      { href: "/users", label: "Users", icon: UserCircle, roles: ["admin"] },
     ],
   },
 ];
@@ -96,24 +98,10 @@ function groupIsActive(group: NavGroup, pathname: string): boolean {
   return group.items.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
 }
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function DashboardChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [userRole, setUserRole] = useState<string>("admin");
+  const { role, email, canMutate, loading } = useAdminSession();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    void adminFetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data) => {
-        const role = data?.data?.user?.role;
-        if (role) setUserRole(role);
-      })
-      .catch(() => undefined);
-  }, []);
 
   useEffect(() => {
     setOpenGroups((prev) => {
@@ -132,10 +120,10 @@ export default function DashboardLayout({
       navGroups
         .map((group) => ({
           ...group,
-          items: group.items.filter((item) => item.roles.includes(userRole)),
+          items: group.items.filter((item) => item.roles.includes(role)),
         }))
-        .filter((group) => group.roles.includes(userRole) && group.items.length > 0),
-    [userRole],
+        .filter((group) => group.roles.includes(role) && group.items.length > 0),
+    [role],
   );
 
   function toggleGroup(id: string) {
@@ -156,6 +144,13 @@ export default function DashboardLayout({
             <span className="text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100">TECHBUBBLE</span>
           </Link>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Admin Panel</p>
+          {!loading && email ? (
+            <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+              {email}
+              <span className="mx-1">·</span>
+              <span className="font-medium text-gray-700 dark:text-gray-300">{roleLabel(role)}</span>
+            </p>
+          ) : null}
         </div>
 
         <nav className="flex-1 space-y-1 px-3">
@@ -230,8 +225,21 @@ export default function DashboardLayout({
         <header className="border-b border-gray-200 bg-white px-8 py-4 dark:border-gray-700 dark:bg-gray-900">
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{headerTitle(pathname)}</h1>
         </header>
+        {!loading && !canMutate ? (
+          <div className="border-b border-amber-200 bg-amber-50 px-8 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+            Read-only access ({roleLabel(role)}). You can view data but cannot create, edit, or delete content.
+          </div>
+        ) : null}
         <div className="p-8">{children}</div>
       </main>
     </div>
+  );
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AdminSessionProvider>
+      <DashboardChrome>{children}</DashboardChrome>
+    </AdminSessionProvider>
   );
 }
