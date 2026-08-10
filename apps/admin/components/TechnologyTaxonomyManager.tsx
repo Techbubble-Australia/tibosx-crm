@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { adminFetch } from "@/lib/admin-api";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
 import { TablePagination } from "@/components/ui/TablePagination";
@@ -27,6 +27,12 @@ export function TechnologyTaxonomyManager() {
   const [editName, setEditName] = useState("");
   const [editCategoryId, setEditCategoryId] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const filteredItems = useMemo(() => {
+    if (!newCategoryId) return items;
+    return items.filter((item) => item.categoryId === newCategoryId);
+  }, [items, newCategoryId]);
+
   const {
     search,
     setSearch,
@@ -37,9 +43,11 @@ export function TechnologyTaxonomyManager() {
     paginated,
     totalItems,
     totalSourceItems,
-  } = useListView(items, (item) =>
+  } = useListView(filteredItems, (item) =>
     buildSearchHaystack([item.name, item.category?.name, item.order]),
   );
+
+  const selectedCategoryName = categories.find((cat) => cat.id === newCategoryId)?.name;
 
   async function load() {
     try {
@@ -65,6 +73,10 @@ export function TechnologyTaxonomyManager() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [newCategoryId, setPage]);
 
   async function addItem() {
     const name = newName.trim();
@@ -146,12 +158,14 @@ export function TechnologyTaxonomyManager() {
           Add at least one category before creating technologies.
         </p>
       ) : (
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <label className="sr-only" htmlFor="technology-category-filter">Category</label>
           <select
+            id="technology-category-filter"
             value={newCategoryId}
             onChange={(e) => setNewCategoryId(e.target.value)}
             className={`${inputClass} sm:w-48`}
-            aria-label="Category for new technology"
+            aria-label="Filter technologies by category"
           >
             {categories.map((cat) => (
               <option key={cat.id} value={cat.id}>{cat.name}</option>
@@ -184,7 +198,7 @@ export function TechnologyTaxonomyManager() {
         id="technology-search"
         value={search}
         onChange={setSearch}
-        placeholder="Search technologies or categories…"
+        placeholder={`Search in ${selectedCategoryName ?? "category"}…`}
         filteredCount={totalItems}
         totalCount={totalSourceItems}
       />
@@ -193,6 +207,10 @@ export function TechnologyTaxonomyManager() {
         <ul className="divide-y divide-gray-100 dark:divide-gray-700">
           {items.length === 0 ? (
             <li className="px-4 py-8 text-center text-sm text-gray-400">No technologies yet.</li>
+          ) : filteredItems.length === 0 ? (
+            <li className="px-4 py-8 text-center text-sm text-gray-400">
+              No technologies in {selectedCategoryName ?? "this category"} yet.
+            </li>
           ) : totalItems === 0 ? (
             <li className="px-4 py-8 text-center text-sm text-gray-400">No technologies match your search.</li>
           ) : (
@@ -262,7 +280,7 @@ export function TechnologyTaxonomyManager() {
             ))
           )}
         </ul>
-        {items.length > 0 ? (
+        {filteredItems.length > 0 ? (
           <TablePagination
             page={page}
             pageSize={pageSize}
