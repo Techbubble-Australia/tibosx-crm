@@ -160,7 +160,7 @@ model ContactSubmission {
 }
 
 model CareerApplication {
-  id                String   @id @default(cuid())
+  id                String            @id @default(cuid())
   firstName         String
   lastName          String
   email             String
@@ -177,7 +177,33 @@ model CareerApplication {
   /// Uploaded document URLs (resume, visa copies, etc.)
   documentUrls      Json?
   message           String?
-  createdAt         DateTime @default(now())
+  profile           CandidateProfile?
+  createdAt         DateTime          @default(now())
+}
+
+model CandidateProfile {
+  id                  String             @id @default(cuid())
+  firstName           String
+  lastName            String
+  email               String
+  phone               String
+  category            String
+  technology          String
+  expectedRate        Int
+  currency            String
+  mode                String
+  documentUrls        Json
+  previousSalary      Int?
+  comments            String?            @db.Text
+  careerApplicationId String?            @unique
+  careerApplication   CareerApplication? @relation(fields: [careerApplicationId], references: [id], onDelete: SetNull)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([email])
+  @@index([category])
+  @@index([technology])
+  @@index([createdAt])
 }
 
 model CaseStudyCategory {

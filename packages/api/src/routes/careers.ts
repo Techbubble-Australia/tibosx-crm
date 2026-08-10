@@ -12,6 +12,7 @@ import {
   formatSalaryExpectation,
   parseSalaryRateInput,
 } from "../lib/careers-form";
+import { createProfileFromCareerApplication } from "../lib/profile-from-application";
 import { sendCareerApplicationEmail } from "../lib/mail";
 
 const router: IRouter = Router();
@@ -169,6 +170,12 @@ router.post("/apply", async (req, res) => {
         message: validatedData.message,
       },
     });
+
+    try {
+      await createProfileFromCareerApplication(application);
+    } catch (profileError) {
+      console.error("Error creating profile from career application:", profileError);
+    }
 
     try {
       await sendCareerApplicationEmail({
