@@ -6,6 +6,10 @@ import { Plus, Edit, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { roleLabel } from "@/lib/admin-roles";
 import { RolePermissionsCard } from "@/components/users/RolePermissionsCard";
+import { AdminSearchField } from "@/components/ui/AdminSearchField";
+import { TablePagination } from "@/components/ui/TablePagination";
+import { useListView } from "@/hooks/useListView";
+import { buildSearchHaystack } from "@/lib/search-text";
 
 interface UserRow {
   id: string;
@@ -19,6 +23,19 @@ interface UserRow {
 export default function UsersPage() {
   const [rows, setRows] = useState<UserRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const {
+    search,
+    setSearch,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    paginated,
+    totalItems,
+    totalSourceItems,
+  } = useListView(rows, (row) =>
+    buildSearchHaystack([row.email, row.name, row.role, roleLabel(row.role), row.mfaEnabled ? "mfa" : ""]),
+  );
 
   useEffect(() => {
     void fetchRows();
@@ -76,6 +93,15 @@ export default function UsersPage() {
         </Link>
       </div>
 
+      <AdminSearchField
+        id="user-search"
+        value={search}
+        onChange={setSearch}
+        placeholder="Search by email, name, or role…"
+        filteredCount={totalItems}
+        totalCount={totalSourceItems}
+      />
+
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
         <table className="w-full min-w-[720px] text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
@@ -95,8 +121,12 @@ export default function UsersPage() {
                   No admin users found. Add one to get started.
                 </td>
               </tr>
+            ) : totalItems === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">No users match your search.</td>
+              </tr>
             ) : (
-              rows.map((row) => (
+              paginated.map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                   <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{row.email}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.name || "—"}</td>
@@ -145,6 +175,15 @@ export default function UsersPage() {
             )}
           </tbody>
         </table>
+        {rows.length > 0 ? (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        ) : null}
       </div>
 
       <RolePermissionsCard />

@@ -14,7 +14,7 @@ const inputClass =
 export default function NewUserPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [role, setRole] = useState<AdminRole>("editor");
+  const [role, setRole] = useState<AdminRole>("website");
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

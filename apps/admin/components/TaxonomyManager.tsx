@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { adminFetch } from "@/lib/admin-api";
+import { AdminSearchField } from "@/components/ui/AdminSearchField";
+import { TablePagination } from "@/components/ui/TablePagination";
+import { useListView } from "@/hooks/useListView";
+import { buildSearchHaystack } from "@/lib/search-text";
 
 export type TaxonomyItem = {
   id: string;
@@ -22,6 +26,17 @@ export function TaxonomyManager({ apiPath, title, description }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [saving, setSaving] = useState(false);
+  const {
+    search,
+    setSearch,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    paginated,
+    totalItems,
+    totalSourceItems,
+  } = useListView(items, (item) => buildSearchHaystack([item.name, item.order]));
 
   async function load() {
     try {
@@ -128,11 +143,23 @@ export function TaxonomyManager({ apiPath, title, description }: Props) {
         </button>
       </div>
 
-      <ul className="mt-4 divide-y divide-gray-100 dark:divide-gray-700">
-        {items.length === 0 ? (
-          <li className="py-4 text-center text-sm text-gray-400">No items yet.</li>
-        ) : (
-          items.map((item) => (
+      <AdminSearchField
+        id={`${title.toLowerCase()}-search`}
+        value={search}
+        onChange={setSearch}
+        placeholder={`Search ${title.toLowerCase()}…`}
+        filteredCount={totalItems}
+        totalCount={totalSourceItems}
+      />
+
+      <div className="overflow-hidden rounded-lg border border-gray-100 dark:border-gray-700">
+        <ul className="divide-y divide-gray-100 dark:divide-gray-700">
+          {items.length === 0 ? (
+            <li className="px-4 py-8 text-center text-sm text-gray-400">No items yet.</li>
+          ) : totalItems === 0 ? (
+            <li className="px-4 py-8 text-center text-sm text-gray-400">No items match your search.</li>
+          ) : (
+            paginated.map((item) => (
             <li key={item.id} className="flex items-center justify-between gap-3 py-3">
               {editingId === item.id ? (
                 <div className="flex flex-1 gap-2">
@@ -181,7 +208,17 @@ export function TaxonomyManager({ apiPath, title, description }: Props) {
             </li>
           ))
         )}
-      </ul>
+        </ul>
+        {items.length > 0 ? (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        ) : null}
+      </div>
     </section>
   );
 }

@@ -10,7 +10,7 @@ export function AdminOnlyGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loading && !canManageUsers) {
-      router.replace("/database/dashboard");
+      router.replace("/settings/security");
     }
   }, [canManageUsers, loading, router]);
 

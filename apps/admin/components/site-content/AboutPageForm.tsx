@@ -10,6 +10,12 @@ type StatRow = { n: string; l: string; labelClass: string };
 type MissionCard = { title: string; text: string };
 type WorkforceTab = { label?: string; department: string; active: boolean; order?: number };
 
+function sortWorkforceTabs(tabs: WorkforceTab[]): WorkforceTab[] {
+  return [...tabs]
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    .map((tab, index) => ({ ...tab, order: index + 1 }));
+}
+
 type AdminTeamListRow = {
   id: string;
   department?: string;
@@ -139,28 +145,31 @@ export function AboutPageForm({
   };
 
   const setWorkforceTab = (i: number, patch: Partial<WorkforceTab>) => {
-    const tabs = value.workforce.tabs.map((t, j) => (j === i ? { ...t, ...patch } : t));
+    const tabs = sortWorkforceTabs(value.workforce.tabs.map((t, j) => (j === i ? { ...t, ...patch } : t)));
     onChange({ ...value, workforce: { ...value.workforce, tabs } });
   };
 
   const addWorkforceTab = () => {
-    const nextOrder =
-      value.workforce.tabs.reduce((max, tab) => Math.max(max, tab.order ?? 0), 0) + 1;
+    const tabs = sortWorkforceTabs([
+      ...value.workforce.tabs,
+      { label: "", department: "", active: false, order: value.workforce.tabs.length + 1 },
+    ]);
     onChange({
       ...value,
       workforce: {
         ...value.workforce,
-        tabs: [...value.workforce.tabs, { label: "", department: "", active: false, order: nextOrder }],
+        tabs,
       },
     });
   };
 
   const removeWorkforceTab = (i: number) => {
+    const tabs = sortWorkforceTabs(value.workforce.tabs.filter((_, j) => j !== i));
     onChange({
       ...value,
       workforce: {
         ...value.workforce,
-        tabs: value.workforce.tabs.filter((_, j) => j !== i),
+        tabs,
       },
     });
   };
@@ -169,11 +178,12 @@ export function AboutPageForm({
     const to = direction === "up" ? from - 1 : from + 1;
     if (to < 0 || to >= value.workforce.tabs.length) return;
     const tabs = [...value.workforce.tabs];
-    const fromOrder = tabs[from]?.order ?? from + 1;
-    const toOrder = tabs[to]?.order ?? to + 1;
-    tabs[from] = { ...tabs[from]!, order: toOrder };
-    tabs[to] = { ...tabs[to]!, order: fromOrder };
-    onChange({ ...value, workforce: { ...value.workforce, tabs } });
+    const [moved] = tabs.splice(from, 1);
+    tabs.splice(to, 0, moved!);
+    onChange({
+      ...value,
+      workforce: { ...value.workforce, tabs: sortWorkforceTabs(tabs) },
+    });
   };
 
   const setUspCol = (i: number, patch: Partial<UspColumn>) => {

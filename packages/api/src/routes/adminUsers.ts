@@ -11,7 +11,7 @@ const createSchema = z.object({
   email: z.string().email(),
   name: z.string().max(200).optional(),
   password: z.string().min(8),
-  role: z.enum(ADMIN_ROLES_LIST).default("editor"),
+  role: z.enum(ADMIN_ROLES_LIST).default("website"),
   active: z.boolean().default(true),
 });
 

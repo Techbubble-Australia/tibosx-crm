@@ -1,57 +1,118 @@
-export const ADMIN_ROLES = ["admin", "editor", "viewer"] as const;
+export const ADMIN_ROLES = ["admin", "recruiter", "sales", "website"] as const;
 
 export type AdminRole = (typeof ADMIN_ROLES)[number];
+
+export type TbModule = "recruitment" | "website" | "sales" | "users";
 
 export type RolePermission = {
   id: string;
   label: string;
   admin: boolean;
-  editor: boolean;
-  viewer: boolean;
+  recruiter: boolean;
+  sales: boolean;
+  website: boolean;
 };
 
-export const ROLE_META: Record<
-  AdminRole,
-  { label: string; description: string }
-> = {
+export const ROLE_META: Record<AdminRole, { label: string; description: string }> = {
   admin: {
     label: "Administrator",
-    description: "Full access including user accounts, clients, and all content.",
+    description: "Full access to Recruitment, Website, Sales, and user management.",
   },
-  editor: {
-    label: "Editor",
-    description: "Create and edit jobs, pages, case studies, and taxonomy settings.",
+  recruiter: {
+    label: "Recruiter",
+    description: "Access to the Recruitment module (profiles, career applications, dashboard).",
   },
-  viewer: {
-    label: "Viewer",
-    description: "Read-only access. Cannot create, edit, or delete content.",
+  sales: {
+    label: "Sales",
+    description: "Access to the Sales module (clients and contacts).",
   },
+  website: {
+    label: "Website",
+    description: "Access to the Website module (content, jobs, team members, taxonomy).",
+  },
+};
+
+const MODULE_ROLE_MAP: Record<TbModule, readonly AdminRole[]> = {
+  recruitment: ["admin", "recruiter"],
+  website: ["admin", "website"],
+  sales: ["admin", "sales"],
+  users: ["admin"],
 };
 
 export const ROLE_PERMISSIONS: RolePermission[] = [
-  { id: "content", label: "Manage website content (jobs, pages, case studies, etc.)", admin: true, editor: true, viewer: false },
-  { id: "taxonomy", label: "Manage categories, technologies, and departments", admin: true, editor: true, viewer: false },
-  { id: "team", label: "Manage team members", admin: true, editor: true, viewer: false },
-  { id: "applications", label: "View career applications and contact submissions", admin: true, editor: true, viewer: true },
-  { id: "clients", label: "Manage clients (internal job assignments)", admin: true, editor: false, viewer: false },
-  { id: "users", label: "Manage admin users and roles", admin: true, editor: false, viewer: false },
-  { id: "security", label: "Configure own MFA (Security settings)", admin: true, editor: true, viewer: true },
+  {
+    id: "recruitment",
+    label: "Recruitment module (dashboard, profiles, applications)",
+    admin: true,
+    recruiter: true,
+    sales: false,
+    website: false,
+  },
+  {
+    id: "website",
+    label: "Website module (pages, jobs, case studies, team, taxonomy)",
+    admin: true,
+    recruiter: false,
+    sales: false,
+    website: true,
+  },
+  {
+    id: "sales",
+    label: "Sales module (clients and contacts)",
+    admin: true,
+    recruiter: false,
+    sales: true,
+    website: false,
+  },
+  {
+    id: "users",
+    label: "Manage TBOS users and roles",
+    admin: true,
+    recruiter: false,
+    sales: false,
+    website: false,
+  },
+  {
+    id: "security",
+    label: "Configure own MFA (Security settings)",
+    admin: true,
+    recruiter: true,
+    sales: true,
+    website: true,
+  },
 ];
 
 export function isAdminRole(value: string): value is AdminRole {
   return (ADMIN_ROLES as readonly string[]).includes(value);
 }
 
+export function canAccessModule(role: string, module: TbModule): boolean {
+  if (!isAdminRole(role)) return false;
+  return MODULE_ROLE_MAP[module].includes(role);
+}
+
 export function canMutateContent(role: string): boolean {
-  return role === "admin" || role === "editor";
+  return isAdminRole(role);
 }
 
 export function canManageUsers(role: string): boolean {
-  return role === "admin";
+  return canAccessModule(role, "users");
 }
 
 export function canManageClients(role: string): boolean {
-  return role === "admin";
+  return canAccessModule(role, "sales");
+}
+
+export function canAccessRecruitment(role: string): boolean {
+  return canAccessModule(role, "recruitment");
+}
+
+export function canAccessWebsite(role: string): boolean {
+  return canAccessModule(role, "website");
+}
+
+export function canAccessSales(role: string): boolean {
+  return canAccessModule(role, "sales");
 }
 
 export function roleLabel(role: string): string {
@@ -59,4 +120,11 @@ export function roleLabel(role: string): string {
     return ROLE_META[role].label;
   }
   return role;
+}
+
+export function defaultLandingPath(role: string): string {
+  if (canAccessRecruitment(role)) return "/database/dashboard";
+  if (canAccessWebsite(role)) return "/pages";
+  if (canAccessSales(role)) return "/clients";
+  return "/settings/security";
 }

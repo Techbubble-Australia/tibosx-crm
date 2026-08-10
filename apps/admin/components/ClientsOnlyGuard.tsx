@@ -10,7 +10,7 @@ export function ClientsOnlyGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loading && !canManageClients) {
-      router.replace("/database/dashboard");
+      router.replace("/settings/security");
     }
   }, [canManageClients, loading, router]);
 

@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
+import { AdminSearchField } from "@/components/ui/AdminSearchField";
+import { TablePagination } from "@/components/ui/TablePagination";
+import { useListView } from "@/hooks/useListView";
+import { buildSearchHaystack } from "@/lib/search-text";
 
 type CaseStudyCategoryRow = {
   id: string;
@@ -12,9 +16,29 @@ type CaseStudyCategoryRow = {
   subcategories: { id: string; name: string; order: number }[];
 };
 
+function visibleSubcategories(cat: CaseStudyCategoryRow, query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return cat.subcategories;
+  if (cat.name.toLowerCase().includes(q)) return cat.subcategories;
+  return cat.subcategories.filter((sub) => sub.name.toLowerCase().includes(q));
+}
+
 export default function CaseStudyCategoriesPage() {
   const [categories, setCategories] = useState<CaseStudyCategoryRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const {
+    search,
+    setSearch,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    paginated,
+    totalItems,
+    totalSourceItems,
+  } = useListView(categories, (cat) =>
+    buildSearchHaystack([cat.name, ...cat.subcategories.map((sub) => sub.name)]),
+  );
   const [newCategory, setNewCategory] = useState("");
   const [newSubByCat, setNewSubByCat] = useState<Record<string, string>>({});
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
@@ -139,23 +163,32 @@ export default function CaseStudyCategoriesPage() {
   return (
     <div>
       <div className="mb-6 flex items-center gap-3">
-        <Link href="/case-studies" className="rounded p-1.5 hover:bg-gray-100">
+        <Link href="/case-studies" className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <div>
-          <h2 className="text-lg font-semibold">Category &amp; Subcategory Management</h2>
-          <p className="text-sm text-gray-500">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Category &amp; Subcategory Management</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Define categories (e.g. Microsoft) and subcategories (e.g. SharePoint, Dynamics 365) for case studies.
           </p>
         </div>
       </div>
 
-      <div className="mb-6 flex gap-2 rounded-xl border border-gray-200 bg-white p-4">
+      <AdminSearchField
+        id="case-study-category-search"
+        value={search}
+        onChange={setSearch}
+        placeholder="Search categories or subcategories…"
+        filteredCount={totalItems}
+        totalCount={totalSourceItems}
+      />
+
+      <div className="mb-6 flex gap-2 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
         <input
           value={newCategory}
           onChange={(e) => setNewCategory(e.target.value)}
           placeholder="New category name…"
-          className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+          className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white"
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -166,25 +199,28 @@ export default function CaseStudyCategoriesPage() {
         <button
           type="button"
           onClick={() => void addCategory()}
-          className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
         >
           Add Category
         </button>
       </div>
 
-      <div className="space-y-4">
-        {categories.length === 0 ? (
-          <p className="text-center text-gray-400">No categories yet.</p>
-        ) : (
-          categories.map((cat) => (
-            <section key={cat.id} className="rounded-xl border border-gray-200 bg-white p-5">
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="space-y-4 p-4">
+          {categories.length === 0 ? (
+            <p className="py-8 text-center text-gray-400 dark:text-gray-500">No categories yet.</p>
+          ) : totalItems === 0 ? (
+            <p className="py-8 text-center text-gray-400 dark:text-gray-500">No categories match your search.</p>
+          ) : (
+            paginated.map((cat) => (
+            <section key={cat.id} className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800/50">
               <div className="flex items-center justify-between gap-3">
                 {editingCatId === cat.id ? (
                   <div className="flex flex-1 gap-2">
                     <input
                       value={editCatName}
                       onChange={(e) => setEditCatName(e.target.value)}
-                      className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm"
+                      className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                       autoFocus
                     />
                     <button type="button" onClick={() => void saveCategory(cat.id)} className="text-sm font-medium">
@@ -196,7 +232,7 @@ export default function CaseStudyCategoriesPage() {
                   </div>
                 ) : (
                   <>
-                    <h3 className="text-base font-semibold">{cat.name}</h3>
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">{cat.name}</h3>
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -204,7 +240,7 @@ export default function CaseStudyCategoriesPage() {
                           setEditingCatId(cat.id);
                           setEditCatName(cat.name);
                         }}
-                        className="text-sm text-gray-600 hover:text-black"
+                        className="text-sm text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white"
                       >
                         Edit
                       </button>
@@ -220,15 +256,15 @@ export default function CaseStudyCategoriesPage() {
                 )}
               </div>
 
-              <ul className="mt-4 space-y-2 border-t border-gray-100 pt-4">
-                {cat.subcategories.map((sub) => (
+              <ul className="mt-4 space-y-2 border-t border-gray-100 pt-4 dark:border-gray-700">
+                {visibleSubcategories(cat, search).map((sub) => (
                   <li key={sub.id} className="flex items-center justify-between gap-2 pl-4">
                     {editingSub?.subId === sub.id ? (
                       <div className="flex flex-1 gap-2">
                         <input
                           value={editSubName}
                           onChange={(e) => setEditSubName(e.target.value)}
-                          className="flex-1 rounded border border-gray-200 px-2 py-1 text-sm"
+                          className="flex-1 rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                         />
                         <button
                           type="button"
@@ -243,7 +279,7 @@ export default function CaseStudyCategoriesPage() {
                       </div>
                     ) : (
                       <>
-                        <span className="text-sm text-gray-700">↳ {sub.name}</span>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">↳ {sub.name}</span>
                         <div className="flex gap-2">
                           <button
                             type="button"
@@ -251,7 +287,7 @@ export default function CaseStudyCategoriesPage() {
                               setEditingSub({ catId: cat.id, subId: sub.id });
                               setEditSubName(sub.name);
                             }}
-                            className="text-xs text-gray-600 hover:text-black"
+                            className="text-xs text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white"
                           >
                             Edit
                           </button>
@@ -274,7 +310,7 @@ export default function CaseStudyCategoriesPage() {
                   value={newSubByCat[cat.id] ?? ""}
                   onChange={(e) => setNewSubByCat((prev) => ({ ...prev, [cat.id]: e.target.value }))}
                   placeholder="New subcategory…"
-                  className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm"
+                  className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
@@ -285,7 +321,7 @@ export default function CaseStudyCategoriesPage() {
                 <button
                   type="button"
                   onClick={() => void addSubcategory(cat.id)}
-                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm hover:bg-gray-50"
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-900 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-700"
                 >
                   Add Subcategory
                 </button>
@@ -293,6 +329,16 @@ export default function CaseStudyCategoriesPage() {
             </section>
           ))
         )}
+        </div>
+        {categories.length > 0 ? (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        ) : null}
       </div>
     </div>
   );

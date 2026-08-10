@@ -4,9 +4,11 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { adminFetch } from "@/lib/admin-api";
 import {
   type AdminRole,
+  canAccessRecruitment,
+  canAccessSales,
+  canAccessWebsite,
   canManageClients,
   canManageUsers,
-  canMutateContent,
   isAdminRole,
 } from "@/lib/admin-roles";
 
@@ -14,7 +16,9 @@ type AdminSession = {
   role: AdminRole;
   email: string;
   loading: boolean;
-  canMutate: boolean;
+  canAccessRecruitment: boolean;
+  canAccessWebsite: boolean;
+  canAccessSales: boolean;
   canManageUsers: boolean;
   canManageClients: boolean;
 };
@@ -22,7 +26,7 @@ type AdminSession = {
 const AdminSessionContext = createContext<AdminSession | null>(null);
 
 export function AdminSessionProvider({ children }: { children: React.ReactNode }) {
-  const [role, setRole] = useState<AdminRole>("viewer");
+  const [role, setRole] = useState<AdminRole>("website");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -48,7 +52,9 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       role,
       email,
       loading,
-      canMutate: canMutateContent(role),
+      canAccessRecruitment: canAccessRecruitment(role),
+      canAccessWebsite: canAccessWebsite(role),
+      canAccessSales: canAccessSales(role),
       canManageUsers: canManageUsers(role),
       canManageClients: canManageClients(role),
     }),

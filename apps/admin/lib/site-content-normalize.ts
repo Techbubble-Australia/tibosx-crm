@@ -42,6 +42,14 @@ function migrateWorkforceTabRow(raw: unknown, index = 0): { department: string; 
   return { department, label, active: Boolean(t.active), order };
 }
 
+function sortWorkforceTabRows(
+  tabs: { department: string; label: string; active: boolean; order: number }[],
+): { department: string; label: string; active: boolean; order: number }[] {
+  return [...tabs]
+    .sort((a, b) => a.order - b.order)
+    .map((tab, index) => ({ ...tab, order: index + 1 }));
+}
+
 export const SITE_CONTENT_FORM_KEYS = [
   "announcement_bar",
   "marketing_home",
@@ -127,7 +135,7 @@ export function serializeSiteContentForPersist(key: string, payload: unknown): u
           ...next,
           workforce: {
             ...wf,
-            tabs: tabs.map((tab: unknown, index: number) => migrateWorkforceTabRow(tab, index)),
+            tabs: sortWorkforceTabRows(tabs.map((tab: unknown, index: number) => migrateWorkforceTabRow(tab, index))),
           },
         };
       }
@@ -201,7 +209,7 @@ export function normalizeSiteContentPayload(key: string, raw: unknown): unknown 
     const wf = merged.workforce as Record<string, unknown>;
     const tabs = wf.tabs;
     if (Array.isArray(tabs)) {
-      wf.tabs = tabs.map((tab: unknown, index: number) => migrateWorkforceTabRow(tab, index));
+      wf.tabs = sortWorkforceTabRows(tabs.map((tab: unknown, index: number) => migrateWorkforceTabRow(tab, index)));
     }
   }
   return merged;

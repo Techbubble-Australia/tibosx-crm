@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:
 import { generateSecret, generateURI, verify } from "otplib";
 
 const ALGO = "aes-256-gcm";
-const MFA_ISSUER = "TechBubble Admin";
+const MFA_ISSUER = "TBOS";
 
 function deriveEncryptionKey(): Buffer {
   const material = process.env.MFA_ENCRYPTION_KEY || process.env.JWT_SECRET || "dev-only-mfa-key";

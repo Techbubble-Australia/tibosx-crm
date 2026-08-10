@@ -173,7 +173,6 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
     }
   }
 
-  const positionLocked = Boolean(positionParam);
   const fieldClass =
     "h-[46px] w-full rounded-[14px] border border-white/15 bg-white/[0.08] px-[17px] text-[14px] text-white placeholder:text-white/35 focus:outline-none";
 
@@ -219,15 +218,14 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
 
       <input type="hidden" name="position" value={position} />
       <select
-        required={!positionLocked}
+        required
         value={position}
-        onChange={(e) => !positionLocked && handlePositionChange(e.target.value)}
-        disabled={positionLocked}
-        className={`${fieldClass} appearance-none ${positionLocked ? "cursor-default opacity-90" : ""}`}
-        aria-label="Position"
+        onChange={(e) => handlePositionChange(e.target.value)}
+        className={`${fieldClass} appearance-none`}
+        aria-label="Position interested in"
       >
         <option value="" disabled className="bg-[#111111] text-white/60">
-          Select a position *
+          Position interested in *
         </option>
         {positionParam && !uniquePositions.includes(positionParam) ? (
           <option value={positionParam} className="bg-[#111111] text-white">

@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus, Edit, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
+import { AdminSearchField } from "@/components/ui/AdminSearchField";
+import { TablePagination } from "@/components/ui/TablePagination";
+import { useListView } from "@/hooks/useListView";
+import { buildSearchHaystack } from "@/lib/search-text";
 
 interface TeamMember {
   id: string;
@@ -55,6 +59,27 @@ export default function TeamPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("order");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const {
+    search,
+    setSearch,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    filtered,
+    totalItems,
+    totalSourceItems,
+  } = useListView(members, (member) =>
+    buildSearchHaystack([
+      member.name,
+      member.role,
+      member.location,
+      member.department,
+      member.featuredLeadershipOrder,
+      member.order,
+      member.published ? "published" : "draft",
+    ]),
+  );
 
   useEffect(() => {
     void fetchMembers();
@@ -82,7 +107,7 @@ export default function TeamPage() {
   }
 
   const sortedMembers = useMemo(() => {
-    const list = [...members];
+    const list = [...filtered];
     list.sort((a, b) => {
       let cmp = 0;
       switch (sortKey) {
@@ -114,7 +139,12 @@ export default function TeamPage() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return list;
-  }, [members, sortKey, sortDir]);
+  }, [filtered, sortKey, sortDir]);
+
+  const paginatedMembers = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return sortedMembers.slice(start, start + pageSize);
+  }, [sortedMembers, page, pageSize]);
 
   async function deleteMember(id: string) {
     if (!confirm("Delete this team member?")) return;
@@ -150,6 +180,15 @@ export default function TeamPage() {
         </Link>
       </div>
 
+      <AdminSearchField
+        id="team-search"
+        value={search}
+        onChange={setSearch}
+        placeholder="Search by name, role, location, department…"
+        filteredCount={totalItems}
+        totalCount={totalSourceItems}
+      />
+
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
         <table className="w-full text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
@@ -179,14 +218,20 @@ export default function TeamPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {sortedMembers.length === 0 ? (
+            {members.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
                   No team members yet.
                 </td>
               </tr>
+            ) : totalItems === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
+                  No team members match your search.
+                </td>
+              </tr>
             ) : (
-              sortedMembers.map((member) => (
+              paginatedMembers.map((member) => (
                 <tr key={member.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                   <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{member.name}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{member.role}</td>
@@ -229,6 +274,15 @@ export default function TeamPage() {
             )}
           </tbody>
         </table>
+        {members.length > 0 ? (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        ) : null}
       </div>
     </div>
   );

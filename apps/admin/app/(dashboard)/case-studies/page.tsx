@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Edit, Trash2, Eye, CopyPlus } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { TablePagination } from "@/components/ui/TablePagination";
+import { AdminSearchField } from "@/components/ui/AdminSearchField";
+import { useListView } from "@/hooks/useListView";
+import { buildSearchHaystack } from "@/lib/search-text";
 
 interface CaseStudy {
   id: string;
@@ -30,22 +33,26 @@ export default function CaseStudiesPage() {
   const [caseStudies, setCaseStudies] = useState<CaseStudy[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-
-  const totalPages = Math.max(1, Math.ceil(caseStudies.length / pageSize));
-  const safePage = Math.min(page, totalPages);
-
-  const paginatedCaseStudies = useMemo(() => {
-    const start = (safePage - 1) * pageSize;
-    return caseStudies.slice(start, start + pageSize);
-  }, [caseStudies, safePage, pageSize]);
-
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
+  const {
+    search,
+    setSearch,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    paginated: paginatedCaseStudies,
+    totalItems,
+    totalSourceItems,
+  } = useListView(caseStudies, (cs) =>
+    buildSearchHaystack([
+      cs.title,
+      cs.slug,
+      cs.category,
+      cs.subcategory,
+      cs.clientName,
+      cs.published ? "published" : "draft",
+    ]),
+  );
 
   useEffect(() => {
     fetchCaseStudies();
@@ -139,10 +146,6 @@ export default function CaseStudiesPage() {
       if (res.ok) {
         const next = caseStudies.filter((cs) => cs.id !== id);
         setCaseStudies(next);
-        const nextTotalPages = Math.max(1, Math.ceil(next.length / pageSize));
-        if (page > nextTotalPages) {
-          setPage(nextTotalPages);
-        }
       }
     } catch (error) {
       console.error("Error deleting case study:", error);
@@ -181,7 +184,16 @@ export default function CaseStudiesPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <AdminSearchField
+        id="case-study-search"
+        value={search}
+        onChange={setSearch}
+        placeholder="Search by title, slug, category, client…"
+        filteredCount={totalItems}
+        totalCount={totalSourceItems}
+      />
+
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden dark:border-gray-700 dark:bg-gray-900">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -199,6 +211,12 @@ export default function CaseStudiesPage() {
               <tr>
                 <td colSpan={7} className="text-center py-12 text-gray-500">
                   No case studies found. Create your first one!
+                </td>
+              </tr>
+            ) : totalItems === 0 ? (
+              <tr>
+                <td colSpan={7} className="text-center py-12 text-gray-500">
+                  No case studies match your search.
                 </td>
               </tr>
             ) : (
@@ -280,14 +298,11 @@ export default function CaseStudiesPage() {
         </table>
         {caseStudies.length > 0 ? (
           <TablePagination
-            page={safePage}
+            page={page}
             pageSize={pageSize}
-            totalItems={caseStudies.length}
+            totalItems={totalItems}
             onPageChange={setPage}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setPage(1);
-            }}
+            onPageSizeChange={setPageSize}
           />
         ) : null}
       </div>

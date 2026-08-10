@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Edit, Trash2, Settings, Search } from "lucide-react";
+import { Plus, Edit, Trash2, Settings } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { AdminSearchField } from "@/components/ui/AdminSearchField";
+import { TablePagination } from "@/components/ui/TablePagination";
+import { useListView } from "@/hooks/useListView";
 
 interface JobListing {
   id: string;
@@ -40,10 +43,20 @@ function jobSearchHaystack(job: JobListing): string {
 }
 
 export default function JobsPage() {
-  const { canMutate } = useAdminSession();
+  const { canAccessWebsite } = useAdminSession();
   const [jobs, setJobs] = useState<JobListing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const {
+    search,
+    setSearch,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    paginated: paginatedJobs,
+    totalItems,
+    totalSourceItems,
+  } = useListView(jobs, jobSearchHaystack);
 
   useEffect(() => {
     void fetchJobs();
@@ -61,19 +74,16 @@ export default function JobsPage() {
     }
   }
 
-  const filteredJobs = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return jobs;
-    return jobs.filter((job) => jobSearchHaystack(job).includes(q));
-  }, [jobs, search]);
-
   async function deleteJob(id: string) {
     if (!confirm("Are you sure you want to delete this job listing?")) return;
     try {
       const res = await adminFetch(`/api/admin/jobs/${id}`, {
         method: "DELETE",
       });
-      if (res.ok) setJobs(jobs.filter((j) => j.id !== id));
+      if (res.ok) {
+        const next = jobs.filter((j) => j.id !== id);
+        setJobs(next);
+      }
     } catch (error) {
       console.error("Error deleting job:", error);
     }
@@ -95,7 +105,7 @@ export default function JobsPage() {
           <p className="text-sm text-gray-500 dark:text-gray-400">Manage open positions on the careers page</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {canMutate ? (
+          {canAccessWebsite ? (
             <>
               <Link
                 href="/settings/categories"
@@ -116,30 +126,14 @@ export default function JobsPage() {
         </div>
       </div>
 
-      <div className="mb-4">
-        <label className="sr-only" htmlFor="job-search">
-          Search job listings
-        </label>
-        <div className="relative">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500"
-            aria-hidden
-          />
-          <input
-            id="job-search"
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by ref, title, category, technology, department, location…"
-            className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:ring-white"
-          />
-        </div>
-        {search.trim() ? (
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            Showing {filteredJobs.length} of {jobs.length} listings
-          </p>
-        ) : null}
-      </div>
+      <AdminSearchField
+        id="job-search"
+        value={search}
+        onChange={setSearch}
+        placeholder="Search by ref, title, category, technology, department, location…"
+        filteredCount={totalItems}
+        totalCount={totalSourceItems}
+      />
 
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
         <table className="w-full min-w-[800px] text-sm">
@@ -158,16 +152,20 @@ export default function JobsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {filteredJobs.length === 0 ? (
+            {jobs.length === 0 ? (
               <tr>
                 <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
-                  {jobs.length === 0
-                    ? "No job listings yet. Add one to get started."
-                    : "No listings match your search."}
+                  No job listings yet. Add one to get started.
+                </td>
+              </tr>
+            ) : totalItems === 0 ? (
+              <tr>
+                <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
+                  No listings match your search.
                 </td>
               </tr>
             ) : (
-              filteredJobs.map((job) => (
+              paginatedJobs.map((job) => (
                 <tr key={job.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                   <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">{job.referenceNumber}</td>
                   <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{job.title}</td>
@@ -196,7 +194,7 @@ export default function JobsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {canMutate ? (
+                    {canAccessWebsite ? (
                       <div className="inline-flex items-center gap-2">
                         <Link
                           href={`/jobs/${job.id}`}
@@ -221,6 +219,15 @@ export default function JobsPage() {
             )}
           </tbody>
         </table>
+        {jobs.length > 0 ? (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        ) : null}
       </div>
     </div>
   );

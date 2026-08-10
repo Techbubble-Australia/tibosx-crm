@@ -17,7 +17,7 @@ export default function EditUserPage() {
   const id = params.id as string;
   const [isLoading, setIsLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const [role, setRole] = useState<AdminRole>("editor");
+  const [role, setRole] = useState<AdminRole>("website");
   const [defaults, setDefaults] = useState<{
     email: string;
     name: string | null;

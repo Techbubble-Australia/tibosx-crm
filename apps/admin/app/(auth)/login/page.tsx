@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Lock, Mail, Loader2, ShieldCheck } from "lucide-react";
+import { defaultLandingPath } from "@/lib/admin-roles";
 
 type LoginStep = "credentials" | "mfa";
 
@@ -49,7 +50,7 @@ export default function LoginPage() {
         return;
       }
 
-      window.location.assign("/case-studies");
+      window.location.assign(defaultLandingPath(data?.data?.user?.role ?? "website"));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -79,7 +80,7 @@ export default function LoginPage() {
         throw new Error(typeof data.error === "string" ? data.error : "MFA verification failed");
       }
 
-      window.location.assign("/case-studies");
+      window.location.assign(defaultLandingPath(data?.data?.user?.role ?? "website"));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "MFA verification failed");
     } finally {
@@ -98,15 +99,15 @@ export default function LoginPage() {
               <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
               <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
             </div>
-            <span className="text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100">TECHBUBBLE</span>
+            <span className="text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100">TBOS</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            {step === "mfa" ? "Two-factor authentication" : "Admin Login"}
+            {step === "mfa" ? "Two-factor authentication" : "TBOS"}
           </h1>
           <p className="mt-2 text-gray-500 dark:text-gray-400">
             {step === "mfa"
               ? `Enter the 6-digit code from your authenticator app for ${emailHint}.`
-              : "Sign in to manage content"}
+              : "TechBubble Business Operating System"}
           </p>
         </div>
 

@@ -1,21 +1,39 @@
 import { prisma } from "@techbubble/database";
 
-export const ADMIN_ROLES = ["admin", "editor", "viewer"] as const;
+export const ADMIN_ROLES = ["admin", "recruiter", "sales", "website"] as const;
 
 export const ADMIN_ROLES_LIST = ADMIN_ROLES;
 
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
+export type TbModule = "recruitment" | "website" | "sales" | "users";
+
+const MODULE_ROLE_MAP: Record<TbModule, readonly AdminRole[]> = {
+  recruitment: ["admin", "recruiter"],
+  website: ["admin", "website"],
+  sales: ["admin", "sales"],
+  users: ["admin"],
+};
+
+export function isAdminRole(value: string): value is AdminRole {
+  return (ADMIN_ROLES as readonly string[]).includes(value);
+}
+
+export function canAccessModule(role: string, module: TbModule): boolean {
+  if (!isAdminRole(role)) return false;
+  return MODULE_ROLE_MAP[module].includes(role);
+}
+
 export function canMutateContent(role: string): boolean {
-  return role === "admin" || role === "editor";
+  return isAdminRole(role);
 }
 
 export function canManageUsers(role: string): boolean {
-  return role === "admin";
+  return canAccessModule(role, "users");
 }
 
 export function canManageClients(role: string): boolean {
-  return role === "admin";
+  return canAccessModule(role, "sales");
 }
 
 export async function countActiveAdmins(): Promise<number> {

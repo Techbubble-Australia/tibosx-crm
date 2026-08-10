@@ -24,7 +24,7 @@ import { siteContentPublicRoutes, siteContentAdminRoutes } from "./routes/siteCo
 import { clientRoutes } from "./routes/clients";
 import { adminUserRoutes } from "./routes/adminUsers";
 import { authMiddleware } from "./middleware/auth";
-import { requireRole, blockViewerMutations } from "./middleware/requireRole";
+import { requireRole, requireModule, blockModuleMutations } from "./middleware/requireRole";
 
 dotenv.config();
 
@@ -70,25 +70,27 @@ app.use("/api/testimonials", testimonialPublicRoutes);
 app.use("/api/faqs", faqRoutes);
 app.use("/api/site-content", siteContentPublicRoutes);
 
-// Protected routes (admin only)
-const adminAuth = [authMiddleware, blockViewerMutations];
+// Protected routes (module-scoped)
+const websiteWrite = [authMiddleware, blockModuleMutations("website")];
+const recruitmentWrite = [authMiddleware, blockModuleMutations("recruitment")];
+const salesWrite = [authMiddleware, blockModuleMutations("sales")];
 
-app.use("/api/admin/case-studies", ...adminAuth, caseStudyPreviewRouter);
-app.use("/api/admin/case-studies", ...adminAuth, caseStudyRoutes);
-app.use("/api/admin/jobs", ...adminAuth, jobRoutes);
-app.use("/api/admin/job-categories", ...adminAuth, jobCategoryRoutes);
-app.use("/api/admin/job-departments", ...adminAuth, jobDepartmentRoutes);
-app.use("/api/admin/job-technologies", ...adminAuth, jobTechnologyRoutes);
-app.use("/api/admin/case-study-categories", ...adminAuth, caseStudyCategoryRoutes);
-app.use("/api/admin/team", ...adminAuth, teamRoutes);
-app.use("/api/admin/testimonials", ...adminAuth, testimonialAdminRoutes);
-app.use("/api/admin/faqs", ...adminAuth, faqRoutes);
-app.use("/api/admin/site-content", ...adminAuth, siteContentAdminRoutes);
-app.use("/api/admin/career-applications", authMiddleware, careerRoutes);
-app.use("/api/admin/contact-submissions", authMiddleware, contactRoutes);
-app.use("/api/admin/clients", authMiddleware, requireRole("admin"), clientRoutes);
+app.use("/api/admin/case-studies", ...websiteWrite, caseStudyPreviewRouter);
+app.use("/api/admin/case-studies", ...websiteWrite, caseStudyRoutes);
+app.use("/api/admin/jobs", ...websiteWrite, jobRoutes);
+app.use("/api/admin/job-categories", ...websiteWrite, jobCategoryRoutes);
+app.use("/api/admin/job-departments", ...websiteWrite, jobDepartmentRoutes);
+app.use("/api/admin/job-technologies", ...websiteWrite, jobTechnologyRoutes);
+app.use("/api/admin/case-study-categories", ...websiteWrite, caseStudyCategoryRoutes);
+app.use("/api/admin/team", ...websiteWrite, teamRoutes);
+app.use("/api/admin/testimonials", ...websiteWrite, testimonialAdminRoutes);
+app.use("/api/admin/faqs", ...websiteWrite, faqRoutes);
+app.use("/api/admin/site-content", ...websiteWrite, siteContentAdminRoutes);
+app.use("/api/admin/career-applications", authMiddleware, requireModule("recruitment"), careerRoutes);
+app.use("/api/admin/contact-submissions", authMiddleware, requireModule("website"), contactRoutes);
+app.use("/api/admin/clients", authMiddleware, requireModule("sales"), clientRoutes);
 app.use("/api/admin/users", authMiddleware, requireRole("admin"), adminUserRoutes);
-app.use("/api/upload", ...adminAuth, uploadRoutes);
+app.use("/api/upload", ...websiteWrite, uploadRoutes);
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

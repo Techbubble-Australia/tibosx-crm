@@ -15,7 +15,6 @@ import {
   FileStack,
   Building2,
   Shield,
-  Database,
   Globe,
   Settings,
   LayoutDashboard,
@@ -24,6 +23,7 @@ import {
   Layers,
   Cpu,
   Building,
+  Target,
 } from "lucide-react";
 import { AdminSessionProvider, useAdminSession } from "@/contexts/AdminSessionContext";
 import { roleLabel } from "@/lib/admin-roles";
@@ -38,49 +38,55 @@ type NavItem = {
 type NavGroup = {
   id: string;
   label: string;
-  icon: typeof Database;
+  icon: typeof Globe;
   roles: string[];
   items: NavItem[];
 };
 
 const navGroups: NavGroup[] = [
   {
-    id: "database",
-    label: "Database",
-    icon: Database,
-    roles: ["admin", "editor", "viewer"],
+    id: "recruitment",
+    label: "Recruitment",
+    icon: Target,
+    roles: ["admin", "recruiter"],
     items: [
-      { href: "/database/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "editor", "viewer"] },
-      { href: "/database/profiles", label: "Profiles", icon: UserCircle, roles: ["admin", "editor", "viewer"] },
-      { href: "/database/career-applications", label: "Career applications", icon: UserCheck, roles: ["admin", "editor", "viewer"] },
+      { href: "/database/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "recruiter"] },
+      { href: "/database/profiles", label: "Profiles", icon: UserCircle, roles: ["admin", "recruiter"] },
+      { href: "/database/career-applications", label: "Career applications", icon: UserCheck, roles: ["admin", "recruiter"] },
     ],
   },
   {
     id: "website",
     label: "Website",
     icon: Globe,
-    roles: ["admin", "editor", "viewer"],
+    roles: ["admin", "website"],
     items: [
-      { href: "/pages", label: "Site pages", icon: FileStack, roles: ["admin", "editor", "viewer"] },
-      { href: "/jobs", label: "Job Listings", icon: Briefcase, roles: ["admin", "editor", "viewer"] },
-      { href: "/case-studies", label: "Case Studies", icon: FileText, roles: ["admin", "editor", "viewer"] },
-      { href: "/testimonials", label: "Testimonials", icon: MessageSquare, roles: ["admin", "editor", "viewer"] },
-      { href: "/faqs", label: "FAQs", icon: HelpCircle, roles: ["admin", "editor", "viewer"] },
-      { href: "/contact-submissions", label: "Contact Submissions", icon: Mail, roles: ["admin", "editor", "viewer"] },
+      { href: "/pages", label: "Site pages", icon: FileStack, roles: ["admin", "website"] },
+      { href: "/jobs", label: "Job Listings", icon: Briefcase, roles: ["admin", "website"] },
+      { href: "/case-studies", label: "Case Studies", icon: FileText, roles: ["admin", "website"] },
+      { href: "/testimonials", label: "Testimonials", icon: MessageSquare, roles: ["admin", "website"] },
+      { href: "/faqs", label: "FAQs", icon: HelpCircle, roles: ["admin", "website"] },
+      { href: "/contact-submissions", label: "Contact Submissions", icon: Mail, roles: ["admin", "website"] },
+      { href: "/team", label: "Team members", icon: Users, roles: ["admin", "website"] },
     ],
+  },
+  {
+    id: "sales",
+    label: "Sales",
+    icon: Building2,
+    roles: ["admin", "sales"],
+    items: [{ href: "/clients", label: "Clients", icon: Building2, roles: ["admin", "sales"] }],
   },
   {
     id: "settings",
     label: "Settings",
     icon: Settings,
-    roles: ["admin", "editor", "viewer"],
+    roles: ["admin", "recruiter", "sales", "website"],
     items: [
-      { href: "/settings/categories", label: "Category", icon: Layers, roles: ["admin", "editor"] },
-      { href: "/settings/technologies", label: "Technology", icon: Cpu, roles: ["admin", "editor"] },
-      { href: "/settings/departments", label: "Department", icon: Building, roles: ["admin", "editor"] },
-      { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin", "editor", "viewer"] },
-      { href: "/team", label: "Team members", icon: Users, roles: ["admin", "editor", "viewer"] },
-      { href: "/clients", label: "Client", icon: Building2, roles: ["admin"] },
+      { href: "/settings/categories", label: "Category", icon: Layers, roles: ["admin", "website"] },
+      { href: "/settings/technologies", label: "Technology", icon: Cpu, roles: ["admin", "website"] },
+      { href: "/settings/departments", label: "Department", icon: Building, roles: ["admin", "website"] },
+      { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin", "recruiter", "sales", "website"] },
       { href: "/users", label: "Users", icon: UserCircle, roles: ["admin"] },
     ],
   },
@@ -91,7 +97,7 @@ function headerTitle(pathname: string): string {
     const hit = group.items.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
     if (hit) return hit.label;
   }
-  return "Admin";
+  return "TBOS";
 }
 
 function groupIsActive(group: NavGroup, pathname: string): boolean {
@@ -100,7 +106,7 @@ function groupIsActive(group: NavGroup, pathname: string): boolean {
 
 function DashboardChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { role, email, canMutate, loading } = useAdminSession();
+  const { role, email, loading } = useAdminSession();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -142,10 +148,10 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
               <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
             </div>
             <span className="truncate text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100">
-              TECHBUBBLE
+              TBOS
             </span>
           </Link>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Admin Panel</p>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">TechBubble Business Operating System</p>
           {!loading && email ? (
             <div className="mt-3 min-w-0 space-y-1 border-t border-gray-100 pt-3 dark:border-gray-800">
               <p className="truncate text-xs text-gray-500 dark:text-gray-400" title={email}>
@@ -228,11 +234,6 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         <header className="border-b border-gray-200 bg-white px-8 py-4 dark:border-gray-700 dark:bg-gray-900">
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{headerTitle(pathname)}</h1>
         </header>
-        {!loading && !canMutate ? (
-          <div className="border-b border-amber-200 bg-amber-50 px-8 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
-            Read-only access ({roleLabel(role)}). You can view data but cannot create, edit, or delete content.
-          </div>
-        ) : null}
         <div className="p-8">{children}</div>
       </main>
     </div>

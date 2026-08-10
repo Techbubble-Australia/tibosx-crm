@@ -4,17 +4,49 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
+import { AdminSearchField } from "@/components/ui/AdminSearchField";
+import { TablePagination } from "@/components/ui/TablePagination";
+import { useListView } from "@/hooks/useListView";
+import { buildSearchHaystack } from "@/lib/search-text";
+import { formatClientPhone } from "@/lib/phone-country-codes";
 
 interface ClientRow {
   id: string;
   name: string;
+  website: string;
+  country: string;
   order: number;
   active: boolean;
+  contacts?: { name: string; email: string; phoneCountryCode: string; phoneNumber: string }[];
 }
 
 export default function ClientsPage() {
   const [rows, setRows] = useState<ClientRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const {
+    search,
+    setSearch,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    paginated,
+    totalItems,
+    totalSourceItems,
+  } = useListView(rows, (row) =>
+    buildSearchHaystack([
+      row.name,
+      row.website,
+      row.country,
+      row.order,
+      row.active ? "active" : "inactive",
+      ...(row.contacts ?? []).flatMap((c) => [
+        c.name,
+        c.email,
+        formatClientPhone(c.phoneCountryCode, c.phoneNumber),
+      ]),
+    ]),
+  );
 
   useEffect(() => {
     void fetchRows();
@@ -36,8 +68,10 @@ export default function ClientsPage() {
     if (!confirm("Delete this client?")) return;
     try {
       const res = await adminFetch(`/api/admin/clients/${id}`, { method: "DELETE" });
-      if (res.ok) setRows((r) => r.filter((x) => x.id !== id));
-      else {
+      if (res.ok) {
+        const next = rows.filter((x) => x.id !== id);
+        setRows(next);
+      } else {
         const err = await res.json().catch(() => ({}));
         alert((err as { error?: string }).error || "Delete failed");
       }
@@ -72,12 +106,22 @@ export default function ClientsPage() {
         </Link>
       </div>
 
+      <AdminSearchField
+        id="client-search"
+        value={search}
+        onChange={setSearch}
+        placeholder="Search by client name…"
+        filteredCount={totalItems}
+        totalCount={totalSourceItems}
+      />
+
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
         <table className="w-full text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
             <tr>
               <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Name</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Order</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Country</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Contacts</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
               <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
             </tr>
@@ -85,15 +129,20 @@ export default function ClientsPage() {
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
-                  No clients yet.
-                </td>
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">No clients yet.</td>
+              </tr>
+            ) : totalItems === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">No clients match your search.</td>
               </tr>
             ) : (
-              rows.map((row) => (
+              paginated.map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                   <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{row.name}</td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.order}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.country}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                    {row.contacts?.length ?? 0}
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -127,6 +176,15 @@ export default function ClientsPage() {
             )}
           </tbody>
         </table>
+        {rows.length > 0 ? (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        ) : null}
       </div>
     </div>
   );

@@ -4,16 +4,32 @@ import { prisma } from "@techbubble/database";
 
 const router: IRouter = Router();
 
+const contactSchema = z.object({
+  name: z.string().min(1).max(200),
+  email: z.string().email(),
+  phoneCountryCode: z.string().min(1).max(8),
+  phoneNumber: z.string().min(4).max(20),
+  order: z.number().int().default(0),
+});
+
 const clientSchema = z.object({
   name: z.string().min(1).max(200),
+  website: z.string().max(500).optional().default(""),
+  country: z.string().min(1).max(200),
   order: z.number().int().default(0),
   active: z.boolean().default(true),
+  contacts: z.array(contactSchema).optional().default([]),
 });
 
 router.get("/", async (_req, res) => {
   try {
     const rows = await prisma.client.findMany({
       orderBy: [{ order: "asc" }, { name: "asc" }],
+      include: {
+        contacts: {
+          orderBy: [{ order: "asc" }, { name: "asc" }],
+        },
+      },
     });
     res.json({ data: rows });
   } catch (error) {
@@ -24,7 +40,14 @@ router.get("/", async (_req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
-    const row = await prisma.client.findUnique({ where: { id: req.params.id } });
+    const row = await prisma.client.findUnique({
+      where: { id: req.params.id },
+      include: {
+        contacts: {
+          orderBy: [{ order: "asc" }, { name: "asc" }],
+        },
+      },
+    });
     if (!row) return res.status(404).json({ error: "Not found" });
     res.json({ data: row });
   } catch (error) {
@@ -36,7 +59,29 @@ router.get("/:id", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const data = clientSchema.parse(req.body);
-    const row = await prisma.client.create({ data });
+    const row = await prisma.client.create({
+      data: {
+        name: data.name,
+        website: data.website ?? "",
+        country: data.country,
+        order: data.order,
+        active: data.active,
+        contacts: {
+          create: data.contacts.map((contact, index) => ({
+            name: contact.name,
+            email: contact.email,
+            phoneCountryCode: contact.phoneCountryCode,
+            phoneNumber: contact.phoneNumber,
+            order: contact.order ?? index,
+          })),
+        },
+      },
+      include: {
+        contacts: {
+          orderBy: [{ order: "asc" }, { name: "asc" }],
+        },
+      },
+    });
     res.status(201).json({ data: row });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -50,9 +95,44 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const data = clientSchema.partial().parse(req.body);
-    const row = await prisma.client.update({
+    const existing = await prisma.client.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const { contacts, ...clientFields } = data;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.client.update({
+        where: { id: req.params.id },
+        data: clientFields,
+      });
+
+      if (contacts) {
+        await tx.clientContact.deleteMany({ where: { clientId: req.params.id } });
+        for (let index = 0; index < contacts.length; index++) {
+          const contact = contacts[index]!;
+          await tx.clientContact.create({
+            data: {
+              clientId: req.params.id,
+              name: contact.name,
+              email: contact.email,
+              phoneCountryCode: contact.phoneCountryCode,
+              phoneNumber: contact.phoneNumber,
+              order: contact.order ?? index,
+            },
+          });
+        }
+      }
+    });
+
+    const row = await prisma.client.findUnique({
       where: { id: req.params.id },
-      data,
+      include: {
+        contacts: {
+          orderBy: [{ order: "asc" }, { name: "asc" }],
+        },
+      },
     });
     res.json({ data: row });
   } catch (error) {

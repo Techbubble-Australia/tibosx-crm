@@ -5,6 +5,10 @@ import Link from "next/link";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { SITE_CONTENT_FORM_KEYS, SITE_CONTENT_KEY_LABELS } from "@/lib/site-content-normalize";
+import { AdminSearchField } from "@/components/ui/AdminSearchField";
+import { TablePagination } from "@/components/ui/TablePagination";
+import { useListView } from "@/hooks/useListView";
+import { buildSearchHaystack } from "@/lib/search-text";
 
 interface SiteContentRow {
   id: string;
@@ -40,6 +44,20 @@ export default function SitePagesListPage() {
     const extras = rows.filter((r) => !canonicalKeys.has(r.key)).map((r) => ({ ...r, missing: false as const }));
     return [...canonical, ...extras];
   }, [rows]);
+
+  const {
+    search,
+    setSearch,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    paginated,
+    totalItems,
+    totalSourceItems,
+  } = useListView(mergedRows, (row) =>
+    buildSearchHaystack([row.key, row.label, row.missing ? "missing" : ""]),
+  );
 
   useEffect(() => {
     void fetchRows();
@@ -101,6 +119,15 @@ export default function SitePagesListPage() {
         </Link>
       </div>
 
+      <AdminSearchField
+        id="site-pages-search"
+        value={search}
+        onChange={setSearch}
+        placeholder="Search by key or label…"
+        filteredCount={totalItems}
+        totalCount={totalSourceItems}
+      />
+
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         <table className="w-full text-sm">
           <thead className="border-b border-gray-200 bg-gray-50">
@@ -118,8 +145,12 @@ export default function SitePagesListPage() {
                   No site content yet. Run the database seed or create a document.
                 </td>
               </tr>
+            ) : totalItems === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-4 py-8 text-center text-gray-400">No pages match your search.</td>
+              </tr>
             ) : (
-              mergedRows.map((row) => (
+              paginated.map((row) => (
                 <tr key={row.id} className={row.missing ? "bg-amber-50/50" : "hover:bg-gray-50"}>
                   <td className="px-4 py-3 font-mono text-xs font-medium text-gray-900">{row.key}</td>
                   <td className="max-w-[320px] truncate px-4 py-3 text-gray-700">
@@ -168,6 +199,15 @@ export default function SitePagesListPage() {
             )}
           </tbody>
         </table>
+        {mergedRows.length > 0 ? (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        ) : null}
       </div>
     </div>
   );

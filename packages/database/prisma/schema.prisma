@@ -206,11 +206,12 @@ model CaseStudySubcategory {
 }
 
 model JobCategory {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  order     Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String          @id @default(cuid())
+  name         String          @unique
+  order        Int             @default(0)
+  technologies JobTechnology[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
   @@index([order])
 }
@@ -226,26 +227,48 @@ model JobDepartment {
 }
 
 model JobTechnology {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  order     Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String      @id @default(cuid())
+  name       String
+  categoryId String
+  category   JobCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  order      Int         @default(0)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 
+  @@unique([categoryId, name])
+  @@index([categoryId])
   @@index([order])
 }
 
 model Client {
-  id        String       @id @default(cuid())
-  name      String       @unique
-  order     Int          @default(0)
-  active    Boolean      @default(true)
+  id        String          @id @default(cuid())
+  name      String          @unique
+  website   String          @default("")
+  country   String
+  order     Int             @default(0)
+  active    Boolean         @default(true)
   jobs      JobListing[]
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  contacts  ClientContact[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
 
   @@index([order])
   @@index([active])
+}
+
+model ClientContact {
+  id               String   @id @default(cuid())
+  clientId         String
+  client           Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name             String
+  email            String
+  phoneCountryCode String
+  phoneNumber      String
+  order            Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([clientId])
 }
 
 model JobListing {
@@ -362,7 +385,7 @@ model AdminUser {
   email        String   @unique
   name         String?
   passwordHash String
-  role         String   @default("admin") // admin | editor | viewer
+  role         String   @default("admin") // admin | recruiter | sales | website
   active       Boolean  @default(true)
   /// AES-256-GCM encrypted TOTP secret (set during MFA enrollment).
   totpSecretEnc String?

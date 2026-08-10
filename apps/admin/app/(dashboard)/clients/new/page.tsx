@@ -5,13 +5,18 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
+import { CountryFlagPicker } from "@/components/CountryFlagPicker";
+import { ClientContactsField, type ClientContactInput } from "@/components/clients/ClientContactsField";
 
 const inputClass =
-  "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
+  "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
 
 export default function NewClientPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [contacts, setContacts] = useState<ClientContactInput[]>([
+    { name: "", email: "", phoneCountryCode: "+61", phoneNumber: "" },
+  ]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -23,32 +28,54 @@ export default function NewClientPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formData.get("name"),
+          website: formData.get("website") ?? "",
+          country: formData.get("country"),
           order: parseInt(formData.get("order") as string, 10) || 0,
           active: formData.get("active") === "on",
+          contacts,
         }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error || "Failed");
+      }
       router.push("/clients");
-    } catch {
-      alert("Failed to create client");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to create client");
     } finally {
       setIsLoading(false);
     }
   }
 
   return (
-    <div className="max-w-lg">
+    <div className="max-w-2xl">
       <div className="mb-6 flex items-center gap-3">
         <Link href="/clients" className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">New Client</h2>
       </div>
-      <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+      <form
+        onSubmit={onSubmit}
+        className="space-y-6 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900"
+      >
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Name *</label>
           <input name="name" required className={inputClass} placeholder="e.g. University of Sydney" />
         </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Website</label>
+          <input
+            name="website"
+            type="url"
+            className={inputClass}
+            placeholder="https://example.com"
+          />
+        </div>
+        <CountryFlagPicker
+          selectClassName={inputClass}
+          labelClassName="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100"
+        />
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Order</label>
           <input name="order" type="number" defaultValue={0} className={inputClass} />
@@ -57,6 +84,7 @@ export default function NewClientPage() {
           <input name="active" type="checkbox" defaultChecked className="h-4 w-4 rounded" />
           Active
         </label>
+        <ClientContactsField contacts={contacts} onChange={setContacts} inputClassName={inputClass} />
         <button
           type="submit"
           disabled={isLoading}

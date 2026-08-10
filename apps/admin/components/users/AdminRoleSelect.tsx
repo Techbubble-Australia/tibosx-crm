@@ -13,7 +13,7 @@ type RoleSelectProps = {
 };
 
 export function AdminRoleSelect({ name = "role", value, onChange, required = true }: RoleSelectProps) {
-  const description = ROLE_META[value as keyof typeof ROLE_META]?.description ?? ROLE_META.editor.description;
+  const description = ROLE_META[value as keyof typeof ROLE_META]?.description ?? ROLE_META.website.description;
 
   return (
     <div className="space-y-2">
