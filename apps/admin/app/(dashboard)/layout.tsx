@@ -132,24 +132,27 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="flex w-64 flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-        <div className="p-6">
-          <Link href="/database/dashboard" className="flex items-center gap-2">
-            <div className="grid grid-cols-2 gap-0.5">
+      <aside className="flex w-64 shrink-0 flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="min-w-0 p-6">
+          <Link href="/database/dashboard" className="flex min-w-0 items-center gap-2">
+            <div className="grid shrink-0 grid-cols-2 gap-0.5">
               <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
               <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
               <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
               <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
             </div>
-            <span className="text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100">TECHBUBBLE</span>
+            <span className="truncate text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+              TECHBUBBLE
+            </span>
           </Link>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Admin Panel</p>
           {!loading && email ? (
-            <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-              {email}
-              <span className="mx-1">·</span>
-              <span className="font-medium text-gray-700 dark:text-gray-300">{roleLabel(role)}</span>
-            </p>
+            <div className="mt-3 min-w-0 space-y-1 border-t border-gray-100 pt-3 dark:border-gray-800">
+              <p className="truncate text-xs text-gray-500 dark:text-gray-400" title={email}>
+                {email}
+              </p>
+              <p className="text-xs font-medium text-gray-700 dark:text-gray-300">{roleLabel(role)}</p>
+            </div>
           ) : null}
         </div>
 
@@ -169,9 +172,9 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
                       : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
                   }`}
                 >
-                  <span className="flex items-center gap-2.5">
+                  <span className="flex min-w-0 items-center gap-2.5">
                     <GroupIcon className="h-4 w-4 shrink-0" />
-                    {group.label}
+                    <span className="truncate">{group.label}</span>
                   </span>
                   <ChevronDown
                     className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
@@ -194,7 +197,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
                           }`}
                         >
                           <Icon className="h-3.5 w-3.5 shrink-0 opacity-70" />
-                          <span>{item.label}</span>
+                          <span className="truncate">{item.label}</span>
                         </Link>
                       );
                     })}
