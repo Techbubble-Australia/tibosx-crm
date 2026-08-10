@@ -31,6 +31,10 @@ const mfaVerifyLoginSchema = mfaCodeSchema.extend({
   mfaToken: z.string().min(1),
 });
 
+const mfaDisableSchema = mfaCodeSchema.extend({
+  password: z.string().min(1),
+});
+
 function publicUser(user: { id: string; email: string; role: string; mfaEnabled: boolean }) {
   return {
     id: user.id,
@@ -268,10 +272,53 @@ router.post("/mfa/confirm", authMiddleware, async (req: AuthRequest, res) => {
 });
 
 router.post("/mfa/disable", authMiddleware, async (req: AuthRequest, res) => {
-  return res.status(403).json({
-    error: "MFA cannot be disabled. Two-factor authentication is required for all TBOS users.",
-    code: "MFA_MANDATORY",
-  });
+  try {
+    const u = req.user;
+    if (!u) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { password, code } = mfaDisableSchema.parse(req.body);
+    const user = await prisma.adminUser.findUnique({ where: { id: u.id } });
+    if (!user?.passwordHash) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const validPassword = await bcrypt.compare(password, user.passwordHash);
+    if (!validPassword) {
+      return res.status(401).json({ error: "Invalid password" });
+    }
+
+    if (user.mfaEnabled && user.totpSecretEnc) {
+      const validCode = await verifyUserTotpCode(user.totpSecretEnc, code);
+      if (!validCode) {
+        return res.status(401).json({ error: "Invalid verification code" });
+      }
+    }
+
+    await prisma.adminUser.update({
+      where: { id: user.id },
+      data: {
+        mfaEnabled: false,
+        totpSecretEnc: null,
+        mfaEnrolledAt: null,
+      },
+    });
+
+    res.json({
+      message: "MFA disabled",
+      data: {
+        mfaEnabled: false,
+        mfaEnrolledAt: null,
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("MFA disable error:", error);
+    res.status(500).json({ error: "Failed to disable MFA" });
+  }
 });
 
 export { router as authRoutes };
