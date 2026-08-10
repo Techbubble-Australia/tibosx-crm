@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Lock, Mail, Loader2, ShieldCheck } from "lucide-react";
 
 type LoginStep = "credentials" | "mfa";
@@ -11,6 +11,13 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [mfaToken, setMfaToken] = useState("");
   const [emailHint, setEmailHint] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
+
+  useEffect(() => {
+    if (step === "mfa") {
+      setMfaCode("");
+    }
+  }, [step]);
 
   async function onCredentialsSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -56,7 +63,7 @@ export default function LoginPage() {
     setError("");
 
     const formData = new FormData(e.currentTarget);
-    const code = (formData.get("code") as string).replace(/\s/g, "");
+    const code = mfaCode.replace(/\s/g, "");
 
     try {
       const res = await fetch("/api/auth/mfa/verify", {
@@ -157,23 +164,32 @@ export default function LoginPage() {
             </button>
           </form>
         ) : (
-          <form onSubmit={onMfaSubmit} className="space-y-4">
+          <form onSubmit={onMfaSubmit} className="space-y-4" autoComplete="off">
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+              <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100" htmlFor="mfa-totp-code">
                 Verification code
               </label>
               <div className="relative">
                 <ShieldCheck className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
-                  name="code"
+                  id="mfa-totp-code"
+                  name="mfa-totp-code"
                   type="text"
                   required
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value.replace(/[^\d\s]/g, ""))}
                   inputMode="numeric"
                   autoComplete="one-time-code"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  data-lpignore="true"
+                  data-1p-ignore
                   pattern="[0-9\s]{6,8}"
                   maxLength={8}
                   className="w-full rounded-lg border border-gray-200 bg-white py-3 pl-10 pr-4 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-neutral-950 dark:text-gray-100 dark:focus:ring-white"
                   placeholder="123456"
+                  autoFocus
                 />
               </div>
             </div>
@@ -198,6 +214,7 @@ export default function LoginPage() {
               onClick={() => {
                 setStep("credentials");
                 setMfaToken("");
+                setMfaCode("");
                 setError("");
               }}
               className="w-full text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"

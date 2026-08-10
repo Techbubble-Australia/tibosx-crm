@@ -220,16 +220,23 @@ export default function SecuritySettingsPage() {
                   </div>
                 </div>
 
-                <form onSubmit={confirmSetup} className="flex flex-wrap items-end gap-3">
+                <form onSubmit={confirmSetup} className="flex flex-wrap items-end gap-3" autoComplete="off">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="mfa-setup-code">
                       Verification code
                     </label>
                     <input
+                      id="mfa-setup-code"
+                      name="mfa-totp-code"
                       value={confirmCode}
-                      onChange={(e) => setConfirmCode(e.target.value)}
+                      onChange={(e) => setConfirmCode(e.target.value.replace(/[^\d\s]/g, ""))}
                       inputMode="numeric"
                       autoComplete="one-time-code"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      data-lpignore="true"
+                      data-1p-ignore
                       pattern="[0-9\s]{6,8}"
                       maxLength={8}
                       required
@@ -249,7 +256,7 @@ export default function SecuritySettingsPage() {
             )}
           </div>
         ) : (
-          <form onSubmit={disableMfa} className="mt-6 space-y-4 max-w-md">
+          <form onSubmit={disableMfa} className="mt-6 space-y-4 max-w-md" autoComplete="off">
             <p className="text-sm text-gray-500 dark:text-gray-400">
               To disable MFA, confirm your password and enter a current authenticator code.
             </p>
@@ -269,10 +276,17 @@ export default function SecuritySettingsPage() {
                 Authenticator code
               </label>
               <input
+                id="mfa-disable-code"
+                name="mfa-totp-code"
                 value={disableCode}
-                onChange={(e) => setDisableCode(e.target.value)}
+                onChange={(e) => setDisableCode(e.target.value.replace(/[^\d\s]/g, ""))}
                 inputMode="numeric"
                 autoComplete="one-time-code"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                data-lpignore="true"
+                data-1p-ignore
                 pattern="[0-9\s]{6,8}"
                 maxLength={8}
                 required

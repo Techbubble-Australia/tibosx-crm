@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Edit, Trash2, Eye, CopyPlus } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
+import { TablePagination } from "@/components/ui/TablePagination";
 
 interface CaseStudy {
   id: string;
@@ -29,6 +30,22 @@ export default function CaseStudiesPage() {
   const [caseStudies, setCaseStudies] = useState<CaseStudy[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const totalPages = Math.max(1, Math.ceil(caseStudies.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+
+  const paginatedCaseStudies = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return caseStudies.slice(start, start + pageSize);
+  }, [caseStudies, safePage, pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   useEffect(() => {
     fetchCaseStudies();
@@ -120,7 +137,12 @@ export default function CaseStudiesPage() {
       });
 
       if (res.ok) {
-        setCaseStudies(caseStudies.filter((cs) => cs.id !== id));
+        const next = caseStudies.filter((cs) => cs.id !== id);
+        setCaseStudies(next);
+        const nextTotalPages = Math.max(1, Math.ceil(next.length / pageSize));
+        if (page > nextTotalPages) {
+          setPage(nextTotalPages);
+        }
       }
     } catch (error) {
       console.error("Error deleting case study:", error);
@@ -175,12 +197,12 @@ export default function CaseStudiesPage() {
           <tbody className="divide-y divide-gray-200">
             {caseStudies.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-12 text-gray-500">
+                <td colSpan={7} className="text-center py-12 text-gray-500">
                   No case studies found. Create your first one!
                 </td>
               </tr>
             ) : (
-              caseStudies.map((cs) => (
+              paginatedCaseStudies.map((cs) => (
                 <tr key={cs.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <div className="font-medium">{cs.title}</div>
@@ -256,6 +278,18 @@ export default function CaseStudiesPage() {
             )}
           </tbody>
         </table>
+        {caseStudies.length > 0 ? (
+          <TablePagination
+            page={safePage}
+            pageSize={pageSize}
+            totalItems={caseStudies.length}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        ) : null}
       </div>
     </div>
   );
