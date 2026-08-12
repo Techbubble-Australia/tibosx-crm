@@ -1,21 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useParams, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { JobForm, type JobFormDefaults } from "@/components/jobs/JobForm";
 import { JobApplicationsPanel } from "@/components/jobs/JobApplicationsPanel";
 import { adminFetch } from "@/lib/admin-api";
+import { jobListHref, jobListingsTabFromPath } from "@/lib/job-routes";
 
-export default function EditJobPage() {
+function EditJobPageInner() {
   const router = useRouter();
   const params = useParams();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const id = params.id as string;
 
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [job, setJob] = useState<JobFormDefaults | null>(null);
+
+  const listHref = useMemo(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "active" || tabParam === "inactive") {
+      return jobListHref(tabParam);
+    }
+    if (job?.published === false) {
+      return jobListHref("inactive");
+    }
+    return jobListHref(jobListingsTabFromPath(pathname, tabParam));
+  }, [job?.published, pathname, searchParams]);
 
   useEffect(() => {
     async function loadJob() {
@@ -44,7 +58,7 @@ export default function EditJobPage() {
       if (!res.ok) throw new Error("Failed to update job");
       const updated = await res.json();
       const published = Boolean(updated?.data?.published ?? payload.published);
-      router.push(published ? "/jobs/active" : "/jobs/inactive");
+      router.push(jobListHref(published ? "active" : "inactive"));
     } catch (error) {
       console.error(error);
       alert("Failed to update job listing");
@@ -66,7 +80,7 @@ export default function EditJobPage() {
   return (
     <div>
       <div className="mb-6 flex items-center gap-3">
-        <Link href="/jobs" className="rounded p-1.5 hover:bg-gray-100">
+        <Link href={listHref} className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <div>
@@ -81,7 +95,7 @@ export default function EditJobPage() {
         defaults={job}
         onSubmit={onSubmit}
         isLoading={isLoading}
-        cancelHref={job.published ? "/jobs/active" : "/jobs/inactive"}
+        cancelHref={listHref}
         submitLabel="Save Changes"
       />
 
@@ -89,5 +103,19 @@ export default function EditJobPage() {
         <JobApplicationsPanel jobId={id} />
       </div>
     </div>
+  );
+}
+
+export default function EditJobPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-64 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-black border-t-transparent dark:border-white" />
+        </div>
+      }
+    >
+      <EditJobPageInner />
+    </Suspense>
   );
 }

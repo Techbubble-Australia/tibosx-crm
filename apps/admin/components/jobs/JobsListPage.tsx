@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Plus, Edit, Trash2, Settings } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { jobEditHref } from "@/lib/job-routes";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { ViewModeToggle, type ViewMode } from "@/components/ui/ViewModeToggle";
@@ -27,6 +28,16 @@ interface JobListing {
   applicationCount: number;
   recruiterIds?: string[];
   createdAt: string;
+}
+
+type RecruiterUser = { id: string; email: string };
+
+function formatRecruiters(recruiterIds: string[] | undefined, recruiterById: Map<string, string>): string {
+  if (!recruiterIds?.length) return "—";
+  const labels = recruiterIds
+    .map((id) => recruiterById.get(id))
+    .filter((email): email is string => Boolean(email));
+  return labels.length > 0 ? labels.join(", ") : "—";
 }
 
 function jobSearchHaystack(job: JobListing): string {
@@ -55,7 +66,9 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
   const { canAccessWebsite, canAccessRecruitment } = useAdminSession();
   const canManageJobs = canAccessWebsite || canAccessRecruitment;
   const [jobs, setJobs] = useState<JobListing[]>([]);
+  const [recruiterById, setRecruiterById] = useState<Map<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
+  const listTab = publishedFilter ? "active" : "inactive";
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const filteredJobs = useMemo(
     () => jobs.filter((job) => job.published === publishedFilter),
@@ -79,9 +92,18 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
 
   async function fetchJobs() {
     try {
-      const res = await adminFetch("/api/admin/jobs/admin/all");
-      const data = await res.json();
+      const [jobsRes, recruitersRes] = await Promise.all([
+        adminFetch("/api/admin/jobs/admin/all"),
+        adminFetch("/api/admin/jobs/admin/recruiters"),
+      ]);
+      const data = await jobsRes.json();
+      const recruitersData = await recruitersRes.json();
       setJobs(data.data || []);
+      const map = new Map<string, string>();
+      for (const user of (recruitersData.data ?? []) as RecruiterUser[]) {
+        map.set(user.id, user.email);
+      }
+      setRecruiterById(map);
     } catch (error) {
       console.error("Error fetching jobs:", error);
     } finally {
@@ -169,6 +191,7 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Country</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Technology</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Applications</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Recruiters</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
                 <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
               </tr>
@@ -176,13 +199,13 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {filteredJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
                     No {publishedFilter ? "active" : "inactive"} job listings.
                   </td>
                 </tr>
               ) : totalItems === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
                     No listings match your search.
                   </td>
                 </tr>
@@ -197,6 +220,9 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                     </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.technology || "—"}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.applicationCount ?? 0}</td>
+                    <td className="max-w-[200px] truncate px-4 py-3 text-gray-600 dark:text-gray-400" title={formatRecruiters(job.recruiterIds, recruiterById)}>
+                      {formatRecruiters(job.recruiterIds, recruiterById)}
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -212,7 +238,7 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                       {canManageJobs ? (
                         <div className="inline-flex items-center gap-2">
                           <Link
-                            href={`/jobs/${job.id}`}
+                            href={jobEditHref(job.id, listTab)}
                             className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-black dark:hover:bg-gray-800 dark:hover:text-white"
                           >
                             <Edit className="h-4 w-4" />
@@ -274,9 +300,12 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                         <p className="text-sm text-gray-500 dark:text-gray-400">
                           {job.referenceNumber} · {job.country} · {job.applicationCount ?? 0} applications
                         </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Recruiters: {formatRecruiters(job.recruiterIds, recruiterById)}
+                        </p>
                       </div>
                       <Link
-                        href={`/jobs/${job.id}`}
+                        href={jobEditHref(job.id, listTab)}
                         className="inline-flex rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
                       >
                         View

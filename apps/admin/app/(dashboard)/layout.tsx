@@ -28,6 +28,7 @@ import { AdminSessionProvider, useAdminSession } from "@/contexts/AdminSessionCo
 import { MfaEnrollmentGuard } from "@/components/MfaEnrollmentGuard";
 import { TechBubbleLogo } from "@/components/TechBubbleLogo";
 import { roleLabel } from "@/lib/admin-roles";
+import { isCareerApplicationsPath, isJobListingsPath } from "@/lib/job-routes";
 
 type NavItem = {
   href: string;
@@ -49,7 +50,7 @@ const navGroups: NavGroup[] = [
     id: "recruitment",
     label: "Recruitment",
     icon: Target,
-    roles: ["admin", "recruiter"],
+    roles: ["admin", "recruiter", "website"],
     items: [
       { href: "/database/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "recruiter"] },
       { href: "/database/profiles", label: "Profiles", icon: UserCircle, roles: ["admin", "recruiter"] },
@@ -93,6 +94,12 @@ const navGroups: NavGroup[] = [
 ];
 
 function headerTitle(pathname: string): string {
+  if (isCareerApplicationsPath(pathname)) {
+    return "Career Applications";
+  }
+  if (isJobListingsPath(pathname)) {
+    return "Job Listings";
+  }
   for (const group of navGroups) {
     const hit = group.items.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
     if (hit) return hit.label;
@@ -101,7 +108,17 @@ function headerTitle(pathname: string): string {
 }
 
 function groupIsActive(group: NavGroup, pathname: string): boolean {
+  if (group.id === "recruitment" && isJobListingsPath(pathname)) {
+    return true;
+  }
   return group.items.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
+}
+
+function navItemIsActive(item: NavItem, pathname: string): boolean {
+  if (item.href === "/jobs/active") {
+    return isJobListingsPath(pathname);
+  }
+  return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
 function DashboardChrome({ children }: { children: React.ReactNode }) {
@@ -183,7 +200,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
                   <div className="mt-1 space-y-0.5 pl-2">
                     {group.items.map((item) => {
                       const Icon = item.icon;
-                      const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                      const isActive = navItemIsActive(item, pathname);
                       return (
                         <Link
                           key={item.href}

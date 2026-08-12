@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+import { Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
+import { useAdminSession } from "@/contexts/AdminSessionContext";
 
 type ApplicationRow = {
   id: string;
@@ -16,16 +17,45 @@ type ApplicationRow = {
 };
 
 export function JobApplicationsPanel({ jobId }: { jobId: string }) {
+  const { canAccessWebsite, canAccessRecruitment } = useAdminSession();
+  const canManageApplications = canAccessWebsite || canAccessRecruitment;
   const [rows, setRows] = useState<ApplicationRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const fetchApplications = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await adminFetch(`/api/admin/jobs/admin/${jobId}/applications`);
+      const data = await res.json();
+      setRows(data.data ?? []);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  }, [jobId]);
 
   useEffect(() => {
-    void adminFetch(`/api/admin/jobs/admin/${jobId}/applications`)
-      .then((res) => res.json())
-      .then((data) => setRows(data.data ?? []))
-      .catch((error) => console.error(error))
-      .finally(() => setLoading(false));
-  }, [jobId]);
+    void fetchApplications();
+  }, [fetchApplications]);
+
+  async function deleteApplication(id: string) {
+    if (!confirm("Delete this application? This cannot be undone.")) return;
+    setDeletingId(id);
+    try {
+      const res = await adminFetch(`/api/admin/career-applications/admin/applications/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      setRows((prev) => prev.filter((row) => row.id !== id));
+    } catch (error) {
+      console.error(error);
+      alert("Failed to delete application.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   if (loading) {
     return (
@@ -53,7 +83,7 @@ export function JobApplicationsPanel({ jobId }: { jobId: string }) {
         <p className="text-sm text-gray-400">No applications yet.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px] text-sm">
+          <table className="w-full min-w-[760px] text-sm">
             <thead className="border-b border-gray-200 dark:border-gray-700">
               <tr>
                 <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Name</th>
@@ -61,6 +91,9 @@ export function JobApplicationsPanel({ jobId }: { jobId: string }) {
                 <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Phone</th>
                 <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Location</th>
                 <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Submitted</th>
+                {canManageApplications ? (
+                  <th className="px-3 py-2 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
+                ) : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -77,6 +110,19 @@ export function JobApplicationsPanel({ jobId }: { jobId: string }) {
                   <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
                     {new Date(row.createdAt).toLocaleString()}
                   </td>
+                  {canManageApplications ? (
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => void deleteApplication(row.id)}
+                        disabled={deletingId === row.id}
+                        className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-900/20"
+                        aria-label={`Delete application from ${row.email}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>
