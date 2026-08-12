@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { AdminSearchField } from "@/components/ui/AdminSearchField";
+import { TablePagination } from "@/components/ui/TablePagination";
+import { useListView } from "@/hooks/useListView";
+import { buildSearchHaystack } from "@/lib/search-text";
+import { resolveDocumentFileName, resolveDocumentHref } from "@/lib/media-url";
 
 interface CareerApplication {
   id: string;
@@ -52,11 +57,37 @@ function formatLocation(app: CareerApplication): string | null {
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
+function applicationSearchHaystack(app: CareerApplication): string {
+  return buildSearchHaystack([
+    app.firstName,
+    app.lastName,
+    app.email,
+    app.phone,
+    app.position,
+    app.country,
+    app.city,
+    app.visaStatus,
+    app.message,
+  ]);
+}
+
 export function CareerApplicationsList() {
   const { canAccessWebsite, canAccessRecruitment } = useAdminSession();
   const canManage = canAccessWebsite || canAccessRecruitment;
   const [applications, setApplications] = useState<CareerApplication[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const {
+    search,
+    setSearch,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    paginated,
+    totalItems,
+    totalSourceItems,
+    adjustPageAfterDelete,
+  } = useListView(applications, applicationSearchHaystack);
 
   useEffect(() => {
     void fetchApplications();
@@ -80,7 +111,13 @@ export function CareerApplicationsList() {
       const res = await adminFetch(`/api/admin/career-applications/admin/applications/${id}`, {
         method: "DELETE",
       });
-      if (res.ok) setApplications((prev) => prev.filter((item) => item.id !== id));
+      if (res.ok) {
+        setApplications((prev) => {
+          const next = prev.filter((item) => item.id !== id);
+          adjustPageAfterDelete(next.length);
+          return next;
+        });
+      }
     } catch (error) {
       console.error("Error deleting application:", error);
     }
@@ -99,17 +136,30 @@ export function CareerApplicationsList() {
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Career Applications</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          {applications.length} submission{applications.length !== 1 ? "s" : ""} received
+          {totalSourceItems} submission{totalSourceItems !== 1 ? "s" : ""} received
         </p>
       </div>
+
+      <AdminSearchField
+        id="career-applications-search"
+        value={search}
+        onChange={setSearch}
+        placeholder="Search by name, email, position, location…"
+        filteredCount={totalItems}
+        totalCount={totalSourceItems}
+      />
 
       <div className="space-y-3">
         {applications.length === 0 ? (
           <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-gray-400 dark:border-gray-700 dark:bg-gray-900">
             No applications yet.
           </div>
+        ) : totalItems === 0 ? (
+          <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-gray-400 dark:border-gray-700 dark:bg-gray-900">
+            No applications match your search.
+          </div>
         ) : (
-          applications.map((app) => {
+          paginated.map((app) => {
             const salary = formatSalary(app);
             const docs = documentLinks(app);
             const location = formatLocation(app);
@@ -146,12 +196,12 @@ export function CareerApplicationsList() {
                         {docs.map((url, index) => (
                           <a
                             key={`${url}-${index}`}
-                            href={url}
+                            href={resolveDocumentHref(url)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex text-sm text-blue-600 hover:underline dark:text-blue-400"
                           >
-                            Document {index + 1} →
+                            {resolveDocumentFileName(url, index + 1)} →
                           </a>
                         ))}
                       </div>
@@ -182,6 +232,16 @@ export function CareerApplicationsList() {
           })
         )}
       </div>
+
+      {applications.length > 0 ? (
+        <TablePagination
+          page={page}
+          pageSize={pageSize}
+          totalItems={totalItems}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      ) : null}
     </div>
   );
 }
