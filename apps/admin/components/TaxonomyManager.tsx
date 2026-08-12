@@ -115,36 +115,51 @@ export function TaxonomyManager({ apiPath, title, description }: Props) {
     );
   }
 
-  return (
-    <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-      <h3 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
-      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{description}</p>
+  const inputClass =
+    "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
 
-      <div className="mt-4 flex gap-2">
-        <input
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          placeholder={`New ${title.toLowerCase()}…`}
-          className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              void addItem();
-            }
-          }}
-        />
+  const newItemLabel = `New ${title.toLowerCase().replace(/s$/, "")}`;
+  const searchId = `${title.toLowerCase().replace(/\s+/g, "-")}-search`;
+  const newItemId = `${title.toLowerCase().replace(/\s+/g, "-")}-new-name`;
+
+  return (
+    <section className="space-y-6 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+      <div>
+        <h3 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{description}</p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor={newItemId}>
+            {newItemLabel}
+          </label>
+          <input
+            id={newItemId}
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder={`New ${title.toLowerCase()}…`}
+            className={inputClass}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void addItem();
+              }
+            }}
+          />
+        </div>
         <button
           type="button"
           disabled={saving || !newName.trim()}
           onClick={() => void addItem()}
-          className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+          className="w-full rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-200 sm:w-auto"
         >
           Add
         </button>
       </div>
 
       <AdminSearchField
-        id={`${title.toLowerCase()}-search`}
+        id={searchId}
         value={search}
         onChange={setSearch}
         placeholder={`Search ${title.toLowerCase()}…`}
@@ -152,7 +167,7 @@ export function TaxonomyManager({ apiPath, title, description }: Props) {
         totalCount={totalSourceItems}
       />
 
-      <div className="overflow-hidden rounded-lg border border-gray-100 dark:border-gray-700">
+      <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
         <ul className="divide-y divide-gray-100 dark:divide-gray-700">
           {items.length === 0 ? (
             <li className="px-4 py-8 text-center text-sm text-gray-400">No items yet.</li>
@@ -160,54 +175,61 @@ export function TaxonomyManager({ apiPath, title, description }: Props) {
             <li className="px-4 py-8 text-center text-sm text-gray-400">No items match your search.</li>
           ) : (
             paginated.map((item) => (
-            <li key={item.id} className="flex items-center justify-between gap-3 py-3">
-              {editingId === item.id ? (
-                <div className="flex flex-1 gap-2">
-                  <input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void saveEdit(item.id)}
-                    className="text-sm font-medium text-black dark:text-white"
-                  >
-                    Save
-                  </button>
-                  <button type="button" onClick={() => setEditingId(null)} className="text-sm text-gray-500">
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.name}</span>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingId(item.id);
-                        setEditName(item.name);
-                      }}
-                      className="text-sm text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void removeItem(item.id, item.name)}
-                      className="text-sm text-red-600 hover:text-red-700"
-                    >
-                      Delete
-                    </button>
+              <li
+                key={item.id}
+                className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                {editingId === item.id ? (
+                  <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+                    <input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className={`${inputClass} min-w-0 flex-1`}
+                      autoFocus
+                    />
+                    <div className="flex shrink-0 gap-3">
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void saveEdit(item.id)}
+                        className="text-sm font-medium text-black dark:text-white"
+                      >
+                        Save
+                      </button>
+                      <button type="button" onClick={() => setEditingId(null)} className="text-sm text-gray-500">
+                        Cancel
+                      </button>
+                    </div>
                   </div>
-                </>
-              )}
-            </li>
-          ))
-        )}
+                ) : (
+                  <>
+                    <span className="min-w-0 pr-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {item.name}
+                    </span>
+                    <div className="flex shrink-0 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingId(item.id);
+                          setEditName(item.name);
+                        }}
+                        className="text-sm text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void removeItem(item.id, item.name)}
+                        className="text-sm text-red-600 hover:text-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                )}
+              </li>
+            ))
+          )}
         </ul>
         {items.length > 0 ? (
           <TablePagination
