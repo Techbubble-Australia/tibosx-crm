@@ -168,6 +168,9 @@ model CareerApplication {
   position          String
   company           String?
   country           String?
+  city              String?
+  jobListingId      String?
+  jobListing        JobListing?       @relation(fields: [jobListingId], references: [id], onDelete: SetNull)
   visaStatus        String?
   salaryCurrency    String?
   salaryRate        Int?
@@ -187,6 +190,8 @@ model CandidateProfile {
   lastName            String
   email               String
   phone               String
+  country             String             @default("")
+  city                String?
   category            String
   technology          String
   expectedRate        Int
@@ -203,6 +208,7 @@ model CandidateProfile {
   @@index([email])
   @@index([category])
   @@index([technology])
+  @@index([country])
   @@index([createdAt])
 }
 
@@ -320,7 +326,10 @@ model JobListing {
   likeCount       Int       @default(0)
   published       Boolean   @default(true)
   order           Int       @default(0)
+  /// Admin user IDs assigned as recruiters for this role
+  recruiterIds    Json?
   likes           JobLike[]
+  applications    CareerApplication[]
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

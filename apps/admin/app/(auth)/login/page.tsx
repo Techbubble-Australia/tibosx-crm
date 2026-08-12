@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Lock, Mail, Loader2, ShieldCheck } from "lucide-react";
 import { defaultLandingPath } from "@/lib/admin-roles";
+import { TechBubbleLogo } from "@/components/TechBubbleLogo";
 
 type LoginStep = "credentials" | "mfa";
 
@@ -97,14 +98,8 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 dark:bg-neutral-950">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg dark:bg-neutral-900">
         <div className="mb-8 text-center">
-          <div className="mb-4 flex items-center justify-center gap-2">
-            <div className="grid grid-cols-2 gap-0.5">
-              <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
-              <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
-              <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
-              <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
-            </div>
-            <span className="text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100">TBOS</span>
+          <div className="mb-4 flex items-center justify-center">
+            <TechBubbleLogo priority />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
             {step === "mfa" ? "Two-factor authentication" : "TBOS"}

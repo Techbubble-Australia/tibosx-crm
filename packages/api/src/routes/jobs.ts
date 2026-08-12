@@ -28,6 +28,7 @@ const jobSchema = z.object({
   description: z.string().max(500_000).default(""),
   published: z.boolean().default(true),
   order: z.number().int().default(0),
+  recruiterIds: z.array(z.string().min(1)).optional(),
 });
 
 function prepareJobWriteData(body: z.infer<typeof jobSchema>): Record<string, unknown> {
@@ -66,10 +67,16 @@ function prepareJobWriteData(body: z.infer<typeof jobSchema>): Record<string, un
   };
 }
 
+function parseRecruiterIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((id): id is string => typeof id === "string" && id.trim().length > 0);
+}
+
 function serializePublicJob(job: JobListing) {
   const locations = normalizeJobLocations(job);
   const legacy = syncLegacyLocationFields(locations);
   return {
+    id: job.id,
     slug: job.slug,
     referenceNumber: job.referenceNumber,
     title: job.title,
@@ -89,7 +96,7 @@ function serializePublicJob(job: JobListing) {
   };
 }
 
-function serializeAdminJob(job: JobListing) {
+function serializeAdminJob(job: JobListing, applicationCount?: number) {
   const locations = normalizeJobLocations(job);
   const legacy = syncLegacyLocationFields(locations);
   return {
@@ -112,6 +119,8 @@ function serializeAdminJob(job: JobListing) {
     likeCount: job.likeCount ?? 0,
     published: job.published,
     order: job.order,
+    recruiterIds: parseRecruiterIds(job.recruiterIds),
+    applicationCount: applicationCount ?? 0,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
   };
@@ -160,15 +169,72 @@ router.get("/", async (_req, res) => {
 });
 
 // Admin: list all jobs (including unpublished) — must be before /:slug
+router.get("/admin/recruiters", async (_req, res) => {
+  try {
+    const rows = await prisma.adminUser.findMany({
+      where: { active: true, role: { in: ["admin", "recruiter"] } },
+      select: { id: true, email: true, role: true, active: true },
+      orderBy: { email: "asc" },
+    });
+    res.json({ data: rows });
+  } catch (error) {
+    console.error("Error fetching recruiters:", error);
+    res.status(500).json({ error: "Failed to fetch recruiters" });
+  }
+});
+
 router.get("/admin/all", async (_req, res) => {
   try {
     const jobs = await prisma.jobListing.findMany({
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
     });
-    res.json({ data: jobs.map((job: JobListing) => serializeAdminJob(job)) });
+    const applicationCounts = await prisma.careerApplication.groupBy({
+      by: ["jobListingId"],
+      _count: { _all: true },
+      where: { jobListingId: { not: null } },
+    });
+    const countByJobId = new Map<string, number>();
+    for (const row of applicationCounts) {
+      if (row.jobListingId) {
+        countByJobId.set(row.jobListingId, row._count._all);
+      }
+    }
+    const positionCounts = await prisma.careerApplication.groupBy({
+      by: ["position"],
+      _count: { _all: true },
+      where: { jobListingId: null },
+    });
+    const countByPosition = new Map(positionCounts.map((row) => [row.position.trim().toLowerCase(), row._count._all]));
+
+    res.json({
+      data: jobs.map((job: JobListing) => {
+        const linked = countByJobId.get(job.id) ?? 0;
+        const byTitle = countByPosition.get(job.title.trim().toLowerCase()) ?? 0;
+        return serializeAdminJob(job, linked + byTitle);
+      }),
+    });
   } catch (error) {
     console.error("Error fetching jobs:", error);
     res.status(500).json({ error: "Failed to fetch jobs" });
+  }
+});
+
+router.get("/admin/:id/applications", async (req, res) => {
+  try {
+    const job = await prisma.jobListing.findUnique({ where: { id: req.params.id } });
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    const applications = await prisma.careerApplication.findMany({
+      where: {
+        OR: [{ jobListingId: job.id }, { jobListingId: null, position: job.title }],
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json({ data: applications });
+  } catch (error) {
+    console.error("Error fetching job applications:", error);
+    res.status(500).json({ error: "Failed to fetch applications" });
   }
 });
 

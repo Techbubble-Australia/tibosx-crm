@@ -26,7 +26,8 @@ import { profileRoutes } from "./routes/profiles";
 import { adminUserRoutes } from "./routes/adminUsers";
 import { authMiddleware } from "./middleware/auth";
 import { requireMfaEnrolled } from "./middleware/requireMfaEnrolled";
-import { requireRole, requireModule, blockModuleMutations } from "./middleware/requireRole";
+import { requireRole, requireModule, requireAnyModule, blockModuleMutations } from "./middleware/requireRole";
+import { dashboardRoutes } from "./routes/dashboard";
 
 dotenv.config();
 
@@ -74,10 +75,14 @@ app.use("/api/site-content", siteContentPublicRoutes);
 
 // Protected routes (module-scoped; MFA enrollment required)
 const websiteWrite = [authMiddleware, requireMfaEnrolled, blockModuleMutations("website")];
+const recruitmentRead = [authMiddleware, requireMfaEnrolled, requireAnyModule("recruitment", "website")];
+const recruitmentWrite = [authMiddleware, requireMfaEnrolled, requireAnyModule("recruitment", "website")];
+
+app.use("/api/admin/dashboard", authMiddleware, requireMfaEnrolled, requireModule("recruitment"), dashboardRoutes);
 
 app.use("/api/admin/case-studies", ...websiteWrite, caseStudyPreviewRouter);
 app.use("/api/admin/case-studies", ...websiteWrite, caseStudyRoutes);
-app.use("/api/admin/jobs", ...websiteWrite, jobRoutes);
+app.use("/api/admin/jobs", ...recruitmentWrite, jobRoutes);
 app.use("/api/admin/job-categories", ...websiteWrite, jobCategoryRoutes);
 app.use("/api/admin/job-departments", ...websiteWrite, jobDepartmentRoutes);
 app.use("/api/admin/job-technologies", ...websiteWrite, jobTechnologyRoutes);

@@ -42,7 +42,7 @@ const MODULE_ROLE_MAP: Record<TbModule, readonly AdminRole[]> = {
 export const ROLE_PERMISSIONS: RolePermission[] = [
   {
     id: "recruitment",
-    label: "Recruitment module (dashboard, profiles, applications)",
+    label: "Recruitment module (dashboard, profiles, job listings)",
     admin: true,
     recruiter: true,
     sales: false,

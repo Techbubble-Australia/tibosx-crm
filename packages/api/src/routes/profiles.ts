@@ -19,6 +19,8 @@ const profileSchema = z.object({
   phone: z.string().regex(PHONE_REGEX, PHONE_VALIDATION_MESSAGE),
   category: z.string().min(1).max(120),
   technology: z.string().min(1).max(120),
+  country: z.string().min(1, "Country is required").max(120),
+  city: z.string().max(120).optional().nullable(),
   expectedRate: z.coerce.number().int().positive("Expected rate is required"),
   currency: z.enum(salaryCurrencyCodes),
   mode: z.enum(SALARY_MODES),
@@ -74,6 +76,8 @@ function serializeProfile(row: {
   lastName: string;
   email: string;
   phone: string;
+  country: string;
+  city: string | null;
   category: string;
   technology: string;
   expectedRate: number;
@@ -96,6 +100,8 @@ function serializeProfile(row: {
     lastName: row.lastName,
     email: row.email,
     phone: row.phone,
+    country: row.country,
+    city: row.city,
     category: row.category,
     technology: row.technology,
     expectedRate: row.expectedRate,
@@ -155,6 +161,8 @@ router.post("/", async (req, res) => {
         lastName: data.lastName,
         email: data.email,
         phone: data.phone,
+        country: data.country,
+        city: data.city ?? null,
         category: data.category,
         technology: data.technology,
         expectedRate: data.expectedRate,
@@ -197,6 +205,8 @@ router.put("/:id", async (req, res) => {
         lastName: data.lastName,
         email: data.email,
         phone: data.phone,
+        country: data.country,
+        city: data.city ?? null,
         category: data.category,
         technology: data.technology,
         expectedRate: data.expectedRate,

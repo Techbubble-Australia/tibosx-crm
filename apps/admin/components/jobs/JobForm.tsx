@@ -26,10 +26,12 @@ export type JobFormDefaults = {
   published?: boolean;
   referenceNumber?: string;
   locations?: JobLocationEntry[];
+  recruiterIds?: string[];
 };
 
 type TaxonomyItem = { id: string; name: string };
 type ClientItem = { id: string; name: string; active: boolean };
+type RecruiterUser = { id: string; email: string; role: string; active: boolean };
 
 type Props = {
   mode: "create" | "edit";
@@ -91,26 +93,31 @@ export function JobForm({
   const [department, setDepartment] = useState(initialListing.department);
   const [listingType, setListingType] = useState(initialListing.listingType);
   const [clientId, setClientId] = useState(defaults.clientId ?? "");
+  const [recruiterIds, setRecruiterIds] = useState<string[]>(defaults.recruiterIds ?? []);
+  const [recruiters, setRecruiters] = useState<RecruiterUser[]>([]);
 
   const departmentOptions = departments.filter((d) => !isListingTypeValue(d.name));
 
   useEffect(() => {
     async function loadTaxonomy() {
       try {
-        const [catRes, techRes, deptRes, clientRes] = await Promise.all([
+        const [catRes, techRes, deptRes, clientRes, usersRes] = await Promise.all([
           adminFetch("/api/admin/job-categories"),
           adminFetch("/api/admin/job-technologies"),
           adminFetch("/api/admin/job-departments"),
           adminFetch("/api/admin/clients"),
+          adminFetch("/api/admin/jobs/admin/recruiters"),
         ]);
         const catData = await catRes.json();
         const techData = await techRes.json();
         const deptData = await deptRes.json();
         const clientData = await clientRes.json();
+        const recruitersData = await usersRes.json();
         setCategories(catData.data ?? []);
         setTechnologies(techData.data ?? []);
         setDepartments(deptData.data ?? []);
         setClients((clientData.data ?? []).filter((c: ClientItem) => c.active));
+        setRecruiters(recruitersData.data ?? []);
       } catch (e) {
         console.error(e);
       } finally {
@@ -124,6 +131,7 @@ export function JobForm({
     if (defaults.category) setCategory(defaults.category);
     if (defaults.technology) setTechnology(defaults.technology);
     if (defaults.clientId) setClientId(defaults.clientId);
+    if (defaults.recruiterIds) setRecruiterIds(defaults.recruiterIds);
     const resolved = resolveListingFields(defaults);
     setListingType(resolved.listingType);
     setDepartment(resolved.department);
@@ -180,6 +188,7 @@ export function JobForm({
       technology,
       department,
       clientId,
+      recruiterIds,
       description,
       order: parseInt(formData.get("order") as string, 10) || 0,
       published: formData.get("published") === "on",
@@ -373,6 +382,40 @@ export function JobForm({
                     Manage clients
                   </Link>
                 </p>
+              </div>
+            </div>
+
+            <div>
+              <label className={labelClass}>Recruiters</label>
+              <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-600">
+                {recruiters.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No recruiter users available.</p>
+                ) : (
+                  <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {recruiters.map((user) => {
+                      const checked = recruiterIds.includes(user.id);
+                      return (
+                        <li key={user.id}>
+                          <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                setRecruiterIds((prev) =>
+                                  e.target.checked
+                                    ? [...prev, user.id]
+                                    : prev.filter((id) => id !== user.id),
+                                );
+                              }}
+                              className="h-4 w-4 rounded"
+                            />
+                            <span className="truncate">{user.email}</span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
             </div>
           </>

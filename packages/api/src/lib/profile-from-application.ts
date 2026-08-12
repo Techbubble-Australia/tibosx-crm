@@ -40,6 +40,9 @@ type ApplicationRow = {
   email: string;
   phone: string | null;
   position: string;
+  country: string | null;
+  city: string | null;
+  jobListingId: string | null;
   salaryCurrency: string | null;
   salaryRate: number | null;
   salaryMode: string | null;
@@ -79,12 +82,31 @@ export async function createProfileFromCareerApplication(application: Applicatio
 
   const { category, technology } = await inferCategoryTechnologyFromPosition(application.position);
 
+  let country = application.country?.trim() ?? "";
+  let city = application.city?.trim() || null;
+
+  if (application.jobListingId) {
+    const job = await prisma.jobListing.findUnique({
+      where: { id: application.jobListingId },
+      select: { country: true, locations: true },
+    });
+    if (job && !country) {
+      country = job.country?.trim() ?? "";
+    }
+  }
+
+  if (!country) {
+    return;
+  }
+
   await prisma.candidateProfile.create({
     data: {
       firstName: application.firstName.trim(),
       lastName: application.lastName.trim(),
       email: application.email.trim(),
       phone,
+      country,
+      city,
       category,
       technology,
       expectedRate,

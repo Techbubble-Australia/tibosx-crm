@@ -24,6 +24,16 @@ export function requireModule(module: TbModule) {
   };
 }
 
+export function requireAnyModule(...modules: TbModule[]) {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    const role = req.user?.role ?? "";
+    if (!modules.some((module) => canAccessModule(role, module))) {
+      return res.status(403).json({ error: "Forbidden: insufficient permissions" });
+    }
+    next();
+  };
+}
+
 /** Block roles without module access from mutating admin resources on that module's routes. */
 export function blockModuleMutations(module: TbModule) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {

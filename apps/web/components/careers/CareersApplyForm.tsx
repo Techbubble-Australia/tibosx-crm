@@ -8,7 +8,11 @@ import { normalizeJobLocations } from "@/lib/job-locations";
 import {
   SALARY_CURRENCIES,
   SALARY_MODES,
-  countriesForJobTitle,
+  OTHER_CITY_VALUE,
+  countryOptionsForJob,
+  defaultCountryForJob,
+  cityOptionsForJobCountry,
+  jobListingIdForTitle,
   formatSalaryRateDisplay,
   parseSalaryRateInput,
   type JobApplyOption,
@@ -32,16 +36,17 @@ function readOptionalMessage(formData: FormData): string | undefined {
 }
 
 function buildJobApplyOptions(jobs: JobApiRow[]): JobApplyOption[] {
-  return jobs.map((job) => {
-    const entries = normalizeJobLocations(job);
-    const countries = [...new Set(entries.map((e) => e.country.trim()).filter(Boolean))];
-    return { title: job.title, countries };
-  });
+  return jobs.map((job) => ({
+    title: job.title,
+    jobListingId: job.id,
+    locations: normalizeJobLocations(job),
+  }));
 }
 
 function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
   const searchParams = useSearchParams();
   const positionParam = searchParams.get("position") ?? "";
+  const jobIdParam = searchParams.get("jobId") ?? "";
   const jobOptions = useMemo(() => buildJobApplyOptions(jobs), [jobs]);
   const uniquePositions = [...new Set(jobs.map((j) => j.title.trim()).filter(Boolean))].sort((a, b) =>
     a.localeCompare(b),
@@ -49,15 +54,25 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
 
   const [position, setPosition] = useState(positionParam);
   const [country, setCountry] = useState("");
+  const [city, setCity] = useState("");
+  const [cityOther, setCityOther] = useState("");
   const [salaryRateInput, setSalaryRateInput] = useState("");
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
+  const countryOptions = useMemo(() => countryOptionsForJob(position, jobOptions), [position, jobOptions]);
+  const cityOptions = useMemo(
+    () => cityOptionsForJobCountry(position, country, jobOptions),
+    [position, country, jobOptions],
+  );
+
   useEffect(() => {
     if (positionParam) {
       setPosition(positionParam);
-      setCountry(countriesForJobTitle(positionParam, jobOptions));
+      setCountry(defaultCountryForJob(positionParam, jobOptions));
+      setCity("");
+      setCityOther("");
     }
   }, [positionParam, jobOptions]);
 
@@ -69,7 +84,15 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
 
   function handlePositionChange(next: string) {
     setPosition(next);
-    setCountry(countriesForJobTitle(next, jobOptions));
+    setCountry(defaultCountryForJob(next, jobOptions));
+    setCity("");
+    setCityOther("");
+  }
+
+  function handleCountryChange(next: string) {
+    setCountry(next);
+    setCity("");
+    setCityOther("");
   }
 
   function handleDocumentsChange(fileList: FileList | null) {
@@ -82,6 +105,13 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
 
   function removeDocument(index: number) {
     setDocumentFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function resolveCityValue(): string {
+    if (city === OTHER_CITY_VALUE) {
+      return cityOther.trim();
+    }
+    return city.trim();
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -98,7 +128,12 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
       }
 
       if (!country.trim()) {
-        throw new Error("Country is required — select a position first");
+        throw new Error("Country is required");
+      }
+
+      const resolvedCity = resolveCityValue();
+      if (!resolvedCity) {
+        throw new Error("City is required");
       }
 
       const uploadData = new FormData();
@@ -123,6 +158,9 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
         throw new Error("Salary rate is required");
       }
 
+      const jobListingId =
+        jobIdParam || jobListingIdForTitle(position.trim(), jobOptions) || undefined;
+
       const payload = {
         firstName: readFormString(formData, "firstName"),
         lastName: readFormString(formData, "lastName"),
@@ -130,6 +168,8 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
         phone: readFormString(formData, "phone"),
         position: position.trim(),
         country: country.trim(),
+        city: resolvedCity,
+        jobListingId,
         visaStatus: readFormString(formData, "visaStatus"),
         salaryCurrency: readFormString(formData, "salaryCurrency"),
         salaryRate,
@@ -162,11 +202,13 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
       setDocumentFiles([]);
       if (positionParam) {
         setPosition(positionParam);
-        setCountry(countriesForJobTitle(positionParam, jobOptions));
+        setCountry(defaultCountryForJob(positionParam, jobOptions));
       } else {
         setPosition("");
         setCountry("");
       }
+      setCity("");
+      setCityOther("");
     } catch (err) {
       setStatus("error");
       setErrorMsg(err instanceof Error ? err.message : "Something went wrong");
@@ -278,24 +320,70 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <input type="hidden" name="country" value={country} />
-        <input
-          type="text"
-          readOnly
+        <select
+          required
           value={country}
-          placeholder="Country"
-          className={`${fieldClass} cursor-default opacity-90`}
-          aria-readonly="true"
-          tabIndex={-1}
-        />
+          onChange={(e) => handleCountryChange(e.target.value)}
+          disabled={!position || countryOptions.length === 0}
+          className={`${fieldClass} appearance-none disabled:opacity-50`}
+          aria-label="Country"
+        >
+          <option value="" disabled className="bg-[#111111] text-white/60">
+            Country *
+          </option>
+          {countryOptions.map((option) => (
+            <option key={option.country} value={option.country} className="bg-[#111111] text-white">
+              {option.flag ? `${option.flag} ` : ""}
+              {option.country}
+            </option>
+          ))}
+        </select>
+        <select
+          required
+          value={city}
+          onChange={(e) => {
+            setCity(e.target.value);
+            if (e.target.value !== OTHER_CITY_VALUE) {
+              setCityOther("");
+            }
+          }}
+          disabled={!country}
+          className={`${fieldClass} appearance-none disabled:opacity-50`}
+          aria-label="City"
+        >
+          <option value="" disabled className="bg-[#111111] text-white/60">
+            City *
+          </option>
+          {cityOptions.map((option) => (
+            <option key={option} value={option} className="bg-[#111111] text-white">
+              {option}
+            </option>
+          ))}
+          <option value={OTHER_CITY_VALUE} className="bg-[#111111] text-white">
+            Other
+          </option>
+        </select>
+      </div>
+
+      {city === OTHER_CITY_VALUE ? (
         <input
-          name="visaStatus"
           type="text"
           required
-          placeholder="Visa status *"
+          value={cityOther}
+          onChange={(e) => setCityOther(e.target.value)}
+          placeholder="Enter your city *"
           className={fieldClass}
+          aria-label="Other city"
         />
-      </div>
+      ) : null}
+
+      <input
+        name="visaStatus"
+        type="text"
+        required
+        placeholder="Visa status *"
+        className={fieldClass}
+      />
 
       <label className="flex min-h-[100px] cursor-pointer flex-col items-center justify-center rounded-[14px] border border-white/15 bg-white/[0.08] px-4 py-4 text-center">
         <input

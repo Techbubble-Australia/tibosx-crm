@@ -11,7 +11,6 @@ import {
   MessageSquare,
   HelpCircle,
   Mail,
-  UserCheck,
   FileStack,
   Building2,
   Shield,
@@ -27,6 +26,7 @@ import {
 } from "lucide-react";
 import { AdminSessionProvider, useAdminSession } from "@/contexts/AdminSessionContext";
 import { MfaEnrollmentGuard } from "@/components/MfaEnrollmentGuard";
+import { TechBubbleLogo } from "@/components/TechBubbleLogo";
 import { roleLabel } from "@/lib/admin-roles";
 
 type NavItem = {
@@ -53,7 +53,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/database/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "recruiter"] },
       { href: "/database/profiles", label: "Profiles", icon: UserCircle, roles: ["admin", "recruiter"] },
-      { href: "/database/career-applications", label: "Career applications", icon: UserCheck, roles: ["admin", "recruiter"] },
+      { href: "/jobs/active", label: "Job Listings", icon: Briefcase, roles: ["admin", "recruiter", "website"] },
     ],
   },
   {
@@ -63,7 +63,6 @@ const navGroups: NavGroup[] = [
     roles: ["admin", "website"],
     items: [
       { href: "/pages", label: "Site pages", icon: FileStack, roles: ["admin", "website"] },
-      { href: "/jobs", label: "Job Listings", icon: Briefcase, roles: ["admin", "website"] },
       { href: "/case-studies", label: "Case Studies", icon: FileText, roles: ["admin", "website"] },
       { href: "/testimonials", label: "Testimonials", icon: MessageSquare, roles: ["admin", "website"] },
       { href: "/faqs", label: "FAQs", icon: HelpCircle, roles: ["admin", "website"] },
@@ -142,15 +141,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
       <aside className="flex w-64 shrink-0 flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
         <div className="min-w-0 p-6">
           <Link href="/database/dashboard" className="flex min-w-0 items-center gap-2">
-            <div className="grid shrink-0 grid-cols-2 gap-0.5">
-              <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
-              <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
-              <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
-              <div className="h-2 w-2 rounded-full bg-black dark:bg-white" />
-            </div>
-            <span className="truncate text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100">
-              TBOS
-            </span>
+            <TechBubbleLogo />
           </Link>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">TechBubble Business Operating System</p>
           {!loading && email ? (

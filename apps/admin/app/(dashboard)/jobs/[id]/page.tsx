@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { JobForm, type JobFormDefaults } from "@/components/jobs/JobForm";
+import { JobApplicationsPanel } from "@/components/jobs/JobApplicationsPanel";
 import { adminFetch } from "@/lib/admin-api";
 
 export default function EditJobPage() {
@@ -41,7 +42,9 @@ export default function EditJobPage() {
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Failed to update job");
-      router.push("/jobs");
+      const updated = await res.json();
+      const published = Boolean(updated?.data?.published ?? payload.published);
+      router.push(published ? "/jobs/active" : "/jobs/inactive");
     } catch (error) {
       console.error(error);
       alert("Failed to update job listing");
@@ -78,9 +81,13 @@ export default function EditJobPage() {
         defaults={job}
         onSubmit={onSubmit}
         isLoading={isLoading}
-        cancelHref="/jobs"
+        cancelHref={job.published ? "/jobs/active" : "/jobs/inactive"}
         submitLabel="Save Changes"
       />
+
+      <div className="mt-8">
+        <JobApplicationsPanel jobId={id} />
+      </div>
     </div>
   );
 }

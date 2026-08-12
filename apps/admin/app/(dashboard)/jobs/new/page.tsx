@@ -20,7 +20,9 @@ export default function NewJobPage() {
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Failed to create job");
-      router.push("/jobs");
+      const created = await res.json();
+      const published = Boolean(created?.data?.published ?? payload.published ?? true);
+      router.push(published ? "/jobs/active" : "/jobs/inactive");
     } catch (error) {
       console.error(error);
       alert("Failed to create job listing");
@@ -32,7 +34,7 @@ export default function NewJobPage() {
   return (
     <div>
       <div className="mb-6 flex items-center gap-3">
-        <Link href="/jobs" className="rounded p-1.5 hover:bg-gray-100">
+        <Link href="/jobs/active" className="rounded p-1.5 hover:bg-gray-100">
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <div>
@@ -45,7 +47,7 @@ export default function NewJobPage() {
         mode="create"
         onSubmit={onSubmit}
         isLoading={isLoading}
-        cancelHref="/jobs"
+        cancelHref="/jobs/active"
         submitLabel="Create Job Listing"
       />
     </div>

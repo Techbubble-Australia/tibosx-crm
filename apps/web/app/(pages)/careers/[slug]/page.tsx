@@ -64,7 +64,7 @@ export default async function CareerJobDetailPage({ params }: { params: { slug: 
 
         <div className="mt-10 flex flex-wrap gap-4">
           <Link
-            href={`/careers?position=${encodeURIComponent(job.title)}#apply`}
+            href={`/careers?position=${encodeURIComponent(job.title)}&jobId=${encodeURIComponent(job.id)}#apply`}
             className="inline-flex h-12 items-center justify-center gap-2 rounded-[18px] bg-[#111111] px-6 text-[15px] font-semibold text-white dark:bg-white dark:text-neutral-900"
           >
             Apply for this role

@@ -116,6 +116,7 @@ export type JobLocationEntry = {
 };
 
 export type JobApiRow = {
+  id: string;
   slug: string;
   referenceNumber: string;
   title: string;

@@ -11,12 +11,18 @@ import {
   formatSalaryRateDisplay,
   parseSalaryRateInput,
 } from "@/lib/careers-form";
+import { getSortedCountryOptions } from "@/lib/country-flags";
+import { getCitiesForCountryCode } from "@/lib/country-cities";
+
+const OTHER_CITY_VALUE = "__other__";
 
 export type ProfileFormValues = {
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
+  country: string;
+  city?: string | null;
   category: string;
   technology: string;
   expectedRate: number;
@@ -60,6 +66,10 @@ export function ProfileForm({
   const [lastName, setLastName] = useState(defaults.lastName ?? "");
   const [email, setEmail] = useState(defaults.email ?? "");
   const [phone, setPhone] = useState(defaults.phone ?? "");
+  const [countryCode, setCountryCode] = useState("");
+  const [country, setCountry] = useState(defaults.country ?? "");
+  const [city, setCity] = useState(defaults.city ?? "");
+  const [cityOther, setCityOther] = useState("");
   const [category, setCategory] = useState(defaults.category ?? "");
   const [technology, setTechnology] = useState(defaults.technology ?? "");
   const [currency, setCurrency] = useState(defaults.currency ?? "AUD");
@@ -100,6 +110,24 @@ export function ProfileForm({
     if (!category) return technologies;
     return technologies.filter((tech) => tech.category?.name === category || tech.name === technology);
   }, [technologies, category, technology]);
+
+  const countryOptions = useMemo(() => getSortedCountryOptions(), []);
+  const cityOptions = useMemo(() => {
+    if (!countryCode) return [];
+    return [...getCitiesForCountryCode(countryCode)];
+  }, [countryCode]);
+
+  useEffect(() => {
+    if (!defaults.country) return;
+    const match = countryOptions.find((option) => option.name === defaults.country);
+    if (match) {
+      setCountryCode(match.code);
+    }
+    if (defaults.city && cityOptions.length > 0 && !cityOptions.includes(defaults.city)) {
+      setCity(OTHER_CITY_VALUE);
+      setCityOther(defaults.city);
+    }
+  }, [defaults.country, defaults.city, countryOptions, cityOptions]);
 
   function handleCategoryChange(next: string) {
     setCategory(next);
@@ -172,11 +200,16 @@ export function ProfileForm({
     const previousSalary = previousSalaryRaw > 0 ? previousSalaryRaw : null;
 
     try {
+      const resolvedCity =
+        city === OTHER_CITY_VALUE ? cityOther.trim() || null : city.trim() || null;
+
       await onSubmit({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim(),
         phone: phone.trim(),
+        country: country.trim(),
+        city: resolvedCity,
         category: category.trim(),
         technology: technology.trim(),
         expectedRate,
@@ -230,6 +263,59 @@ export function ProfileForm({
               title="Enter a valid phone number"
               className={inputClass}
             />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className={labelClass}>Country *</label>
+            <select
+              required
+              value={countryCode}
+              onChange={(e) => {
+                const code = e.target.value;
+                setCountryCode(code);
+                const match = countryOptions.find((option) => option.code === code);
+                setCountry(match?.name ?? "");
+                setCity("");
+                setCityOther("");
+              }}
+              className={inputClass}
+            >
+              <option value="">Select country…</option>
+              {countryOptions.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.flag} {option.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>City</label>
+            <select
+              value={city}
+              onChange={(e) => {
+                setCity(e.target.value);
+                if (e.target.value !== OTHER_CITY_VALUE) {
+                  setCityOther("");
+                }
+              }}
+              disabled={!countryCode}
+              className={inputClass}
+            >
+              <option value="">Select city…</option>
+              {cityOptions.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+              <option value={OTHER_CITY_VALUE}>Other</option>
+            </select>
+            {city === OTHER_CITY_VALUE ? (
+              <input
+                value={cityOther}
+                onChange={(e) => setCityOther(e.target.value)}
+                className={`${inputClass} mt-2`}
+                placeholder="Enter city"
+              />
+            ) : null}
           </div>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
