@@ -177,26 +177,26 @@ router.post("/apply", async (req, res) => {
       console.error("Error creating profile from career application:", profileError);
     }
 
-    try {
-      await sendCareerApplicationEmail({
-        firstName: validatedData.firstName,
-        lastName: validatedData.lastName,
-        email: validatedData.email,
-        phone: validatedData.phone,
-        position: validatedData.position,
-        country: validatedData.country,
-        visaStatus: validatedData.visaStatus,
-        salaryExpectationLabel,
-        documentUrls: validatedData.documentUrls,
-        message: validatedData.message,
-      });
-    } catch (emailError) {
-      console.error("Error sending career application email:", emailError);
-      return res.status(500).json({
-        error: "Your application was saved but we could not notify HR. Please contact hr@techbubble.com.au directly.",
-        data: { id: application.id },
-      });
-    }
+    // try {
+    //   await sendCareerApplicationEmail({
+    //     firstName: validatedData.firstName,
+    //     lastName: validatedData.lastName,
+    //     email: validatedData.email,
+    //     phone: validatedData.phone,
+    //     position: validatedData.position,
+    //     country: validatedData.country,
+    //     visaStatus: validatedData.visaStatus,
+    //     salaryExpectationLabel,
+    //     documentUrls: validatedData.documentUrls,
+    //     message: validatedData.message,
+    //   });
+    // } catch (emailError) {
+    //   console.error("Error sending career application email:", emailError);
+    //   return res.status(500).json({
+    //     error: "Your application was saved but we could not notify HR. Please contact hr@techbubble.com.au directly.",
+    //     data: { id: application.id },
+    //   });
+    // }
 
     res.status(201).json({
       message: "Thank you for your application. Our team will review and reach out within 48 hours.",
