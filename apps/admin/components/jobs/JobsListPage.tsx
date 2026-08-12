@@ -81,10 +81,16 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
     setPage,
     pageSize,
     setPageSize,
+    filtered,
     paginated: paginatedJobs,
     totalItems,
     totalSourceItems,
   } = useListView(filteredJobs, jobSearchHaystack);
+  const [selectedTechnology, setSelectedTechnology] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedTechnology(null);
+  }, [search, viewMode, publishedFilter]);
 
   useEffect(() => {
     void fetchJobs();
@@ -125,14 +131,19 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
 
   const groupedByTechnology = useMemo(() => {
     const map = new Map<string, JobListing[]>();
-    for (const job of paginatedJobs) {
+    for (const job of filtered) {
       const key = job.technology.trim() || "Unknown";
       const list = map.get(key) ?? [];
       list.push(job);
       map.set(key, list);
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [paginatedJobs]);
+  }, [filtered]);
+
+  const jobsInSelectedTechnology = useMemo(() => {
+    if (!selectedTechnology) return [];
+    return groupedByTechnology.find(([tech]) => tech === selectedTechnology)?.[1] ?? [];
+  }, [groupedByTechnology, selectedTechnology]);
 
   if (isLoading) {
     return (
@@ -270,6 +281,73 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
             />
           ) : null}
         </div>
+      ) : selectedTechnology ? (
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => setSelectedTechnology(null)}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            ← All technologies
+          </button>
+          <section className="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+              <h3 className="font-semibold text-gray-900 dark:text-gray-100">{selectedTechnology}</h3>
+              <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                {jobsInSelectedTechnology.length} listing{jobsInSelectedTechnology.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            {jobsInSelectedTechnology.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-gray-400">No listings for this technology.</p>
+            ) : (
+              <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+                {jobsInSelectedTechnology.map((job) => (
+                  <li
+                    key={job.id}
+                    className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900 dark:text-gray-100">{job.title}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {job.referenceNumber} · {job.country} · {job.applicationCount ?? 0} applications
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Recruiters: {formatRecruiters(job.recruiterIds, recruiterById)}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {canManageJobs ? (
+                        <>
+                          <Link
+                            href={jobEditHref(job.id, listTab)}
+                            className="inline-flex rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                          >
+                            View
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => void deleteJob(job.id)}
+                            className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                            aria-label={`Delete ${job.title}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </>
+                      ) : (
+                        <Link
+                          href={jobEditHref(job.id, listTab)}
+                          className="inline-flex rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                        >
+                          View
+                        </Link>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
       ) : (
         <div className="space-y-4">
           {filteredJobs.length === 0 ? (
@@ -280,51 +358,27 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
             <div className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:bg-gray-900">
               No listings match your search.
             </div>
+          ) : groupedByTechnology.length === 0 ? (
+            <div className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:bg-gray-900">
+              No technologies with listings on this tab.
+            </div>
           ) : (
-            groupedByTechnology.map(([technology, items]) => (
-              <section
-                key={technology}
-                className="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
-              >
-                <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-                  <h3 className="font-semibold text-gray-900 dark:text-gray-100">{technology}</h3>
-                  <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                    {items.length}
-                  </span>
-                </div>
-                <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {items.map((job) => (
-                    <li key={job.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0">
-                        <p className="font-medium text-gray-900 dark:text-gray-100">{job.title}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {job.referenceNumber} · {job.country} · {job.applicationCount ?? 0} applications
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Recruiters: {formatRecruiters(job.recruiterIds, recruiterById)}
-                        </p>
-                      </div>
-                      <Link
-                        href={jobEditHref(job.id, listTab)}
-                        className="inline-flex rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
-                      >
-                        View
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {groupedByTechnology.map(([technology, items]) => (
+                <button
+                  key={technology}
+                  type="button"
+                  onClick={() => setSelectedTechnology(technology)}
+                  className="rounded-xl border border-gray-200 bg-white p-5 text-left transition-colors hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600 dark:hover:bg-gray-800"
+                >
+                  <p className="font-semibold text-gray-900 dark:text-gray-100">{technology}</p>
+                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    {items.length} listing{items.length !== 1 ? "s" : ""}
+                  </p>
+                </button>
+              ))}
+            </div>
           )}
-          {filteredJobs.length > 0 ? (
-            <TablePagination
-              page={page}
-              pageSize={pageSize}
-              totalItems={totalItems}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-            />
-          ) : null}
         </div>
       )}
     </div>
