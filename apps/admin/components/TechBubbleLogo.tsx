@@ -1,32 +1,20 @@
-"use client";
-
-import Image from "next/image";
-
 type TechBubbleLogoProps = {
   className?: string;
-  priority?: boolean;
 };
 
-/** TechBubble stacked logo — switches for light/dark mode. */
-export function TechBubbleLogo({ className = "", priority = false }: TechBubbleLogoProps) {
+/** TechBubble wordmark — 2×2 dot grid + TECHBUBBLE (admin brand mark). */
+export function TechBubbleLogo({ className = "" }: TechBubbleLogoProps) {
   return (
-    <>
-      <Image
-        src="/techbubble-logo-stacked-black.svg"
-        alt="TechBubble"
-        width={160}
-        height={46}
-        className={`h-10 w-auto dark:hidden ${className}`}
-        priority={priority}
-      />
-      <Image
-        src="/techbubble-logo-stacked-white.svg"
-        alt="TechBubble"
-        width={160}
-        height={46}
-        className={`hidden h-10 w-auto dark:block ${className}`}
-        priority={priority}
-      />
-    </>
+    <span className={`inline-flex min-w-0 items-center gap-2 ${className}`}>
+      <span className="grid shrink-0 grid-cols-2 gap-0.5" aria-hidden="true">
+        <span className="h-2 w-2 rounded-full bg-black dark:bg-white" />
+        <span className="h-2 w-2 rounded-full bg-black dark:bg-white" />
+        <span className="h-2 w-2 rounded-full bg-black dark:bg-white" />
+        <span className="h-2 w-2 rounded-full bg-black dark:bg-white" />
+      </span>
+      <span className="truncate text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+        TECHBUBBLE
+      </span>
+    </span>
   );
 }
