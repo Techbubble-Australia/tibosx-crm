@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { HtmlEditor } from "@/components/HtmlEditor";
@@ -30,6 +30,12 @@ export type JobFormDefaults = {
 };
 
 type TaxonomyItem = { id: string; name: string };
+type TechnologyItem = {
+  id: string;
+  name: string;
+  categoryId: string;
+  category?: { id: string; name: string };
+};
 type ClientItem = { id: string; name: string; active: boolean };
 type RecruiterUser = { id: string; email: string; role: string; active: boolean };
 
@@ -81,7 +87,7 @@ export function JobForm({
 }: Props) {
   const [title, setTitle] = useState(defaults.title ?? "");
   const [categories, setCategories] = useState<TaxonomyItem[]>([]);
-  const [technologies, setTechnologies] = useState<TaxonomyItem[]>([]);
+  const [technologies, setTechnologies] = useState<TechnologyItem[]>([]);
   const [departments, setDepartments] = useState<TaxonomyItem[]>([]);
   const [clients, setClients] = useState<ClientItem[]>([]);
   const [taxonomyReady, setTaxonomyReady] = useState(false);
@@ -97,6 +103,23 @@ export function JobForm({
   const [recruiters, setRecruiters] = useState<RecruiterUser[]>([]);
 
   const departmentOptions = departments.filter((d) => !isListingTypeValue(d.name));
+
+  const filteredTechnologies = useMemo(() => {
+    if (!category) return [];
+    return technologies.filter(
+      (tech) => tech.category?.name === category || tech.name === technology,
+    );
+  }, [technologies, category, technology]);
+
+  function handleCategoryChange(next: string) {
+    setCategory(next);
+    const stillValid = technologies.some(
+      (tech) => tech.name === technology && tech.category?.name === next,
+    );
+    if (!stillValid) {
+      setTechnology("");
+    }
+  }
 
   useEffect(() => {
     async function loadTaxonomy() {
@@ -282,7 +305,7 @@ export function JobForm({
                   name="category"
                   required
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
                   className={inputClass}
                 >
                   <option value="">Select category…</option>
@@ -309,19 +332,23 @@ export function JobForm({
                   required
                   value={technology}
                   onChange={(e) => setTechnology(e.target.value)}
-                  className={inputClass}
+                  disabled={!category}
+                  className={`${inputClass} disabled:cursor-not-allowed disabled:opacity-60`}
                 >
-                  <option value="">Select technology…</option>
-                  {technologies.map((t) => (
+                  <option value="">{category ? "Select technology…" : "Select category first…"}</option>
+                  {filteredTechnologies.map((t) => (
                     <option key={t.id} value={t.name}>
                       {t.name}
                     </option>
                   ))}
-                  {technology && !technologies.some((t) => t.name === technology) ? (
+                  {technology && !filteredTechnologies.some((t) => t.name === technology) ? (
                     <option value={technology}>{technology} (current)</option>
                   ) : null}
                 </select>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {category
+                    ? `${filteredTechnologies.length} technolog${filteredTechnologies.length === 1 ? "y" : "ies"} in ${category}. `
+                    : null}
                   <Link href="/settings/technologies" className="underline hover:text-gray-700 dark:hover:text-gray-300">
                     Manage technologies
                   </Link>

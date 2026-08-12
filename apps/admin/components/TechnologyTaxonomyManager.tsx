@@ -147,50 +147,64 @@ export function TechnologyTaxonomyManager() {
     "rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-      <h3 className="font-semibold text-gray-900 dark:text-gray-100">Technologies</h3>
-      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        Manage technology options for jobs and case studies. Each technology must belong to a category.
-      </p>
+    <section className="space-y-6 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+      <div>
+        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Technologies</h3>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          Manage technology options for jobs and case studies. Each technology must belong to a category.
+        </p>
+      </div>
 
       {categories.length === 0 ? (
-        <p className="mt-4 text-sm text-amber-700 dark:text-amber-300">
+        <p className="text-sm text-amber-700 dark:text-amber-300">
           Add at least one category before creating technologies.
         </p>
       ) : (
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <label className="sr-only" htmlFor="technology-category-filter">Category</label>
-          <select
-            id="technology-category-filter"
-            value={newCategoryId}
-            onChange={(e) => setNewCategoryId(e.target.value)}
-            className={`${inputClass} sm:w-48`}
-            aria-label="Filter technologies by category"
-          >
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
-            ))}
-          </select>
-          <input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="New technology…"
-            className={`${inputClass} flex-1`}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                void addItem();
-              }
-            }}
-          />
-          <button
-            type="button"
-            disabled={saving || !newName.trim() || !newCategoryId}
-            onClick={() => void addItem()}
-            className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-200"
-          >
-            Add
-          </button>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_auto] sm:items-center">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="technology-category-filter">
+              Category
+            </label>
+            <select
+              id="technology-category-filter"
+              value={newCategoryId}
+              onChange={(e) => setNewCategoryId(e.target.value)}
+              className={inputClass}
+              aria-label="Filter technologies by category"
+            >
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="technology-new-name">
+              New technology
+            </label>
+            <input
+              id="technology-new-name"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="New technology…"
+              className={inputClass}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void addItem();
+                }
+              }}
+            />
+          </div>
+          <div className="sm:pt-6">
+            <button
+              type="button"
+              disabled={saving || !newName.trim() || !newCategoryId}
+              onClick={() => void addItem()}
+              className="w-full rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-200 sm:w-auto"
+            >
+              Add
+            </button>
+          </div>
         </div>
       )}
 
@@ -203,7 +217,7 @@ export function TechnologyTaxonomyManager() {
         totalCount={totalSourceItems}
       />
 
-      <div className="overflow-hidden rounded-lg border border-gray-100 dark:border-gray-700">
+      <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
         <ul className="divide-y divide-gray-100 dark:divide-gray-700">
           {items.length === 0 ? (
             <li className="px-4 py-8 text-center text-sm text-gray-400">No technologies yet.</li>
@@ -215,9 +229,12 @@ export function TechnologyTaxonomyManager() {
             <li className="px-4 py-8 text-center text-sm text-gray-400">No technologies match your search.</li>
           ) : (
             paginated.map((item) => (
-              <li key={item.id} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <li
+                key={item.id}
+                className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+              >
                 {editingId === item.id ? (
-                  <div className="flex flex-1 flex-col gap-2 sm:flex-row">
+                  <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
                     <select
                       value={editCategoryId}
                       onChange={(e) => setEditCategoryId(e.target.value)}
@@ -231,30 +248,32 @@ export function TechnologyTaxonomyManager() {
                     <input
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      className={`${inputClass} flex-1`}
+                      className={`${inputClass} min-w-0 flex-1`}
                       autoFocus
                     />
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => void saveEdit(item.id)}
-                      className="text-sm font-medium text-black dark:text-white"
-                    >
-                      Save
-                    </button>
-                    <button type="button" onClick={() => setEditingId(null)} className="text-sm text-gray-500">
-                      Cancel
-                    </button>
+                    <div className="flex shrink-0 gap-3">
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void saveEdit(item.id)}
+                        className="text-sm font-medium text-black dark:text-white"
+                      >
+                        Save
+                      </button>
+                      <button type="button" onClick={() => setEditingId(null)} className="text-sm text-gray-500">
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <>
-                    <div className="min-w-0">
+                    <div className="min-w-0 pr-2">
                       <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.name}</span>
-                      <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                      <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
                         Category: {item.category?.name ?? "—"}
                       </span>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex shrink-0 gap-3">
                       <button
                         type="button"
                         onClick={() => {
