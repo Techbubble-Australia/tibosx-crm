@@ -199,12 +199,12 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
               <tr>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Ref</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Title</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Hot</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">City</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Country</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Client</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Technology</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Applications</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Hot</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
                 <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
               </tr>
@@ -227,16 +227,6 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                   <tr key={job.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                     <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">{job.referenceNumber}</td>
                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{job.title}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.city || "—"}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                      <span className="mr-1" aria-hidden>{job.flag}</span>
-                      {job.country}
-                    </td>
-                    <td className="max-w-[200px] truncate px-4 py-3 text-gray-600 dark:text-gray-400" title={job.clientName || undefined}>
-                      {job.clientName || "—"}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.technology || "—"}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.applicationCount ?? 0}</td>
                     <td className="px-4 py-3">
                       {canManageJobs ? (
                         <button
@@ -244,6 +234,7 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                           onClick={() => void toggleHot(job)}
                           className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800"
                           aria-label={job.isHot ? "Remove hot flag" : "Mark as hot"}
+                          title={job.isHot ? "Hot job — click to remove" : "Mark as hot job"}
                         >
                           <Flame
                             className={`h-4 w-4 ${
@@ -262,6 +253,16 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                         />
                       )}
                     </td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.city || "—"}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                      <span className="mr-1" aria-hidden>{job.flag}</span>
+                      {job.country}
+                    </td>
+                    <td className="max-w-[200px] truncate px-4 py-3 text-gray-600 dark:text-gray-400" title={job.clientName || undefined}>
+                      {job.clientName || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.technology || "—"}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.applicationCount ?? 0}</td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -349,6 +350,25 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
+                      {canManageJobs ? (
+                        <button
+                          type="button"
+                          onClick={() => void toggleHot(job)}
+                          className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          aria-label={job.isHot ? "Remove hot flag" : "Mark as hot"}
+                          title={job.isHot ? "Hot job — click to remove" : "Mark as hot job"}
+                        >
+                          <Flame
+                            className={`h-4 w-4 ${
+                              job.isHot
+                                ? "fill-orange-500 text-orange-500"
+                                : "text-gray-400"
+                            }`}
+                          />
+                        </button>
+                      ) : job.isHot ? (
+                        <Flame className="h-4 w-4 fill-orange-500 text-orange-500" aria-label="Hot job" />
+                      ) : null}
                       {canManageJobs ? (
                         <>
                           <Link
