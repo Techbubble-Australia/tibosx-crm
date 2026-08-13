@@ -19,7 +19,19 @@ import {
 } from "@/lib/careers-form";
 
 /** Must match packages/api/src/lib/validation.ts PHONE_REGEX */
-const PHONE_PATTERN = String.raw`^\+?[\d\s().-]{8,20}$`;
+const PHONE_PATTERN = String.raw`^\+?\d{8,20}$`;
+
+async function readResponseJson(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  if (!text.trim()) {
+    return {};
+  }
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    throw new Error(res.ok ? "Invalid server response" : "Submission failed. Please try again.");
+  }
+}
 
 type CareersApplyFormProps = {
   jobs: JobApiRow[];
@@ -142,12 +154,12 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
         method: "POST",
         body: uploadData,
       });
-      const uploadJson = await uploadRes.json();
+      const uploadJson = await readResponseJson(uploadRes);
       if (!uploadRes.ok) {
-        throw new Error(uploadJson.error || "Document upload failed");
+        throw new Error(typeof uploadJson.error === "string" ? uploadJson.error : "Document upload failed");
       }
 
-      const uploadedFiles = uploadJson.data?.files as Array<{ url: string }> | undefined;
+      const uploadedFiles = (uploadJson.data as { files?: Array<{ url: string }> } | undefined)?.files;
       const documentUrls = uploadedFiles?.map((f) => f.url).filter(Boolean) ?? [];
       if (documentUrls.length === 0) {
         throw new Error("Document upload failed");
@@ -165,7 +177,7 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
         firstName: readFormString(formData, "firstName"),
         lastName: readFormString(formData, "lastName"),
         email: readFormString(formData, "email"),
-        phone: readFormString(formData, "phone"),
+        phone: readFormString(formData, "phone").replace(/\s+/g, ""),
         position: position.trim(),
         country: country.trim(),
         city: resolvedCity,
@@ -187,13 +199,19 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const json = await res.json();
+      const json = await readResponseJson(res);
       if (!res.ok) {
+        const details = json.details;
         const detailText =
-          Array.isArray(json.details)
-            ? json.details.map((d: { message?: string }) => d.message).filter(Boolean).join(". ")
+          Array.isArray(details)
+            ? details
+                .map((d) => (typeof d === "object" && d && "message" in d ? String(d.message) : ""))
+                .filter(Boolean)
+                .join(". ")
             : "";
-        throw new Error(detailText || json.error || "Submission failed");
+        throw new Error(
+          detailText || (typeof json.error === "string" ? json.error : "Submission failed"),
+        );
       }
 
       setStatus("success");
@@ -211,6 +229,10 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
       setCityOther("");
     } catch (err) {
       setStatus("error");
+      if (err instanceof TypeError && /fetch/i.test(err.message)) {
+        setErrorMsg("Unable to reach the server. Please check your connection and try again.");
+        return;
+      }
       setErrorMsg(err instanceof Error ? err.message : "Something went wrong");
     }
   }
@@ -253,7 +275,7 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
         required
         autoComplete="tel"
         pattern={PHONE_PATTERN}
-        title="Enter a valid phone number (8–20 digits, may include +, spaces, or dashes)"
+        title="Enter a valid phone number (8–20 digits, optional + prefix, no spaces)"
         placeholder="Phone Number *"
         className={fieldClass}
       />

@@ -45,13 +45,19 @@ export async function proxyApiRequest(req: NextRequest, pathSegments: string[]):
 
   try {
     const res = await fetch(target, init);
-    const out = new NextResponse(res.body, {
+    const bodyBuf = await res.arrayBuffer();
+    const out = new NextResponse(bodyBuf, {
       status: res.status,
       statusText: res.statusText,
     });
+    const skipResponseHeaders = new Set([
+      "transfer-encoding",
+      "content-encoding",
+      "content-length",
+    ]);
     res.headers.forEach((value, key) => {
       const low = key.toLowerCase();
-      if (low === "transfer-encoding") return;
+      if (skipResponseHeaders.has(low) || HOP_BY_HOP.has(low)) return;
       out.headers.set(key, value);
     });
     return out;

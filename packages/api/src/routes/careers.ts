@@ -66,13 +66,7 @@ const documentUpload = multer({
   limits: { fileSize: 5 * 1024 * 1024, files: 10 },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    const allowedExt = /\.(pdf|doc|docx)$/i.test(ext);
-    const mt = (file.mimetype || "").toLowerCase();
-    const allowedMt =
-      mt === "application/pdf" ||
-      mt === "application/msword" ||
-      mt === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-    if (allowedExt && allowedMt) {
+    if (/\.(pdf|doc|docx)$/i.test(ext)) {
       return cb(null, true);
     }
     cb(new Error("Only PDF, DOC, and DOCX files are allowed"));
@@ -108,7 +102,15 @@ router.post("/upload-resume", documentUpload.single("resume"), async (req, res, 
 
 router.post(
   "/upload-documents",
-  documentUpload.array("documents", 10),
+  (req, res, next) => {
+    documentUpload.array("documents", 10)(req, res, (err) => {
+      if (err) {
+        const message = err instanceof Error ? err.message : "Upload failed";
+        return res.status(400).json({ error: message });
+      }
+      next();
+    });
+  },
   async (req, res, next) => {
     try {
       const files = req.files as Express.Multer.File[] | undefined;
