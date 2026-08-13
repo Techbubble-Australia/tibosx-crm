@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, ChevronDown } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
 import { TablePagination } from "@/components/ui/TablePagination";
@@ -86,6 +86,20 @@ export default function ProfilesPage() {
     } catch (error) {
       console.error("Error deleting profile:", error);
     }
+  }
+
+  const [expandedTechnologies, setExpandedTechnologies] = useState<Set<string>>(() => new Set());
+
+  function toggleTechnologyGroup(technology: string) {
+    setExpandedTechnologies((prev) => {
+      const next = new Set(prev);
+      if (next.has(technology)) {
+        next.delete(technology);
+      } else {
+        next.add(technology);
+      }
+      return next;
+    });
   }
 
   const groupedByTechnology = useMemo(() => {
@@ -224,44 +238,81 @@ export default function ProfilesPage() {
               No profiles on this page.
             </div>
           ) : (
-            groupedByTechnology.map(([technology, profiles]) => (
-              <section
-                key={technology}
-                className="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
-              >
-                <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-                  <h3 className="font-semibold text-gray-900 dark:text-gray-100">{technology}</h3>
-                  <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                    {profiles.length}
-                  </span>
-                </div>
-                <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {profiles.map((row) => (
-                    <li key={row.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0">
-                        <p className="font-medium text-gray-900 dark:text-gray-100">
-                          {row.firstName} {row.lastName}
-                        </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {row.email} · {row.phone}
-                        </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {[row.city, row.country].filter(Boolean).join(", ") || "—"} · {formatRate(row)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/database/profiles/${row.id}`}
-                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+            groupedByTechnology.map(([technology, profiles]) => {
+              const isExpanded = expandedTechnologies.has(technology);
+              const panelId = `profile-group-${technology.replace(/\s+/g, "-").toLowerCase()}`;
+
+              return (
+                <section
+                  key={technology}
+                  className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleTechnologyGroup(technology)}
+                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                    aria-expanded={isExpanded}
+                    aria-controls={panelId}
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <ChevronDown
+                        className={`h-4 w-4 shrink-0 text-gray-500 transition-transform dark:text-gray-400 ${
+                          isExpanded ? "rotate-180" : ""
+                        }`}
+                        aria-hidden
+                      />
+                      <h3 className="truncate font-semibold text-gray-900 dark:text-gray-100">{technology}</h3>
+                    </span>
+                    <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                      {profiles.length}
+                    </span>
+                  </button>
+                  {isExpanded ? (
+                    <div
+                      id={panelId}
+                      className="grid grid-cols-1 gap-4 border-t border-gray-100 p-4 sm:grid-cols-2 xl:grid-cols-3 dark:border-gray-800"
+                    >
+                      {profiles.map((row) => (
+                        <article
+                          key={row.id}
+                          className="flex h-full flex-col rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:border-gray-700 dark:bg-gray-800/30"
                         >
-                          View
-                        </Link>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-semibold text-gray-900 dark:text-gray-100">
+                              {row.firstName} {row.lastName}
+                            </p>
+                            <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">{row.email}</p>
+                            <p className="truncate text-xs text-gray-500 dark:text-gray-400">{row.phone}</p>
+                            <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                              {[row.city, row.country].filter(Boolean).join(", ") || "—"}
+                            </p>
+                            <p className="mt-1 text-xs font-medium text-gray-700 dark:text-gray-300">{formatRate(row)}</p>
+                          </div>
+                          <div className="mt-3 flex items-center gap-2">
+                            <Link
+                              href={`/database/profiles/${row.id}`}
+                              className="inline-flex flex-1 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:hover:bg-gray-800"
+                            >
+                              View
+                            </Link>
+                            {canDeleteProfiles ? (
+                              <button
+                                type="button"
+                                onClick={() => void deleteRow(row.id)}
+                                className="rounded-lg p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                                aria-label={`Delete ${row.firstName} ${row.lastName}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            ) : null}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+              );
+            })
           )}
           {rows.length > 0 ? (
             <TablePagination
