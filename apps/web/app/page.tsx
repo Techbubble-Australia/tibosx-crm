@@ -44,6 +44,7 @@ export default async function HomePage() {
     title: j.title,
     meta: `${j.referenceNumber ? `${j.referenceNumber} · ` : ""}${formatJobMetaLine(j)}`,
     href: `/careers/${encodeURIComponent(j.slug)}`,
+    isHot: j.isHot,
   }));
 
   const caseStudies = caseStudyRows.map(apiRowToListCard);

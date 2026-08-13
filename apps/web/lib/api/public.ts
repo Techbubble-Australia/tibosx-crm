@@ -130,6 +130,7 @@ export type JobApiRow = {
   technology: string;
   department: string;
   likeCount?: number;
+  isHot?: boolean;
 };
 
 export type JobDetailApiRow = JobApiRow & {

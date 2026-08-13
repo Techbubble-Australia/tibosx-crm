@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ArrowRight, ChevronDown } from "lucide-react";
 import type { JobApiRow } from "@/lib/api/public";
+import { JobHotBadge } from "@/components/careers/JobHotBadge";
 import {
   collectJobLocationFilterOptions,
   formatLocationEntryDisplay,
@@ -133,7 +134,10 @@ export function CareersPositionsSection({ jobs }: { jobs: JobApiRow[] }) {
                           {position.referenceNumber}
                         </p>
                       ) : null}
-                      <p className="mt-1 text-[18px] font-bold leading-7 text-[#111111] dark:text-zinc-50">{position.title}</p>
+                      <p className="mt-1 flex items-center gap-2 text-[18px] font-bold leading-7 text-[#111111] dark:text-zinc-50">
+                        <span>{position.title}</span>
+                        <JobHotBadge isHot={position.isHot} />
+                      </p>
                     </div>
                     <ArrowRight
                       className="mt-1 h-[18px] w-[18px] shrink-0 stroke-[1.5] text-[#111111] transition-transform group-hover:translate-x-0.5 dark:text-zinc-200"

@@ -6,6 +6,7 @@ import { ClientStoriesSection } from "@/components/ClientStoriesSection";
 import { UploadableImage } from "@/components/media/UploadableImage";
 import { TechnologyExpertiseSection } from "@/components/TechnologyExpertiseSection";
 import { SectionPill } from "@/components/ui/SectionPill";
+import { JobHotBadge } from "@/components/careers/JobHotBadge";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import {
   ArrowRight,
@@ -27,7 +28,7 @@ import { CASE_STUDY_SIDEBAR, buildCaseStudyCategoryFilters, buildHomeCaseStudySl
 import { useStatCountUpOnView } from "@/hooks/useStatCountUpOnView";
 import { isUploadsProxyPath, resolveMediaUrl, resolveUploadsImgSrc, sameOriginUploadsPath } from "@/lib/media-url";
 
-export type HomePreviewJob = { slug: string; title: string; meta: string; href: string };
+export type HomePreviewJob = { slug: string; title: string; meta: string; href: string; isHot?: boolean };
 export type HomeClientStory = {
   quote: string;
   authorName: string;
@@ -1330,8 +1331,11 @@ export function MarketingHome({
                       className="flex h-[78px] items-center justify-between rounded-[24px] border border-[#e5e5e5] bg-white px-6 transition-colors hover:bg-[#fafafa]"
                     >
                       <div>
-                        <p className="text-[16px] font-bold leading-6 text-[#111111]">{role.title}</p>
-                        <p className="text-[14px] leading-5 tracking-[0.035px] text-[#7a7f8e]">{role.meta}</p>
+                        <p className="flex items-center gap-2 text-[16px] font-bold leading-6 text-[#111111] dark:text-zinc-50">
+                          <span>{role.title}</span>
+                          <JobHotBadge isHot={role.isHot} size="sm" />
+                        </p>
+                        <p className="text-[14px] leading-5 tracking-[0.035px] text-[#7a7f8e] dark:text-zinc-400">{role.meta}</p>
                       </div>
                       <ArrowRight className="h-[18px] w-[18px] text-[#111111]" strokeWidth={2} aria-hidden />
                     </Link>

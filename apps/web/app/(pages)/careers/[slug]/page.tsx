@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getPublishedJobBySlug } from "@/lib/api/public";
+import { JobHotBadge } from "@/components/careers/JobHotBadge";
 import { JobDescription } from "@/components/careers/JobDescription";
 import { JobDetailActions } from "@/components/careers/JobDetailActions";
 import { JobLocationFlags } from "@/components/careers/JobLocationFlags";
@@ -45,8 +46,9 @@ export default async function CareerJobDetailPage({ params }: { params: { slug: 
               {eyebrow}
             </p>
           ) : null}
-          <h1 className="mt-2 text-[36px] font-bold leading-tight tracking-[-0.02em] text-[#111111] dark:text-zinc-50">
-            {job.title}
+          <h1 className="mt-2 flex flex-wrap items-center gap-3 text-[36px] font-bold leading-tight tracking-[-0.02em] text-[#111111] dark:text-zinc-50">
+            <span>{job.title}</span>
+            <JobHotBadge isHot={job.isHot} size="md" />
           </h1>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[16px] text-[#666666] dark:text-zinc-400">
             <JobLocationFlags locations={locations} flagHeight={22} />

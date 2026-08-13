@@ -114,6 +114,7 @@ function serializePublicJob(job: JobListing) {
     description: job.description,
     likeCount: job.likeCount ?? 0,
     published: job.published,
+    isHot: job.isHot ?? false,
     order: job.order,
   };
 }
@@ -186,7 +187,7 @@ router.get("/", async (_req, res) => {
   try {
     const jobs = await prisma.jobListing.findMany({
       where: { published: true },
-      orderBy: [{ order: "asc" }, { createdAt: "desc" }],
+      orderBy: [{ isHot: "desc" }, { order: "asc" }, { createdAt: "desc" }],
     });
     res.json({ data: jobs.map((job: JobListing) => serializePublicJob(job)) });
   } catch (error) {
