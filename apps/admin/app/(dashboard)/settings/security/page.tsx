@@ -34,8 +34,12 @@ export default function SecuritySettingsPageWrapper() {
 function SecuritySettingsPage() {
   const searchParams = useSearchParams();
   const mfaRequired = searchParams.get("mfa") === "required";
+  const passwordResetRequired = searchParams.get("reset") === "required";
 
   const [status, setStatus] = useState<MfaStatus | null>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [setup, setSetup] = useState<SetupPayload | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [confirmCode, setConfirmCode] = useState("");
@@ -81,6 +85,38 @@ function SecuritySettingsPage() {
       .catch(() => setQrDataUrl(""));
   }, [setup]);
 
+  async function submitPasswordReset(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setError("New passwords do not match");
+      return;
+    }
+    setIsSubmitting(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch("/api/auth/password/change-required", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Failed to update password");
+      }
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setMessage("Password updated. Continue with MFA setup below.");
+      window.location.replace("/settings/security?mfa=required");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update password");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   async function startSetup() {
     setIsSubmitting(true);
     setError("");
@@ -105,12 +141,12 @@ function SecuritySettingsPage() {
   }
 
   useEffect(() => {
-    if (isLoading || autoSetupStarted || status?.mfaEnabled) {
+    if (passwordResetRequired || isLoading || autoSetupStarted || status?.mfaEnabled) {
       return;
     }
     setAutoSetupStarted(true);
     void startSetup();
-  }, [isLoading, autoSetupStarted, status?.mfaEnabled]);
+  }, [passwordResetRequired, isLoading, autoSetupStarted, status?.mfaEnabled]);
 
   async function confirmSetup(e: React.FormEvent) {
     e.preventDefault();
@@ -186,6 +222,57 @@ function SecuritySettingsPage() {
         </p>
       </div>
 
+      {passwordResetRequired ? (
+        <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100">Change your password</h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Enter your current password and choose a new one before continuing to MFA setup.
+          </p>
+          <form onSubmit={submitPasswordReset} className="mt-4 space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium">Current password</label>
+              <input
+                type="password"
+                required
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">New password</label>
+              <input
+                type="password"
+                required
+                minLength={8}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Confirm new password</label>
+              <input
+                type="password"
+                required
+                minLength={8}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="inline-flex items-center gap-2 rounded-lg bg-black px-6 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+            >
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Save and continue
+            </button>
+          </form>
+        </section>
+      ) : null}
+
       {mfaRequired || !status?.mfaEnabled ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
           You must set up two-factor authentication before you can access TBOS.
@@ -201,6 +288,7 @@ function SecuritySettingsPage() {
         </div>
       ) : null}
 
+      {!passwordResetRequired ? (
       <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -333,6 +421,7 @@ function SecuritySettingsPage() {
           </form>
         )}
       </div>
+      ) : null}
     </div>
   );
 }

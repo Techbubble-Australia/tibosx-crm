@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { getCitiesForCountryCode } from "@/lib/country-cities";
 import { getSortedCountryOptions } from "@/lib/country-flags";
@@ -11,6 +12,9 @@ type Props = {
   inputClass: string;
   labelClass: string;
 };
+
+const ANY_LABEL = "Any";
+const OTHER_LABEL = "Other";
 
 function emptyRow(): JobLocationEntry {
   return { countryCode: "", country: "", flag: "", label: "", cities: [] };
@@ -28,6 +32,7 @@ function normalizeCities(row: JobLocationEntry): string[] {
 export function JobLocationsField({ value, onChange, inputClass, labelClass }: Props) {
   const options = getSortedCountryOptions();
   const rows = value.length > 0 ? value : [emptyRow()];
+  const [otherOpenRows, setOtherOpenRows] = useState<Set<number>>(new Set());
 
   const updateRow = (index: number, patch: Partial<JobLocationEntry>) => {
     onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -35,6 +40,11 @@ export function JobLocationsField({ value, onChange, inputClass, labelClass }: P
 
   const setCountry = (index: number, code: string) => {
     const selected = options.find((o) => o.code === code);
+    setOtherOpenRows((prev) => {
+      const next = new Set(prev);
+      next.delete(index);
+      return next;
+    });
     updateRow(index, {
       countryCode: code,
       country: selected?.name ?? "",
@@ -54,6 +64,45 @@ export function JobLocationsField({ value, onChange, inputClass, labelClass }: P
     updateRow(index, { cities: next, label: "" });
   };
 
+  const toggleAny = (index: number) => {
+    setOtherOpenRows((prev) => {
+      const next = new Set(prev);
+      next.delete(index);
+      return next;
+    });
+    updateRow(index, { cities: [], label: "" });
+  };
+
+  const toggleOther = (index: number, cityOptions: readonly string[]) => {
+    const row = rows[index];
+    if (!row) return;
+    const selectedCities = normalizeCities(row);
+    const customCities = selectedCities.filter((city) => !cityOptions.includes(city));
+    const isOpen = otherOpenRows.has(index) || customCities.length > 0;
+
+    if (isOpen) {
+      const preset = selectedCities.filter((city) => cityOptions.includes(city));
+      updateRow(index, { cities: preset, label: "" });
+      setOtherOpenRows((prev) => {
+        const next = new Set(prev);
+        next.delete(index);
+        return next;
+      });
+      return;
+    }
+
+    setOtherOpenRows((prev) => new Set(prev).add(index));
+  };
+
+  const setCustomCity = (index: number, cityOptions: readonly string[], value: string) => {
+    const row = rows[index];
+    if (!row) return;
+    const preset = normalizeCities(row).filter((city) => cityOptions.includes(city));
+    const trimmed = value.trim();
+    const next = trimmed ? [...preset, trimmed] : preset;
+    updateRow(index, { cities: next, label: "" });
+  };
+
   return (
     <div className="space-y-3">
       <div>
@@ -67,6 +116,10 @@ export function JobLocationsField({ value, onChange, inputClass, labelClass }: P
       {rows.map((row, index) => {
         const cityOptions = getCitiesForCountryCode(row.countryCode);
         const selectedCities = normalizeCities(row);
+        const customCities = selectedCities.filter((city) => !cityOptions.includes(city));
+        const anySelected = selectedCities.length === 0;
+        const otherSelected = otherOpenRows.has(index) || customCities.length > 0;
+        const customCityValue = customCities[0] ?? "";
 
         return (
           <div
@@ -113,31 +166,57 @@ export function JobLocationsField({ value, onChange, inputClass, labelClass }: P
                 <label className="mb-2 block text-xs font-medium text-gray-600 dark:text-gray-300">
                   Cities (optional, multi-select)
                 </label>
-                {cityOptions.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {cityOptions.map((city: string) => {
-                      const selected = selectedCities.includes(city);
-                      return (
-                        <button
-                          key={city}
-                          type="button"
-                          onClick={() => toggleCity(index, city)}
-                          className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                            selected
-                              ? "border-black bg-black text-white dark:border-white dark:bg-white dark:text-black"
-                              : "border-gray-300 bg-white text-gray-700 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
-                          }`}
-                        >
-                          {city}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    No preset cities for this country. The country name will appear on job cards.
-                  </p>
-                )}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleAny(index)}
+                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                      anySelected
+                        ? "border-black bg-black text-white dark:border-white dark:bg-white dark:text-black"
+                        : "border-gray-300 bg-white text-gray-700 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
+                    }`}
+                  >
+                    {ANY_LABEL}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleOther(index, cityOptions)}
+                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                      otherSelected
+                        ? "border-black bg-black text-white dark:border-white dark:bg-white dark:text-black"
+                        : "border-gray-300 bg-white text-gray-700 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
+                    }`}
+                  >
+                    {OTHER_LABEL}
+                  </button>
+                  {cityOptions.map((city: string) => {
+                    const selected = selectedCities.includes(city);
+                    return (
+                      <button
+                        key={city}
+                        type="button"
+                        onClick={() => toggleCity(index, city)}
+                        className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                          selected
+                            ? "border-black bg-black text-white dark:border-white dark:bg-white dark:text-black"
+                            : "border-gray-300 bg-white text-gray-700 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
+                        }`}
+                      >
+                        {city}
+                      </button>
+                    );
+                  })}
+                </div>
+                {otherSelected ? (
+                  <input
+                    type="text"
+                    value={customCityValue}
+                    onChange={(e) => setCustomCity(index, cityOptions, e.target.value)}
+                    className={`${inputClass} mt-2`}
+                    placeholder="Enter city name"
+                    aria-label={`Custom city for ${row.country}`}
+                  />
+                ) : null}
               </div>
             ) : null}
           </div>

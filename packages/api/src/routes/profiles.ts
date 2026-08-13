@@ -5,8 +5,10 @@ import path from "path";
 import { promises as fsp } from "fs";
 import { prisma } from "@techbubble/database";
 import { objectStorageConfigured, putUploadObject } from "../lib/object-storage";
+import type { AuthRequest } from "../middleware/auth";
 import { PHONE_REGEX, PHONE_VALIDATION_MESSAGE } from "../lib/validation";
 import { SALARY_CURRENCIES, SALARY_MODES, parseSalaryRateInput } from "../lib/careers-form";
+import { linkProfileToJobIfRequested } from "../lib/profile-to-application";
 
 const router: IRouter = Router();
 
@@ -28,6 +30,8 @@ const profileSchema = z.object({
   previousSalary: z.coerce.number().int().positive().optional().nullable(),
   comments: z.string().max(5000).optional().nullable(),
   careerApplicationId: z.string().optional().nullable(),
+  sourcedById: z.string().optional().nullable(),
+  jobListingId: z.string().optional().nullable(),
 });
 
 function makeStoredFilename(fieldname: string, originalname: string): string {
@@ -87,6 +91,8 @@ function serializeProfile(row: {
   previousSalary: number | null;
   comments: string | null;
   careerApplicationId: string | null;
+  sourcedById: string | null;
+  sourcedByName: string | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -111,17 +117,48 @@ function serializeProfile(row: {
     previousSalary: row.previousSalary,
     comments: row.comments,
     careerApplicationId: row.careerApplicationId,
+    sourcedById: row.sourcedById,
+    sourcedByName: row.sourcedByName,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
 
+router.get("/meta/sourcers", async (_req, res) => {
+  try {
+    const rows = await prisma.adminUser.findMany({
+      where: { active: true, role: { in: ["admin", "recruiter"] } },
+      select: { id: true, name: true, email: true, role: true },
+      orderBy: [{ name: "asc" }, { email: "asc" }],
+    });
+    res.json({
+      data: rows.map((row) => ({
+        id: row.id,
+        label: row.name?.trim() || row.email,
+        email: row.email,
+        role: row.role,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching sourcers:", error);
+    res.status(500).json({ error: "Failed to fetch sourcers" });
+  }
+});
+
 router.get("/", async (_req, res) => {
   try {
     const rows = await prisma.candidateProfile.findMany({
+      include: { sourcedBy: { select: { name: true, email: true } } },
       orderBy: { createdAt: "desc" },
     });
-    res.json({ data: rows.map(serializeProfile) });
+    res.json({
+      data: rows.map((row) =>
+        serializeProfile({
+          ...row,
+          sourcedByName: row.sourcedBy?.name?.trim() || row.sourcedBy?.email || null,
+        }),
+      ),
+    });
   } catch (error) {
     console.error("Error fetching profiles:", error);
     res.status(500).json({ error: "Failed to fetch profiles" });
@@ -130,11 +167,19 @@ router.get("/", async (_req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
-    const row = await prisma.candidateProfile.findUnique({ where: { id: req.params.id } });
+    const row = await prisma.candidateProfile.findUnique({
+      where: { id: req.params.id },
+      include: { sourcedBy: { select: { name: true, email: true } } },
+    });
     if (!row) {
       return res.status(404).json({ error: "Not found" });
     }
-    res.json({ data: serializeProfile(row) });
+    res.json({
+      data: serializeProfile({
+        ...row,
+        sourcedByName: row.sourcedBy?.name?.trim() || row.sourcedBy?.email || null,
+      }),
+    });
   } catch (error) {
     console.error("Error fetching profile:", error);
     res.status(500).json({ error: "Failed to fetch profile" });
@@ -172,9 +217,23 @@ router.post("/", async (req, res) => {
         previousSalary: data.previousSalary ?? null,
         comments: data.comments ?? null,
         careerApplicationId: data.careerApplicationId ?? null,
+        sourcedById: data.sourcedById ?? null,
       },
     });
-    res.status(201).json({ data: serializeProfile(row) });
+
+    await linkProfileToJobIfRequested(row, data.jobListingId);
+
+    const refreshed = await prisma.candidateProfile.findUnique({
+      where: { id: row.id },
+      include: { sourcedBy: { select: { name: true, email: true } } },
+    });
+    res.status(201).json({
+      data: serializeProfile({
+        ...(refreshed ?? row),
+        sourcedByName:
+          refreshed?.sourcedBy?.name?.trim() || refreshed?.sourcedBy?.email || null,
+      }),
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
@@ -215,9 +274,23 @@ router.put("/:id", async (req, res) => {
         documentUrls: data.documentUrls,
         previousSalary: data.previousSalary ?? null,
         comments: data.comments ?? null,
+        sourcedById: data.sourcedById ?? null,
       },
     });
-    res.json({ data: serializeProfile(row) });
+
+    await linkProfileToJobIfRequested(row, data.jobListingId);
+
+    const refreshed = await prisma.candidateProfile.findUnique({
+      where: { id: row.id },
+      include: { sourcedBy: { select: { name: true, email: true } } },
+    });
+    res.json({
+      data: serializeProfile({
+        ...(refreshed ?? row),
+        sourcedByName:
+          refreshed?.sourcedBy?.name?.trim() || refreshed?.sourcedBy?.email || null,
+      }),
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
@@ -227,8 +300,11 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", async (req: AuthRequest, res) => {
   try {
+    if (req.user?.role === "recruiter") {
+      return res.status(403).json({ error: "Recruiters cannot delete profiles" });
+    }
     await prisma.candidateProfile.delete({ where: { id: req.params.id } });
     res.json({ message: "Deleted" });
   } catch (error: unknown) {

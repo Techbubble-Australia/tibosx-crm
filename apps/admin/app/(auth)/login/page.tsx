@@ -51,6 +51,11 @@ export default function LoginPage() {
         return;
       }
 
+      if (data.requiresPasswordReset) {
+        window.location.assign("/settings/security?reset=required");
+        return;
+      }
+
       if (data.requiresMfaSetup) {
         window.location.assign("/settings/security?mfa=required");
         return;

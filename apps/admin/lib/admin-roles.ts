@@ -103,6 +103,22 @@ export function canManageClients(role: string): boolean {
   return canAccessModule(role, "sales");
 }
 
+export function canManageJobs(role: string): boolean {
+  return role === "admin" || role === "website";
+}
+
+export function canViewJobs(role: string): boolean {
+  return canManageJobs(role) || role === "recruiter";
+}
+
+export function canEditProfiles(role: string): boolean {
+  return canAccessRecruitment(role);
+}
+
+export function canDeleteProfiles(role: string): boolean {
+  return role === "admin";
+}
+
 export function canAccessRecruitment(role: string): boolean {
   return canAccessModule(role, "recruitment");
 }

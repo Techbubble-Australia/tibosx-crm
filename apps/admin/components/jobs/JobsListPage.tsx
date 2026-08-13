@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Edit, Trash2, Settings } from "lucide-react";
+import { Plus, Edit, Trash2, Settings, Flame } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { jobEditHref } from "@/lib/job-routes";
@@ -17,6 +17,7 @@ interface JobListing {
   slug: string;
   referenceNumber: string;
   location: string;
+  city?: string;
   country: string;
   flag: string;
   type: string;
@@ -26,24 +27,17 @@ interface JobListing {
   department: string;
   published: boolean;
   applicationCount: number;
-  recruiterIds?: string[];
+  clientName?: string;
+  isHot?: boolean;
   createdAt: string;
-}
-
-type RecruiterUser = { id: string; email: string };
-
-function formatRecruiters(recruiterIds: string[] | undefined, recruiterById: Map<string, string>): string {
-  if (!recruiterIds?.length) return "—";
-  const labels = recruiterIds
-    .map((id) => recruiterById.get(id))
-    .filter((email): email is string => Boolean(email));
-  return labels.length > 0 ? labels.join(", ") : "—";
 }
 
 function jobSearchHaystack(job: JobListing): string {
   return [
     job.referenceNumber,
     job.title,
+    job.city,
+    job.clientName,
     job.location,
     job.country,
     job.type,
@@ -63,10 +57,8 @@ type JobsListPageProps = {
 };
 
 export function JobsListPage({ publishedFilter, heading, description }: JobsListPageProps) {
-  const { canAccessWebsite, canAccessRecruitment } = useAdminSession();
-  const canManageJobs = canAccessWebsite || canAccessRecruitment;
+  const { canManageJobs, canViewJobs } = useAdminSession();
   const [jobs, setJobs] = useState<JobListing[]>([]);
-  const [recruiterById, setRecruiterById] = useState<Map<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const listTab = publishedFilter ? "active" : "inactive";
   const [viewMode, setViewMode] = useState<ViewMode>("list");
@@ -98,18 +90,9 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
 
   async function fetchJobs() {
     try {
-      const [jobsRes, recruitersRes] = await Promise.all([
-        adminFetch("/api/admin/jobs/admin/all"),
-        adminFetch("/api/admin/jobs/admin/recruiters"),
-      ]);
+      const jobsRes = await adminFetch("/api/admin/jobs/admin/all");
       const data = await jobsRes.json();
-      const recruitersData = await recruitersRes.json();
       setJobs(data.data || []);
-      const map = new Map<string, string>();
-      for (const user of (recruitersData.data ?? []) as RecruiterUser[]) {
-        map.set(user.id, user.email);
-      }
-      setRecruiterById(map);
     } catch (error) {
       console.error("Error fetching jobs:", error);
     } finally {
@@ -126,6 +109,23 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
       }
     } catch (error) {
       console.error("Error deleting job:", error);
+    }
+  }
+
+  async function toggleHot(job: JobListing) {
+    if (!canManageJobs) return;
+    const nextIsHot = !job.isHot;
+    try {
+      const res = await adminFetch(`/api/admin/jobs/admin/${job.id}/hot`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isHot: nextIsHot }),
+      });
+      if (res.ok) {
+        setJobs((prev) => prev.map((j) => (j.id === job.id ? { ...j, isHot: nextIsHot } : j)));
+      }
+    } catch (error) {
+      console.error("Error toggling hot status:", error);
     }
   }
 
@@ -187,22 +187,24 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
         id={`job-search-${publishedFilter ? "active" : "inactive"}`}
         value={search}
         onChange={setSearch}
-        placeholder="Search by ref, title, category, technology, department, location…"
+        placeholder="Search by ref, title, city, client, category, technology, department, location…"
         filteredCount={totalItems}
         totalCount={totalSourceItems}
       />
 
       {viewMode === "list" ? (
         <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-          <table className="w-full min-w-[900px] text-sm">
+          <table className="w-full min-w-[1100px] text-sm">
             <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
               <tr>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Ref</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Title</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">City</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Country</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Client</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Technology</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Applications</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Recruiters</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Hot</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
                 <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
               </tr>
@@ -210,13 +212,13 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {filteredJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
                     No {publishedFilter ? "active" : "inactive"} job listings.
                   </td>
                 </tr>
               ) : totalItems === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
                     No listings match your search.
                   </td>
                 </tr>
@@ -225,14 +227,40 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                   <tr key={job.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                     <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">{job.referenceNumber}</td>
                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{job.title}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.city || "—"}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                       <span className="mr-1" aria-hidden>{job.flag}</span>
                       {job.country}
                     </td>
+                    <td className="max-w-[200px] truncate px-4 py-3 text-gray-600 dark:text-gray-400" title={job.clientName || undefined}>
+                      {job.clientName || "—"}
+                    </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.technology || "—"}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.applicationCount ?? 0}</td>
-                    <td className="max-w-[200px] truncate px-4 py-3 text-gray-600 dark:text-gray-400" title={formatRecruiters(job.recruiterIds, recruiterById)}>
-                      {formatRecruiters(job.recruiterIds, recruiterById)}
+                    <td className="px-4 py-3">
+                      {canManageJobs ? (
+                        <button
+                          type="button"
+                          onClick={() => void toggleHot(job)}
+                          className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          aria-label={job.isHot ? "Remove hot flag" : "Mark as hot"}
+                        >
+                          <Flame
+                            className={`h-4 w-4 ${
+                              job.isHot
+                                ? "fill-orange-500 text-orange-500"
+                                : "text-gray-400"
+                            }`}
+                          />
+                        </button>
+                      ) : (
+                        <Flame
+                          className={`h-4 w-4 ${
+                            job.isHot ? "fill-orange-500 text-orange-500" : "text-gray-400"
+                          }`}
+                          aria-hidden
+                        />
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -262,9 +290,14 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
-                      ) : (
-                        <span className="text-xs text-gray-400">View only</span>
-                      )}
+                      ) : canViewJobs ? (
+                        <Link
+                          href={jobEditHref(job.id, listTab)}
+                          className="inline-flex rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                        >
+                          View
+                        </Link>
+                      ) : null}
                     </td>
                   </tr>
                 ))
@@ -309,10 +342,10 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                     <div className="min-w-0">
                       <p className="font-medium text-gray-900 dark:text-gray-100">{job.title}</p>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {job.referenceNumber} · {job.country} · {job.applicationCount ?? 0} applications
+                        {job.referenceNumber} · {job.city || "—"} · {job.country} · {job.applicationCount ?? 0} applications
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Recruiters: {formatRecruiters(job.recruiterIds, recruiterById)}
+                        Client: {job.clientName || "—"}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -333,14 +366,14 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </>
-                      ) : (
+                      ) : canViewJobs ? (
                         <Link
                           href={jobEditHref(job.id, listTab)}
                           className="inline-flex rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
                         >
                           View
                         </Link>
-                      )}
+                      ) : null}
                     </div>
                   </li>
                 ))}

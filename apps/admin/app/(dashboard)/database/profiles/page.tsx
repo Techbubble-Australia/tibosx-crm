@@ -9,6 +9,7 @@ import { TablePagination } from "@/components/ui/TablePagination";
 import { ViewModeToggle, type ViewMode } from "@/components/ui/ViewModeToggle";
 import { useListView } from "@/hooks/useListView";
 import { buildSearchHaystack } from "@/lib/search-text";
+import { useAdminSession } from "@/contexts/AdminSessionContext";
 
 interface ProfileRow {
   id: string;
@@ -31,6 +32,7 @@ function formatRate(row: ProfileRow): string {
 }
 
 export default function ProfilesPage() {
+  const { canDeleteProfiles } = useAdminSession();
   const [rows, setRows] = useState<ProfileRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
@@ -181,13 +183,15 @@ export default function ProfilesPage() {
                         >
                           <Edit className="h-4 w-4" />
                         </Link>
-                        <button
-                          type="button"
-                          onClick={() => void deleteRow(row.id)}
-                          className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {canDeleteProfiles ? (
+                          <button
+                            type="button"
+                            onClick={() => void deleteRow(row.id)}
+                            className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

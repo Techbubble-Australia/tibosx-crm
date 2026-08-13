@@ -27,8 +27,9 @@ const jobSchema = z.object({
   clientId: z.string().min(1, "Client is required"),
   description: z.string().max(500_000).default(""),
   published: z.boolean().default(true),
+  isHot: z.boolean().optional(),
+  city: z.string().max(120).optional().nullable(),
   order: z.number().int().default(0),
-  recruiterIds: z.array(z.string().min(1)).optional(),
 });
 
 function prepareJobWriteData(body: z.infer<typeof jobSchema>): Record<string, unknown> {
@@ -67,10 +68,31 @@ function prepareJobWriteData(body: z.infer<typeof jobSchema>): Record<string, un
   };
 }
 
-function parseRecruiterIds(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((id): id is string => typeof id === "string" && id.trim().length > 0);
+function parseRecruiterIds(_value: unknown): string[] {
+  return [];
 }
+
+router.patch("/admin/:id/hot", async (req, res) => {
+  try {
+    const body = z.object({ isHot: z.boolean() }).parse(req.body);
+    const existing = await prisma.jobListing.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    const job = await prisma.jobListing.update({
+      where: { id: req.params.id },
+      data: { isHot: body.isHot },
+      include: { client: { select: { name: true } } },
+    });
+    res.json({ data: serializeAdminJob(job) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error updating job hot flag:", error);
+    res.status(500).json({ error: "Failed to update job" });
+  }
+});
 
 function serializePublicJob(job: JobListing) {
   const locations = normalizeJobLocations(job);
@@ -96,7 +118,10 @@ function serializePublicJob(job: JobListing) {
   };
 }
 
-function serializeAdminJob(job: JobListing, applicationCount?: number) {
+function serializeAdminJob(
+  job: JobListing & { client?: { name: string } | null },
+  applicationCount?: number,
+) {
   const locations = normalizeJobLocations(job);
   const legacy = syncLegacyLocationFields(locations);
   return {
@@ -107,6 +132,7 @@ function serializeAdminJob(job: JobListing, applicationCount?: number) {
     location: legacy.location,
     country: legacy.country,
     flag: legacy.flag,
+    city: job.city,
     locations,
     type: job.type,
     listingType: job.listingType,
@@ -115,11 +141,12 @@ function serializeAdminJob(job: JobListing, applicationCount?: number) {
     technology: job.technology,
     department: job.department,
     clientId: job.clientId,
+    clientName: job.client?.name ?? "",
     description: job.description,
     likeCount: job.likeCount ?? 0,
     published: job.published,
+    isHot: job.isHot ?? false,
     order: job.order,
-    recruiterIds: parseRecruiterIds(job.recruiterIds),
     applicationCount: applicationCount ?? 0,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
@@ -186,6 +213,7 @@ router.get("/admin/recruiters", async (_req, res) => {
 router.get("/admin/all", async (_req, res) => {
   try {
     const jobs = await prisma.jobListing.findMany({
+      include: { client: { select: { name: true } } },
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
     });
     const applicationCounts = await prisma.careerApplication.groupBy({
@@ -297,6 +325,7 @@ router.post("/", async (req, res) => {
     const referenceNumber = await allocateJobReferenceNumber();
     const job = await prisma.jobListing.create({
       data: { ...writeData, referenceNumber } as Prisma.JobListingCreateInput,
+      include: { client: { select: { name: true } } },
     });
     res.status(201).json({ data: serializeAdminJob(job) });
   } catch (error) {
@@ -321,6 +350,7 @@ router.put("/:id", async (req, res) => {
     const job = await prisma.jobListing.update({
       where: { id: req.params.id },
       data: writeData as Prisma.JobListingUpdateInput,
+      include: { client: { select: { name: true } } },
     });
     res.json({ data: serializeAdminJob(job) });
   } catch (error) {

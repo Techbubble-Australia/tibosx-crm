@@ -18,6 +18,11 @@ export function MfaEnrollmentGuard({ children }: { children: React.ReactNode }) 
     void adminFetch("/api/auth/me")
       .then((res) => res.json())
       .then((data) => {
+        const passwordNeedsReset = data?.data?.user?.passwordNeedsReset;
+        if (passwordNeedsReset === true) {
+          router.replace("/settings/security?reset=required");
+          return;
+        }
         const mfaEnabled = data?.data?.user?.mfaEnabled;
         if (mfaEnabled === false) {
           router.replace(`${MFA_SETUP_PATH}?mfa=required`);

@@ -53,8 +53,8 @@ const navGroups: NavGroup[] = [
     roles: ["admin", "recruiter", "website"],
     items: [
       { href: "/database/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "recruiter"] },
-      { href: "/database/profiles", label: "Profiles", icon: UserCircle, roles: ["admin", "recruiter"] },
       { href: "/jobs/active", label: "Job Listings", icon: Briefcase, roles: ["admin", "recruiter", "website"] },
+      { href: "/database/profiles", label: "Profiles", icon: UserCircle, roles: ["admin", "recruiter"] },
     ],
   },
   {

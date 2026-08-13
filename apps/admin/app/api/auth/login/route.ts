@@ -40,6 +40,15 @@ export async function POST(req: Request) {
     });
   }
 
+  if (data?.data?.requiresPasswordReset && typeof data?.data?.token === "string") {
+    const response = NextResponse.json({
+      requiresPasswordReset: true,
+      user: data.data.user,
+    });
+    response.cookies.set(ADMIN_SESSION_COOKIE, data.data.token, sessionCookieOptions());
+    return response;
+  }
+
   if (data?.data?.requiresMfaSetup && typeof data?.data?.token === "string") {
     const response = NextResponse.json({
       requiresMfaSetup: true,

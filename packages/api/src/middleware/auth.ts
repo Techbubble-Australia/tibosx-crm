@@ -8,6 +8,7 @@ export const ADMIN_SESSION_COOKIE = "admin_session";
 
 export const MFA_PENDING_PURPOSE = "mfa_pending";
 export const MFA_SETUP_REQUIRED_PURPOSE = "mfa_setup_required";
+export const PASSWORD_RESET_REQUIRED_PURPOSE = "password_reset_required";
 
 export interface AuthUser {
   id: string;
@@ -61,7 +62,9 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
       return res.status(401).json({ error: "Unauthorized: MFA verification required" });
     }
     req.user = { id: decoded.id, email: decoded.email, role: decoded.role };
-    req.mfaSetupRequired = decoded.purpose === MFA_SETUP_REQUIRED_PURPOSE;
+    req.mfaSetupRequired =
+      decoded.purpose === MFA_SETUP_REQUIRED_PURPOSE ||
+      decoded.purpose === PASSWORD_RESET_REQUIRED_PURPOSE;
     next();
   } catch {
     return res.status(401).json({ error: "Unauthorized: Invalid token" });
@@ -78,6 +81,10 @@ export const generateMfaPendingToken = (payload: AuthUser) => {
 
 export const generateMfaSetupRequiredToken = (payload: AuthUser) => {
   return jwt.sign({ ...payload, purpose: MFA_SETUP_REQUIRED_PURPOSE }, JWT_SECRET, { expiresIn: "2h" });
+};
+
+export const generatePasswordResetRequiredToken = (payload: AuthUser) => {
+  return jwt.sign({ ...payload, purpose: PASSWORD_RESET_REQUIRED_PURPOSE }, JWT_SECRET, { expiresIn: "2h" });
 };
 
 export function verifyMfaPendingToken(token: string): AuthUser | null {

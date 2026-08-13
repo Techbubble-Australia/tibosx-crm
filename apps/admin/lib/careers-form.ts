@@ -27,4 +27,4 @@ export function formatSalaryRateDisplay(raw: string): string {
 }
 
 /** Must match packages/api/src/lib/validation.ts PHONE_REGEX */
-export const PHONE_PATTERN = String.raw`^\+?[\d\s().-]{8,20}$`;
+export const PHONE_PATTERN = String.raw`^\+?\d{8,20}$`;

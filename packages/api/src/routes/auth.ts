@@ -7,6 +7,7 @@ import {
   generateToken,
   generateMfaPendingToken,
   generateMfaSetupRequiredToken,
+  generatePasswordResetRequiredToken,
   verifyMfaPendingToken,
   type AuthRequest,
 } from "../middleware/auth";
@@ -35,12 +36,24 @@ const mfaDisableSchema = mfaCodeSchema.extend({
   password: z.string().min(1),
 });
 
-function publicUser(user: { id: string; email: string; role: string; mfaEnabled: boolean }) {
+const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8),
+});
+
+function publicUser(user: {
+  id: string;
+  email: string;
+  role: string;
+  mfaEnabled: boolean;
+  passwordNeedsReset?: boolean;
+}) {
   return {
     id: user.id,
     email: user.email,
     role: user.role,
     mfaEnabled: user.mfaEnabled,
+    passwordNeedsReset: user.passwordNeedsReset ?? false,
   };
 }
 
@@ -59,6 +72,22 @@ router.post("/login", async (req, res) => {
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
       return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    if (user.passwordNeedsReset) {
+      const resetToken = generatePasswordResetRequiredToken({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      });
+      return res.json({
+        message: "Password reset required",
+        data: {
+          requiresPasswordReset: true,
+          token: resetToken,
+          user: publicUser(user),
+        },
+      });
     }
 
     if (user.mfaEnabled && user.totpSecretEnc) {
@@ -148,7 +177,14 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
 
   const user = await prisma.adminUser.findUnique({
     where: { id: u.id },
-    select: { id: true, email: true, role: true, mfaEnabled: true, mfaEnrolledAt: true },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      mfaEnabled: true,
+      mfaEnrolledAt: true,
+      passwordNeedsReset: true,
+    },
   });
   if (!user) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -184,6 +220,57 @@ router.get("/mfa/status", authMiddleware, async (req: AuthRequest, res) => {
       mfaEnrolledAt: user.mfaEnrolledAt?.toISOString() ?? null,
     },
   });
+});
+
+router.post("/password/change-required", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const u = req.user;
+    if (!u) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { currentPassword, newPassword } = passwordChangeSchema.parse(req.body);
+    const user = await prisma.adminUser.findUnique({ where: { id: u.id } });
+    if (!user?.passwordHash) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    if (!user.passwordNeedsReset) {
+      return res.status(400).json({ error: "Password reset is not required for this account" });
+    }
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) {
+      return res.status(401).json({ error: "Current password is incorrect" });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const updated = await prisma.adminUser.update({
+      where: { id: user.id },
+      data: { passwordHash, passwordNeedsReset: false },
+      select: { id: true, email: true, role: true, mfaEnabled: true, passwordNeedsReset: true },
+    });
+
+    const setupToken = generateMfaSetupRequiredToken({
+      id: updated.id,
+      email: updated.email,
+      role: updated.role,
+    });
+
+    res.json({
+      message: "Password updated",
+      data: {
+        token: setupToken,
+        user: publicUser(updated),
+        requiresMfaSetup: !updated.mfaEnabled,
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Password change error:", error);
+    res.status(500).json({ error: "Failed to update password" });
+  }
 });
 
 router.post("/mfa/setup", authMiddleware, async (req: AuthRequest, res) => {

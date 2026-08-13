@@ -200,11 +200,15 @@ model CandidateProfile {
   documentUrls        Json
   previousSalary      Int?
   comments            String?            @db.Text
+  /// Admin user who sourced this candidate (recruiter/admin).
+  sourcedById         String?
+  sourcedBy           AdminUser?         @relation("ProfileSourcedBy", fields: [sourcedById], references: [id], onDelete: SetNull)
   careerApplicationId String?            @unique
   careerApplication   CareerApplication? @relation(fields: [careerApplicationId], references: [id], onDelete: SetNull)
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
+  @@index([sourcedById])
   @@index([email])
   @@index([category])
   @@index([technology])
@@ -325,6 +329,9 @@ model JobListing {
   description     String    @default("") @db.Text
   likeCount       Int       @default(0)
   published       Boolean   @default(true)
+  isHot           Boolean   @default(false)
+  /// Primary city for admin list display (Any / Other / named city).
+  city            String?
   order           Int       @default(0)
   /// Admin user IDs assigned as recruiters for this role
   recruiterIds    Json?
@@ -426,6 +433,8 @@ model AdminUser {
   totpSecretEnc String?
   mfaEnabled    Boolean  @default(false)
   mfaEnrolledAt DateTime?
+  passwordNeedsReset Boolean @default(false)
+  sourcedProfiles CandidateProfile[] @relation("ProfileSourcedBy")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

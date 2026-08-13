@@ -23,6 +23,7 @@ export default function EditUserPage() {
     name: string | null;
     active: boolean;
     mfaEnabled: boolean;
+    passwordNeedsReset: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -54,6 +55,7 @@ export default function EditUserPage() {
       name: formData.get("name") || null,
       role,
       active: formData.get("active") === "on",
+      passwordNeedsReset: formData.get("passwordNeedsReset") === "on",
     };
     if (password) body.password = password;
 
@@ -123,6 +125,15 @@ export default function EditUserPage() {
             }}
           />
         </div>
+        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <input
+            name="passwordNeedsReset"
+            type="checkbox"
+            defaultChecked={defaults.passwordNeedsReset}
+            className="h-4 w-4 rounded"
+          />
+          Password needs reset (user must change password on next login)
+        </label>
         <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
           <input name="active" type="checkbox" defaultChecked={defaults.active} className="h-4 w-4 rounded" />
           Active (user can sign in)

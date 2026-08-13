@@ -13,6 +13,7 @@ const createSchema = z.object({
   password: z.string().min(8),
   role: z.enum(ADMIN_ROLES_LIST).default("website"),
   active: z.boolean().default(true),
+  passwordNeedsReset: z.boolean().default(false),
 });
 
 const updateSchema = z.object({
@@ -21,6 +22,7 @@ const updateSchema = z.object({
   password: z.string().min(8).optional(),
   role: z.enum(ADMIN_ROLES_LIST).optional(),
   active: z.boolean().optional(),
+  passwordNeedsReset: z.boolean().optional(),
 });
 
 function sanitizeUser(row: {
@@ -31,6 +33,7 @@ function sanitizeUser(row: {
   active: boolean;
   mfaEnabled: boolean;
   mfaEnrolledAt: Date | null;
+  passwordNeedsReset: boolean;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -42,6 +45,7 @@ function sanitizeUser(row: {
     active: row.active,
     mfaEnabled: row.mfaEnabled,
     mfaEnrolledAt: row.mfaEnrolledAt?.toISOString() ?? null,
+    passwordNeedsReset: row.passwordNeedsReset,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -55,6 +59,7 @@ const userSelect = {
   active: true,
   mfaEnabled: true,
   mfaEnrolledAt: true,
+  passwordNeedsReset: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -97,6 +102,7 @@ router.post("/", async (req, res) => {
         passwordHash,
         role: data.role,
         active: data.active,
+        passwordNeedsReset: data.passwordNeedsReset,
       },
       select: userSelect,
     });
@@ -129,6 +135,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
     if (data.name !== undefined) updateData.name = data.name;
     if (data.role !== undefined) updateData.role = data.role;
     if (data.active !== undefined) updateData.active = data.active;
+    if (data.passwordNeedsReset !== undefined) updateData.passwordNeedsReset = data.passwordNeedsReset;
     if (data.password) {
       updateData.passwordHash = await bcrypt.hash(data.password, 10);
     }

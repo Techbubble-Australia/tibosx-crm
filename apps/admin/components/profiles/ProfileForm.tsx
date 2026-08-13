@@ -13,6 +13,7 @@ import {
 } from "@/lib/careers-form";
 import { getSortedCountryOptions } from "@/lib/country-flags";
 import { getCitiesForCountryCode } from "@/lib/country-cities";
+import { resolveDocumentFileName, resolveDocumentHref } from "@/lib/media-url";
 
 const OTHER_CITY_VALUE = "__other__";
 
@@ -32,10 +33,14 @@ export type ProfileFormValues = {
   previousSalary?: number | null;
   comments?: string | null;
   careerApplicationId?: string | null;
+  sourcedById?: string | null;
+  jobListingId?: string | null;
 };
 
 type TaxonomyItem = { id: string; name: string };
 type TechnologyItem = { id: string; name: string; categoryId: string; category?: { name: string } };
+type SourcerOption = { id: string; label: string };
+type JobOption = { id: string; label: string; published: boolean };
 
 type Props = {
   mode: "create" | "edit";
@@ -81,6 +86,10 @@ export function ProfileForm({
     defaults.previousSalary ? formatSalaryRateDisplay(String(defaults.previousSalary)) : "",
   );
   const [comments, setComments] = useState(defaults.comments ?? "");
+  const [sourcedById, setSourcedById] = useState(defaults.sourcedById ?? "");
+  const [jobListingId, setJobListingId] = useState(defaults.jobListingId ?? "");
+  const [sourcers, setSourcers] = useState<SourcerOption[]>([]);
+  const [jobOptions, setJobOptions] = useState<JobOption[]>([]);
   const [documentUrls, setDocumentUrls] = useState<string[]>(defaults.documentUrls ?? []);
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -104,6 +113,29 @@ export function ProfileForm({
       }
     }
     void loadTaxonomy();
+    void adminFetch("/api/admin/profiles/meta/sourcers")
+      .then((res) => res.json())
+      .then((data) => setSourcers(data.data ?? []))
+      .catch(console.error);
+    void adminFetch("/api/admin/jobs/admin/all")
+      .then((res) => res.json())
+      .then((data) => {
+        const rows = (data.data ?? []) as Array<{
+          id: string;
+          title: string;
+          referenceNumber: string;
+          clientName?: string;
+          published: boolean;
+        }>;
+        setJobOptions(
+          rows.map((job) => ({
+            id: job.id,
+            published: job.published,
+            label: `${job.referenceNumber} · ${job.title}${job.clientName ? ` (${job.clientName})` : ""}${job.published ? "" : " [Inactive]"}`,
+          })),
+        );
+      })
+      .catch(console.error);
   }, []);
 
   const filteredTechnologies = useMemo(() => {
@@ -161,6 +193,12 @@ export function ProfileForm({
       return;
     }
 
+    const normalizedPhone = phone.replace(/\s+/g, "");
+    if (!/^\+?\d{8,20}$/.test(normalizedPhone)) {
+      setError("Phone must contain digits only with no spaces (8–20 characters)");
+      return;
+    }
+
     let nextDocumentUrls = [...documentUrls];
 
     if (documentFiles.length > 0) {
@@ -207,7 +245,7 @@ export function ProfileForm({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim(),
-        phone: phone.trim(),
+        phone: normalizedPhone,
         country: country.trim(),
         city: resolvedCity,
         category: category.trim(),
@@ -219,6 +257,8 @@ export function ProfileForm({
         previousSalary,
         comments: comments.trim() || null,
         careerApplicationId: defaults.careerApplicationId ?? null,
+        sourcedById: sourcedById || null,
+        jobListingId: jobListingId || null,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save profile");
@@ -258,9 +298,9 @@ export function ProfileForm({
               type="tel"
               required
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => setPhone(e.target.value.replace(/\s+/g, ""))}
               pattern={PHONE_PATTERN}
-              title="Enter a valid phone number"
+              title="Digits only, no spaces (8–20 characters)"
               className={inputClass}
             />
           </div>
@@ -350,6 +390,38 @@ export function ProfileForm({
             </select>
           </div>
         </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className={labelClass}>Sourced by</label>
+            <select value={sourcedById} onChange={(e) => setSourcedById(e.target.value)} className={inputClass}>
+              <option value="">Optional</option>
+              {sourcers.map((option) => (
+                <option key={option.id} value={option.id}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Add to job</label>
+            <select
+              value={jobListingId}
+              onChange={(e) => setJobListingId(e.target.value)}
+              className={inputClass}
+              disabled={Boolean(defaults.careerApplicationId)}
+            >
+              <option value="">Optional</option>
+              {jobOptions.map((job) => (
+                <option key={job.id} value={job.id}>{job.label}</option>
+              ))}
+            </select>
+            {defaults.careerApplicationId ? (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Already linked to a career application.</p>
+            ) : (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                On save, creates a career application for the selected job.
+              </p>
+            )}
+          </div>
+        </div>
       </section>
 
       <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
@@ -423,8 +495,8 @@ export function ProfileForm({
           <ul className="space-y-2">
             {documentUrls.map((url, index) => (
               <li key={`${url}-${index}`} className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700">
-                <a href={url} target="_blank" rel="noopener noreferrer" className="truncate text-blue-600 hover:underline dark:text-blue-400">
-                  {url.split("/").pop() ?? url}
+                <a href={resolveDocumentHref(url)} target="_blank" rel="noopener noreferrer" className="truncate text-blue-600 hover:underline dark:text-blue-400">
+                  {resolveDocumentFileName(url, index + 1)}
                 </a>
                 <button
                   type="button"

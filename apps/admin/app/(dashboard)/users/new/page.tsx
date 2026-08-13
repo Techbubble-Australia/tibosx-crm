@@ -30,6 +30,7 @@ export default function NewUserPage() {
           password: formData.get("password"),
           role,
           active: formData.get("active") === "on",
+          passwordNeedsReset: formData.get("passwordNeedsReset") === "on",
         }),
       });
       if (!res.ok) {
@@ -78,6 +79,10 @@ export default function NewUserPage() {
             }}
           />
         </div>
+        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <input name="passwordNeedsReset" type="checkbox" defaultChecked className="h-4 w-4 rounded" />
+          Password needs reset (user must change password on first login)
+        </label>
         <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
           <input name="active" type="checkbox" defaultChecked className="h-4 w-4 rounded" />
           Active (user can sign in)

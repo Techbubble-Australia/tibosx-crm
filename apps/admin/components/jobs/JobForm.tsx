@@ -6,7 +6,11 @@ import { Loader2 } from "lucide-react";
 import { HtmlEditor } from "@/components/HtmlEditor";
 import { JobLocationsField } from "@/components/jobs/JobLocationsField";
 import { adminFetch } from "@/lib/admin-api";
+import { getCitiesForCountryCode } from "@/lib/country-cities";
 import { jobLocationsFromDefaults, type JobLocationEntry } from "@/lib/job-locations";
+
+const ANY_CITY_VALUE = "__any__";
+const OTHER_CITY_VALUE = "__other__";
 
 export type JobFormDefaults = {
   id?: string;
@@ -15,7 +19,6 @@ export type JobFormDefaults = {
   country?: string;
   flag?: string;
   type?: string;
-  listingType?: string;
   workMode?: string;
   category?: string;
   technology?: string;
@@ -26,7 +29,7 @@ export type JobFormDefaults = {
   published?: boolean;
   referenceNumber?: string;
   locations?: JobLocationEntry[];
-  recruiterIds?: string[];
+  city?: string | null;
 };
 
 type TaxonomyItem = { id: string; name: string };
@@ -37,7 +40,6 @@ type TechnologyItem = {
   category?: { id: string; name: string };
 };
 type ClientItem = { id: string; name: string; active: boolean };
-type RecruiterUser = { id: string; email: string; role: string; active: boolean };
 
 type Props = {
   mode: "create" | "edit";
@@ -52,30 +54,23 @@ function slugify(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
+function resolveInitialCity(
+  defaults: JobFormDefaults,
+  cityOptions: readonly string[],
+): { city: string; cityOther: string } {
+  const raw = defaults.city?.trim() ?? "";
+  if (!raw) {
+    return { city: ANY_CITY_VALUE, cityOther: "" };
+  }
+  if (cityOptions.includes(raw)) {
+    return { city: raw, cityOther: "" };
+  }
+  return { city: OTHER_CITY_VALUE, cityOther: raw };
+}
+
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
 const labelClass = "mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100";
-
-/** Public job-card placement — must not be used as department or client. */
-const JOB_LISTING_TYPE_OPTIONS = ["Internal", "External for Client"] as const;
-
-function isListingTypeValue(value: string): value is (typeof JOB_LISTING_TYPE_OPTIONS)[number] {
-  return (JOB_LISTING_TYPE_OPTIONS as readonly string[]).includes(value);
-}
-
-function resolveListingFields(defaults: JobFormDefaults): { listingType: string; department: string } {
-  let listingType = defaults.listingType?.trim() || "Internal";
-  let department = defaults.department?.trim() ?? "";
-
-  if (department && isListingTypeValue(department)) {
-    if (!defaults.listingType || defaults.listingType === "Internal") {
-      listingType = department;
-    }
-    department = "";
-  }
-
-  return { listingType, department };
-}
 
 export function JobForm({
   mode,
@@ -93,16 +88,32 @@ export function JobForm({
   const [taxonomyReady, setTaxonomyReady] = useState(false);
   const [description, setDescription] = useState(defaults.description ?? "");
   const [locations, setLocations] = useState<JobLocationEntry[]>(() => jobLocationsFromDefaults(defaults));
-  const initialListing = resolveListingFields(defaults);
   const [category, setCategory] = useState(defaults.category ?? "");
   const [technology, setTechnology] = useState(defaults.technology ?? "");
-  const [department, setDepartment] = useState(initialListing.department);
-  const [listingType, setListingType] = useState(initialListing.listingType);
+  const [department, setDepartment] = useState(defaults.department?.trim() ?? "");
   const [clientId, setClientId] = useState(defaults.clientId ?? "");
-  const [recruiterIds, setRecruiterIds] = useState<string[]>(defaults.recruiterIds ?? []);
-  const [recruiters, setRecruiters] = useState<RecruiterUser[]>([]);
 
-  const departmentOptions = departments.filter((d) => !isListingTypeValue(d.name));
+  const primaryCountryCode = locations.find((row) => row.countryCode.trim())?.countryCode ?? "";
+  const cityOptions = useMemo(
+    () => [...getCitiesForCountryCode(primaryCountryCode)],
+    [primaryCountryCode],
+  );
+  const [city, setCity] = useState(() =>
+    resolveInitialCity(
+      defaults,
+      getCitiesForCountryCode(
+        jobLocationsFromDefaults(defaults).find((row) => row.countryCode.trim())?.countryCode ?? "",
+      ),
+    ).city,
+  );
+  const [cityOther, setCityOther] = useState(() =>
+    resolveInitialCity(
+      defaults,
+      getCitiesForCountryCode(
+        jobLocationsFromDefaults(defaults).find((row) => row.countryCode.trim())?.countryCode ?? "",
+      ),
+    ).cityOther,
+  );
 
   const filteredTechnologies = useMemo(() => {
     if (!category) return [];
@@ -124,23 +135,20 @@ export function JobForm({
   useEffect(() => {
     async function loadTaxonomy() {
       try {
-        const [catRes, techRes, deptRes, clientRes, usersRes] = await Promise.all([
+        const [catRes, techRes, deptRes, clientRes] = await Promise.all([
           adminFetch("/api/admin/job-categories"),
           adminFetch("/api/admin/job-technologies"),
           adminFetch("/api/admin/job-departments"),
           adminFetch("/api/admin/clients"),
-          adminFetch("/api/admin/jobs/admin/recruiters"),
         ]);
         const catData = await catRes.json();
         const techData = await techRes.json();
         const deptData = await deptRes.json();
         const clientData = await clientRes.json();
-        const recruitersData = await usersRes.json();
         setCategories(catData.data ?? []);
         setTechnologies(techData.data ?? []);
         setDepartments(deptData.data ?? []);
         setClients((clientData.data ?? []).filter((c: ClientItem) => c.active));
-        setRecruiters(recruitersData.data ?? []);
       } catch (e) {
         console.error(e);
       } finally {
@@ -154,11 +162,35 @@ export function JobForm({
     if (defaults.category) setCategory(defaults.category);
     if (defaults.technology) setTechnology(defaults.technology);
     if (defaults.clientId) setClientId(defaults.clientId);
-    if (defaults.recruiterIds) setRecruiterIds(defaults.recruiterIds);
-    const resolved = resolveListingFields(defaults);
-    setListingType(resolved.listingType);
-    setDepartment(resolved.department);
-  }, [defaults.category, defaults.technology, defaults.department, defaults.clientId, defaults.listingType]);
+    if (defaults.department) setDepartment(defaults.department.trim());
+  }, [defaults.category, defaults.technology, defaults.department, defaults.clientId]);
+
+  useEffect(() => {
+    const raw = defaults.city?.trim() ?? "";
+    if (!raw) return;
+    const options = getCitiesForCountryCode(
+      jobLocationsFromDefaults(defaults).find((row) => row.countryCode.trim())?.countryCode ?? "",
+    );
+    if (options.includes(raw)) {
+      setCity(raw);
+      setCityOther("");
+      return;
+    }
+    setCity(OTHER_CITY_VALUE);
+    setCityOther(raw);
+  }, [defaults.city, defaults.locations]);
+
+  useEffect(() => {
+    if (!primaryCountryCode) {
+      setCity(ANY_CITY_VALUE);
+      setCityOther("");
+      return;
+    }
+    setCity((current) => {
+      if (current === OTHER_CITY_VALUE || current === ANY_CITY_VALUE) return current;
+      return cityOptions.includes(current) ? current : ANY_CITY_VALUE;
+    });
+  }, [primaryCountryCode, cityOptions]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -184,17 +216,20 @@ export function JobForm({
       return;
     }
     if (!department.trim()) {
-      alert("Department is required (e.g. Technology, Engineering). Use Listing type for Internal / External for Client.");
-      return;
-    }
-    if (isListingTypeValue(department)) {
-      alert('Use the "Listing type" field for Internal or External for Client — not Department.');
+      alert("Department is required (e.g. Technology, Engineering).");
       return;
     }
     if (!clientId.trim()) {
       alert("Client is required.");
       return;
     }
+
+    const resolvedCity =
+      city === ANY_CITY_VALUE
+        ? null
+        : city === OTHER_CITY_VALUE
+          ? cityOther.trim() || null
+          : city.trim() || null;
 
     const formData = new FormData(e.currentTarget);
     const payload: Record<string, unknown> = {
@@ -205,13 +240,12 @@ export function JobForm({
         label: "",
       })),
       type: formData.get("type"),
-      listingType,
       workMode: formData.get("workMode"),
       category,
       technology,
       department,
       clientId,
-      recruiterIds,
+      city: resolvedCity,
       description,
       order: parseInt(formData.get("order") as string, 10) || 0,
       published: formData.get("published") === "on",
@@ -257,7 +291,41 @@ export function JobForm({
           labelClass={labelClass}
         />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div>
+          <label className={labelClass}>City</label>
+          <select
+            value={city}
+            onChange={(e) => {
+              setCity(e.target.value);
+              if (e.target.value !== OTHER_CITY_VALUE) {
+                setCityOther("");
+              }
+            }}
+            disabled={!primaryCountryCode}
+            className={inputClass}
+          >
+            <option value={ANY_CITY_VALUE}>Any</option>
+            {cityOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+            <option value={OTHER_CITY_VALUE}>Other</option>
+          </select>
+          {city === OTHER_CITY_VALUE ? (
+            <input
+              value={cityOther}
+              onChange={(e) => setCityOther(e.target.value)}
+              className={`${inputClass} mt-2`}
+              placeholder="Enter city"
+            />
+          ) : null}
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Primary city for admin lists, based on the first country above.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className={labelClass}>Employment Type *</label>
             <select name="type" required defaultValue={defaults.type ?? "Full-time"} className={inputClass}>
@@ -274,25 +342,6 @@ export function JobForm({
               <option value="Hybrid">Hybrid</option>
               <option value="Onsite">Onsite</option>
             </select>
-          </div>
-          <div className="sm:col-span-2 lg:col-span-1">
-            <label className={labelClass}>Listing type *</label>
-            <select
-              name="listingType"
-              required
-              value={listingType}
-              onChange={(e) => setListingType(e.target.value)}
-              className={inputClass}
-            >
-              {JOB_LISTING_TYPE_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Shown on public job cards. Not the same as Department or Client.
-            </p>
           </div>
         </div>
 
@@ -367,17 +416,17 @@ export function JobForm({
                   className={inputClass}
                 >
                   <option value="">Select department…</option>
-                  {departmentOptions.map((d) => (
+                  {departments.map((d) => (
                     <option key={d.id} value={d.name}>
                       {d.name}
                     </option>
                   ))}
-                  {department && !departmentOptions.some((d) => d.name === department) ? (
+                  {department && !departments.some((d) => d.name === department) ? (
                     <option value={department}>{department} (current)</option>
                   ) : null}
                 </select>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Team or function (e.g. Technology). For Internal / External for Client, use Listing type above.{" "}
+                  Team or function (e.g. Technology).{" "}
                   <Link href="/settings/departments" className="underline hover:text-gray-700 dark:hover:text-gray-300">
                     Manage departments
                   </Link>
@@ -404,45 +453,11 @@ export function JobForm({
                   ) : null}
                 </select>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Hiring organisation (admin only). Not the same as Listing type.{" "}
+                  Hiring organisation (admin only).{" "}
                   <Link href="/clients" className="underline hover:text-gray-700 dark:hover:text-gray-300">
                     Manage clients
                   </Link>
                 </p>
-              </div>
-            </div>
-
-            <div>
-              <label className={labelClass}>Recruiters</label>
-              <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-600">
-                {recruiters.length === 0 ? (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No recruiter users available.</p>
-                ) : (
-                  <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {recruiters.map((user) => {
-                      const checked = recruiterIds.includes(user.id);
-                      return (
-                        <li key={user.id}>
-                          <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(e) => {
-                                setRecruiterIds((prev) =>
-                                  e.target.checked
-                                    ? [...prev, user.id]
-                                    : prev.filter((id) => id !== user.id),
-                                );
-                              }}
-                              className="h-4 w-4 rounded"
-                            />
-                            <span className="truncate">{user.email}</span>
-                          </label>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
               </div>
             </div>
           </>

@@ -7,8 +7,12 @@ import {
   canAccessRecruitment,
   canAccessSales,
   canAccessWebsite,
+  canDeleteProfiles,
+  canEditProfiles,
   canManageClients,
+  canManageJobs,
   canManageUsers,
+  canViewJobs,
   isAdminRole,
 } from "@/lib/admin-roles";
 
@@ -21,6 +25,10 @@ type AdminSession = {
   canAccessSales: boolean;
   canManageUsers: boolean;
   canManageClients: boolean;
+  canManageJobs: boolean;
+  canViewJobs: boolean;
+  canEditProfiles: boolean;
+  canDeleteProfiles: boolean;
 };
 
 const AdminSessionContext = createContext<AdminSession | null>(null);
@@ -57,6 +65,10 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       canAccessSales: canAccessSales(role),
       canManageUsers: canManageUsers(role),
       canManageClients: canManageClients(role),
+      canManageJobs: canManageJobs(role),
+      canViewJobs: canViewJobs(role),
+      canEditProfiles: canEditProfiles(role),
+      canDeleteProfiles: canDeleteProfiles(role),
     }),
     [role, email, loading],
   );
