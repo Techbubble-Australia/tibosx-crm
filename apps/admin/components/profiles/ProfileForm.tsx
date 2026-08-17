@@ -14,6 +14,7 @@ import {
 import { getSortedCountryOptions } from "@/lib/country-flags";
 import { getCitiesForCountryCode } from "@/lib/country-cities";
 import { resolveDocumentFileName, resolveDocumentHref } from "@/lib/media-url";
+import { useAdminSession } from "@/contexts/AdminSessionContext";
 
 const OTHER_CITY_VALUE = "__other__";
 
@@ -34,7 +35,11 @@ export type ProfileFormValues = {
   comments?: string | null;
   careerApplicationId?: string | null;
   sourcedById?: string | null;
+  sourcedByName?: string | null;
   jobListingId?: string | null;
+  isDuplicate?: boolean;
+  duplicateCount?: number;
+  duplicateMatchReason?: string | null;
 };
 
 type TaxonomyItem = { id: string; name: string };
@@ -63,6 +68,7 @@ export function ProfileForm({
   cancelHref,
   submitLabel,
 }: Props) {
+  const { canManageProfileOwnership } = useAdminSession();
   const [categories, setCategories] = useState<TaxonomyItem[]>([]);
   const [technologies, setTechnologies] = useState<TechnologyItem[]>([]);
   const [taxonomyReady, setTaxonomyReady] = useState(false);
@@ -269,6 +275,16 @@ export function ProfileForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {defaults.isDuplicate ? (
+        <div
+          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          role="status"
+        >
+          Duplicate profile — {defaults.duplicateCount ?? 0} other record
+          {(defaults.duplicateCount ?? 0) === 1 ? "" : "s"} match by{" "}
+          {defaults.duplicateMatchReason ?? "email or phone"}. Review ownership before contacting the candidate.
+        </div>
+      ) : null}
       <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
         <h3 className="font-semibold text-gray-900 dark:text-gray-100">Candidate details</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -393,12 +409,25 @@ export function ProfileForm({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className={labelClass}>Sourced by</label>
-            <select value={sourcedById} onChange={(e) => setSourcedById(e.target.value)} className={inputClass}>
-              <option value="">Optional</option>
-              {sourcers.map((option) => (
-                <option key={option.id} value={option.id}>{option.label}</option>
-              ))}
-            </select>
+            {canManageProfileOwnership ? (
+              <select value={sourcedById} onChange={(e) => setSourcedById(e.target.value)} className={inputClass}>
+                <option value="">Optional</option>
+                {sourcers.map((option) => (
+                  <option key={option.id} value={option.id}>{option.label}</option>
+                ))}
+              </select>
+            ) : (
+              <p className={`${inputClass} bg-gray-50 dark:bg-gray-800/80`}>
+                {defaults.sourcedByName?.trim() ||
+                  sourcers.find((option) => option.id === sourcedById)?.label ||
+                  "You (on create)"}
+              </p>
+            )}
+            {!canManageProfileOwnership ? (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Only an administrator can change profile ownership.
+              </p>
+            ) : null}
           </div>
           <div>
             <label className={labelClass}>Add to job</label>

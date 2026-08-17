@@ -13,6 +13,7 @@ import {
   parseSalaryRateInput,
 } from "../lib/careers-form";
 import { createProfileFromCareerApplication } from "../lib/profile-from-application";
+import { findDuplicateCareerApplication } from "../lib/career-application-dedup";
 import { sendCareerApplicationEmail } from "../lib/mail";
 
 const router: IRouter = Router();
@@ -149,6 +150,18 @@ router.post("/apply", async (req, res) => {
       body.salaryRate = parseSalaryRateInput(body.salaryRate);
     }
     const validatedData = careerSchema.parse(body);
+
+    const isDuplicate = await findDuplicateCareerApplication({
+      jobListingId: validatedData.jobListingId,
+      position: validatedData.position,
+      email: validatedData.email,
+      phone: validatedData.phone,
+    });
+    if (isDuplicate) {
+      return res.status(409).json({
+        error: "You have already applied for this role. Our team will contact you if there are updates.",
+      });
+    }
 
     const salaryExpectationLabel = formatSalaryExpectation(
       validatedData.salaryCurrency,

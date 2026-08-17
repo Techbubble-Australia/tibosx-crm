@@ -11,6 +11,7 @@ import {
   canEditProfiles,
   canManageClients,
   canManageJobs,
+  canManageProfileOwnership,
   canManageUsers,
   canViewJobs,
   isAdminRole,
@@ -19,6 +20,7 @@ import {
 type AdminSession = {
   role: AdminRole;
   email: string;
+  userId: string;
   loading: boolean;
   canAccessRecruitment: boolean;
   canAccessWebsite: boolean;
@@ -29,6 +31,7 @@ type AdminSession = {
   canViewJobs: boolean;
   canEditProfiles: boolean;
   canDeleteProfiles: boolean;
+  canManageProfileOwnership: boolean;
 };
 
 const AdminSessionContext = createContext<AdminSession | null>(null);
@@ -36,6 +39,7 @@ const AdminSessionContext = createContext<AdminSession | null>(null);
 export function AdminSessionProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<AdminRole>("website");
   const [email, setEmail] = useState("");
+  const [userId, setUserId] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -50,6 +54,10 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
         if (typeof userEmail === "string") {
           setEmail(userEmail);
         }
+        const id = data?.data?.user?.id;
+        if (typeof id === "string") {
+          setUserId(id);
+        }
       })
       .catch(() => undefined)
       .finally(() => setLoading(false));
@@ -59,6 +67,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
     () => ({
       role,
       email,
+      userId,
       loading,
       canAccessRecruitment: canAccessRecruitment(role),
       canAccessWebsite: canAccessWebsite(role),
@@ -69,8 +78,9 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       canViewJobs: canViewJobs(role),
       canEditProfiles: canEditProfiles(role),
       canDeleteProfiles: canDeleteProfiles(role),
+      canManageProfileOwnership: canManageProfileOwnership(role),
     }),
-    [role, email, loading],
+    [role, email, userId, loading],
   );
 
   return <AdminSessionContext.Provider value={value}>{children}</AdminSessionContext.Provider>;

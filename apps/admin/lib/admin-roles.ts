@@ -119,6 +119,10 @@ export function canDeleteProfiles(role: string): boolean {
   return role === "admin";
 }
 
+export function canManageProfileOwnership(role: string): boolean {
+  return role === "admin";
+}
+
 export function canAccessRecruitment(role: string): boolean {
   return canAccessModule(role, "recruitment");
 }

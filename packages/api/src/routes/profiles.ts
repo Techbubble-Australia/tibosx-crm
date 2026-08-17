@@ -9,6 +9,7 @@ import type { AuthRequest } from "../middleware/auth";
 import { PHONE_REGEX, PHONE_VALIDATION_MESSAGE } from "../lib/validation";
 import { SALARY_CURRENCIES, SALARY_MODES, parseSalaryRateInput } from "../lib/careers-form";
 import { linkProfileToJobIfRequested } from "../lib/profile-to-application";
+import { computeProfileDuplicateMeta } from "../lib/profile-duplicates";
 
 const router: IRouter = Router();
 
@@ -93,6 +94,9 @@ function serializeProfile(row: {
   careerApplicationId: string | null;
   sourcedById: string | null;
   sourcedByName: string | null;
+  isDuplicate?: boolean;
+  duplicateCount?: number;
+  duplicateMatchReason?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -119,6 +123,9 @@ function serializeProfile(row: {
     careerApplicationId: row.careerApplicationId,
     sourcedById: row.sourcedById,
     sourcedByName: row.sourcedByName,
+    isDuplicate: row.isDuplicate ?? false,
+    duplicateCount: row.duplicateCount ?? 0,
+    duplicateMatchReason: row.duplicateMatchReason ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -151,13 +158,18 @@ router.get("/", async (_req, res) => {
       include: { sourcedBy: { select: { name: true, email: true } } },
       orderBy: { createdAt: "desc" },
     });
+    const duplicateMeta = computeProfileDuplicateMeta(rows);
     res.json({
-      data: rows.map((row) =>
-        serializeProfile({
+      data: rows.map((row) => {
+        const meta = duplicateMeta.get(row.id);
+        return serializeProfile({
           ...row,
           sourcedByName: row.sourcedBy?.name?.trim() || row.sourcedBy?.email || null,
-        }),
-      ),
+          isDuplicate: meta?.isDuplicate ?? false,
+          duplicateCount: meta?.duplicateCount ?? 0,
+          duplicateMatchReason: meta?.duplicateMatchReason ?? null,
+        });
+      }),
     });
   } catch (error) {
     console.error("Error fetching profiles:", error);
@@ -174,10 +186,17 @@ router.get("/:id", async (req, res) => {
     if (!row) {
       return res.status(404).json({ error: "Not found" });
     }
+    const allRows = await prisma.candidateProfile.findMany({
+      select: { id: true, email: true, phone: true },
+    });
+    const meta = computeProfileDuplicateMeta(allRows).get(row.id);
     res.json({
       data: serializeProfile({
         ...row,
         sourcedByName: row.sourcedBy?.name?.trim() || row.sourcedBy?.email || null,
+        isDuplicate: meta?.isDuplicate ?? false,
+        duplicateCount: meta?.duplicateCount ?? 0,
+        duplicateMatchReason: meta?.duplicateMatchReason ?? null,
       }),
     });
   } catch (error) {
@@ -186,7 +205,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", async (req: AuthRequest, res) => {
   try {
     const body = { ...req.body };
     if (typeof body.expectedRate === "string") {
@@ -199,6 +218,13 @@ router.post("/", async (req, res) => {
       }
     }
     const data = profileSchema.parse(body);
+
+    let sourcedById = data.sourcedById ?? null;
+    if (req.user?.role === "recruiter") {
+      sourcedById = req.user.id;
+    } else if (req.user?.role !== "admin") {
+      sourcedById = req.user?.id ?? sourcedById;
+    }
 
     const row = await prisma.candidateProfile.create({
       data: {
@@ -217,7 +243,7 @@ router.post("/", async (req, res) => {
         previousSalary: data.previousSalary ?? null,
         comments: data.comments ?? null,
         careerApplicationId: data.careerApplicationId ?? null,
-        sourcedById: data.sourcedById ?? null,
+        sourcedById,
       },
     });
 
@@ -243,8 +269,13 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", async (req: AuthRequest, res) => {
   try {
+    const existing = await prisma.candidateProfile.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
     const body = { ...req.body };
     if (typeof body.expectedRate === "string") {
       body.expectedRate = parseSalaryRateInput(body.expectedRate);
@@ -256,6 +287,11 @@ router.put("/:id", async (req, res) => {
       }
     }
     const data = profileSchema.parse(body);
+
+    let sourcedById = data.sourcedById ?? null;
+    if (req.user?.role !== "admin") {
+      sourcedById = existing.sourcedById;
+    }
 
     const row = await prisma.candidateProfile.update({
       where: { id: req.params.id },
@@ -274,7 +310,7 @@ router.put("/:id", async (req, res) => {
         documentUrls: data.documentUrls,
         previousSalary: data.previousSalary ?? null,
         comments: data.comments ?? null,
-        sourcedById: data.sourcedById ?? null,
+        sourcedById,
       },
     });
 

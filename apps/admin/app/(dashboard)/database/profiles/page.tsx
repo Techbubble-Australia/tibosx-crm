@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Edit, Trash2, ChevronDown } from "lucide-react";
+import { Plus, Edit, Trash2, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
 import { TablePagination } from "@/components/ui/TablePagination";
@@ -24,6 +24,65 @@ interface ProfileRow {
   expectedRate: number;
   currency: string;
   mode: string;
+  sourcedByName?: string | null;
+  isDuplicate?: boolean;
+  duplicateCount?: number;
+  duplicateMatchReason?: string | null;
+}
+
+type SortKey =
+  | "name"
+  | "email"
+  | "phone"
+  | "city"
+  | "country"
+  | "technology"
+  | "expectedRate"
+  | "sourcedByName"
+  | "duplicate";
+type SortDir = "asc" | "desc";
+
+function SortHeader({
+  label,
+  sortKey,
+  activeKey,
+  dir,
+  onSort,
+}: {
+  label: string;
+  sortKey: SortKey;
+  activeKey: SortKey;
+  dir: SortDir;
+  onSort: (key: SortKey) => void;
+}) {
+  const active = activeKey === sortKey;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(sortKey)}
+      className="inline-flex items-center gap-1 font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
+    >
+      {label}
+      {active ? (
+        dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />
+      ) : (
+        <span className="inline-block h-3.5 w-3.5 opacity-0" aria-hidden />
+      )}
+    </button>
+  );
+}
+
+function DuplicateBadge({ row }: { row: ProfileRow }) {
+  if (!row.isDuplicate) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+      title={`Matches ${row.duplicateCount ?? 0} other profile(s) by ${row.duplicateMatchReason ?? "email or phone"}`}
+    >
+      <AlertTriangle className="h-3 w-3" aria-hidden />
+      Duplicate
+    </span>
+  );
 }
 
 function formatRate(row: ProfileRow): string {
@@ -36,6 +95,8 @@ export default function ProfilesPage() {
   const [rows, setRows] = useState<ProfileRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
   const {
     search,
     setSearch,
@@ -43,7 +104,7 @@ export default function ProfilesPage() {
     setPage,
     pageSize,
     setPageSize,
-    paginated,
+    filtered,
     totalItems,
     totalSourceItems,
   } = useListView(rows, (row) =>
@@ -102,16 +163,68 @@ export default function ProfilesPage() {
     });
   }
 
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  const sortedProfiles = useMemo(() => {
+    const list = [...filtered];
+    list.sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "name":
+          cmp = `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
+          break;
+        case "email":
+          cmp = a.email.localeCompare(b.email);
+          break;
+        case "phone":
+          cmp = a.phone.localeCompare(b.phone);
+          break;
+        case "city":
+          cmp = (a.city || "").localeCompare(b.city || "");
+          break;
+        case "country":
+          cmp = (a.country || "").localeCompare(b.country || "");
+          break;
+        case "technology":
+          cmp = a.technology.localeCompare(b.technology);
+          break;
+        case "expectedRate":
+          cmp = a.expectedRate - b.expectedRate;
+          break;
+        case "sourcedByName":
+          cmp = (a.sourcedByName || "").localeCompare(b.sourcedByName || "");
+          break;
+        case "duplicate":
+          cmp = Number(b.isDuplicate) - Number(a.isDuplicate);
+          break;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return list;
+  }, [filtered, sortKey, sortDir]);
+
+  const paginatedProfiles = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return sortedProfiles.slice(start, start + pageSize);
+  }, [sortedProfiles, page, pageSize]);
+
   const groupedByTechnology = useMemo(() => {
     const map = new Map<string, ProfileRow[]>();
-    for (const row of paginated) {
+    for (const row of paginatedProfiles) {
       const key = row.technology.trim() || "Unknown";
       const list = map.get(key) ?? [];
       list.push(row);
       map.set(key, list);
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [paginated]);
+  }, [paginatedProfiles]);
 
   if (isLoading) {
     return (
@@ -156,32 +269,55 @@ export default function ProfilesPage() {
           <table className="w-full min-w-[1000px] text-sm">
             <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
               <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Name</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Email</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Phone</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">City</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Country</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Technology</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Expected rate</th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Name" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Email" sortKey="email" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Phone" sortKey="phone" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="City" sortKey="city" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Country" sortKey="country" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Technology" sortKey="technology" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Expected rate" sortKey="expectedRate" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Sourced by" sortKey="sourcedByName" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Status" sortKey="duplicate" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
                 <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
                     No profile records yet.
                   </td>
                 </tr>
               ) : totalItems === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-400">No profiles match your search.</td>
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">No profiles match your search.</td>
                 </tr>
               ) : (
-                paginated.map((row) => (
+                paginatedProfiles.map((row) => (
                   <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
-                      {row.firstName} {row.lastName}
+                      <span className="inline-flex flex-wrap items-center gap-2">
+                        <span>{row.firstName} {row.lastName}</span>
+                        <DuplicateBadge row={row} />
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.email}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.phone}</td>
@@ -189,6 +325,16 @@ export default function ProfilesPage() {
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.country || "—"}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.technology}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatRate(row)}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.sourcedByName || "—"}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                      {row.isDuplicate ? (
+                        <span className="text-xs text-amber-700 dark:text-amber-300">
+                          {row.duplicateCount} match{(row.duplicateCount ?? 0) === 1 ? "" : "es"}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center gap-2">
                         <Link
@@ -278,8 +424,9 @@ export default function ProfilesPage() {
                           className="flex h-full flex-col rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:border-gray-700 dark:bg-gray-800/30"
                         >
                           <div className="min-w-0 flex-1">
-                            <p className="truncate font-semibold text-gray-900 dark:text-gray-100">
-                              {row.firstName} {row.lastName}
+                            <p className="flex flex-wrap items-center gap-2 truncate font-semibold text-gray-900 dark:text-gray-100">
+                              <span className="truncate">{row.firstName} {row.lastName}</span>
+                              <DuplicateBadge row={row} />
                             </p>
                             <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">{row.email}</p>
                             <p className="truncate text-xs text-gray-500 dark:text-gray-400">{row.phone}</p>
@@ -287,6 +434,9 @@ export default function ProfilesPage() {
                               {[row.city, row.country].filter(Boolean).join(", ") || "—"}
                             </p>
                             <p className="mt-1 text-xs font-medium text-gray-700 dark:text-gray-300">{formatRate(row)}</p>
+                            {row.sourcedByName ? (
+                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Sourced by {row.sourcedByName}</p>
+                            ) : null}
                           </div>
                           <div className="mt-3 flex items-center gap-2">
                             <Link
