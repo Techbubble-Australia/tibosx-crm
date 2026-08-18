@@ -47,6 +47,13 @@ type NavGroup = {
 
 const navGroups: NavGroup[] = [
   {
+    id: "sales",
+    label: "Sales",
+    icon: Building2,
+    roles: ["admin", "sales"],
+    items: [{ href: "/clients", label: "Clients", icon: Building2, roles: ["admin", "sales"] }],
+  },
+  {
     id: "recruitment",
     label: "Recruitment",
     icon: Target,
@@ -70,13 +77,6 @@ const navGroups: NavGroup[] = [
       { href: "/contact-submissions", label: "Contact Submissions", icon: Mail, roles: ["admin", "website"] },
       { href: "/team", label: "Team members", icon: Users, roles: ["admin", "website"] },
     ],
-  },
-  {
-    id: "sales",
-    label: "Sales",
-    icon: Building2,
-    roles: ["admin", "sales"],
-    items: [{ href: "/clients", label: "Clients", icon: Building2, roles: ["admin", "sales"] }],
   },
   {
     id: "settings",

@@ -24,26 +24,11 @@ function formatType(s: string): string {
 export function CareersPositionsSection({ jobs }: { jobs: JobApiRow[] }) {
   const locationOptions = useMemo(() => collectJobLocationFilterOptions(jobs), [jobs]);
 
-  const departments = useMemo(() => {
-    const set = new Set<string>();
-    jobs.forEach((j) => {
-      const d = (j.department || "General").trim() || "General";
-      set.add(d);
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [jobs]);
-
   const [locationFilter, setLocationFilter] = useState<string>("");
-  const [departmentFilter, setDepartmentFilter] = useState<string>("");
 
   const filtered = useMemo(() => {
-    return jobs.filter((j) => {
-      if (!jobMatchesLocationFilter(j, locationFilter)) return false;
-      const dept = (j.department || "General").trim() || "General";
-      if (departmentFilter && dept !== departmentFilter) return false;
-      return true;
-    });
-  }, [jobs, locationFilter, departmentFilter]);
+    return jobs.filter((j) => jobMatchesLocationFilter(j, locationFilter));
+  }, [jobs, locationFilter]);
 
   return (
     <>
@@ -72,25 +57,6 @@ export function CareersPositionsSection({ jobs }: { jobs: JobApiRow[] }) {
                     <option key={loc.key} value={loc.key}>
                       {loc.flag ? `${loc.flag} ` : ""}
                       {loc.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  className="pointer-events-none absolute right-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#666666] dark:text-zinc-400"
-                  aria-hidden
-                />
-              </div>
-              <div className="relative">
-                <select
-                  value={departmentFilter}
-                  onChange={(e) => setDepartmentFilter(e.target.value)}
-                  className="h-[51px] min-w-[180px] appearance-none rounded-[18px] border border-[#e5e5e5] bg-white pl-4 pr-10 text-[14px] font-semibold text-[#666666] dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-300"
-                  aria-label="Filter by department"
-                >
-                  <option value="">All Departments</option>
-                  {departments.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
                     </option>
                   ))}
                 </select>
@@ -166,7 +132,7 @@ export function CareersPositionsSection({ jobs }: { jobs: JobApiRow[] }) {
           </div>
           {filtered.length === 0 ? (
             <p className="mt-8 text-center text-[15px] text-[#666666] dark:text-zinc-400">
-              No roles match these filters. Try &quot;All Locations&quot; and &quot;All Departments&quot;.
+              No roles match this location filter. Try &quot;All Locations&quot;.
             </p>
           ) : null}
         </>

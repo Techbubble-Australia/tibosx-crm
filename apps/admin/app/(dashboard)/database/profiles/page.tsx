@@ -90,13 +90,42 @@ function formatRate(row: ProfileRow): string {
   return `${row.currency} ${rate} (${row.mode})`;
 }
 
+const filterSelectClass =
+  "h-10 min-w-[140px] rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
+
+function collectSortedOptions(rows: ProfileRow[], field: "country" | "category" | "technology"): string[] {
+  const set = new Set<string>();
+  for (const row of rows) {
+    const value = row[field].trim();
+    if (value) set.add(value);
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
+}
+
 export default function ProfilesPage() {
   const { canDeleteProfiles } = useAdminSession();
   const [rows, setRows] = useState<ProfileRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [countryFilter, setCountryFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [technologyFilter, setTechnologyFilter] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("technology");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const dimensionFiltered = useMemo(() => {
+    return rows.filter((row) => {
+      if (countryFilter && row.country !== countryFilter) return false;
+      if (categoryFilter && row.category !== categoryFilter) return false;
+      if (technologyFilter && row.technology !== technologyFilter) return false;
+      return true;
+    });
+  }, [rows, countryFilter, categoryFilter, technologyFilter]);
+
+  const countryOptions = useMemo(() => collectSortedOptions(rows, "country"), [rows]);
+  const categoryOptions = useMemo(() => collectSortedOptions(rows, "category"), [rows]);
+  const technologyOptions = useMemo(() => collectSortedOptions(rows, "technology"), [rows]);
+
   const {
     search,
     setSearch,
@@ -107,7 +136,7 @@ export default function ProfilesPage() {
     filtered,
     totalItems,
     totalSourceItems,
-  } = useListView(rows, (row) =>
+  } = useListView(dimensionFiltered, (row) =>
     buildSearchHaystack([
       row.firstName,
       row.lastName,
@@ -115,11 +144,16 @@ export default function ProfilesPage() {
       row.phone,
       row.country,
       row.city,
+      row.category,
       row.technology,
       row.currency,
       row.mode,
     ]),
   );
+
+  useEffect(() => {
+    setPage(1);
+  }, [countryFilter, categoryFilter, technologyFilter, setPage]);
 
   useEffect(() => {
     void fetchRows();
@@ -264,6 +298,57 @@ export default function ProfilesPage() {
         totalCount={totalSourceItems}
       />
 
+      {rows.length > 0 ? (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <select
+            value={countryFilter}
+            onChange={(e) => setCountryFilter(e.target.value)}
+            className={filterSelectClass}
+            aria-label="Filter by country"
+          >
+            <option value="">All countries</option>
+            {countryOptions.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className={filterSelectClass}
+            aria-label="Filter by category"
+          >
+            <option value="">All categories</option>
+            {categoryOptions.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+          <select
+            value={technologyFilter}
+            onChange={(e) => setTechnologyFilter(e.target.value)}
+            className={filterSelectClass}
+            aria-label="Filter by technology"
+          >
+            <option value="">All technologies</option>
+            {technologyOptions.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+          {(countryFilter || categoryFilter || technologyFilter) ? (
+            <button
+              type="button"
+              onClick={() => {
+                setCountryFilter("");
+                setCategoryFilter("");
+                setTechnologyFilter("");
+              }}
+              className="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+            >
+              Clear filters
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {viewMode === "list" ? (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
           <table className="w-full min-w-[1000px] text-sm">
@@ -308,7 +393,9 @@ export default function ProfilesPage() {
                 </tr>
               ) : totalItems === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">No profiles match your search.</td>
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
+                    No profiles match your search or filters.
+                  </td>
                 </tr>
               ) : (
                 paginatedProfiles.map((row) => (
@@ -377,7 +464,7 @@ export default function ProfilesPage() {
             </div>
           ) : totalItems === 0 ? (
             <div className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:bg-gray-900">
-              No profiles match your search.
+              No profiles match your search or filters.
             </div>
           ) : groupedByTechnology.length === 0 ? (
             <div className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:bg-gray-900">
