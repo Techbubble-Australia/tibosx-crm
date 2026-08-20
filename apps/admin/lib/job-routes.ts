@@ -4,15 +4,12 @@ export function isJobListingsPath(pathname: string): boolean {
 }
 
 export function isCareerApplicationsPath(pathname: string): boolean {
-  return pathname === "/jobs/career-applications";
+  return pathname === "/career-applications" || pathname.startsWith("/career-applications/");
 }
 
-export type JobsNavTab = "active" | "inactive" | "career-applications";
+export type JobsNavTab = "active" | "inactive";
 
 export function jobsNavTabFromPath(pathname: string, tabParam: string | null): JobsNavTab {
-  if (isCareerApplicationsPath(pathname)) {
-    return "career-applications";
-  }
   if (pathname === "/jobs/inactive" || tabParam === "inactive") {
     return "inactive";
   }

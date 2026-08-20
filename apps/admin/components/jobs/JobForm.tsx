@@ -30,6 +30,7 @@ export type JobFormDefaults = {
   referenceNumber?: string;
   locations?: JobLocationEntry[];
   city?: string | null;
+  endClient?: string | null;
 };
 
 type TaxonomyItem = { id: string; name: string };
@@ -92,6 +93,7 @@ export function JobForm({
   const [technology, setTechnology] = useState(defaults.technology ?? "");
   const [department, setDepartment] = useState(defaults.department?.trim() ?? "");
   const [clientId, setClientId] = useState(defaults.clientId ?? "");
+  const [endClient, setEndClient] = useState(defaults.endClient ?? "");
 
   const primaryCountryCode = locations.find((row) => row.countryCode.trim())?.countryCode ?? "";
   const cityOptions = useMemo(
@@ -245,6 +247,7 @@ export function JobForm({
       technology,
       department,
       clientId,
+      endClient: endClient.trim() || null,
       city: resolvedCity,
       description,
       order: parseInt(formData.get("order") as string, 10) || 0,
@@ -457,6 +460,21 @@ export function JobForm({
                   <Link href="/clients" className="underline hover:text-gray-700 dark:hover:text-gray-300">
                     Manage clients
                   </Link>
+                </p>
+              </div>
+
+              <div>
+                <label className={labelClass}>End client</label>
+                <input
+                  type="text"
+                  value={endClient}
+                  onChange={(e) => setEndClient(e.target.value)}
+                  className={inputClass}
+                  placeholder="Optional end client name"
+                  maxLength={200}
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Optional. The end customer for this role, if different from the client above.
                 </p>
               </div>
             </div>

@@ -37,6 +37,8 @@ export type ProfileFormValues = {
   sourcedById?: string | null;
   sourcedByName?: string | null;
   jobListingId?: string | null;
+  isCitizen?: boolean;
+  visaStatus?: string | null;
   isDuplicate?: boolean;
   duplicateCount?: number;
   duplicateMatchReason?: string | null;
@@ -92,6 +94,8 @@ export function ProfileForm({
     defaults.previousSalary ? formatSalaryRateDisplay(String(defaults.previousSalary)) : "",
   );
   const [comments, setComments] = useState(defaults.comments ?? "");
+  const [isCitizen, setIsCitizen] = useState(defaults.isCitizen !== false);
+  const [visaStatus, setVisaStatus] = useState(defaults.visaStatus ?? "");
   const [sourcedById, setSourcedById] = useState(defaults.sourcedById ?? "");
   const [jobListingId, setJobListingId] = useState(defaults.jobListingId ?? "");
   const [sourcers, setSourcers] = useState<SourcerOption[]>([]);
@@ -243,6 +247,11 @@ export function ProfileForm({
     const previousSalaryRaw = parseSalaryRateInput(previousSalaryInput);
     const previousSalary = previousSalaryRaw > 0 ? previousSalaryRaw : null;
 
+    if (!isCitizen && !visaStatus.trim()) {
+      setError("Visa status is required when citizen is No");
+      return;
+    }
+
     try {
       const resolvedCity =
         city === OTHER_CITY_VALUE ? cityOther.trim() || null : city.trim() || null;
@@ -262,6 +271,8 @@ export function ProfileForm({
         documentUrls: nextDocumentUrls,
         previousSalary,
         comments: comments.trim() || null,
+        isCitizen,
+        visaStatus: isCitizen ? null : visaStatus.trim(),
         careerApplicationId: defaults.careerApplicationId ?? null,
         sourcedById: sourcedById || null,
         jobListingId: jobListingId || null,
@@ -318,6 +329,35 @@ export function ProfileForm({
               pattern={PHONE_PATTERN}
               title="Digits only, no spaces (8–20 characters)"
               className={inputClass}
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className={labelClass}>Australian citizen? *</label>
+            <select
+              value={isCitizen ? "yes" : "no"}
+              onChange={(e) => {
+                const yes = e.target.value === "yes";
+                setIsCitizen(yes);
+                if (yes) setVisaStatus("");
+              }}
+              className={inputClass}
+            >
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Visa status {isCitizen ? "" : "*"}</label>
+            <input
+              type="text"
+              value={isCitizen ? "Australian citizen / permanent resident" : visaStatus}
+              onChange={(e) => setVisaStatus(e.target.value)}
+              readOnly={isCitizen}
+              required={!isCitizen}
+              placeholder={isCitizen ? "" : "e.g. Student visa, PR in progress"}
+              className={`${inputClass}${isCitizen ? " bg-gray-50 dark:bg-gray-800/80" : ""}`}
             />
           </div>
         </div>

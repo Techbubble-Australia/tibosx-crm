@@ -70,6 +70,8 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
   const [cityOther, setCityOther] = useState("");
   const [salaryRateInput, setSalaryRateInput] = useState("");
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
+  const [isCitizen, setIsCitizen] = useState(true);
+  const [visaStatus, setVisaStatus] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -170,6 +172,10 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
         throw new Error("Salary rate is required");
       }
 
+      if (!isCitizen && !visaStatus.trim()) {
+        throw new Error("Visa status is required when you are not an Australian citizen");
+      }
+
       const jobListingId =
         jobIdParam || jobListingIdForTitle(position.trim(), jobOptions) || undefined;
 
@@ -182,7 +188,8 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
         country: country.trim(),
         city: resolvedCity,
         jobListingId,
-        visaStatus: readFormString(formData, "visaStatus"),
+        isCitizen,
+        visaStatus: isCitizen ? "" : visaStatus.trim(),
         salaryCurrency: readFormString(formData, "salaryCurrency"),
         salaryRate,
         salaryMode: readFormString(formData, "salaryMode"),
@@ -399,13 +406,33 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
         />
       ) : null}
 
-      <input
-        name="visaStatus"
-        type="text"
-        required
-        placeholder="Visa status *"
-        className={fieldClass}
-      />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <select
+          required
+          value={isCitizen ? "yes" : "no"}
+          onChange={(e) => {
+            const yes = e.target.value === "yes";
+            setIsCitizen(yes);
+            if (yes) setVisaStatus("");
+          }}
+          className={`${fieldClass} appearance-none`}
+          aria-label="Australian citizen"
+        >
+          <option value="yes" className="bg-[#111111] text-white">Australian citizen? Yes</option>
+          <option value="no" className="bg-[#111111] text-white">Australian citizen? No</option>
+        </select>
+        <input
+          name="visaStatus"
+          type="text"
+          required={!isCitizen}
+          readOnly={isCitizen}
+          value={isCitizen ? "Australian citizen / permanent resident" : visaStatus}
+          onChange={(e) => setVisaStatus(e.target.value)}
+          placeholder={isCitizen ? "" : "Visa status *"}
+          className={`${fieldClass}${isCitizen ? " opacity-70" : ""}`}
+          aria-label="Visa status"
+        />
+      </div>
 
       <label className="flex min-h-[100px] cursor-pointer flex-col items-center justify-center rounded-[14px] border border-white/15 bg-white/[0.08] px-4 py-4 text-center">
         <input

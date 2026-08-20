@@ -33,6 +33,16 @@ const profileSchema = z.object({
   careerApplicationId: z.string().optional().nullable(),
   sourcedById: z.string().optional().nullable(),
   jobListingId: z.string().optional().nullable(),
+  isCitizen: z.boolean().default(true),
+  visaStatus: z.string().max(200).optional().nullable(),
+}).superRefine((data, ctx) => {
+  if (!data.isCitizen && !data.visaStatus?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Visa status is required when citizen is No",
+      path: ["visaStatus"],
+    });
+  }
 });
 
 function makeStoredFilename(fieldname: string, originalname: string): string {
@@ -94,6 +104,8 @@ function serializeProfile(row: {
   careerApplicationId: string | null;
   sourcedById: string | null;
   sourcedByName: string | null;
+  isCitizen: boolean;
+  visaStatus: string | null;
   isDuplicate?: boolean;
   duplicateCount?: number;
   duplicateMatchReason?: string | null;
@@ -123,6 +135,8 @@ function serializeProfile(row: {
     careerApplicationId: row.careerApplicationId,
     sourcedById: row.sourcedById,
     sourcedByName: row.sourcedByName,
+    isCitizen: row.isCitizen ?? true,
+    visaStatus: row.visaStatus ?? null,
     isDuplicate: row.isDuplicate ?? false,
     duplicateCount: row.duplicateCount ?? 0,
     duplicateMatchReason: row.duplicateMatchReason ?? null,
@@ -244,6 +258,8 @@ router.post("/", async (req: AuthRequest, res) => {
         comments: data.comments ?? null,
         careerApplicationId: data.careerApplicationId ?? null,
         sourcedById,
+        isCitizen: data.isCitizen,
+        visaStatus: data.isCitizen ? null : data.visaStatus?.trim() ?? null,
       },
     });
 
@@ -266,6 +282,66 @@ router.post("/", async (req: AuthRequest, res) => {
     }
     console.error("Error creating profile:", error);
     res.status(500).json({ error: "Failed to create profile" });
+  }
+});
+
+router.patch("/:id", async (req: AuthRequest, res) => {
+  try {
+    const existing = await prisma.candidateProfile.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const patchSchema = z.object({
+      isCitizen: z.boolean().optional(),
+      city: z.string().max(120).optional().nullable(),
+      country: z.string().min(1).max(120).optional(),
+      technology: z.string().min(1).max(120).optional(),
+      sourcedById: z.string().nullable().optional(),
+    });
+
+    const data = patchSchema.parse(req.body);
+
+    let sourcedById = data.sourcedById;
+    if (sourcedById !== undefined && req.user?.role !== "admin") {
+      return res.status(403).json({ error: "Only administrators can change profile ownership" });
+    }
+
+    const row = await prisma.candidateProfile.update({
+      where: { id: req.params.id },
+      data: {
+        ...(data.isCitizen !== undefined ? { isCitizen: data.isCitizen } : {}),
+        ...(data.isCitizen !== undefined
+          ? { visaStatus: data.isCitizen ? null : existing.visaStatus }
+          : {}),
+        ...(data.city !== undefined ? { city: data.city } : {}),
+        ...(data.country !== undefined ? { country: data.country } : {}),
+        ...(data.technology !== undefined ? { technology: data.technology } : {}),
+        ...(sourcedById !== undefined ? { sourcedById } : {}),
+      },
+      include: { sourcedBy: { select: { name: true, email: true } } },
+    });
+
+    const allRows = await prisma.candidateProfile.findMany({
+      select: { id: true, email: true, phone: true },
+    });
+    const meta = computeProfileDuplicateMeta(allRows).get(row.id);
+
+    res.json({
+      data: serializeProfile({
+        ...row,
+        sourcedByName: row.sourcedBy?.name?.trim() || row.sourcedBy?.email || null,
+        isDuplicate: meta?.isDuplicate ?? false,
+        duplicateCount: meta?.duplicateCount ?? 0,
+        duplicateMatchReason: meta?.duplicateMatchReason ?? null,
+      }),
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error patching profile:", error);
+    res.status(500).json({ error: "Failed to update profile" });
   }
 });
 
@@ -311,6 +387,8 @@ router.put("/:id", async (req: AuthRequest, res) => {
         previousSalary: data.previousSalary ?? null,
         comments: data.comments ?? null,
         sourcedById,
+        isCitizen: data.isCitizen,
+        visaStatus: data.isCitizen ? null : data.visaStatus?.trim() ?? null,
       },
     });
 

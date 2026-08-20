@@ -13,7 +13,6 @@ function JobsTabsInner() {
   const tabs = [
     { href: "/jobs/active", id: "active" as const, label: "Active" },
     { href: "/jobs/inactive", id: "inactive" as const, label: "Inactive" },
-    { href: "/jobs/career-applications", id: "career-applications" as const, label: "Career Applications" },
   ];
 
   return (
@@ -47,7 +46,6 @@ export default function JobsLayout({ children }: { children: React.ReactNode }) 
           <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-2 dark:border-gray-700">
             <span className="px-4 py-2 text-sm text-gray-400">Active</span>
             <span className="px-4 py-2 text-sm text-gray-400">Inactive</span>
-            <span className="px-4 py-2 text-sm text-gray-400">Career Applications</span>
           </div>
         }
       >

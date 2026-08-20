@@ -43,12 +43,14 @@ type ApplicationRow = {
   country: string | null;
   city: string | null;
   jobListingId: string | null;
+  visaStatus: string | null;
   salaryCurrency: string | null;
   salaryRate: number | null;
   salaryMode: string | null;
   resumeUrl: string | null;
   documentUrls: unknown;
   message: string | null;
+  isCitizen?: boolean;
 };
 
 function documentUrlsFromApplication(application: ApplicationRow): string[] {
@@ -114,6 +116,8 @@ export async function createProfileFromCareerApplication(application: Applicatio
       mode,
       documentUrls,
       comments: application.message?.trim() || null,
+      isCitizen: application.isCitizen ?? true,
+      visaStatus: application.isCitizen ? null : application.visaStatus?.trim() ?? null,
       careerApplicationId: application.id,
     },
   });

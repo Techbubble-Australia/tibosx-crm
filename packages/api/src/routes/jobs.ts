@@ -29,6 +29,7 @@ const jobSchema = z.object({
   published: z.boolean().default(true),
   isHot: z.boolean().optional(),
   city: z.string().max(120).optional().nullable(),
+  endClient: z.string().max(200).optional().nullable(),
   order: z.number().int().default(0),
 });
 
@@ -143,6 +144,7 @@ function serializeAdminJob(
     department: job.department,
     clientId: job.clientId,
     clientName: job.client?.name ?? "",
+    endClient: job.endClient ?? "",
     description: job.description,
     likeCount: job.likeCount ?? 0,
     published: job.published,

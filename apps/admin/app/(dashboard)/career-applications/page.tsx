@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function LegacyCareerApplicationsPage() {
-  redirect("/jobs/career-applications");
+export default function CareerApplicationsIndexPage() {
+  redirect("/career-applications/active");
 }

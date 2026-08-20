@@ -1,5 +1,5 @@
-import { CareerApplicationsList } from "@/components/jobs/CareerApplicationsList";
+import { redirect } from "next/navigation";
 
-export default function JobCareerApplicationsPage() {
-  return <CareerApplicationsList />;
+export default function LegacyJobsCareerApplicationsPage() {
+  redirect("/career-applications/active");
 }

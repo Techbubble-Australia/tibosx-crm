@@ -10,22 +10,9 @@ import { ViewModeToggle, type ViewMode } from "@/components/ui/ViewModeToggle";
 import { useListView } from "@/hooks/useListView";
 import { buildSearchHaystack } from "@/lib/search-text";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { ProfilesListTable, type ProfileListRow } from "@/components/profiles/ProfilesListTable";
 
-interface ProfileRow {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  country: string;
-  city?: string | null;
-  category: string;
-  technology: string;
-  expectedRate: number;
-  currency: string;
-  mode: string;
-  sourcedByName?: string | null;
-  isDuplicate?: boolean;
+interface ProfileRow extends ProfileListRow {
   duplicateCount?: number;
   duplicateMatchReason?: string | null;
 }
@@ -103,13 +90,16 @@ function collectSortedOptions(rows: ProfileRow[], field: "country" | "category" 
 }
 
 export default function ProfilesPage() {
-  const { canDeleteProfiles } = useAdminSession();
+  const { canDeleteProfiles, canManageProfileOwnership } = useAdminSession();
   const [rows, setRows] = useState<ProfileRow[]>([]);
+  const [sourcers, setSourcers] = useState<Array<{ id: string; label: string }>>([]);
+  const [technologies, setTechnologies] = useState<Array<{ id: string; name: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [countryFilter, setCountryFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [technologyFilter, setTechnologyFilter] = useState("");
+  const [citizenFilter, setCitizenFilter] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("technology");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
@@ -118,9 +108,11 @@ export default function ProfilesPage() {
       if (countryFilter && row.country !== countryFilter) return false;
       if (categoryFilter && row.category !== categoryFilter) return false;
       if (technologyFilter && row.technology !== technologyFilter) return false;
+      if (citizenFilter === "yes" && !row.isCitizen) return false;
+      if (citizenFilter === "no" && row.isCitizen) return false;
       return true;
     });
-  }, [rows, countryFilter, categoryFilter, technologyFilter]);
+  }, [rows, countryFilter, categoryFilter, technologyFilter, citizenFilter]);
 
   const countryOptions = useMemo(() => collectSortedOptions(rows, "country"), [rows]);
   const categoryOptions = useMemo(() => collectSortedOptions(rows, "category"), [rows]);
@@ -148,16 +140,38 @@ export default function ProfilesPage() {
       row.technology,
       row.currency,
       row.mode,
+      row.isCitizen ? "citizen yes" : "citizen no",
     ]),
+    { initialPageSize: 100 },
   );
 
   useEffect(() => {
     setPage(1);
-  }, [countryFilter, categoryFilter, technologyFilter, setPage]);
+  }, [countryFilter, categoryFilter, technologyFilter, citizenFilter, setPage]);
 
   useEffect(() => {
     void fetchRows();
+    void loadMeta();
   }, []);
+
+  async function loadMeta() {
+    try {
+      const [sourcersRes, techRes] = await Promise.all([
+        adminFetch("/api/admin/profiles/meta/sourcers"),
+        adminFetch("/api/admin/job-technologies"),
+      ]);
+      const sourcersData = await sourcersRes.json();
+      const techData = await techRes.json();
+      setSourcers(sourcersData.data ?? []);
+      setTechnologies((techData.data ?? []).map((t: { id: string; name: string }) => ({ id: t.id, name: t.name })));
+    } catch (error) {
+      console.error("Error loading profile meta:", error);
+    }
+  }
+
+  function handleRowUpdated(updated: ProfileListRow) {
+    setRows((prev) => prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row)));
+  }
 
   async function fetchRows() {
     try {
@@ -333,13 +347,24 @@ export default function ProfilesPage() {
               <option key={option} value={option}>{option}</option>
             ))}
           </select>
-          {(countryFilter || categoryFilter || technologyFilter) ? (
+          <select
+            value={citizenFilter}
+            onChange={(e) => setCitizenFilter(e.target.value)}
+            className={filterSelectClass}
+            aria-label="Filter by citizen"
+          >
+            <option value="">All citizen</option>
+            <option value="yes">Citizen: Yes</option>
+            <option value="no">Citizen: No</option>
+          </select>
+          {(countryFilter || categoryFilter || technologyFilter || citizenFilter) ? (
             <button
               type="button"
               onClick={() => {
                 setCountryFilter("");
                 setCategoryFilter("");
                 setTechnologyFilter("");
+                setCitizenFilter("");
               }}
               className="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
             >
@@ -351,101 +376,21 @@ export default function ProfilesPage() {
 
       {viewMode === "list" ? (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-          <table className="w-full min-w-[1000px] text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
-              <tr>
-                <th className="px-4 py-3 text-left">
-                  <SortHeader label="Name" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortHeader label="Email" sortKey="email" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortHeader label="Phone" sortKey="phone" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortHeader label="City" sortKey="city" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortHeader label="Country" sortKey="country" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortHeader label="Technology" sortKey="technology" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortHeader label="Expected rate" sortKey="expectedRate" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortHeader label="Sourced by" sortKey="sourcedByName" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortHeader label="Status" sortKey="duplicate" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
-                    No profile records yet.
-                  </td>
-                </tr>
-              ) : totalItems === 0 ? (
-                <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
-                    No profiles match your search or filters.
-                  </td>
-                </tr>
-              ) : (
-                paginatedProfiles.map((row) => (
-                  <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
-                      <span className="inline-flex flex-wrap items-center gap-2">
-                        <span>{row.firstName} {row.lastName}</span>
-                        <DuplicateBadge row={row} />
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.email}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.phone}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.city || "—"}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.country || "—"}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.technology}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatRate(row)}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.sourcedByName || "—"}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                      {row.isDuplicate ? (
-                        <span className="text-xs text-amber-700 dark:text-amber-300">
-                          {row.duplicateCount} match{(row.duplicateCount ?? 0) === 1 ? "" : "es"}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="inline-flex items-center gap-2">
-                        <Link
-                          href={`/database/profiles/${row.id}`}
-                          className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-black dark:hover:bg-gray-800 dark:hover:text-white"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Link>
-                        {canDeleteProfiles ? (
-                          <button
-                            type="button"
-                            onClick={() => void deleteRow(row.id)}
-                            className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          {rows.length === 0 ? (
+            <p className="px-4 py-8 text-center text-gray-400">No profile records yet.</p>
+          ) : totalItems === 0 ? (
+            <p className="px-4 py-8 text-center text-gray-400">No profiles match your search or filters.</p>
+          ) : (
+            <ProfilesListTable
+              rows={paginatedProfiles}
+              canDeleteProfiles={canDeleteProfiles}
+              canManageProfileOwnership={canManageProfileOwnership}
+              sourcers={sourcers}
+              technologies={technologies}
+              onRowUpdated={handleRowUpdated}
+              onDelete={(id) => void deleteRow(id)}
+            />
+          )}
           {rows.length > 0 ? (
             <TablePagination
               page={page}
@@ -453,6 +398,7 @@ export default function ProfilesPage() {
               totalItems={totalItems}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
+              pageSizeOptions={[100, 200, 500]}
             />
           ) : null}
         </div>
@@ -558,6 +504,7 @@ export default function ProfilesPage() {
               totalItems={totalItems}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
+              pageSizeOptions={[100, 200, 500]}
             />
           ) : null}
         </div>

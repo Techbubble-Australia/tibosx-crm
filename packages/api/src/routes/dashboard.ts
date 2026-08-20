@@ -6,11 +6,12 @@ const router: IRouter = Router();
 router.get("/stats", async (req, res) => {
   try {
     const countryFilter = typeof req.query.country === "string" ? req.query.country.trim() : "";
+    const clientFilter = typeof req.query.clientId === "string" ? req.query.clientId.trim() : "";
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const [profiles, applications30d, openRoles] = await Promise.all([
+    const [profiles, applications30d, openRoles, activeJobs, clients] = await Promise.all([
       prisma.candidateProfile.findMany({
         select: { technology: true, country: true },
       }),
@@ -18,6 +19,22 @@ router.get("/stats", async (req, res) => {
         where: { createdAt: { gte: thirtyDaysAgo } },
       }),
       prisma.jobListing.count({ where: { published: true } }),
+      prisma.jobListing.findMany({
+        where: { published: true, ...(clientFilter ? { clientId: clientFilter } : {}) },
+        select: {
+          id: true,
+          title: true,
+          clientId: true,
+          client: { select: { name: true } },
+          applications: { select: { id: true } },
+        },
+        orderBy: [{ order: "asc" }, { title: "asc" }],
+      }),
+      prisma.client.findMany({
+        where: { active: true },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
     ]);
 
     const countries = [...new Set(profiles.map((p) => p.country.trim()).filter(Boolean))].sort((a, b) =>
@@ -38,13 +55,26 @@ router.get("/stats", async (req, res) => {
       .map(([technology, count]) => ({ technology, count }))
       .sort((a, b) => b.count - a.count || a.technology.localeCompare(b.technology));
 
+    const applicationsByActiveJob = activeJobs
+      .map((job) => ({
+        jobId: job.id,
+        jobTitle: job.title,
+        clientId: job.clientId,
+        clientName: job.client.name,
+        count: job.applications.length,
+      }))
+      .filter((row) => row.count > 0)
+      .sort((a, b) => b.count - a.count || a.jobTitle.localeCompare(b.jobTitle));
+
     res.json({
       data: {
         totalProfiles: profiles.length,
         applications30d,
         openRoles,
         countries,
+        clients,
         profilesByTechnology,
+        applicationsByActiveJob,
       },
     });
   } catch (error) {

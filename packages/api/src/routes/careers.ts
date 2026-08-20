@@ -14,31 +14,48 @@ import {
 } from "../lib/careers-form";
 import { createProfileFromCareerApplication } from "../lib/profile-from-application";
 import { findDuplicateCareerApplication } from "../lib/career-application-dedup";
+import {
+  CAREER_APPLICATION_STATUSES,
+} from "../lib/career-application-status";
 import { sendCareerApplicationEmail } from "../lib/mail";
 
 const router: IRouter = Router();
 
 const salaryCurrencyCodes = SALARY_CURRENCIES.map((c) => c.code) as [string, ...string[]];
 
-const careerSchema = z.object({
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Valid email is required"),
-  phone: z.string().regex(PHONE_REGEX, PHONE_VALIDATION_MESSAGE),
-  position: z.string().min(1, "Position is required"),
-  country: z.string().min(1, "Country is required"),
-  city: z.string().min(1, "City is required"),
-  jobListingId: z.string().optional(),
-  visaStatus: z.string().min(1, "Visa status is required"),
-  salaryCurrency: z.enum(salaryCurrencyCodes, { message: "Currency is required" }),
-  salaryRate: z.coerce.number().int().positive("Salary rate is required"),
-  salaryMode: z.enum(SALARY_MODES, { message: "Salary mode is required" }),
-  documentUrls: z.array(z.string().min(1)).min(1, "At least one document is required"),
-  message: z.preprocess(
-    (v) => (v === null || v === undefined || v === "" ? undefined : String(v)),
-    z.string().optional(),
-  ),
-});
+const careerSchema = z
+  .object({
+    firstName: z.string().min(1, "First name is required"),
+    lastName: z.string().min(1, "Last name is required"),
+    email: z.string().email("Valid email is required"),
+    phone: z.string().regex(PHONE_REGEX, PHONE_VALIDATION_MESSAGE),
+    position: z.string().min(1, "Position is required"),
+    country: z.string().min(1, "Country is required"),
+    city: z.string().min(1, "City is required"),
+    jobListingId: z.string().optional(),
+    isCitizen: z.preprocess(
+      (v) => v === true || v === "true" || v === "yes" || v === "Yes",
+      z.boolean(),
+    ).default(true),
+    visaStatus: z.string().optional(),
+    salaryCurrency: z.enum(salaryCurrencyCodes, { message: "Currency is required" }),
+    salaryRate: z.coerce.number().int().positive("Salary rate is required"),
+    salaryMode: z.enum(SALARY_MODES, { message: "Salary mode is required" }),
+    documentUrls: z.array(z.string().min(1)).min(1, "At least one document is required"),
+    message: z.preprocess(
+      (v) => (v === null || v === undefined || v === "" ? undefined : String(v)),
+      z.string().optional(),
+    ),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.isCitizen && !data.visaStatus?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Visa status is required when not an Australian citizen",
+        path: ["visaStatus"],
+      });
+    }
+  });
 
 function makeStoredFilename(fieldname: string, originalname: string): string {
   const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
@@ -179,7 +196,8 @@ router.post("/apply", async (req, res) => {
         country: validatedData.country,
         city: validatedData.city,
         jobListingId: validatedData.jobListingId ?? null,
-        visaStatus: validatedData.visaStatus,
+        isCitizen: validatedData.isCitizen,
+        visaStatus: validatedData.isCitizen ? null : validatedData.visaStatus?.trim() ?? null,
         salaryCurrency: validatedData.salaryCurrency,
         salaryRate: validatedData.salaryRate,
         salaryMode: validatedData.salaryMode,
@@ -236,13 +254,79 @@ router.post("/apply", async (req, res) => {
 // Admin: list all career applications
 router.get("/admin/applications", async (req, res) => {
   try {
+    const publishedParam = typeof req.query.published === "string" ? req.query.published : "";
+    const where =
+      publishedParam === "true"
+        ? { OR: [{ jobListing: { published: true } }, { jobListingId: null }] }
+        : publishedParam === "false"
+          ? { jobListing: { published: false } }
+          : undefined;
+
     const applications = await prisma.careerApplication.findMany({
+      where,
+      include: {
+        jobListing: {
+          select: {
+            id: true,
+            title: true,
+            published: true,
+            clientId: true,
+            client: { select: { name: true } },
+          },
+        },
+      },
       orderBy: { createdAt: "desc" },
     });
-    res.json({ data: applications });
+    res.json({
+      data: applications.map((row) => ({
+        ...row,
+        jobTitle: row.jobListing?.title ?? null,
+        jobPublished: row.jobListing?.published ?? null,
+        clientName: row.jobListing?.client?.name ?? null,
+      })),
+    });
   } catch (error) {
     console.error("Error fetching career applications:", error);
     res.status(500).json({ error: "Failed to fetch applications" });
+  }
+});
+
+router.patch("/admin/applications/:id", async (req, res) => {
+  try {
+    const body = z.object({
+      status: z.enum(CAREER_APPLICATION_STATUSES),
+    }).parse(req.body);
+
+    const updated = await prisma.careerApplication.update({
+      where: { id: req.params.id },
+      data: { status: body.status },
+      include: {
+        jobListing: {
+          select: {
+            id: true,
+            title: true,
+            published: true,
+            clientId: true,
+            client: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    res.json({
+      data: {
+        ...updated,
+        jobTitle: updated.jobListing?.title ?? null,
+        jobPublished: updated.jobListing?.published ?? null,
+        clientName: updated.jobListing?.client?.name ?? null,
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: formatZodError(error), details: error.errors });
+    }
+    console.error("Error updating career application:", error);
+    res.status(500).json({ error: "Failed to update application" });
   }
 });
 

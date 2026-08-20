@@ -180,6 +180,10 @@ model CareerApplication {
   /// Uploaded document URLs (resume, visa copies, etc.)
   documentUrls      Json?
   message           String?
+  /// Australian citizen / permanent resident (default yes on website apply form).
+  isCitizen         Boolean           @default(true)
+  /// Pipeline status for recruiter tracking.
+  status            String            @default("CLIENT_REVIEW")
   profile           CandidateProfile?
   createdAt         DateTime          @default(now())
 }
@@ -200,6 +204,8 @@ model CandidateProfile {
   documentUrls        Json
   previousSalary      Int?
   comments            String?            @db.Text
+  isCitizen           Boolean            @default(true)
+  visaStatus          String?
   /// Admin user who sourced this candidate (recruiter/admin).
   sourcedById         String?
   sourcedBy           AdminUser?         @relation("ProfileSourcedBy", fields: [sourcedById], references: [id], onDelete: SetNull)
@@ -332,6 +338,8 @@ model JobListing {
   isHot           Boolean   @default(false)
   /// Primary city for admin list display (Any / Other / named city).
   city            String?
+  /// Optional end-client name (free text).
+  endClient       String?
   order           Int       @default(0)
   /// Admin user IDs assigned as recruiters for this role
   recruiterIds    Json?

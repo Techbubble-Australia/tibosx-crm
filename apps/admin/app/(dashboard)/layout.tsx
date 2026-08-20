@@ -23,10 +23,12 @@ import {
   Cpu,
   Building,
   Target,
+  ClipboardList,
 } from "lucide-react";
 import { AdminSessionProvider, useAdminSession } from "@/contexts/AdminSessionContext";
 import { MfaEnrollmentGuard } from "@/components/MfaEnrollmentGuard";
 import { TechBubbleLogo } from "@/components/TechBubbleLogo";
+import { InactivityLogout } from "@/components/InactivityLogout";
 import { roleLabel } from "@/lib/admin-roles";
 import { isCareerApplicationsPath, isJobListingsPath } from "@/lib/job-routes";
 
@@ -61,6 +63,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/database/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "recruiter"] },
       { href: "/jobs/active", label: "Job Listings", icon: Briefcase, roles: ["admin", "recruiter", "website"] },
+      { href: "/career-applications/active", label: "Career Applications", icon: ClipboardList, roles: ["admin", "recruiter"] },
       { href: "/database/profiles", label: "Profiles", icon: UserCircle, roles: ["admin", "recruiter"] },
     ],
   },
@@ -108,7 +111,7 @@ function headerTitle(pathname: string): string {
 }
 
 function groupIsActive(group: NavGroup, pathname: string): boolean {
-  if (group.id === "recruitment" && isJobListingsPath(pathname)) {
+  if (group.id === "recruitment" && (isJobListingsPath(pathname) || isCareerApplicationsPath(pathname))) {
     return true;
   }
   return group.items.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
@@ -117,6 +120,9 @@ function groupIsActive(group: NavGroup, pathname: string): boolean {
 function navItemIsActive(item: NavItem, pathname: string): boolean {
   if (item.href === "/jobs/active") {
     return isJobListingsPath(pathname);
+  }
+  if (item.href === "/career-applications/active") {
+    return isCareerApplicationsPath(pathname);
   }
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
@@ -253,6 +259,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <AdminSessionProvider>
       <MfaEnrollmentGuard>
+        <InactivityLogout />
         <DashboardChrome>{children}</DashboardChrome>
       </MfaEnrollmentGuard>
     </AdminSessionProvider>
