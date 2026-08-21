@@ -146,6 +146,27 @@ export function formatJobLocationsSummary(entries: readonly JobLocationEntry[]):
   return { flags, locationText, countryKeys };
 }
 
+/** Primary city for admin lists — first country's selected cities. */
+export function derivePrimaryCityFromLocations(entries: readonly JobLocationEntry[]): string | null {
+  const first = entries.find((row) => row.country.trim());
+  if (!first) return null;
+
+  const cities = (first.cities ?? []).map((c) => c.trim()).filter(Boolean);
+  if (cities.length > 0) {
+    const joined = cities.join(", ");
+    return joined.length > 120 ? joined.slice(0, 120) : joined;
+  }
+
+  const label = first.label?.trim() ?? "";
+  if (!label) return null;
+
+  const parsed = label.split(/\s*(?:,|&| and )\s*/i).map((s) => s.trim()).filter(Boolean);
+  if (parsed.length === 0) return null;
+
+  const joined = parsed.join(", ");
+  return joined.length > 120 ? joined.slice(0, 120) : joined;
+}
+
 export function syncLegacyLocationFields(entries: readonly JobLocationEntry[]): JobLocationLegacyFields {
   const normalized = entries.length > 0 ? entries : [];
   const { locationText } = formatJobLocationsSummary(normalized);

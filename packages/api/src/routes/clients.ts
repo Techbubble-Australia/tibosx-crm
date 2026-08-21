@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { prisma } from "@techbubble/database";
+import { CLIENT_STATUSES } from "../lib/client-status";
 
 const router: IRouter = Router();
 
@@ -16,9 +17,50 @@ const clientSchema = z.object({
   name: z.string().min(1).max(200),
   website: z.string().max(500).optional().default(""),
   country: z.string().min(1).max(200),
-  order: z.number().int().default(0),
-  active: z.boolean().default(true),
+  order: z.number().int().optional(),
+  status: z.enum(CLIENT_STATUSES).default("ACTIVE"),
   contacts: z.array(contactSchema).optional().default([]),
+});
+
+function serializeClient(row: {
+  id: string;
+  name: string;
+  website: string;
+  country: string;
+  order: number;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+  contacts?: unknown[];
+  _count?: { opportunities: number };
+}) {
+  return {
+    id: row.id,
+    name: row.name,
+    website: row.website,
+    country: row.country,
+    order: row.order,
+    status: row.status,
+    opportunityCount: row._count?.opportunities ?? 0,
+    contacts: row.contacts ?? [],
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+async function allocateNextClientOrder(): Promise<number> {
+  const result = await prisma.client.aggregate({ _max: { order: true } });
+  return (result._max.order ?? 0) + 1;
+}
+
+router.get("/next-order", async (_req, res) => {
+  try {
+    const order = await allocateNextClientOrder();
+    res.json({ data: { order } });
+  } catch (error) {
+    console.error("Error fetching next client order:", error);
+    res.status(500).json({ error: "Failed to fetch next order" });
+  }
 });
 
 router.get("/", async (_req, res) => {
@@ -29,9 +71,10 @@ router.get("/", async (_req, res) => {
         contacts: {
           orderBy: [{ order: "asc" }, { name: "asc" }],
         },
+        _count: { select: { opportunities: true } },
       },
     });
-    res.json({ data: rows });
+    res.json({ data: rows.map(serializeClient) });
   } catch (error) {
     console.error("Error fetching clients:", error);
     res.status(500).json({ error: "Failed to fetch clients" });
@@ -40,16 +83,20 @@ router.get("/", async (_req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
+    if (req.params.id === "next-order") {
+      return res.status(404).json({ error: "Not found" });
+    }
     const row = await prisma.client.findUnique({
       where: { id: req.params.id },
       include: {
         contacts: {
           orderBy: [{ order: "asc" }, { name: "asc" }],
         },
+        _count: { select: { opportunities: true } },
       },
     });
     if (!row) return res.status(404).json({ error: "Not found" });
-    res.json({ data: row });
+    res.json({ data: serializeClient(row) });
   } catch (error) {
     console.error("Error fetching client:", error);
     res.status(500).json({ error: "Failed to fetch client" });
@@ -59,13 +106,14 @@ router.get("/:id", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const data = clientSchema.parse(req.body);
+    const order = data.order && data.order > 0 ? data.order : await allocateNextClientOrder();
     const row = await prisma.client.create({
       data: {
         name: data.name,
         website: data.website ?? "",
         country: data.country,
-        order: data.order,
-        active: data.active,
+        order,
+        status: data.status,
         contacts: {
           create: data.contacts.map((contact, index) => ({
             name: contact.name,
@@ -80,9 +128,10 @@ router.post("/", async (req, res) => {
         contacts: {
           orderBy: [{ order: "asc" }, { name: "asc" }],
         },
+        _count: { select: { opportunities: true } },
       },
     });
-    res.status(201).json({ data: row });
+    res.status(201).json({ data: serializeClient(row) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
@@ -132,9 +181,10 @@ router.put("/:id", async (req, res) => {
         contacts: {
           orderBy: [{ order: "asc" }, { name: "asc" }],
         },
+        _count: { select: { opportunities: true } },
       },
     });
-    res.json({ data: row });
+    res.json({ data: serializeClient(row!) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
@@ -151,6 +201,13 @@ router.delete("/:id", async (req, res) => {
       return res.status(409).json({
         error: "Cannot delete client while job listings reference it",
         jobCount,
+      });
+    }
+    const oppCount = await prisma.opportunity.count({ where: { clientId: req.params.id } });
+    if (oppCount > 0) {
+      return res.status(409).json({
+        error: "Cannot delete client while opportunities reference it",
+        opportunityCount: oppCount,
       });
     }
     await prisma.client.delete({ where: { id: req.params.id } });

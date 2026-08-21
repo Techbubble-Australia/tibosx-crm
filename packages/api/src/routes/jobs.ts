@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma, type JobListing, type Prisma } from "@techbubble/database";
 import {
   jobLocationEntrySchema,
+  derivePrimaryCityFromLocations,
   normalizeJobLocations,
   parseJobLocations,
   syncLegacyLocationFields,
@@ -43,6 +44,7 @@ function prepareJobWriteData(body: z.infer<typeof jobSchema>): Record<string, un
       country: legacy.country,
       flag: legacy.flag,
       locations: parsedLocations,
+      city: derivePrimaryCityFromLocations(parsedLocations),
     };
   }
 
@@ -170,6 +172,11 @@ function mergeJobUpdate(
   return jobSchema.parse(merged);
 }
 
+async function allocateNextJobOrder(): Promise<number> {
+  const result = await prisma.jobListing.aggregate({ _max: { order: true } });
+  return (result._max.order ?? 0) + 1;
+}
+
 async function allocateJobReferenceNumber(): Promise<string> {
   const jobs = await prisma.jobListing.findMany({
     select: { referenceNumber: true },
@@ -210,6 +217,16 @@ router.get("/admin/recruiters", async (_req, res) => {
   } catch (error) {
     console.error("Error fetching recruiters:", error);
     res.status(500).json({ error: "Failed to fetch recruiters" });
+  }
+});
+
+router.get("/admin/next-order", async (_req, res) => {
+  try {
+    const order = await allocateNextJobOrder();
+    res.json({ data: { order } });
+  } catch (error) {
+    console.error("Error fetching next job order:", error);
+    res.status(500).json({ error: "Failed to fetch next order" });
   }
 });
 
@@ -326,8 +343,9 @@ router.post("/", async (req, res) => {
     const data = jobSchema.parse(req.body);
     const writeData = prepareJobWriteData(data);
     const referenceNumber = await allocateJobReferenceNumber();
+    const order = data.order && data.order > 0 ? data.order : await allocateNextJobOrder();
     const job = await prisma.jobListing.create({
-      data: { ...writeData, referenceNumber } as Prisma.JobListingCreateInput,
+      data: { ...writeData, referenceNumber, order } as Prisma.JobListingCreateInput,
       include: { client: { select: { name: true } } },
     });
     res.status(201).json({ data: serializeAdminJob(job) });

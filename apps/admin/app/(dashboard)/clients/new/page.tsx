@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { CountryFlagPicker } from "@/components/CountryFlagPicker";
 import { ClientContactsField, type ClientContactInput } from "@/components/clients/ClientContactsField";
+import { CLIENT_STATUSES, CLIENT_STATUS_LABELS } from "@/lib/client-status";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
@@ -14,9 +15,23 @@ const inputClass =
 export default function NewClientPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [nextOrder, setNextOrder] = useState<number | null>(null);
   const [contacts, setContacts] = useState<ClientContactInput[]>([
     { name: "", email: "", phoneCountryCode: "+61", phoneNumber: "" },
   ]);
+
+  useEffect(() => {
+    async function loadNextOrder() {
+      try {
+        const res = await adminFetch("/api/admin/clients/next-order");
+        const data = await res.json();
+        setNextOrder(data.data?.order ?? 1);
+      } catch {
+        setNextOrder(1);
+      }
+    }
+    void loadNextOrder();
+  }, []);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -30,8 +45,7 @@ export default function NewClientPage() {
           name: formData.get("name"),
           website: formData.get("website") ?? "",
           country: formData.get("country"),
-          order: parseInt(formData.get("order") as string, 10) || 0,
-          active: formData.get("active") === "on",
+          status: formData.get("status"),
           contacts,
         }),
       });
@@ -39,7 +53,7 @@ export default function NewClientPage() {
         const err = await res.json().catch(() => ({}));
         throw new Error((err as { error?: string }).error || "Failed");
       }
-      router.push("/clients");
+      router.push("/clients/active");
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to create client");
     } finally {
@@ -50,7 +64,7 @@ export default function NewClientPage() {
   return (
     <div className="max-w-2xl">
       <div className="mb-6 flex items-center gap-3">
-        <Link href="/clients" className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
+        <Link href="/clients/active" className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">New Client</h2>
@@ -65,25 +79,23 @@ export default function NewClientPage() {
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Website</label>
-          <input
-            name="website"
-            type="url"
-            className={inputClass}
-            placeholder="https://example.com"
-          />
+          <input name="website" type="url" className={inputClass} placeholder="https://example.com" />
         </div>
         <CountryFlagPicker
           selectClassName={inputClass}
           labelClassName="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100"
         />
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Order</label>
-          <input name="order" type="number" defaultValue={0} className={inputClass} />
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Status *</label>
+          <select name="status" required defaultValue="ACTIVE" className={inputClass}>
+            {CLIENT_STATUSES.map((status) => (
+              <option key={status} value={status}>{CLIENT_STATUS_LABELS[status]}</option>
+            ))}
+          </select>
         </div>
-        <label className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
-          <input name="active" type="checkbox" defaultChecked className="h-4 w-4 rounded" />
-          Active
-        </label>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Display order: {nextOrder ?? "…"} (assigned automatically)
+        </p>
         <ClientContactsField contacts={contacts} onChange={setContacts} inputClassName={inputClass} />
         <button
           type="submit"

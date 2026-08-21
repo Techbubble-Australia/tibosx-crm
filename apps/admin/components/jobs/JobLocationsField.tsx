@@ -108,8 +108,8 @@ export function JobLocationsField({ value, onChange, inputClass, labelClass }: P
       <div>
         <label className={labelClass}>Locations *</label>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Use one row per country. Select multiple cities in that row when needed. Use &quot;Add country&quot; only for a
-          different country (e.g. Australia and India). If no city is selected, the country name is shown on job cards.
+          Use one row per country. Select cities here (Any, preset cities, or Other). This drives job cards and the
+          admin City column. Use &quot;Add country&quot; only for a different country.
         </p>
       </div>
 

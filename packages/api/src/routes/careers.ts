@@ -51,7 +51,7 @@ const careerSchema = z
     if (!data.isCitizen && !data.visaStatus?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Visa status is required when not an Australian citizen",
+        message: "Visa status is required when not an Australian Citizen",
         path: ["visaStatus"],
       });
     }
@@ -251,16 +251,40 @@ router.post("/apply", async (req, res) => {
   }
 });
 
+async function jobTitlesForListing(jobListingId: string): Promise<string[]> {
+  const job = await prisma.jobListing.findUnique({
+    where: { id: jobListingId },
+    select: { title: true },
+  });
+  return job?.title ? [job.title] : [];
+}
+
 // Admin: list all career applications
 router.get("/admin/applications", async (req, res) => {
   try {
     const publishedParam = typeof req.query.published === "string" ? req.query.published : "";
-    const where =
+    const jobListingId = typeof req.query.jobListingId === "string" ? req.query.jobListingId.trim() : "";
+
+    const publishedWhere =
       publishedParam === "true"
         ? { OR: [{ jobListing: { published: true } }, { jobListingId: null }] }
         : publishedParam === "false"
           ? { jobListing: { published: false } }
           : undefined;
+
+    const jobWhere = jobListingId
+      ? {
+          OR: [
+            { jobListingId },
+            { jobListingId: null, position: { in: await jobTitlesForListing(jobListingId) } },
+          ],
+        }
+      : undefined;
+
+    const where =
+      publishedWhere && jobWhere
+        ? { AND: [publishedWhere, jobWhere] }
+        : publishedWhere ?? jobWhere;
 
     const applications = await prisma.careerApplication.findMany({
       where,
@@ -280,6 +304,7 @@ router.get("/admin/applications", async (req, res) => {
     res.json({
       data: applications.map((row) => ({
         ...row,
+        jobListingId: row.jobListingId,
         jobTitle: row.jobListing?.title ?? null,
         jobPublished: row.jobListing?.published ?? null,
         clientName: row.jobListing?.client?.name ?? null,

@@ -24,7 +24,7 @@ export const ROLE_META: Record<AdminRole, { label: string; description: string }
   },
   sales: {
     label: "Sales",
-    description: "Access to the Sales module (clients and contacts).",
+    description: "Access to the Sales module (clients, opportunities, and contacts).",
   },
   website: {
     label: "Website",
@@ -145,6 +145,6 @@ export function roleLabel(role: string): string {
 export function defaultLandingPath(role: string): string {
   if (canAccessRecruitment(role)) return "/database/dashboard";
   if (canAccessWebsite(role)) return "/pages";
-  if (canAccessSales(role)) return "/clients";
+  if (canAccessSales(role)) return "/clients/active";
   return "/settings/security";
 }

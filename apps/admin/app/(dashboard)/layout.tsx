@@ -13,6 +13,8 @@ import {
   Mail,
   FileStack,
   Building2,
+  Handshake,
+  CircleDollarSign,
   Shield,
   Globe,
   Settings,
@@ -53,7 +55,10 @@ const navGroups: NavGroup[] = [
     label: "Sales",
     icon: Building2,
     roles: ["admin", "sales"],
-    items: [{ href: "/clients", label: "Clients", icon: Building2, roles: ["admin", "sales"] }],
+    items: [
+      { href: "/clients/active", label: "Clients", icon: Handshake, roles: ["admin", "sales"] },
+      { href: "/opportunities", label: "Opportunities", icon: CircleDollarSign, roles: ["admin", "sales"] },
+    ],
   },
   {
     id: "recruitment",
@@ -103,6 +108,12 @@ function headerTitle(pathname: string): string {
   if (isJobListingsPath(pathname)) {
     return "Job Listings";
   }
+  if (pathname.startsWith("/opportunities")) {
+    return "Opportunities";
+  }
+  if (pathname.startsWith("/clients")) {
+    return "Clients";
+  }
   for (const group of navGroups) {
     const hit = group.items.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
     if (hit) return hit.label;
@@ -114,6 +125,9 @@ function groupIsActive(group: NavGroup, pathname: string): boolean {
   if (group.id === "recruitment" && (isJobListingsPath(pathname) || isCareerApplicationsPath(pathname))) {
     return true;
   }
+  if (group.id === "sales" && (pathname.startsWith("/clients") || pathname.startsWith("/opportunities"))) {
+    return true;
+  }
   return group.items.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
 }
 
@@ -123,6 +137,12 @@ function navItemIsActive(item: NavItem, pathname: string): boolean {
   }
   if (item.href === "/career-applications/active") {
     return isCareerApplicationsPath(pathname);
+  }
+  if (item.href === "/clients/active") {
+    return pathname.startsWith("/clients");
+  }
+  if (item.href === "/opportunities") {
+    return pathname === "/opportunities" || pathname.startsWith("/opportunities/");
   }
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }

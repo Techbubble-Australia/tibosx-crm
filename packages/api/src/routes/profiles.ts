@@ -39,7 +39,7 @@ const profileSchema = z.object({
   if (!data.isCitizen && !data.visaStatus?.trim()) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "Visa status is required when citizen is No",
+      message: "Visa status is required when Citizen is No",
       path: ["visaStatus"],
     });
   }

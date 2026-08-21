@@ -64,9 +64,9 @@ async function seedDefaultClient() {
       website: "",
       country: "Australia",
       order: 0,
-      active: true,
+      status: "ACTIVE",
     },
-    update: { name: "Internal", country: "Australia", active: true },
+    update: { name: "Internal", country: "Australia", status: "ACTIVE" },
   });
 }
 

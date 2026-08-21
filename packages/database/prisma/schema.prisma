@@ -283,19 +283,40 @@ model JobTechnology {
 }
 
 model Client {
-  id        String          @id @default(cuid())
-  name      String          @unique
-  website   String          @default("")
-  country   String
-  order     Int             @default(0)
-  active    Boolean         @default(true)
-  jobs      JobListing[]
-  contacts  ClientContact[]
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  id            String          @id @default(cuid())
+  name          String          @unique
+  website       String          @default("")
+  country       String
+  order         Int             @default(0)
+  /// ACTIVE | PROSPECT | INACTIVE
+  status        String          @default("ACTIVE")
+  jobs          JobListing[]
+  contacts      ClientContact[]
+  opportunities Opportunity[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
   @@index([order])
-  @@index([active])
+  @@index([status])
+}
+
+model Opportunity {
+  id        String   @id @default(cuid())
+  name      String
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  currency  String
+  amount    Decimal  @db.Decimal(14, 2)
+  /// DRAFT | PROPOSAL | ACCEPTED | REJECTED
+  status    String   @default("DRAFT")
+  comments  String   @default("") @db.Text
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([status])
+  @@index([order])
 }
 
 model ClientContact {

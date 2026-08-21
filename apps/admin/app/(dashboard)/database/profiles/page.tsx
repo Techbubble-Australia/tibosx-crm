@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Plus, Edit, Trash2, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
@@ -90,6 +91,21 @@ function collectSortedOptions(rows: ProfileRow[], field: "country" | "category" 
 }
 
 export default function ProfilesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-64 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-black border-t-transparent dark:border-white" />
+        </div>
+      }
+    >
+      <ProfilesPageInner />
+    </Suspense>
+  );
+}
+
+function ProfilesPageInner() {
+  const searchParams = useSearchParams();
   const { canDeleteProfiles, canManageProfileOwnership } = useAdminSession();
   const [rows, setRows] = useState<ProfileRow[]>([]);
   const [sourcers, setSourcers] = useState<Array<{ id: string; label: string }>>([]);
@@ -153,6 +169,13 @@ export default function ProfilesPage() {
     void fetchRows();
     void loadMeta();
   }, []);
+
+  useEffect(() => {
+    const technology = searchParams.get("technology")?.trim();
+    const country = searchParams.get("country")?.trim();
+    if (technology) setTechnologyFilter(technology);
+    if (country) setCountryFilter(country);
+  }, [searchParams]);
 
   async function loadMeta() {
     try {
@@ -351,9 +374,9 @@ export default function ProfilesPage() {
             value={citizenFilter}
             onChange={(e) => setCitizenFilter(e.target.value)}
             className={filterSelectClass}
-            aria-label="Filter by citizen"
+            aria-label="Filter by Citizen"
           >
-            <option value="">All citizen</option>
+            <option value="">All Citizen</option>
             <option value="yes">Citizen: Yes</option>
             <option value="no">Citizen: No</option>
           </select>

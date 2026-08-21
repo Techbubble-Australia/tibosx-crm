@@ -6,11 +6,7 @@ import { Loader2 } from "lucide-react";
 import { HtmlEditor } from "@/components/HtmlEditor";
 import { JobLocationsField } from "@/components/jobs/JobLocationsField";
 import { adminFetch } from "@/lib/admin-api";
-import { getCitiesForCountryCode } from "@/lib/country-cities";
 import { jobLocationsFromDefaults, type JobLocationEntry } from "@/lib/job-locations";
-
-const ANY_CITY_VALUE = "__any__";
-const OTHER_CITY_VALUE = "__other__";
 
 export type JobFormDefaults = {
   id?: string;
@@ -40,7 +36,7 @@ type TechnologyItem = {
   categoryId: string;
   category?: { id: string; name: string };
 };
-type ClientItem = { id: string; name: string; active: boolean };
+type ClientItem = { id: string; name: string; status: string };
 
 type Props = {
   mode: "create" | "edit";
@@ -53,20 +49,6 @@ type Props = {
 
 function slugify(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-}
-
-function resolveInitialCity(
-  defaults: JobFormDefaults,
-  cityOptions: readonly string[],
-): { city: string; cityOther: string } {
-  const raw = defaults.city?.trim() ?? "";
-  if (!raw) {
-    return { city: ANY_CITY_VALUE, cityOther: "" };
-  }
-  if (cityOptions.includes(raw)) {
-    return { city: raw, cityOther: "" };
-  }
-  return { city: OTHER_CITY_VALUE, cityOther: raw };
 }
 
 const inputClass =
@@ -94,28 +76,6 @@ export function JobForm({
   const [department, setDepartment] = useState(defaults.department?.trim() ?? "");
   const [clientId, setClientId] = useState(defaults.clientId ?? "");
   const [endClient, setEndClient] = useState(defaults.endClient ?? "");
-
-  const primaryCountryCode = locations.find((row) => row.countryCode.trim())?.countryCode ?? "";
-  const cityOptions = useMemo(
-    () => [...getCitiesForCountryCode(primaryCountryCode)],
-    [primaryCountryCode],
-  );
-  const [city, setCity] = useState(() =>
-    resolveInitialCity(
-      defaults,
-      getCitiesForCountryCode(
-        jobLocationsFromDefaults(defaults).find((row) => row.countryCode.trim())?.countryCode ?? "",
-      ),
-    ).city,
-  );
-  const [cityOther, setCityOther] = useState(() =>
-    resolveInitialCity(
-      defaults,
-      getCitiesForCountryCode(
-        jobLocationsFromDefaults(defaults).find((row) => row.countryCode.trim())?.countryCode ?? "",
-      ),
-    ).cityOther,
-  );
 
   const filteredTechnologies = useMemo(() => {
     if (!category) return [];
@@ -150,7 +110,7 @@ export function JobForm({
         setCategories(catData.data ?? []);
         setTechnologies(techData.data ?? []);
         setDepartments(deptData.data ?? []);
-        setClients((clientData.data ?? []).filter((c: ClientItem) => c.active));
+        setClients((clientData.data ?? []).filter((c: ClientItem) => c.status === "ACTIVE"));
       } catch (e) {
         console.error(e);
       } finally {
@@ -166,33 +126,6 @@ export function JobForm({
     if (defaults.clientId) setClientId(defaults.clientId);
     if (defaults.department) setDepartment(defaults.department.trim());
   }, [defaults.category, defaults.technology, defaults.department, defaults.clientId]);
-
-  useEffect(() => {
-    const raw = defaults.city?.trim() ?? "";
-    if (!raw) return;
-    const options = getCitiesForCountryCode(
-      jobLocationsFromDefaults(defaults).find((row) => row.countryCode.trim())?.countryCode ?? "",
-    );
-    if (options.includes(raw)) {
-      setCity(raw);
-      setCityOther("");
-      return;
-    }
-    setCity(OTHER_CITY_VALUE);
-    setCityOther(raw);
-  }, [defaults.city, defaults.locations]);
-
-  useEffect(() => {
-    if (!primaryCountryCode) {
-      setCity(ANY_CITY_VALUE);
-      setCityOther("");
-      return;
-    }
-    setCity((current) => {
-      if (current === OTHER_CITY_VALUE || current === ANY_CITY_VALUE) return current;
-      return cityOptions.includes(current) ? current : ANY_CITY_VALUE;
-    });
-  }, [primaryCountryCode, cityOptions]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -226,13 +159,6 @@ export function JobForm({
       return;
     }
 
-    const resolvedCity =
-      city === ANY_CITY_VALUE
-        ? null
-        : city === OTHER_CITY_VALUE
-          ? cityOther.trim() || null
-          : city.trim() || null;
-
     const formData = new FormData(e.currentTarget);
     const payload: Record<string, unknown> = {
       title: formData.get("title"),
@@ -248,9 +174,8 @@ export function JobForm({
       department,
       clientId,
       endClient: endClient.trim() || null,
-      city: resolvedCity,
       description,
-      order: parseInt(formData.get("order") as string, 10) || 0,
+      order: mode === "create" ? 0 : parseInt(formData.get("order") as string, 10) || 0,
       published: formData.get("published") === "on",
     };
     if (mode === "create") {
@@ -293,40 +218,6 @@ export function JobForm({
           inputClass={inputClass}
           labelClass={labelClass}
         />
-
-        <div>
-          <label className={labelClass}>City</label>
-          <select
-            value={city}
-            onChange={(e) => {
-              setCity(e.target.value);
-              if (e.target.value !== OTHER_CITY_VALUE) {
-                setCityOther("");
-              }
-            }}
-            disabled={!primaryCountryCode}
-            className={inputClass}
-          >
-            <option value={ANY_CITY_VALUE}>Any</option>
-            {cityOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-            <option value={OTHER_CITY_VALUE}>Other</option>
-          </select>
-          {city === OTHER_CITY_VALUE ? (
-            <input
-              value={cityOther}
-              onChange={(e) => setCityOther(e.target.value)}
-              className={`${inputClass} mt-2`}
-              placeholder="Enter city"
-            />
-          ) : null}
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Primary city for admin lists, based on the first country above.
-          </p>
-        </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
@@ -457,7 +348,7 @@ export function JobForm({
                 </select>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   Hiring organisation (admin only).{" "}
-                  <Link href="/clients" className="underline hover:text-gray-700 dark:hover:text-gray-300">
+                  <Link href="/clients/active" className="underline hover:text-gray-700 dark:hover:text-gray-300">
                     Manage clients
                   </Link>
                 </p>
@@ -497,16 +388,22 @@ export function JobForm({
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className={labelClass}>Display Order</label>
-            <input
-              name="order"
-              type="number"
-              defaultValue={defaults.order ?? 0}
-              className={inputClass}
-            />
-          </div>
-          <div className="flex items-center gap-3 pt-6">
+          {mode === "edit" ? (
+            <div>
+              <label className={labelClass}>Display Order</label>
+              <input
+                name="order"
+                type="number"
+                defaultValue={defaults.order ?? 0}
+                className={inputClass}
+              />
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500 dark:text-gray-400 sm:col-span-2">
+              Display order is assigned automatically when the job is created.
+            </p>
+          )}
+          <div className={`flex items-center gap-3 ${mode === "edit" ? "pt-6" : ""}`}>
             <input
               name="published"
               type="checkbox"

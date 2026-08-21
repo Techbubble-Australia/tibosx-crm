@@ -31,7 +31,7 @@ router.get("/stats", async (req, res) => {
         orderBy: [{ order: "asc" }, { title: "asc" }],
       }),
       prisma.client.findMany({
-        where: { active: true },
+        where: { status: "ACTIVE" },
         select: { id: true, name: true },
         orderBy: { name: "asc" },
       }),

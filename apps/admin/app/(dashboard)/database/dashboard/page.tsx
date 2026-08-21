@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { adminFetch } from "@/lib/admin-api";
 
 type DashboardStats = {
@@ -29,6 +30,7 @@ function BarChart({
   filterValue,
   filterOptions,
   onFilterChange,
+  getCountHref,
 }: {
   title: string;
   subtitle: string;
@@ -39,6 +41,7 @@ function BarChart({
   filterValue: string;
   filterOptions: Array<{ value: string; label: string }>;
   onFilterChange: (value: string) => void;
+  getCountHref?: (item: Record<string, string | number>) => string | undefined;
 }) {
   const maxCount = useMemo(() => {
     if (!items.length) return 1;
@@ -81,7 +84,15 @@ function BarChart({
                   style={{ width: `${(Number(item[countKey]) / maxCount) * 100}%` }}
                 />
               </div>
-              <span className="text-sm tabular-nums text-gray-600 dark:text-gray-400">{Number(item[countKey])}</span>
+              <span className="text-sm tabular-nums text-gray-600 dark:text-gray-400">
+                {getCountHref?.(item) ? (
+                  <Link href={getCountHref(item)!} className="font-medium text-blue-600 hover:underline dark:text-blue-400">
+                    {Number(item[countKey])}
+                  </Link>
+                ) : (
+                  Number(item[countKey])
+                )}
+              </span>
             </div>
           ))}
         </div>
@@ -169,6 +180,12 @@ export default function DatabaseDashboardPage() {
           filterValue={country}
           filterOptions={countryOptions}
           onFilterChange={setCountry}
+          getCountHref={(item) => {
+            const params = new URLSearchParams();
+            params.set("technology", String(item.technology));
+            if (country) params.set("country", country);
+            return `/database/profiles?${params.toString()}`;
+          }}
         />
         <BarChart
           title="Applications by active jobs"

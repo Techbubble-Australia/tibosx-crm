@@ -173,7 +173,7 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
       }
 
       if (!isCitizen && !visaStatus.trim()) {
-        throw new Error("Visa status is required when you are not an Australian citizen");
+        throw new Error("Visa status is required when you are not an Australian Citizen");
       }
 
       const jobListingId =
@@ -416,17 +416,17 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
             if (yes) setVisaStatus("");
           }}
           className={`${fieldClass} appearance-none`}
-          aria-label="Australian citizen"
+          aria-label="Australian Citizen"
         >
-          <option value="yes" className="bg-[#111111] text-white">Australian citizen? Yes</option>
-          <option value="no" className="bg-[#111111] text-white">Australian citizen? No</option>
+          <option value="yes" className="bg-[#111111] text-white">Australian Citizen? Yes</option>
+          <option value="no" className="bg-[#111111] text-white">Australian Citizen? No</option>
         </select>
         <input
           name="visaStatus"
           type="text"
           required={!isCitizen}
           readOnly={isCitizen}
-          value={isCitizen ? "Australian citizen / permanent resident" : visaStatus}
+          value={isCitizen ? "Australian Citizen / permanent resident" : visaStatus}
           onChange={(e) => setVisaStatus(e.target.value)}
           placeholder={isCitizen ? "" : "Visa status *"}
           className={`${fieldClass}${isCitizen ? " opacity-70" : ""}`}

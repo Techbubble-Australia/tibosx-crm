@@ -262,7 +262,18 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                       {job.clientName || "—"}
                     </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.technology || "—"}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.applicationCount ?? 0}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                      {(job.applicationCount ?? 0) > 0 ? (
+                        <Link
+                          href={`/career-applications/${listTab}?jobListingId=${encodeURIComponent(job.id)}`}
+                          className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                        >
+                          {job.applicationCount ?? 0}
+                        </Link>
+                      ) : (
+                        "0"
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -343,7 +354,17 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                     <div className="min-w-0">
                       <p className="font-medium text-gray-900 dark:text-gray-100">{job.title}</p>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {job.referenceNumber} · {job.city || "—"} · {job.country} · {job.applicationCount ?? 0} applications
+                        {job.referenceNumber} · {job.city || "—"} · {job.country} ·{" "}
+                        {(job.applicationCount ?? 0) > 0 ? (
+                          <Link
+                            href={`/career-applications/${listTab}?jobListingId=${encodeURIComponent(job.id)}`}
+                            className="text-blue-600 hover:underline dark:text-blue-400"
+                          >
+                            {job.applicationCount ?? 0} applications
+                          </Link>
+                        ) : (
+                          "0 applications"
+                        )}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
                         Client: {job.clientName || "—"}
