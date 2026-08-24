@@ -51,7 +51,7 @@ const careerSchema = z
     if (!data.isCitizen && !data.visaStatus?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Visa status is required when not an Australian Citizen",
+        message: "Visa status is required when not a citizen",
         path: ["visaStatus"],
       });
     }
@@ -294,6 +294,8 @@ router.get("/admin/applications", async (req, res) => {
             id: true,
             title: true,
             published: true,
+            country: true,
+            workMode: true,
             clientId: true,
             client: { select: { name: true } },
           },
@@ -307,6 +309,8 @@ router.get("/admin/applications", async (req, res) => {
         jobListingId: row.jobListingId,
         jobTitle: row.jobListing?.title ?? null,
         jobPublished: row.jobListing?.published ?? null,
+        jobCountry: row.jobListing?.country ?? null,
+        jobWorkMode: row.jobListing?.workMode ?? null,
         clientName: row.jobListing?.client?.name ?? null,
       })),
     });
@@ -331,6 +335,8 @@ router.patch("/admin/applications/:id", async (req, res) => {
             id: true,
             title: true,
             published: true,
+            country: true,
+            workMode: true,
             clientId: true,
             client: { select: { name: true } },
           },
@@ -343,6 +349,8 @@ router.patch("/admin/applications/:id", async (req, res) => {
         ...updated,
         jobTitle: updated.jobListing?.title ?? null,
         jobPublished: updated.jobListing?.published ?? null,
+        jobCountry: updated.jobListing?.country ?? null,
+        jobWorkMode: updated.jobListing?.workMode ?? null,
         clientName: updated.jobListing?.client?.name ?? null,
       },
     });

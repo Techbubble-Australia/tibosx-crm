@@ -41,6 +41,8 @@ interface CareerApplication {
   createdAt: string;
   jobTitle?: string | null;
   jobPublished?: boolean | null;
+  jobCountry?: string | null;
+  jobWorkMode?: string | null;
   clientName?: string | null;
 }
 
@@ -83,6 +85,8 @@ function applicationSearchHaystack(app: CareerApplication): string {
     app.visaStatus,
     app.message,
     app.jobTitle,
+    app.jobCountry,
+    app.jobWorkMode,
     app.clientName,
     app.status,
   ]);
@@ -117,8 +121,8 @@ function ApplicationCard({
   const salary = formatSalary(app);
   const docs = documentLinks(app);
   const location = formatLocation(app);
-  const status = (app.status as CareerApplicationStatus) || "CLIENT_REVIEW";
-  const statusColors = CAREER_APPLICATION_STATUS_COLORS[status] ?? CAREER_APPLICATION_STATUS_COLORS.CLIENT_REVIEW;
+  const status = (app.status as CareerApplicationStatus) || "INTERNAL_REVIEW";
+  const statusColors = CAREER_APPLICATION_STATUS_COLORS[status] ?? CAREER_APPLICATION_STATUS_COLORS.INTERNAL_REVIEW;
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
@@ -160,6 +164,8 @@ function ApplicationCard({
             </a>
             {app.phone ? <span>{app.phone}</span> : null}
             {location ? <span>{location}</span> : null}
+            {app.jobCountry ? <span>Job country: {app.jobCountry}</span> : null}
+            {app.jobWorkMode ? <span>{app.jobWorkMode}</span> : null}
             {app.isCitizen === false && app.visaStatus ? <span>Visa: {app.visaStatus}</span> : null}
             {app.isCitizen !== false ? <span>Citizen: Yes</span> : null}
             {salary ? <span>Salary: {salary}</span> : null}
@@ -218,6 +224,34 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>("card");
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
   const [filteredJobTitle, setFilteredJobTitle] = useState("");
+  const [filterCountry, setFilterCountry] = useState("");
+  const [filterWorkMode, setFilterWorkMode] = useState("");
+  const [filterClient, setFilterClient] = useState("");
+
+  const filteredByJobMeta = useMemo(() => {
+    return applications.filter((app) => {
+      if (filterCountry && app.jobCountry !== filterCountry) return false;
+      if (filterWorkMode && app.jobWorkMode !== filterWorkMode) return false;
+      if (filterClient && app.clientName !== filterClient) return false;
+      return true;
+    });
+  }, [applications, filterCountry, filterWorkMode, filterClient]);
+
+  const filterOptions = useMemo(() => {
+    const countries = new Set<string>();
+    const workModes = new Set<string>();
+    const clients = new Set<string>();
+    for (const app of applications) {
+      if (app.jobCountry) countries.add(app.jobCountry);
+      if (app.jobWorkMode) workModes.add(app.jobWorkMode);
+      if (app.clientName) clients.add(app.clientName);
+    }
+    return {
+      countries: [...countries].sort((a, b) => a.localeCompare(b)),
+      workModes: [...workModes].sort((a, b) => a.localeCompare(b)),
+      clients: [...clients].sort((a, b) => a.localeCompare(b)),
+    };
+  }, [applications]);
 
   const {
     search,
@@ -230,7 +264,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
     totalItems,
     totalSourceItems,
     adjustPageAfterDelete,
-  } = useListView(applications, applicationSearchHaystack);
+  } = useListView(filteredByJobMeta, applicationSearchHaystack);
 
   useEffect(() => {
     void fetchApplications();
@@ -294,14 +328,29 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
   }
 
   const groupedByJob = useMemo(() => {
-    const map = new Map<string, { label: string; items: CareerApplication[] }>();
+    const map = new Map<
+      string,
+      {
+        label: string;
+        country: string | null;
+        workMode: string | null;
+        clientName: string | null;
+        items: CareerApplication[];
+      }
+    >();
     for (const app of paginated) {
       const key = jobGroupKey(app);
       const existing = map.get(key);
       if (existing) {
         existing.items.push(app);
       } else {
-        map.set(key, { label: jobGroupLabel(app), items: [app] });
+        map.set(key, {
+          label: jobGroupLabel(app),
+          country: app.jobCountry ?? null,
+          workMode: app.jobWorkMode ?? null,
+          clientName: app.clientName ?? null,
+          items: [app],
+        });
       }
     }
     return [...map.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label));
@@ -333,7 +382,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Career Applications</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {jobPublished ? "Applications for active (published) jobs" : "Applications for inactive jobs"} —{" "}
-            {totalSourceItems} submission{totalSourceItems !== 1 ? "s" : ""}
+            {filteredByJobMeta.length} submission{filteredByJobMeta.length !== 1 ? "s" : ""}
           </p>
           {jobListingId && filteredJobTitle ? (
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
@@ -353,12 +402,61 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
         onChange={setSearch}
         placeholder="Search by name, email, position, location…"
         filteredCount={totalItems}
-        totalCount={totalSourceItems}
+        totalCount={filteredByJobMeta.length}
       />
+
+      <div className="mb-6 flex flex-wrap gap-3">
+        <select
+          value={filterCountry}
+          onChange={(e) => {
+            setFilterCountry(e.target.value);
+            setPage(1);
+          }}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          aria-label="Filter by country"
+        >
+          <option value="">All countries</option>
+          {filterOptions.countries.map((country) => (
+            <option key={country} value={country}>{country}</option>
+          ))}
+        </select>
+        <select
+          value={filterWorkMode}
+          onChange={(e) => {
+            setFilterWorkMode(e.target.value);
+            setPage(1);
+          }}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          aria-label="Filter by employment type"
+        >
+          <option value="">All employment types</option>
+          {filterOptions.workModes.map((mode) => (
+            <option key={mode} value={mode}>{mode}</option>
+          ))}
+        </select>
+        <select
+          value={filterClient}
+          onChange={(e) => {
+            setFilterClient(e.target.value);
+            setPage(1);
+          }}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          aria-label="Filter by client"
+        >
+          <option value="">All clients</option>
+          {filterOptions.clients.map((client) => (
+            <option key={client} value={client}>{client}</option>
+          ))}
+        </select>
+      </div>
 
       {applications.length === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-gray-400 dark:border-gray-700 dark:bg-gray-900">
           No applications in this tab yet.
+        </div>
+      ) : filteredByJobMeta.length === 0 ? (
+        <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-gray-400 dark:border-gray-700 dark:bg-gray-900">
+          No applications match your filters.
         </div>
       ) : totalItems === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-gray-400 dark:border-gray-700 dark:bg-gray-900">
@@ -393,7 +491,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
                   aria-expanded={isExpanded}
                   aria-controls={panelId}
                 >
-                  <span className="flex min-w-0 items-center gap-2">
+                  <span className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
                     <ChevronDown
                       className={`h-4 w-4 shrink-0 text-gray-500 transition-transform dark:text-gray-400 ${
                         isExpanded ? "rotate-180" : ""
@@ -401,6 +499,11 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
                       aria-hidden
                     />
                     <h3 className="truncate font-semibold text-gray-900 dark:text-gray-100">{group.label}</h3>
+                    <span className="hidden min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 sm:flex dark:text-gray-400">
+                      {group.country ? <span>{group.country}</span> : null}
+                      {group.workMode ? <span>{group.workMode}</span> : null}
+                      {group.clientName ? <span>{group.clientName}</span> : null}
+                    </span>
                   </span>
                   <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
                     {group.items.length}

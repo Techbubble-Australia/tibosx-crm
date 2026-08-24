@@ -1,0 +1,1 @@
+ALTER TABLE "CareerApplication" ALTER COLUMN "status" SET DEFAULT 'INTERNAL_REVIEW';

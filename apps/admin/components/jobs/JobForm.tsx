@@ -138,7 +138,7 @@ export function JobForm({
     const duplicateCountry = countryCodes.find((code, index) => countryCodes.indexOf(code) !== index);
     if (duplicateCountry) {
       alert(
-        "Each country should appear only once. Remove the duplicate row and select all cities for that country in a single row.",
+        "Each country should appear only once. Remove the duplicate country row.",
       );
       return;
     }

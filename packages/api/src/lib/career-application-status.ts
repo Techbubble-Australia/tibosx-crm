@@ -1,4 +1,5 @@
 export const CAREER_APPLICATION_STATUSES = [
+  "INTERNAL_REVIEW",
   "CLIENT_REVIEW",
   "INTERVIEW_SCHEDULED",
   "SELECTED",
@@ -9,6 +10,7 @@ export const CAREER_APPLICATION_STATUSES = [
 export type CareerApplicationStatus = (typeof CAREER_APPLICATION_STATUSES)[number];
 
 export const CAREER_APPLICATION_STATUS_LABELS: Record<CareerApplicationStatus, string> = {
+  INTERNAL_REVIEW: "Internal Review",
   CLIENT_REVIEW: "Client Review",
   INTERVIEW_SCHEDULED: "Interview Scheduled",
   SELECTED: "Selected",
@@ -20,6 +22,12 @@ export const CAREER_APPLICATION_STATUS_COLORS: Record<
   CareerApplicationStatus,
   { bg: string; text: string; darkBg: string; darkText: string }
 > = {
+  INTERNAL_REVIEW: {
+    bg: "bg-gray-100",
+    text: "text-gray-700",
+    darkBg: "dark:bg-gray-800",
+    darkText: "dark:text-gray-300",
+  },
   CLIENT_REVIEW: {
     bg: "bg-gray-100",
     text: "text-gray-700",

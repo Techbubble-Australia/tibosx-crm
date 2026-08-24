@@ -29,6 +29,7 @@ interface JobListing {
   applicationCount: number;
   clientName?: string;
   isHot?: boolean;
+  order?: number;
   createdAt: string;
 }
 
@@ -79,6 +80,7 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
     totalSourceItems,
   } = useListView(filteredJobs, jobSearchHaystack);
   const [selectedTechnology, setSelectedTechnology] = useState<string | null>(null);
+  const [orderDrafts, setOrderDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setSelectedTechnology(null);
@@ -126,6 +128,38 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
       }
     } catch (error) {
       console.error("Error toggling hot status:", error);
+    }
+  }
+
+  async function saveOrder(job: JobListing) {
+    if (!canManageJobs) return;
+    const raw = orderDrafts[job.id] ?? String(job.order ?? 0);
+    const order = Number.parseInt(raw, 10);
+    if (Number.isNaN(order)) return;
+    if (order === job.order) {
+      setOrderDrafts((prev) => {
+        const next = { ...prev };
+        delete next[job.id];
+        return next;
+      });
+      return;
+    }
+    try {
+      const res = await adminFetch(`/api/admin/jobs/admin/${job.id}/order`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order }),
+      });
+      if (res.ok) {
+        setJobs((prev) => prev.map((j) => (j.id === job.id ? { ...j, order } : j)));
+        setOrderDrafts((prev) => {
+          const next = { ...prev };
+          delete next[job.id];
+          return next;
+        });
+      }
+    } catch (error) {
+      console.error("Error updating job order:", error);
     }
   }
 
@@ -198,6 +232,7 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
             <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
               <tr>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Ref</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Order</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Title</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Hot</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">City</th>
@@ -212,13 +247,13 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {filteredJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={11} className="px-4 py-8 text-center text-gray-400">
                     No {publishedFilter ? "active" : "inactive"} job listings.
                   </td>
                 </tr>
               ) : totalItems === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={11} className="px-4 py-8 text-center text-gray-400">
                     No listings match your search.
                   </td>
                 </tr>
@@ -226,6 +261,22 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                 paginatedJobs.map((job) => (
                   <tr key={job.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                     <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">{job.referenceNumber}</td>
+                    <td className="px-4 py-3">
+                      {canManageJobs ? (
+                        <input
+                          type="number"
+                          value={orderDrafts[job.id] ?? String(job.order ?? 0)}
+                          onChange={(e) =>
+                            setOrderDrafts((prev) => ({ ...prev, [job.id]: e.target.value }))
+                          }
+                          onBlur={() => void saveOrder(job)}
+                          className="w-16 rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                          aria-label={`Order for ${job.title}`}
+                        />
+                      ) : (
+                        <span className="text-gray-600 dark:text-gray-400">{job.order ?? 0}</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{job.title}</td>
                     <td className="px-4 py-3">
                       {canManageJobs ? (

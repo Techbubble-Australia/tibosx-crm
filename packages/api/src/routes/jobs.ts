@@ -97,6 +97,28 @@ router.patch("/admin/:id/hot", async (req, res) => {
   }
 });
 
+router.patch("/admin/:id/order", async (req, res) => {
+  try {
+    const body = z.object({ order: z.number().int() }).parse(req.body);
+    const existing = await prisma.jobListing.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    const job = await prisma.jobListing.update({
+      where: { id: req.params.id },
+      data: { order: body.order },
+      include: { client: { select: { name: true } } },
+    });
+    res.json({ data: serializeAdminJob(job) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error updating job order:", error);
+    res.status(500).json({ error: "Failed to update job" });
+  }
+});
+
 function serializePublicJob(job: JobListing) {
   const locations = normalizeJobLocations(job);
   const legacy = syncLegacyLocationFields(locations);

@@ -183,7 +183,7 @@ model CareerApplication {
   /// Australian citizen / permanent resident (default yes on website apply form).
   isCitizen         Boolean           @default(true)
   /// Pipeline status for recruiter tracking.
-  status            String            @default("CLIENT_REVIEW")
+  status            String            @default("INTERNAL_REVIEW")
   profile           CandidateProfile?
   createdAt         DateTime          @default(now())
 }

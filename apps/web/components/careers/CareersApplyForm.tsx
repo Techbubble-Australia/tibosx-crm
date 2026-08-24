@@ -173,7 +173,7 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
       }
 
       if (!isCitizen && !visaStatus.trim()) {
-        throw new Error("Visa status is required when you are not an Australian Citizen");
+        throw new Error("Visa status is required when you are not a citizen");
       }
 
       const jobListingId =
@@ -310,44 +310,6 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
         ))}
       </select>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <select
-          name="salaryCurrency"
-          required
-          defaultValue="AUD"
-          className={`${fieldClass} appearance-none`}
-        >
-          <option value="" disabled className="bg-[#111111] text-white/60">
-            Currency *
-          </option>
-          {SALARY_CURRENCIES.map((c) => (
-            <option key={c.code} value={c.code} className="bg-[#111111] text-white">
-              {c.label}
-            </option>
-          ))}
-        </select>
-        <input
-          name="salaryRate"
-          type="text"
-          required
-          inputMode="numeric"
-          value={salaryRateInput}
-          onChange={(e) => setSalaryRateInput(formatSalaryRateDisplay(e.target.value))}
-          placeholder="Rate *"
-          className={fieldClass}
-        />
-        <select name="salaryMode" required className={`${fieldClass} appearance-none`}>
-          <option value="" disabled className="bg-[#111111] text-white/60">
-            Mode *
-          </option>
-          {SALARY_MODES.map((mode) => (
-            <option key={mode} value={mode} className="bg-[#111111] text-white">
-              {mode}
-            </option>
-          ))}
-        </select>
-      </div>
-
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <select
           required
@@ -406,6 +368,44 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
         />
       ) : null}
 
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <select
+          name="salaryCurrency"
+          required
+          defaultValue="AUD"
+          className={`${fieldClass} appearance-none`}
+        >
+          <option value="" disabled className="bg-[#111111] text-white/60">
+            Currency *
+          </option>
+          {SALARY_CURRENCIES.map((c) => (
+            <option key={c.code} value={c.code} className="bg-[#111111] text-white">
+              {c.label}
+            </option>
+          ))}
+        </select>
+        <input
+          name="salaryRate"
+          type="text"
+          required
+          inputMode="numeric"
+          value={salaryRateInput}
+          onChange={(e) => setSalaryRateInput(formatSalaryRateDisplay(e.target.value))}
+          placeholder="Rate *"
+          className={fieldClass}
+        />
+        <select name="salaryMode" required className={`${fieldClass} appearance-none`}>
+          <option value="" disabled className="bg-[#111111] text-white/60">
+            Mode *
+          </option>
+          {SALARY_MODES.map((mode) => (
+            <option key={mode} value={mode} className="bg-[#111111] text-white">
+              {mode}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <select
           required
@@ -416,17 +416,17 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
             if (yes) setVisaStatus("");
           }}
           className={`${fieldClass} appearance-none`}
-          aria-label="Australian Citizen"
+          aria-label="Citizen"
         >
-          <option value="yes" className="bg-[#111111] text-white">Australian Citizen? Yes</option>
-          <option value="no" className="bg-[#111111] text-white">Australian Citizen? No</option>
+          <option value="yes" className="bg-[#111111] text-white">Citizen — Yes</option>
+          <option value="no" className="bg-[#111111] text-white">Citizen — No</option>
         </select>
         <input
           name="visaStatus"
           type="text"
           required={!isCitizen}
           readOnly={isCitizen}
-          value={isCitizen ? "Australian Citizen / permanent resident" : visaStatus}
+          value={isCitizen ? "Citizen / permanent resident" : visaStatus}
           onChange={(e) => setVisaStatus(e.target.value)}
           placeholder={isCitizen ? "" : "Visa status *"}
           className={`${fieldClass}${isCitizen ? " opacity-70" : ""}`}

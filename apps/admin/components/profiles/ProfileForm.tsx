@@ -336,7 +336,7 @@ export function ProfileForm({
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className={labelClass}>Australian Citizen? *</label>
+            <label className={labelClass}>Citizen *</label>
             <select
               value={isCitizen ? "yes" : "no"}
               onChange={(e) => {
@@ -354,7 +354,7 @@ export function ProfileForm({
             <label className={labelClass}>Visa status {isCitizen ? "" : "*"}</label>
             <input
               type="text"
-              value={isCitizen ? "Australian Citizen / permanent resident" : visaStatus}
+              value={isCitizen ? "Citizen / permanent resident" : visaStatus}
               onChange={(e) => setVisaStatus(e.target.value)}
               readOnly={isCitizen}
               required={!isCitizen}
