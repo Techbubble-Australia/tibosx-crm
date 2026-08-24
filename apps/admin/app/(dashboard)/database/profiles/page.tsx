@@ -12,6 +12,7 @@ import { useListView } from "@/hooks/useListView";
 import { buildSearchHaystack } from "@/lib/search-text";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { ProfilesListTable, type ProfileListRow } from "@/components/profiles/ProfilesListTable";
+import { exportProfilesAsExcel } from "@/lib/export-profiles-excel";
 
 interface ProfileRow extends ProfileListRow {
   duplicateCount?: number;
@@ -118,6 +119,7 @@ function ProfilesPageInner() {
   const [citizenFilter, setCitizenFilter] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("technology");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 
   const dimensionFiltered = useMemo(() => {
     return rows.filter((row) => {
@@ -144,6 +146,7 @@ function ProfilesPageInner() {
     filtered,
     totalItems,
     totalSourceItems,
+    pageSizeOptions,
   } = useListView(dimensionFiltered, (row) =>
     buildSearchHaystack([
       row.firstName,
@@ -158,7 +161,11 @@ function ProfilesPageInner() {
       row.mode,
       row.isCitizen ? "citizen yes" : "citizen no",
     ]),
-    { initialPageSize: 100 },
+    {
+      initialPageSize: 50,
+      pageSizeStorageKey: "tbos:profiles-page-size",
+      pageSizeOptions: [25, 50, 100],
+    },
   );
 
   useEffect(() => {
@@ -214,10 +221,41 @@ function ProfilesPageInner() {
       const res = await adminFetch(`/api/admin/profiles/${id}`, { method: "DELETE" });
       if (res.ok) {
         setRows((prev) => prev.filter((row) => row.id !== id));
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
       }
     } catch (error) {
       console.error("Error deleting profile:", error);
     }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll(ids: string[], selected: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (selected) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }
+
+  function handleExportExcel() {
+    const selected = rows.filter((row) => selectedIds.has(row.id));
+    if (selected.length === 0) return;
+    exportProfilesAsExcel(selected);
   }
 
   const [expandedTechnologies, setExpandedTechnologies] = useState<Set<string>>(() => new Set());
@@ -316,6 +354,16 @@ function ProfilesPageInner() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+          {viewMode === "list" ? (
+            <button
+              type="button"
+              disabled={selectedIds.size === 0}
+              onClick={handleExportExcel}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
+            >
+              Export as Excel
+            </button>
+          ) : null}
           <Link
             href="/database/profiles/new"
             className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
@@ -410,6 +458,9 @@ function ProfilesPageInner() {
               canManageProfileOwnership={canManageProfileOwnership}
               sourcers={sourcers}
               technologies={technologies}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              onToggleSelectAll={toggleSelectAll}
               onRowUpdated={handleRowUpdated}
               onDelete={(id) => void deleteRow(id)}
             />
@@ -421,7 +472,7 @@ function ProfilesPageInner() {
               totalItems={totalItems}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
-              pageSizeOptions={[100, 200, 500]}
+              pageSizeOptions={pageSizeOptions}
             />
           ) : null}
         </div>
@@ -527,7 +578,7 @@ function ProfilesPageInner() {
               totalItems={totalItems}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
-              pageSizeOptions={[100, 200, 500]}
+              pageSizeOptions={pageSizeOptions}
             />
           ) : null}
         </div>

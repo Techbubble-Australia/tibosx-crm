@@ -23,7 +23,8 @@ export default function NewProfilePage() {
         const err = await res.json().catch(() => ({}));
         throw new Error((err as { error?: string }).error || "Failed to create profile");
       }
-      router.push("/database/profiles");
+      const data = await res.json();
+      router.push(`/database/profiles/${data.data.id}`);
     } finally {
       setIsLoading(false);
     }

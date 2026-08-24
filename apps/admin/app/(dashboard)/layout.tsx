@@ -26,6 +26,8 @@ import {
   Building,
   Target,
   ClipboardList,
+  PanelLeftClose,
+  PanelLeft,
 } from "lucide-react";
 import { AdminSessionProvider, useAdminSession } from "@/contexts/AdminSessionContext";
 import { MfaEnrollmentGuard } from "@/components/MfaEnrollmentGuard";
@@ -33,6 +35,7 @@ import { TechBubbleLogo } from "@/components/TechBubbleLogo";
 import { InactivityLogout } from "@/components/InactivityLogout";
 import { roleLabel } from "@/lib/admin-roles";
 import { isCareerApplicationsPath, isJobListingsPath } from "@/lib/job-routes";
+import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 
 type NavItem = {
   href: string;
@@ -151,6 +154,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { role, email, loading } = useAdminSession();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const { collapsed: sidebarCollapsed, toggle: toggleSidebar } = useSidebarCollapsed();
 
   useEffect(() => {
     setOpenGroups((prev) => {
@@ -181,13 +185,30 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="flex w-64 shrink-0 flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-        <div className="min-w-0 p-6">
-          <Link href="/database/dashboard" className="flex min-w-0 items-center gap-2">
-            <TechBubbleLogo />
-          </Link>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">TechBubble Business Operating System</p>
-          {!loading && email ? (
+      <aside
+        className={`flex shrink-0 flex-col border-r border-gray-200 bg-white transition-[width] duration-200 dark:border-gray-700 dark:bg-gray-900 ${
+          sidebarCollapsed ? "w-[4.5rem]" : "w-64"
+        }`}
+      >
+        <div className={`min-w-0 p-4 ${sidebarCollapsed ? "px-2" : "p-6"}`}>
+          <div className="flex items-center justify-between gap-2">
+            <Link href="/database/dashboard" className="flex min-w-0 items-center gap-2">
+              <TechBubbleLogo compact={sidebarCollapsed} />
+            </Link>
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+              aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
+              title={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
+            >
+              {sidebarCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+            </button>
+          </div>
+          {!sidebarCollapsed ? (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">TechBubble Business Operating System</p>
+          ) : null}
+          {!loading && email && !sidebarCollapsed ? (
             <div className="mt-3 min-w-0 space-y-1 border-t border-gray-100 pt-3 dark:border-gray-800">
               <p className="truncate text-xs text-gray-500 dark:text-gray-400" title={email}>
                 {email}
@@ -197,8 +218,32 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
           ) : null}
         </div>
 
-        <nav className="flex-1 space-y-1 px-3">
-          {visibleGroups.map((group) => {
+        <nav className="flex-1 space-y-1 px-2">
+          {sidebarCollapsed ? (
+            <div className="space-y-1">
+              {visibleGroups.flatMap((group) =>
+                group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = navItemIsActive(item, pathname);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      title={item.label}
+                      className={`flex items-center justify-center rounded-lg p-2.5 transition-colors ${
+                        isActive
+                          ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                    </Link>
+                  );
+                }),
+              )}
+            </div>
+          ) : (
+            visibleGroups.map((group) => {
             const GroupIcon = group.icon;
             const isOpen = openGroups[group.id] ?? false;
             const groupActive = groupIsActive(group, pathname);
@@ -246,10 +291,11 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
                 ) : null}
               </div>
             );
-          })}
+          })
+          )}
         </nav>
 
-        <div className="border-t border-gray-200 p-4 dark:border-gray-700">
+        <div className={`border-t border-gray-200 dark:border-gray-700 ${sidebarCollapsed ? "p-2" : "p-4"}`}>
           <button
             type="button"
             onClick={() => {
@@ -257,16 +303,19 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
                 window.location.href = "/login";
               });
             }}
-            className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+            className={`flex w-full items-center rounded-lg text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100 ${
+              sidebarCollapsed ? "justify-center p-2.5" : "gap-3 px-4 py-3"
+            }`}
+            title="Logout"
           >
             <LogOut className="h-4 w-4 shrink-0" />
-            <span>Logout</span>
+            {!sidebarCollapsed ? <span>Logout</span> : null}
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 bg-gray-50 dark:bg-gray-950">
-        <header className="border-b border-gray-200 bg-white px-8 py-4 dark:border-gray-700 dark:bg-gray-900">
+      <main className="min-w-0 flex-1 bg-gray-50 dark:bg-gray-950">
+        <header className="border-b border-gray-200 bg-white px-6 py-4 dark:border-gray-700 dark:bg-gray-900 lg:px-8">
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{headerTitle(pathname)}</h1>
         </header>
         <div className="p-8">{children}</div>

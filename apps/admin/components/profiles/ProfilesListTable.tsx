@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { Edit, Trash2, Info, FileText } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { resolveDocumentHref } from "@/lib/media-url";
@@ -36,6 +37,9 @@ type Props = {
   canManageProfileOwnership: boolean;
   sourcers: SourcerOption[];
   technologies: TechnologyOption[];
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  onToggleSelectAll: (ids: string[], selected: boolean) => void;
   onRowUpdated: (row: ProfileListRow) => void;
   onDelete: (id: string) => void;
 };
@@ -62,10 +66,15 @@ export function ProfilesListTable({
   canManageProfileOwnership,
   sourcers,
   technologies,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
   onRowUpdated,
   onDelete,
 }: Props) {
   const countryOptions = getSortedCountryOptions();
+  const [editingSourcedById, setEditingSourcedById] = useState<string | null>(null);
+  const allSelected = rows.length > 0 && rows.every((row) => selectedIds.has(row.id));
 
   async function patchField(id: string, patch: Record<string, unknown>) {
     try {
@@ -87,6 +96,15 @@ export function ProfilesListTable({
     <table className="w-full text-sm">
       <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
         <tr>
+          <th className="w-10 px-2 py-3">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={(e) => onToggleSelectAll(rows.map((r) => r.id), e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+              aria-label="Select all profiles on this page"
+            />
+          </th>
           <th className="px-3 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Name</th>
           <th className="px-3 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Citizen</th>
           <th className="px-3 py-3 text-left font-medium text-gray-600 dark:text-gray-300">City</th>
@@ -108,9 +126,19 @@ export function ProfilesListTable({
           ]
             .filter(Boolean)
             .join("\n");
+          const isEditingSourcedBy = editingSourcedById === row.id;
 
           return (
             <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+              <td className="px-2 py-2">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(row.id)}
+                  onChange={() => onToggleSelect(row.id)}
+                  className="h-4 w-4 rounded border-gray-300"
+                  aria-label={`Select ${row.firstName} ${row.lastName}`}
+                />
+              </td>
               <td className="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="group relative">
@@ -188,17 +216,33 @@ export function ProfilesListTable({
               <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{formatRate(row)}</td>
               <td className="px-3 py-2">
                 {canManageProfileOwnership ? (
-                  <select
-                    value={row.sourcedById ?? ""}
-                    onChange={(e) => void patchField(row.id, { sourcedById: e.target.value || null })}
-                    className={inlineSelectClass}
-                    aria-label={`Sourced by for ${row.firstName}`}
-                  >
-                    <option value="">—</option>
-                    {sourcers.map((s) => (
-                      <option key={s.id} value={s.id}>{s.label}</option>
-                    ))}
-                  </select>
+                  isEditingSourcedBy ? (
+                    <select
+                      value={row.sourcedById ?? ""}
+                      autoFocus
+                      onChange={(e) => {
+                        void patchField(row.id, { sourcedById: e.target.value || null });
+                        setEditingSourcedById(null);
+                      }}
+                      onBlur={() => setEditingSourcedById(null)}
+                      className={inlineSelectClass}
+                      aria-label={`Sourced by for ${row.firstName}`}
+                    >
+                      <option value="">—</option>
+                      {sourcers.map((s) => (
+                        <option key={s.id} value={s.id}>{s.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <button
+                      type="button"
+                      onDoubleClick={() => setEditingSourcedById(row.id)}
+                      className="w-full rounded border border-transparent px-1 py-0.5 text-left text-xs text-gray-600 hover:border-gray-200 hover:bg-gray-50 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:bg-gray-800/50"
+                      title="Double-click to change"
+                    >
+                      {row.sourcedByName || "—"}
+                    </button>
+                  )
                 ) : (
                   <span className="text-xs text-gray-600 dark:text-gray-400">{row.sourcedByName || "—"}</span>
                 )}

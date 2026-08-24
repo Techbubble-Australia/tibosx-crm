@@ -42,6 +42,8 @@ export type ProfileFormValues = {
   isDuplicate?: boolean;
   duplicateCount?: number;
   duplicateMatchReason?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 type TaxonomyItem = { id: string; name: string };
@@ -591,6 +593,37 @@ export function ProfileForm({
           placeholder="Optional notes about the candidate"
         />
       </section>
+
+      {mode === "edit" && defaults.createdAt ? (
+        <section className="grid grid-cols-1 gap-4 rounded-xl border border-gray-200 bg-gray-50/80 p-6 sm:grid-cols-2 dark:border-gray-700 dark:bg-gray-800/40">
+          <div>
+            <label className={labelClass}>Created on</label>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              {new Date(defaults.createdAt).toLocaleString("en-AU", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
+          </div>
+          <div>
+            <label className={labelClass}>Updated on</label>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              {defaults.updatedAt
+                ? new Date(defaults.updatedAt).toLocaleString("en-AU", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "—"}
+            </p>
+          </div>
+        </section>
+      ) : null}
 
       {error ? (
         <p className="text-sm text-red-600 dark:text-red-400" role="alert">{error}</p>

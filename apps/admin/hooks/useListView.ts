@@ -3,10 +3,29 @@ import { matchesSearch } from "@/lib/search-text";
 
 type UseListViewOptions = {
   initialPageSize?: number;
+  pageSizeStorageKey?: string;
+  pageSizeOptions?: number[];
 };
 
+function readStoredPageSize(key: string, fallback: number, allowed: number[]): number {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = Number(raw);
+    if (allowed.includes(parsed)) return parsed;
+  } catch {
+    // ignore
+  }
+  return fallback;
+}
+
 export function useListView<T>(items: T[], getHaystack: (item: T) => string, options?: UseListViewOptions) {
-  const initialPageSize = options?.initialPageSize ?? 10;
+  const pageSizeOptions = options?.pageSizeOptions ?? [10, 25, 50, 100, 200];
+  const defaultPageSize = options?.initialPageSize ?? 10;
+  const initialPageSize = options?.pageSizeStorageKey
+    ? readStoredPageSize(options.pageSizeStorageKey, defaultPageSize, pageSizeOptions)
+    : defaultPageSize;
   const [search, setSearchState] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSizeState] = useState(initialPageSize);
@@ -38,6 +57,13 @@ export function useListView<T>(items: T[], getHaystack: (item: T) => string, opt
 
   function setPageSize(size: number) {
     setPageSizeState(size);
+    if (options?.pageSizeStorageKey) {
+      try {
+        localStorage.setItem(options.pageSizeStorageKey, String(size));
+      } catch {
+        // ignore
+      }
+    }
     setPage(1);
   }
 
@@ -60,5 +86,6 @@ export function useListView<T>(items: T[], getHaystack: (item: T) => string, opt
     totalItems: filtered.length,
     totalSourceItems: items.length,
     adjustPageAfterDelete,
+    pageSizeOptions,
   };
 }

@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { ProfileForm, type ProfileFormValues } from "@/components/profiles/ProfileForm";
 
 export default function EditProfilePage() {
-  const router = useRouter();
   const params = useParams();
   const id = params.id as string;
   const [isLoading, setIsLoading] = useState(false);
@@ -42,7 +41,8 @@ export default function EditProfilePage() {
         const err = await res.json().catch(() => ({}));
         throw new Error((err as { error?: string }).error || "Failed to update profile");
       }
-      router.push("/database/profiles");
+      const data = await res.json();
+      setDefaults(data.data);
     } finally {
       setIsLoading(false);
     }
@@ -74,6 +74,7 @@ export default function EditProfilePage() {
         </div>
       </div>
       <ProfileForm
+        key={`${id}-${defaults.updatedAt ?? ""}`}
         mode="edit"
         defaults={defaults}
         onSubmit={handleSubmit}
