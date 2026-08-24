@@ -7,6 +7,7 @@ import { HtmlEditor } from "@/components/HtmlEditor";
 import { JobLocationsField } from "@/components/jobs/JobLocationsField";
 import { adminFetch } from "@/lib/admin-api";
 import { jobLocationsFromDefaults, type JobLocationEntry } from "@/lib/job-locations";
+import { PROFILE_LEVELS, DEFAULT_PROFILE_LEVEL } from "@/lib/profile-levels";
 
 export type JobFormDefaults = {
   id?: string;
@@ -27,6 +28,8 @@ export type JobFormDefaults = {
   locations?: JobLocationEntry[];
   city?: string | null;
   endClient?: string | null;
+  level?: string;
+  publishedDate?: string | null;
 };
 
 type TaxonomyItem = { id: string; name: string };
@@ -76,6 +79,7 @@ export function JobForm({
   const [department, setDepartment] = useState(defaults.department?.trim() ?? "");
   const [clientId, setClientId] = useState(defaults.clientId ?? "");
   const [endClient, setEndClient] = useState(defaults.endClient ?? "");
+  const [level, setLevel] = useState(defaults.level ?? DEFAULT_PROFILE_LEVEL);
 
   const filteredTechnologies = useMemo(() => {
     if (!category) return [];
@@ -174,6 +178,7 @@ export function JobForm({
       department,
       clientId,
       endClient: endClient.trim() || null,
+      level,
       description,
       order: mode === "create" ? 0 : parseInt(formData.get("order") as string, 10) || 0,
       published: formData.get("published") === "on",
@@ -237,6 +242,31 @@ export function JobForm({
               <option value="Onsite">Onsite</option>
             </select>
           </div>
+          <div>
+            <label className={labelClass}>Level *</label>
+            <select
+              required
+              value={level}
+              onChange={(e) => setLevel(e.target.value)}
+              className={inputClass}
+            >
+              {PROFILE_LEVELS.map((lvl) => (
+                <option key={lvl} value={lvl}>{lvl}</option>
+              ))}
+            </select>
+          </div>
+          {mode === "edit" && defaults.publishedDate ? (
+            <div>
+              <label className={labelClass}>Published date</label>
+              <p className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
+                {new Date(defaults.publishedDate).toLocaleDateString("en-AU", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </p>
+            </div>
+          ) : null}
         </div>
 
         {taxonomyReady ? (

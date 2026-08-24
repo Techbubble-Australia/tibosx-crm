@@ -15,6 +15,7 @@ import { getSortedCountryOptions } from "@/lib/country-flags";
 import { getCitiesForCountryCode } from "@/lib/country-cities";
 import { resolveDocumentFileName, resolveDocumentHref } from "@/lib/media-url";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { PROFILE_LEVELS, DEFAULT_PROFILE_LEVEL } from "@/lib/profile-levels";
 
 const OTHER_CITY_VALUE = "__other__";
 
@@ -39,6 +40,8 @@ export type ProfileFormValues = {
   jobListingId?: string | null;
   isCitizen?: boolean;
   visaStatus?: string | null;
+  level?: string;
+  relevantExperience?: number;
   isDuplicate?: boolean;
   duplicateCount?: number;
   duplicateMatchReason?: string | null;
@@ -96,6 +99,10 @@ export function ProfileForm({
     defaults.previousSalary ? formatSalaryRateDisplay(String(defaults.previousSalary)) : "",
   );
   const [comments, setComments] = useState(defaults.comments ?? "");
+  const [level, setLevel] = useState(defaults.level ?? DEFAULT_PROFILE_LEVEL);
+  const [relevantExperienceInput, setRelevantExperienceInput] = useState(
+    String(defaults.relevantExperience ?? 0),
+  );
   const [isCitizen, setIsCitizen] = useState(defaults.isCitizen !== false);
   const [visaStatus, setVisaStatus] = useState(defaults.visaStatus ?? "");
   const [sourcedById, setSourcedById] = useState(defaults.sourcedById ?? "");
@@ -106,6 +113,7 @@ export function ProfileForm({
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [savedNotice, setSavedNotice] = useState(false);
 
   useEffect(() => {
     async function loadTaxonomy() {
@@ -249,6 +257,17 @@ export function ProfileForm({
     const previousSalaryRaw = parseSalaryRateInput(previousSalaryInput);
     const previousSalary = previousSalaryRaw > 0 ? previousSalaryRaw : null;
 
+    if (!technology.trim()) {
+      setError("Technology is required");
+      return;
+    }
+
+    const relevantExperience = Number.parseInt(relevantExperienceInput, 10);
+    if (Number.isNaN(relevantExperience) || relevantExperience < 0) {
+      setError("Relevant experience is required");
+      return;
+    }
+
     if (!isCitizen && !visaStatus.trim()) {
       setError("Visa status is required when Citizen is No");
       return;
@@ -275,10 +294,14 @@ export function ProfileForm({
         comments: comments.trim() || null,
         isCitizen,
         visaStatus: isCitizen ? null : visaStatus.trim(),
+        level,
+        relevantExperience,
         careerApplicationId: defaults.careerApplicationId ?? null,
         sourcedById: sourcedById || null,
         jobListingId: jobListingId || null,
       });
+      setSavedNotice(true);
+      window.setTimeout(() => setSavedNotice(false), 4000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save profile");
     }
@@ -446,6 +469,33 @@ export function ProfileForm({
                 <option key={item.id} value={item.name}>{item.name}</option>
               ))}
             </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className={labelClass}>Level *</label>
+            <select
+              required
+              value={level}
+              onChange={(e) => setLevel(e.target.value)}
+              className={inputClass}
+            >
+              {PROFILE_LEVELS.map((lvl) => (
+                <option key={lvl} value={lvl}>{lvl}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Relevant experience (years) *</label>
+            <input
+              type="number"
+              required
+              min={0}
+              max={80}
+              value={relevantExperienceInput}
+              onChange={(e) => setRelevantExperienceInput(e.target.value)}
+              className={inputClass}
+            />
           </div>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -627,6 +677,11 @@ export function ProfileForm({
 
       {error ? (
         <p className="text-sm text-red-600 dark:text-red-400" role="alert">{error}</p>
+      ) : null}
+      {savedNotice ? (
+        <p className="text-sm font-medium text-green-700 dark:text-green-400" role="status">
+          Data saved
+        </p>
       ) : null}
 
       <div className="flex flex-wrap items-center gap-3">

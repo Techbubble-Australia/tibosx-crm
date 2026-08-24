@@ -9,6 +9,7 @@ import {
   syncLegacyLocationFields,
 } from "../lib/job-locations";
 import { JOB_LISTING_TYPES } from "../lib/careers-form";
+import { PROFILE_LEVELS } from "../lib/profile-levels";
 
 const router: IRouter = Router();
 
@@ -32,6 +33,8 @@ const jobSchema = z.object({
   city: z.string().max(120).optional().nullable(),
   endClient: z.string().max(200).optional().nullable(),
   order: z.number().int().default(0),
+  level: z.enum(PROFILE_LEVELS).default("Developer"),
+  publishedDate: z.coerce.date().optional().nullable(),
 });
 
 function prepareJobWriteData(body: z.infer<typeof jobSchema>): Record<string, unknown> {
@@ -174,6 +177,8 @@ function serializeAdminJob(
     published: job.published,
     isHot: job.isHot ?? false,
     order: job.order,
+    level: job.level ?? "Developer",
+    publishedDate: job.publishedDate?.toISOString() ?? null,
     applicationCount: applicationCount ?? 0,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
@@ -367,7 +372,13 @@ router.post("/", async (req, res) => {
     const referenceNumber = await allocateJobReferenceNumber();
     const order = data.order && data.order > 0 ? data.order : await allocateNextJobOrder();
     const job = await prisma.jobListing.create({
-      data: { ...writeData, referenceNumber, order } as Prisma.JobListingCreateInput,
+      data: {
+        ...writeData,
+        referenceNumber,
+        order,
+        publishedDate: data.publishedDate ?? new Date(),
+        level: data.level ?? "Developer",
+      } as Prisma.JobListingCreateInput,
       include: { client: { select: { name: true } } },
     });
     res.status(201).json({ data: serializeAdminJob(job) });

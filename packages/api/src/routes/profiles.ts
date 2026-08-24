@@ -10,6 +10,7 @@ import { PHONE_REGEX, PHONE_VALIDATION_MESSAGE } from "../lib/validation";
 import { SALARY_CURRENCIES, SALARY_MODES, parseSalaryRateInput } from "../lib/careers-form";
 import { linkProfileToJobIfRequested } from "../lib/profile-to-application";
 import { computeProfileDuplicateMeta } from "../lib/profile-duplicates";
+import { PROFILE_LEVELS } from "../lib/profile-levels";
 
 const router: IRouter = Router();
 
@@ -35,6 +36,8 @@ const profileSchema = z.object({
   jobListingId: z.string().optional().nullable(),
   isCitizen: z.boolean().default(true),
   visaStatus: z.string().max(200).optional().nullable(),
+  level: z.enum(PROFILE_LEVELS).default("Developer"),
+  relevantExperience: z.coerce.number().int().min(0).max(80),
 }).superRefine((data, ctx) => {
   if (!data.isCitizen && !data.visaStatus?.trim()) {
     ctx.addIssue({
@@ -106,6 +109,8 @@ function serializeProfile(row: {
   sourcedByName: string | null;
   isCitizen: boolean;
   visaStatus: string | null;
+  level: string;
+  relevantExperience: number;
   isDuplicate?: boolean;
   duplicateCount?: number;
   duplicateMatchReason?: string | null;
@@ -137,6 +142,8 @@ function serializeProfile(row: {
     sourcedByName: row.sourcedByName,
     isCitizen: row.isCitizen ?? true,
     visaStatus: row.visaStatus ?? null,
+    level: row.level ?? "Developer",
+    relevantExperience: row.relevantExperience ?? 0,
     isDuplicate: row.isDuplicate ?? false,
     duplicateCount: row.duplicateCount ?? 0,
     duplicateMatchReason: row.duplicateMatchReason ?? null,
@@ -260,6 +267,8 @@ router.post("/", async (req: AuthRequest, res) => {
         sourcedById,
         isCitizen: data.isCitizen,
         visaStatus: data.isCitizen ? null : data.visaStatus?.trim() ?? null,
+        level: data.level,
+        relevantExperience: data.relevantExperience,
       },
     });
 
@@ -297,6 +306,8 @@ router.patch("/:id", async (req: AuthRequest, res) => {
       city: z.string().max(120).optional().nullable(),
       country: z.string().min(1).max(120).optional(),
       technology: z.string().min(1).max(120).optional(),
+      level: z.enum(PROFILE_LEVELS).optional(),
+      relevantExperience: z.coerce.number().int().min(0).max(80).optional(),
       sourcedById: z.string().nullable().optional(),
     });
 
@@ -317,6 +328,8 @@ router.patch("/:id", async (req: AuthRequest, res) => {
         ...(data.city !== undefined ? { city: data.city } : {}),
         ...(data.country !== undefined ? { country: data.country } : {}),
         ...(data.technology !== undefined ? { technology: data.technology } : {}),
+        ...(data.level !== undefined ? { level: data.level } : {}),
+        ...(data.relevantExperience !== undefined ? { relevantExperience: data.relevantExperience } : {}),
         ...(sourcedById !== undefined ? { sourcedById } : {}),
       },
       include: { sourcedBy: { select: { name: true, email: true } } },
@@ -389,6 +402,8 @@ router.put("/:id", async (req: AuthRequest, res) => {
         sourcedById,
         isCitizen: data.isCitizen,
         visaStatus: data.isCitizen ? null : data.visaStatus?.trim() ?? null,
+        level: data.level,
+        relevantExperience: data.relevantExperience,
       },
     });
 

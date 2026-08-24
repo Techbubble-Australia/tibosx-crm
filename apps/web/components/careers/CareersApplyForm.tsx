@@ -71,6 +71,7 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
   const [salaryRateInput, setSalaryRateInput] = useState("");
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const [isCitizen, setIsCitizen] = useState(true);
+  const [relevantExperienceInput, setRelevantExperienceInput] = useState("");
   const [visaStatus, setVisaStatus] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -172,6 +173,11 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
         throw new Error("Salary rate is required");
       }
 
+      const relevantExperience = Number.parseInt(relevantExperienceInput, 10);
+      if (Number.isNaN(relevantExperience) || relevantExperience < 0) {
+        throw new Error("Relevant experience is required");
+      }
+
       if (!isCitizen && !visaStatus.trim()) {
         throw new Error("Visa status is required when you are not a citizen");
       }
@@ -193,6 +199,7 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
         salaryCurrency: readFormString(formData, "salaryCurrency"),
         salaryRate,
         salaryMode: readFormString(formData, "salaryMode"),
+        relevantExperience,
         documentUrls,
         message: readOptionalMessage(formData),
       };
@@ -234,6 +241,7 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
       }
       setCity("");
       setCityOther("");
+      setRelevantExperienceInput("");
     } catch (err) {
       setStatus("error");
       if (err instanceof TypeError && /fetch/i.test(err.message)) {
@@ -433,6 +441,18 @@ function CareersApplyFormInner({ jobs }: CareersApplyFormProps) {
           aria-label="Visa status"
         />
       </div>
+
+      <input
+        type="number"
+        required
+        min={0}
+        max={80}
+        value={relevantExperienceInput}
+        onChange={(e) => setRelevantExperienceInput(e.target.value)}
+        placeholder="Relevant Experience (years) *"
+        className={fieldClass}
+        aria-label="Relevant experience in years"
+      />
 
       <label className="flex min-h-[100px] cursor-pointer flex-col items-center justify-center rounded-[14px] border border-white/15 bg-white/[0.08] px-4 py-4 text-center">
         <input

@@ -10,6 +10,23 @@ import { AdminSearchField } from "@/components/ui/AdminSearchField";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { ViewModeToggle, type ViewMode } from "@/components/ui/ViewModeToggle";
 import { useListView } from "@/hooks/useListView";
+import { ListColumnPersonalizer } from "@/components/ui/ListColumnPersonalizer";
+import { useColumnVisibility, type ListColumnDef } from "@/hooks/useColumnVisibility";
+
+const JOB_LIST_COLUMNS: ListColumnDef[] = [
+  { id: "ref", label: "Ref" },
+  { id: "order", label: "Order" },
+  { id: "title", label: "Title" },
+  { id: "hot", label: "Hot" },
+  { id: "city", label: "City" },
+  { id: "country", label: "Country" },
+  { id: "client", label: "Client" },
+  { id: "technology", label: "Technology" },
+  { id: "level", label: "Level" },
+  { id: "publishedDate", label: "Published date" },
+  { id: "applications", label: "Applications" },
+  { id: "status", label: "Status" },
+];
 
 interface JobListing {
   id: string;
@@ -30,6 +47,8 @@ interface JobListing {
   clientName?: string;
   isHot?: boolean;
   order?: number;
+  level?: string;
+  publishedDate?: string | null;
   createdAt: string;
 }
 
@@ -146,7 +165,12 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
     filtered,
     totalItems,
     totalSourceItems,
-  } = useListView(filteredJobs, jobSearchHaystack);
+  } = useListView(filteredJobs, jobSearchHaystack, {
+    initialPageSize: 100,
+    pageSizeOptions: [25, 50, 100, 200],
+  });
+  const { columns: jobColumnDefs, visibleIds, isVisible: isColumnVisible, toggleColumn } =
+    useColumnVisibility("tbos:jobs-columns", JOB_LIST_COLUMNS);
   const [selectedTechnology, setSelectedTechnology] = useState<string | null>(null);
   const [orderDrafts, setOrderDrafts] = useState<Record<string, string>>({});
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
@@ -299,6 +323,13 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+          {viewMode === "list" ? (
+            <ListColumnPersonalizer
+              columns={jobColumnDefs}
+              visibleIds={visibleIds}
+              onToggle={toggleColumn}
+            />
+          ) : null}
           {canManageJobs ? (
             <>
               <Link
@@ -334,154 +365,214 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
           <table className="w-full min-w-[1100px] text-sm">
             <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
               <tr>
-                <th className="px-4 py-3 text-left">
-                  <SortHeader label="Ref" sortKey="referenceNumber" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortHeader label="Order" sortKey="order" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortHeader label="Title" sortKey="title" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortHeader label="Hot" sortKey="isHot" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortHeader label="City" sortKey="city" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortHeader label="Country" sortKey="country" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortHeader label="Client" sortKey="clientName" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortHeader label="Technology" sortKey="technology" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortHeader label="Applications" sortKey="applicationCount" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
+                {isColumnVisible("ref") ? (
+                  <th className="px-4 py-3 text-left">
+                    <SortHeader label="Ref" sortKey="referenceNumber" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                  </th>
+                ) : null}
+                {isColumnVisible("order") ? (
+                  <th className="px-4 py-3 text-left">
+                    <SortHeader label="Order" sortKey="order" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                  </th>
+                ) : null}
+                {isColumnVisible("title") ? (
+                  <th className="px-4 py-3 text-left">
+                    <SortHeader label="Title" sortKey="title" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                  </th>
+                ) : null}
+                {isColumnVisible("hot") ? (
+                  <th className="px-4 py-3 text-left">
+                    <SortHeader label="Hot" sortKey="isHot" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                  </th>
+                ) : null}
+                {isColumnVisible("city") ? (
+                  <th className="px-4 py-3 text-left">
+                    <SortHeader label="City" sortKey="city" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                  </th>
+                ) : null}
+                {isColumnVisible("country") ? (
+                  <th className="px-4 py-3 text-left">
+                    <SortHeader label="Country" sortKey="country" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                  </th>
+                ) : null}
+                {isColumnVisible("client") ? (
+                  <th className="px-4 py-3 text-left">
+                    <SortHeader label="Client" sortKey="clientName" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                  </th>
+                ) : null}
+                {isColumnVisible("technology") ? (
+                  <th className="px-4 py-3 text-left">
+                    <SortHeader label="Technology" sortKey="technology" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                  </th>
+                ) : null}
+                {isColumnVisible("level") ? (
+                  <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Level</th>
+                ) : null}
+                {isColumnVisible("publishedDate") ? (
+                  <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Published date</th>
+                ) : null}
+                {isColumnVisible("applications") ? (
+                  <th className="px-4 py-3 text-left">
+                    <SortHeader label="Applications" sortKey="applicationCount" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                  </th>
+                ) : null}
+                {isColumnVisible("status") ? (
+                  <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
+                ) : null}
                 <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {filteredJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={20} className="px-4 py-8 text-center text-gray-400">
                     No {publishedFilter ? "active" : "inactive"} job listings.
                   </td>
                 </tr>
               ) : totalItems === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={20} className="px-4 py-8 text-center text-gray-400">
                     No listings match your search.
                   </td>
                 </tr>
               ) : (
                 paginatedJobs.map((job) => (
                   <tr key={job.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                    <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">{job.referenceNumber}</td>
-                    <td className="px-4 py-3">
-                      {canManageJobs ? (
-                        <div className="flex items-center gap-1">
-                          {editingOrderId === job.id ? (
-                            <input
-                              type="number"
-                              value={orderDrafts[job.id] ?? String(job.order ?? 0)}
-                              onChange={(e) =>
-                                setOrderDrafts((prev) => ({ ...prev, [job.id]: e.target.value }))
-                              }
-                              onBlur={() => void saveOrder(job)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.currentTarget.blur();
-                                } else if (e.key === "Escape") {
-                                  cancelEditOrder(job.id);
+                    {isColumnVisible("ref") ? (
+                      <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">{job.referenceNumber}</td>
+                    ) : null}
+                    {isColumnVisible("order") ? (
+                      <td className="px-4 py-3">
+                        {canManageJobs ? (
+                          <div className="flex items-center gap-1">
+                            {editingOrderId === job.id ? (
+                              <input
+                                type="number"
+                                value={orderDrafts[job.id] ?? String(job.order ?? 0)}
+                                onChange={(e) =>
+                                  setOrderDrafts((prev) => ({ ...prev, [job.id]: e.target.value }))
                                 }
-                              }}
-                              autoFocus
-                              className="w-16 rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-                              aria-label={`Edit order for ${job.title}`}
-                            />
-                          ) : (
-                            <>
-                              <span className="text-gray-600 dark:text-gray-400">{job.order ?? 0}</span>
-                              <button
-                                type="button"
-                                onClick={() => startEditOrder(job)}
-                                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                                onBlur={() => void saveOrder(job)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.currentTarget.blur();
+                                  } else if (e.key === "Escape") {
+                                    cancelEditOrder(job.id);
+                                  }
+                                }}
+                                autoFocus
+                                className="w-16 rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                                 aria-label={`Edit order for ${job.title}`}
-                                title="Edit order"
-                              >
-                                <Pencil className="h-3.5 w-3.5" aria-hidden />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-gray-600 dark:text-gray-400">{job.order ?? 0}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{job.title}</td>
-                    <td className="px-4 py-3">
-                      {canManageJobs ? (
-                        <button
-                          type="button"
-                          onClick={() => void toggleHot(job)}
-                          className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800"
-                          aria-label={job.isHot ? "Remove hot flag" : "Mark as hot"}
-                          title={job.isHot ? "Hot job — click to remove" : "Mark as hot job"}
-                        >
+                              />
+                            ) : (
+                              <>
+                                <span className="text-gray-600 dark:text-gray-400">{job.order ?? 0}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => startEditOrder(job)}
+                                  className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                                  aria-label={`Edit order for ${job.title}`}
+                                  title="Edit order"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" aria-hidden />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-600 dark:text-gray-400">{job.order ?? 0}</span>
+                        )}
+                      </td>
+                    ) : null}
+                    {isColumnVisible("title") ? (
+                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{job.title}</td>
+                    ) : null}
+                    {isColumnVisible("hot") ? (
+                      <td className="px-4 py-3">
+                        {canManageJobs ? (
+                          <button
+                            type="button"
+                            onClick={() => void toggleHot(job)}
+                            className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            aria-label={job.isHot ? "Remove hot flag" : "Mark as hot"}
+                            title={job.isHot ? "Hot job — click to remove" : "Mark as hot job"}
+                          >
+                            <Flame
+                              className={`h-4 w-4 ${
+                                job.isHot
+                                  ? "fill-orange-500 text-orange-500"
+                                  : "text-gray-400"
+                              }`}
+                            />
+                          </button>
+                        ) : (
                           <Flame
                             className={`h-4 w-4 ${
-                              job.isHot
-                                ? "fill-orange-500 text-orange-500"
-                                : "text-gray-400"
+                              job.isHot ? "fill-orange-500 text-orange-500" : "text-gray-400"
                             }`}
+                            aria-hidden
                           />
-                        </button>
-                      ) : (
-                        <Flame
-                          className={`h-4 w-4 ${
-                            job.isHot ? "fill-orange-500 text-orange-500" : "text-gray-400"
+                        )}
+                      </td>
+                    ) : null}
+                    {isColumnVisible("city") ? (
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.city || "—"}</td>
+                    ) : null}
+                    {isColumnVisible("country") ? (
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                        <span className="mr-1" aria-hidden>{job.flag}</span>
+                        {job.country}
+                      </td>
+                    ) : null}
+                    {isColumnVisible("client") ? (
+                      <td className="max-w-[200px] truncate px-4 py-3 text-gray-600 dark:text-gray-400" title={job.clientName || undefined}>
+                        {job.clientName || "—"}
+                      </td>
+                    ) : null}
+                    {isColumnVisible("technology") ? (
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.technology || "—"}</td>
+                    ) : null}
+                    {isColumnVisible("level") ? (
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.level ?? "Developer"}</td>
+                    ) : null}
+                    {isColumnVisible("publishedDate") ? (
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                        {job.publishedDate
+                          ? new Date(job.publishedDate).toLocaleDateString("en-AU", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : "—"}
+                      </td>
+                    ) : null}
+                    {isColumnVisible("applications") ? (
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                        {(job.applicationCount ?? 0) > 0 ? (
+                          <Link
+                            href={`/career-applications/${listTab}?jobListingId=${encodeURIComponent(job.id)}`}
+                            className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                          >
+                            {job.applicationCount ?? 0}
+                          </Link>
+                        ) : (
+                          "0"
+                        )}
+                      </td>
+                    ) : null}
+                    {isColumnVisible("status") ? (
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            job.published
+                              ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                              : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
                           }`}
-                          aria-hidden
-                        />
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.city || "—"}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                      <span className="mr-1" aria-hidden>{job.flag}</span>
-                      {job.country}
-                    </td>
-                    <td className="max-w-[200px] truncate px-4 py-3 text-gray-600 dark:text-gray-400" title={job.clientName || undefined}>
-                      {job.clientName || "—"}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.technology || "—"}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                      {(job.applicationCount ?? 0) > 0 ? (
-                        <Link
-                          href={`/career-applications/${listTab}?jobListingId=${encodeURIComponent(job.id)}`}
-                          className="font-medium text-blue-600 hover:underline dark:text-blue-400"
                         >
-                          {job.applicationCount ?? 0}
-                        </Link>
-                      ) : (
-                        "0"
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          job.published
-                            ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                            : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
-                        }`}
-                      >
-                        {job.published ? "Published" : "Unpublished"}
-                      </span>
-                    </td>
+                          {job.published ? "Published" : "Unpublished"}
+                        </span>
+                      </td>
+                    ) : null}
                     <td className="px-4 py-3 text-right">
                       {canManageJobs ? (
                         <div className="inline-flex items-center gap-2">

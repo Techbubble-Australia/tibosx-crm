@@ -184,6 +184,8 @@ model CareerApplication {
   isCitizen         Boolean           @default(true)
   /// Pipeline status for recruiter tracking.
   status            String            @default("INTERNAL_REVIEW")
+  /// Years of relevant experience (from apply form).
+  relevantExperience Int?
   profile           CandidateProfile?
   createdAt         DateTime          @default(now())
 }
@@ -206,6 +208,10 @@ model CandidateProfile {
   comments            String?            @db.Text
   isCitizen           Boolean            @default(true)
   visaStatus          String?
+  /// Manager | Architect | Developer | Tester — aligned with job listing level.
+  level               String             @default("Developer")
+  /// Years of relevant experience.
+  relevantExperience  Int                @default(0)
   /// Admin user who sourced this candidate (recruiter/admin).
   sourcedById         String?
   sourcedBy           AdminUser?         @relation("ProfileSourcedBy", fields: [sourcedById], references: [id], onDelete: SetNull)
@@ -356,7 +362,11 @@ model JobListing {
   description     String    @default("") @db.Text
   likeCount       Int       @default(0)
   published       Boolean   @default(true)
+  /// Date shown on admin records; set automatically on create.
+  publishedDate   DateTime?
   isHot           Boolean   @default(false)
+  /// Manager | Architect | Developer | Tester
+  level           String    @default("Developer")
   /// Primary city for admin list display (Any / Other / named city).
   city            String?
   /// Optional end-client name (free text).

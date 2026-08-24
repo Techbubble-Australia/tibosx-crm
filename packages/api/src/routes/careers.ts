@@ -41,6 +41,7 @@ const careerSchema = z
     salaryCurrency: z.enum(salaryCurrencyCodes, { message: "Currency is required" }),
     salaryRate: z.coerce.number().int().positive("Salary rate is required"),
     salaryMode: z.enum(SALARY_MODES, { message: "Salary mode is required" }),
+    relevantExperience: z.coerce.number().int().min(0).max(80),
     documentUrls: z.array(z.string().min(1)).min(1, "At least one document is required"),
     message: z.preprocess(
       (v) => (v === null || v === undefined || v === "" ? undefined : String(v)),
@@ -205,6 +206,7 @@ router.post("/apply", async (req, res) => {
         resumeUrl: validatedData.documentUrls[0],
         documentUrls: validatedData.documentUrls,
         message: validatedData.message,
+        relevantExperience: validatedData.relevantExperience,
       },
     });
 

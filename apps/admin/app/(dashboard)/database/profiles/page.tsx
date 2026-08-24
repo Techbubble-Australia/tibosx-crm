@@ -11,8 +11,24 @@ import { ViewModeToggle, type ViewMode } from "@/components/ui/ViewModeToggle";
 import { useListView } from "@/hooks/useListView";
 import { buildSearchHaystack } from "@/lib/search-text";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
-import { ProfilesListTable, type ProfileListRow } from "@/components/profiles/ProfilesListTable";
+import { ProfilesListTable, type ProfileListRow, type ProfileListEditingState } from "@/components/profiles/ProfilesListTable";
 import { exportProfilesAsExcel } from "@/lib/export-profiles-excel";
+import { ListColumnPersonalizer } from "@/components/ui/ListColumnPersonalizer";
+import { useColumnVisibility, type ListColumnDef } from "@/hooks/useColumnVisibility";
+import { PROFILE_LEVELS } from "@/lib/profile-levels";
+
+const PROFILE_LIST_COLUMNS: ListColumnDef[] = [
+  { id: "name", label: "Name" },
+  { id: "citizen", label: "Citizen" },
+  { id: "city", label: "City" },
+  { id: "country", label: "Country" },
+  { id: "technology", label: "Technology" },
+  { id: "level", label: "Level" },
+  { id: "relevantExperience", label: "Relevant exp." },
+  { id: "expectedRate", label: "Expected rate" },
+  { id: "sourcedBy", label: "Sourced by" },
+  { id: "docs", label: "Docs" },
+];
 
 interface ProfileRow extends ProfileListRow {
   duplicateCount?: number;
@@ -117,6 +133,16 @@ function ProfilesPageInner() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [technologyFilter, setTechnologyFilter] = useState("");
   const [citizenFilter, setCitizenFilter] = useState("");
+  const [levelFilter, setLevelFilter] = useState("");
+  const [experienceMin, setExperienceMin] = useState("");
+  const [experienceMax, setExperienceMax] = useState("");
+  const [listEditingState, setListEditingState] = useState<ProfileListEditingState>({
+    editingId: null,
+    hasChanges: false,
+  });
+  const [saveRequestKey, setSaveRequestKey] = useState(0);
+  const { columns: profileColumnDefs, visibleIds, isVisible: isColumnVisible, toggleColumn } =
+    useColumnVisibility("tbos:profiles-columns", PROFILE_LIST_COLUMNS);
   const [sortKey, setSortKey] = useState<SortKey>("technology");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -128,9 +154,13 @@ function ProfilesPageInner() {
       if (technologyFilter && row.technology !== technologyFilter) return false;
       if (citizenFilter === "yes" && !row.isCitizen) return false;
       if (citizenFilter === "no" && row.isCitizen) return false;
+      if (levelFilter && (row.level ?? "Developer") !== levelFilter) return false;
+      const exp = row.relevantExperience ?? 0;
+      if (experienceMin && exp < Number.parseInt(experienceMin, 10)) return false;
+      if (experienceMax && exp > Number.parseInt(experienceMax, 10)) return false;
       return true;
     });
-  }, [rows, countryFilter, categoryFilter, technologyFilter, citizenFilter]);
+  }, [rows, countryFilter, categoryFilter, technologyFilter, citizenFilter, levelFilter, experienceMin, experienceMax]);
 
   const countryOptions = useMemo(() => collectSortedOptions(rows, "country"), [rows]);
   const categoryOptions = useMemo(() => collectSortedOptions(rows, "category"), [rows]);
@@ -157,20 +187,22 @@ function ProfilesPageInner() {
       row.city,
       row.category,
       row.technology,
+      row.level,
+      row.relevantExperience,
       row.currency,
       row.mode,
       row.isCitizen ? "citizen yes" : "citizen no",
     ]),
     {
-      initialPageSize: 50,
+      initialPageSize: 100,
       pageSizeStorageKey: "tbos:profiles-page-size",
-      pageSizeOptions: [25, 50, 100],
+      pageSizeOptions: [25, 50, 100, 200],
     },
   );
 
   useEffect(() => {
     setPage(1);
-  }, [countryFilter, categoryFilter, technologyFilter, citizenFilter, setPage]);
+  }, [countryFilter, categoryFilter, technologyFilter, citizenFilter, levelFilter, experienceMin, experienceMax, setPage]);
 
   useEffect(() => {
     void fetchRows();
@@ -272,6 +304,12 @@ function ProfilesPageInner() {
     });
   }
 
+  function handleSaveListEdits() {
+    if (!listEditingState.hasChanges) return;
+    if (!confirm("Save changes to this profile?")) return;
+    setSaveRequestKey((key) => key + 1);
+  }
+
   function handleSort(key: SortKey) {
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -355,14 +393,29 @@ function ProfilesPageInner() {
         <div className="flex flex-wrap items-center gap-3">
           <ViewModeToggle mode={viewMode} onChange={setViewMode} />
           {viewMode === "list" ? (
-            <button
-              type="button"
-              disabled={selectedIds.size === 0}
-              onClick={handleExportExcel}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
-            >
-              Export as Excel
-            </button>
+            <>
+              <ListColumnPersonalizer
+                columns={profileColumnDefs}
+                visibleIds={visibleIds}
+                onToggle={toggleColumn}
+              />
+              <button
+                type="button"
+                disabled={!listEditingState.hasChanges}
+                onClick={handleSaveListEdits}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                disabled={selectedIds.size === 0}
+                onClick={handleExportExcel}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
+              >
+                Export as Excel
+              </button>
+            </>
           ) : null}
           <Link
             href="/database/profiles/new"
@@ -428,7 +481,38 @@ function ProfilesPageInner() {
             <option value="yes">Citizen: Yes</option>
             <option value="no">Citizen: No</option>
           </select>
-          {(countryFilter || categoryFilter || technologyFilter || citizenFilter) ? (
+          <select
+            value={levelFilter}
+            onChange={(e) => setLevelFilter(e.target.value)}
+            className={filterSelectClass}
+            aria-label="Filter by level"
+          >
+            <option value="">All levels</option>
+            {PROFILE_LEVELS.map((lvl) => (
+              <option key={lvl} value={lvl}>{lvl}</option>
+            ))}
+          </select>
+          <input
+            type="number"
+            min={0}
+            max={80}
+            value={experienceMin}
+            onChange={(e) => setExperienceMin(e.target.value)}
+            placeholder="Exp. min"
+            className={`${filterSelectClass} min-w-[100px]`}
+            aria-label="Minimum relevant experience"
+          />
+          <input
+            type="number"
+            min={0}
+            max={80}
+            value={experienceMax}
+            onChange={(e) => setExperienceMax(e.target.value)}
+            placeholder="Exp. max"
+            className={`${filterSelectClass} min-w-[100px]`}
+            aria-label="Maximum relevant experience"
+          />
+          {(countryFilter || categoryFilter || technologyFilter || citizenFilter || levelFilter || experienceMin || experienceMax) ? (
             <button
               type="button"
               onClick={() => {
@@ -436,6 +520,9 @@ function ProfilesPageInner() {
                 setCategoryFilter("");
                 setTechnologyFilter("");
                 setCitizenFilter("");
+                setLevelFilter("");
+                setExperienceMin("");
+                setExperienceMax("");
               }}
               className="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
             >
@@ -463,6 +550,9 @@ function ProfilesPageInner() {
               onToggleSelectAll={toggleSelectAll}
               onRowUpdated={handleRowUpdated}
               onDelete={(id) => void deleteRow(id)}
+              isColumnVisible={isColumnVisible}
+              onEditingStateChange={setListEditingState}
+              saveRequestKey={saveRequestKey}
             />
           )}
           {rows.length > 0 ? (

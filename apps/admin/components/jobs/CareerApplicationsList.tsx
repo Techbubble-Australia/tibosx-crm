@@ -264,7 +264,10 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
     totalItems,
     totalSourceItems,
     adjustPageAfterDelete,
-  } = useListView(filteredByJobMeta, applicationSearchHaystack);
+  } = useListView(filteredByJobMeta, applicationSearchHaystack, {
+    initialPageSize: 100,
+    pageSizeOptions: [25, 50, 100, 200],
+  });
 
   useEffect(() => {
     void fetchApplications();

@@ -51,6 +51,7 @@ type ApplicationRow = {
   documentUrls: unknown;
   message: string | null;
   isCitizen?: boolean;
+  relevantExperience?: number | null;
 };
 
 function documentUrlsFromApplication(application: ApplicationRow): string[] {
@@ -87,13 +88,24 @@ export async function createProfileFromCareerApplication(application: Applicatio
   let country = application.country?.trim() ?? "";
   let city = application.city?.trim() || null;
 
+  let level = "Developer";
+
   if (application.jobListingId) {
     const job = await prisma.jobListing.findUnique({
       where: { id: application.jobListingId },
-      select: { country: true, locations: true },
+      select: { country: true, locations: true, level: true, category: true, technology: true },
     });
-    if (job && !country) {
-      country = job.country?.trim() ?? "";
+    if (job) {
+      if (!country) {
+        country = job.country?.trim() ?? "";
+      }
+      if (job.level) {
+        level = job.level;
+      }
+      if (job.category && job.technology) {
+        category = job.category;
+        technology = job.technology;
+      }
     }
   }
 
@@ -118,6 +130,8 @@ export async function createProfileFromCareerApplication(application: Applicatio
       comments: application.message?.trim() || null,
       isCitizen: application.isCitizen ?? true,
       visaStatus: application.isCitizen ? null : application.visaStatus?.trim() ?? null,
+      level,
+      relevantExperience: application.relevantExperience ?? 0,
       careerApplicationId: application.id,
     },
   });
