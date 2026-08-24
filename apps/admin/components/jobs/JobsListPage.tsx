@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Edit, Trash2, Settings, Flame } from "lucide-react";
+import { Plus, Edit, Trash2, Settings, Flame, ChevronDown, ChevronUp, Pencil } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { jobEditHref } from "@/lib/job-routes";
@@ -51,6 +51,75 @@ function jobSearchHaystack(job: JobListing): string {
     .toLowerCase();
 }
 
+type SortKey =
+  | "referenceNumber"
+  | "order"
+  | "title"
+  | "isHot"
+  | "city"
+  | "country"
+  | "clientName"
+  | "technology"
+  | "applicationCount";
+type SortDir = "asc" | "desc";
+
+function compareJobs(a: JobListing, b: JobListing, key: SortKey): number {
+  switch (key) {
+    case "referenceNumber":
+      return a.referenceNumber.localeCompare(b.referenceNumber);
+    case "order":
+      return (a.order ?? 0) - (b.order ?? 0);
+    case "title":
+      return a.title.localeCompare(b.title);
+    case "isHot":
+      return Number(a.isHot) - Number(b.isHot);
+    case "city":
+      return (a.city || "").localeCompare(b.city || "");
+    case "country":
+      return a.country.localeCompare(b.country);
+    case "clientName":
+      return (a.clientName || "").localeCompare(b.clientName || "");
+    case "technology":
+      return (a.technology || "").localeCompare(b.technology || "");
+    case "applicationCount":
+      return (a.applicationCount ?? 0) - (b.applicationCount ?? 0);
+    default:
+      return 0;
+  }
+}
+
+function SortHeader({
+  label,
+  sortKey,
+  activeKey,
+  dir,
+  onSort,
+  className = "",
+}: {
+  label: string;
+  sortKey: SortKey;
+  activeKey: SortKey;
+  dir: SortDir;
+  onSort: (key: SortKey) => void;
+  className?: string;
+}) {
+  const active = activeKey === sortKey;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(sortKey)}
+      className={`inline-flex items-center gap-1 font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 ${className}`}
+    >
+      {label}
+      {active ? (
+        dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />
+      ) : (
+        <span className="inline-block h-3.5 w-3.5 opacity-0" aria-hidden />
+      )}
+    </button>
+  );
+}
+
 type JobsListPageProps = {
   publishedFilter: boolean;
   heading: string;
@@ -75,12 +144,14 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
     pageSize,
     setPageSize,
     filtered,
-    paginated: paginatedJobs,
     totalItems,
     totalSourceItems,
   } = useListView(filteredJobs, jobSearchHaystack);
   const [selectedTechnology, setSelectedTechnology] = useState<string | null>(null);
   const [orderDrafts, setOrderDrafts] = useState<Record<string, string>>({});
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("order");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   useEffect(() => {
     setSelectedTechnology(null);
@@ -131,17 +202,30 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
     }
   }
 
+  function startEditOrder(job: JobListing) {
+    setEditingOrderId(job.id);
+    setOrderDrafts((prev) => ({ ...prev, [job.id]: String(job.order ?? 0) }));
+  }
+
+  function cancelEditOrder(jobId: string) {
+    setEditingOrderId((current) => (current === jobId ? null : current));
+    setOrderDrafts((prev) => {
+      const next = { ...prev };
+      delete next[jobId];
+      return next;
+    });
+  }
+
   async function saveOrder(job: JobListing) {
     if (!canManageJobs) return;
     const raw = orderDrafts[job.id] ?? String(job.order ?? 0);
     const order = Number.parseInt(raw, 10);
-    if (Number.isNaN(order)) return;
+    if (Number.isNaN(order)) {
+      cancelEditOrder(job.id);
+      return;
+    }
     if (order === job.order) {
-      setOrderDrafts((prev) => {
-        const next = { ...prev };
-        delete next[job.id];
-        return next;
-      });
+      cancelEditOrder(job.id);
       return;
     }
     try {
@@ -152,27 +236,46 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
       });
       if (res.ok) {
         setJobs((prev) => prev.map((j) => (j.id === job.id ? { ...j, order } : j)));
-        setOrderDrafts((prev) => {
-          const next = { ...prev };
-          delete next[job.id];
-          return next;
-        });
+        cancelEditOrder(job.id);
       }
     } catch (error) {
       console.error("Error updating job order:", error);
     }
   }
 
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  const sortedFiltered = useMemo(() => {
+    const list = [...filtered];
+    list.sort((a, b) => {
+      const cmp = compareJobs(a, b, sortKey);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return list;
+  }, [filtered, sortKey, sortDir]);
+
+  const paginatedJobs = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return sortedFiltered.slice(start, start + pageSize);
+  }, [sortedFiltered, page, pageSize]);
+
   const groupedByTechnology = useMemo(() => {
     const map = new Map<string, JobListing[]>();
-    for (const job of filtered) {
+    for (const job of sortedFiltered) {
       const key = job.technology.trim() || "Unknown";
       const list = map.get(key) ?? [];
       list.push(job);
       map.set(key, list);
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [filtered]);
+  }, [sortedFiltered]);
 
   const jobsInSelectedTechnology = useMemo(() => {
     if (!selectedTechnology) return [];
@@ -231,15 +334,33 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
           <table className="w-full min-w-[1100px] text-sm">
             <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
               <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Ref</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Order</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Title</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Hot</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">City</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Country</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Client</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Technology</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Applications</th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Ref" sortKey="referenceNumber" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Order" sortKey="order" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Title" sortKey="title" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Hot" sortKey="isHot" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="City" sortKey="city" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Country" sortKey="country" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Client" sortKey="clientName" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Technology" sortKey="technology" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Applications" sortKey="applicationCount" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
                 <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
               </tr>
@@ -263,16 +384,41 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                     <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">{job.referenceNumber}</td>
                     <td className="px-4 py-3">
                       {canManageJobs ? (
-                        <input
-                          type="number"
-                          value={orderDrafts[job.id] ?? String(job.order ?? 0)}
-                          onChange={(e) =>
-                            setOrderDrafts((prev) => ({ ...prev, [job.id]: e.target.value }))
-                          }
-                          onBlur={() => void saveOrder(job)}
-                          className="w-16 rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-                          aria-label={`Order for ${job.title}`}
-                        />
+                        <div className="flex items-center gap-1">
+                          {editingOrderId === job.id ? (
+                            <input
+                              type="number"
+                              value={orderDrafts[job.id] ?? String(job.order ?? 0)}
+                              onChange={(e) =>
+                                setOrderDrafts((prev) => ({ ...prev, [job.id]: e.target.value }))
+                              }
+                              onBlur={() => void saveOrder(job)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.currentTarget.blur();
+                                } else if (e.key === "Escape") {
+                                  cancelEditOrder(job.id);
+                                }
+                              }}
+                              autoFocus
+                              className="w-16 rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                              aria-label={`Edit order for ${job.title}`}
+                            />
+                          ) : (
+                            <>
+                              <span className="text-gray-600 dark:text-gray-400">{job.order ?? 0}</span>
+                              <button
+                                type="button"
+                                onClick={() => startEditOrder(job)}
+                                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                                aria-label={`Edit order for ${job.title}`}
+                                title="Edit order"
+                              >
+                                <Pencil className="h-3.5 w-3.5" aria-hidden />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-gray-600 dark:text-gray-400">{job.order ?? 0}</span>
                       )}
