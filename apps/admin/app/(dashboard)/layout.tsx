@@ -193,7 +193,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         <div className={`min-w-0 p-4 ${sidebarCollapsed ? "px-2" : "p-6"}`}>
           <div className="flex items-center justify-between gap-2">
             <Link href="/database/dashboard" className="flex min-w-0 items-center gap-2">
-              <TechBubbleLogo compact={sidebarCollapsed} />
+              <TechBubbleLogo variant="sidebar" compact={sidebarCollapsed} />
             </Link>
             <button
               type="button"

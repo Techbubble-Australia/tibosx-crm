@@ -1,24 +1,40 @@
 type TechBubbleLogoProps = {
   className?: string;
   compact?: boolean;
+  /** `sidebar` = horizontal mark + wordmark for the dashboard nav; `stacked` = icon above text (login, etc.) */
+  variant?: "stacked" | "sidebar";
 };
 
-const LOGO_SRC = "/techbubble-logo.png";
-const LOGO_WIDTH = 93;
-const LOGO_HEIGHT = 40;
+const STACKED_LOGO = {
+  src: "/techbubble-logo.png",
+  width: 93,
+  height: 40,
+};
 
-/** Official TechBubble logo (hexagon mark + wordmark PNG). */
-export function TechBubbleLogo({ className = "", compact = false }: TechBubbleLogoProps) {
-  const heightClass = compact ? "h-8" : "h-10";
+const SIDEBAR_LOGO = {
+  src: "/techbubble-logo-sidebar.png",
+  width: 132,
+  height: 36,
+};
+
+/** Official TechBubble logo PNGs. */
+export function TechBubbleLogo({
+  className = "",
+  compact = false,
+  variant = "stacked",
+}: TechBubbleLogoProps) {
+  const useSidebarLogo = variant === "sidebar" && !compact;
+  const asset = useSidebarLogo ? SIDEBAR_LOGO : STACKED_LOGO;
+  const heightClass = compact ? "h-8" : useSidebarLogo ? "h-9" : "h-10";
 
   return (
     <span className={`inline-flex min-w-0 items-center ${className}`}>
       <img
-        src={LOGO_SRC}
+        src={asset.src}
         alt="TechBubble"
-        width={LOGO_WIDTH}
-        height={LOGO_HEIGHT}
-        className={`w-auto ${heightClass} dark:brightness-0 dark:invert`}
+        width={asset.width}
+        height={asset.height}
+        className={`w-auto max-w-full ${heightClass} dark:brightness-0 dark:invert`}
         decoding="async"
       />
     </span>
