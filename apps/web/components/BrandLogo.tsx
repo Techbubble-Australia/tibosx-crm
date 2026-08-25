@@ -1,5 +1,3 @@
-import Image from "next/image";
-
 type BrandLogoProps = {
   /** Light background → black logo; dark background → inverted to white */
   variant: "onLight" | "onDark";
@@ -7,17 +5,21 @@ type BrandLogoProps = {
   priority?: boolean;
 };
 
-/** Official TechBubble logo. */
+const LOGO_SRC = "/techbubble-logo.png";
+const LOGO_WIDTH = 93;
+const LOGO_HEIGHT = 40;
+
+/** Official TechBubble logo (hexagon mark + wordmark PNG). */
 export function BrandLogo({ variant, className = "", priority = false }: BrandLogoProps) {
   return (
-    <Image
-      src="/techbubble-logo.png"
+    <img
+      src={LOGO_SRC}
       alt="TechBubble"
-      width={93}
-      height={40}
-      sizes="(max-width: 768px) 120px, 160px"
+      width={LOGO_WIDTH}
+      height={LOGO_HEIGHT}
       className={`h-10 w-auto sm:h-11 ${variant === "onDark" ? "brightness-0 invert" : ""} ${className}`}
-      priority={priority}
+      decoding={priority ? "sync" : "async"}
+      fetchPriority={priority ? "high" : undefined}
     />
   );
 }
