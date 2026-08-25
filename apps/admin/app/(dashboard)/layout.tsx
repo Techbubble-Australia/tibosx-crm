@@ -98,6 +98,7 @@ const navGroups: NavGroup[] = [
       { href: "/settings/categories", label: "Category", icon: Layers, roles: ["admin", "website"] },
       { href: "/settings/technologies", label: "Technology", icon: Cpu, roles: ["admin", "website"] },
       { href: "/settings/departments", label: "Department", icon: Building, roles: ["admin", "website"] },
+      { href: "/settings/levels", label: "Level", icon: Target, roles: ["admin", "website"] },
       { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin", "recruiter", "sales", "website"] },
       { href: "/users", label: "Users", icon: UserCircle, roles: ["admin"] },
     ],

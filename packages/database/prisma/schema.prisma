@@ -279,6 +279,16 @@ model JobDepartment {
   @@index([order])
 }
 
+model JobLevel {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([order])
+}
+
 model JobTechnology {
   id         String      @id @default(cuid())
   name       String
@@ -378,6 +388,8 @@ model JobListing {
   city            String?
   /// Optional end-client name (free text).
   endClient       String?
+  /// Admin budget notes (free text).
+  budget          String    @default("")
   order           Int       @default(0)
   /// Admin user IDs assigned as recruiters for this role
   recruiterIds    Json?

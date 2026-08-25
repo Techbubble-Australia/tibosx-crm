@@ -27,6 +27,7 @@ const PROFILE_LIST_COLUMNS: ListColumnDef[] = [
   { id: "relevantExperience", label: "Relevant exp." },
   { id: "expectedRate", label: "Expected rate" },
   { id: "sourcedBy", label: "Sourced by" },
+  { id: "createdAt", label: "Created on" },
   { id: "docs", label: "Docs" },
 ];
 
@@ -44,6 +45,7 @@ type SortKey =
   | "technology"
   | "expectedRate"
   | "sourcedByName"
+  | "createdAt"
   | "duplicate";
 type SortDir = "asc" | "desc";
 
@@ -143,8 +145,8 @@ function ProfilesPageInner() {
   const [saveRequestKey, setSaveRequestKey] = useState(0);
   const { columns: profileColumnDefs, visibleIds, isVisible: isColumnVisible, toggleColumn } =
     useColumnVisibility("tbos:profiles-columns", PROFILE_LIST_COLUMNS);
-  const [sortKey, setSortKey] = useState<SortKey>("technology");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [sortKey, setSortKey] = useState<SortKey>("createdAt");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 
   const dimensionFiltered = useMemo(() => {
@@ -350,6 +352,9 @@ function ProfilesPageInner() {
           break;
         case "duplicate":
           cmp = Number(b.isDuplicate) - Number(a.isDuplicate);
+          break;
+        case "createdAt":
+          cmp = new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime();
           break;
       }
       return sortDir === "asc" ? cmp : -cmp;

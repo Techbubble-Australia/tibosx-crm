@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useRouter, useParams, usePathname, useSearchParams } from "next/navigation";
+import { useParams, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { JobForm, type JobFormDefaults } from "@/components/jobs/JobForm";
@@ -10,7 +10,6 @@ import { adminFetch } from "@/lib/admin-api";
 import { jobListHref, jobListingsTabFromPath } from "@/lib/job-routes";
 
 function EditJobPageInner() {
-  const router = useRouter();
   const params = useParams();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -57,8 +56,7 @@ function EditJobPageInner() {
       });
       if (!res.ok) throw new Error("Failed to update job");
       const updated = await res.json();
-      const published = Boolean(updated?.data?.published ?? payload.published);
-      router.push(jobListHref(published ? "active" : "inactive"));
+      setJob(updated.data ?? job);
     } catch (error) {
       console.error(error);
       alert("Failed to update job listing");
@@ -90,7 +88,7 @@ function EditJobPageInner() {
       </div>
 
       <JobForm
-        key={id}
+        key={`${id}-${job.updatedAt ?? ""}-${job.level ?? ""}`}
         mode="edit"
         defaults={job}
         onSubmit={onSubmit}

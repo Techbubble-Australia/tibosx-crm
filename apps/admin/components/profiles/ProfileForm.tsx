@@ -15,7 +15,8 @@ import { getSortedCountryOptions } from "@/lib/country-flags";
 import { getCitiesForCountryCode } from "@/lib/country-cities";
 import { resolveDocumentFileName, resolveDocumentHref } from "@/lib/media-url";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
-import { PROFILE_LEVELS, DEFAULT_PROFILE_LEVEL } from "@/lib/profile-levels";
+import { DEFAULT_PROFILE_LEVEL } from "@/lib/profile-levels";
+import { useJobLevels } from "@/hooks/useJobLevels";
 
 const OTHER_CITY_VALUE = "__other__";
 
@@ -88,6 +89,7 @@ export function ProfileForm({
   submitLabel,
 }: Props) {
   const { canManageProfileOwnership } = useAdminSession();
+  const jobLevels = useJobLevels();
   const [categories, setCategories] = useState<TaxonomyItem[]>([]);
   const [technologies, setTechnologies] = useState<TechnologyItem[]>([]);
   const [taxonomyReady, setTaxonomyReady] = useState(false);
@@ -187,12 +189,21 @@ export function ProfileForm({
     const match = countryOptions.find((option) => option.name === defaults.country);
     if (match) {
       setCountryCode(match.code);
+      setCountry(defaults.country);
     }
-    if (defaults.city && cityOptions.length > 0 && !cityOptions.includes(defaults.city)) {
+  }, [defaults.country, countryOptions]);
+
+  useEffect(() => {
+    if (!defaults.city || !defaults.country || defaults.country !== country) return;
+    if (cityOptions.length === 0) return;
+    if (cityOptions.includes(defaults.city)) {
+      setCity(defaults.city);
+      setCityOther("");
+    } else {
       setCity(OTHER_CITY_VALUE);
       setCityOther(defaults.city);
     }
-  }, [defaults.country, defaults.city, countryOptions, cityOptions]);
+  }, [defaults.city, defaults.country, country, cityOptions]);
 
   function handleCategoryChange(next: string) {
     setCategory(next);
@@ -512,7 +523,7 @@ export function ProfileForm({
               onChange={(e) => setLevel(e.target.value)}
               className={inputClass}
             >
-              {PROFILE_LEVELS.map((lvl) => (
+              {jobLevels.map((lvl) => (
                 <option key={lvl} value={lvl}>{lvl}</option>
               ))}
             </select>
@@ -598,12 +609,14 @@ export function ProfileForm({
                     })}
                   </p>
                 </div>
-                <Link
-                  href={`/career-applications/${app.jobPublished ? "active" : "inactive"}?jobListingId=${encodeURIComponent(app.jobListingId ?? "")}`}
-                  className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
-                >
-                  View applications
-                </Link>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Link
+                    href={`/career-applications/${app.jobPublished ? "active" : "inactive"}?jobListingId=${encodeURIComponent(app.jobListingId ?? "")}`}
+                    className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    View job applications
+                  </Link>
+                </div>
               </li>
             ))}
           </ul>
@@ -762,11 +775,6 @@ export function ProfileForm({
           Cancel
         </Link>
       </div>
-      {mode === "edit" && defaults.careerApplicationId && !defaults.careerApplications?.length ? (
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Primary career application: {defaults.careerApplicationId}
-        </p>
-      ) : null}
     </form>
   );
 }

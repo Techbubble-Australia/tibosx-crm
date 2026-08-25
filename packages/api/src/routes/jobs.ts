@@ -9,7 +9,8 @@ import {
   syncLegacyLocationFields,
 } from "../lib/job-locations";
 import { JOB_LISTING_TYPES } from "../lib/careers-form";
-import { PROFILE_LEVELS } from "../lib/profile-levels";
+import { DEFAULT_PROFILE_LEVEL } from "../lib/profile-levels";
+import { getJobLevelNames } from "../lib/job-levels";
 
 const router: IRouter = Router();
 
@@ -32,8 +33,9 @@ const jobSchema = z.object({
   isHot: z.boolean().optional(),
   city: z.string().max(120).optional().nullable(),
   endClient: z.string().max(200).optional().nullable(),
+  budget: z.string().max(500).optional().default(""),
   order: z.number().int().default(0),
-  level: z.enum(PROFILE_LEVELS).default("Developer"),
+  level: z.string().min(1).max(120).default(DEFAULT_PROFILE_LEVEL),
   positionsCount: z.coerce.number().int().min(1).default(1),
   publishedDate: z.coerce.date().optional().nullable(),
 });
@@ -78,6 +80,28 @@ function prepareJobWriteData(body: z.infer<typeof jobSchema>): Record<string, un
 function parseRecruiterIds(_value: unknown): string[] {
   return [];
 }
+
+router.patch("/admin/:id/published-date", async (req, res) => {
+  try {
+    const body = z.object({ publishedDate: z.coerce.date() }).parse(req.body);
+    const existing = await prisma.jobListing.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    const job = await prisma.jobListing.update({
+      where: { id: req.params.id },
+      data: { publishedDate: body.publishedDate },
+      include: { client: { select: { name: true } } },
+    });
+    res.json({ data: serializeAdminJob(job) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error updating job published date:", error);
+    res.status(500).json({ error: "Failed to update published date" });
+  }
+});
 
 router.patch("/admin/:id/hot", async (req, res) => {
   try {
@@ -175,6 +199,7 @@ function serializeAdminJob(
     clientId: job.clientId,
     clientName: job.client?.name ?? "",
     endClient: job.endClient ?? "",
+    budget: job.budget ?? "",
     description: job.description,
     likeCount: job.likeCount ?? 0,
     published: job.published,
@@ -372,6 +397,10 @@ router.get("/:slug", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const data = jobSchema.parse(req.body);
+    const allowedLevels = await getJobLevelNames();
+    if (!allowedLevels.includes(data.level)) {
+      return res.status(400).json({ error: `Invalid level. Choose from: ${allowedLevels.join(", ")}` });
+    }
     const writeData = prepareJobWriteData(data);
     const referenceNumber = await allocateJobReferenceNumber();
     const order = data.order && data.order > 0 ? data.order : await allocateNextJobOrder();
@@ -398,16 +427,30 @@ router.post("/", async (req, res) => {
 // Admin: update job
 router.put("/:id", async (req, res) => {
   try {
-    const data = jobSchema.partial().parse(req.body);
+    const partial = jobSchema.partial().parse(req.body);
     const existing = await prisma.jobListing.findUnique({ where: { id: req.params.id } });
     if (!existing) {
       return res.status(404).json({ error: "Job not found" });
     }
-    const merged = mergeJobUpdate(existing, data);
+
+    if (partial.level) {
+      const allowedLevels = await getJobLevelNames();
+      if (!allowedLevels.includes(partial.level)) {
+        return res.status(400).json({ error: `Invalid level. Choose from: ${allowedLevels.join(", ")}` });
+      }
+    }
+
+    const merged = mergeJobUpdate(existing, partial);
     const writeData = prepareJobWriteData(merged);
     const job = await prisma.jobListing.update({
       where: { id: req.params.id },
-      data: writeData as Prisma.JobListingUpdateInput,
+      data: {
+        ...(writeData as Prisma.JobListingUpdateInput),
+        level: partial.level ?? merged.level,
+        publishedDate:
+          partial.publishedDate !== undefined ? partial.publishedDate : existing.publishedDate,
+        budget: partial.budget !== undefined ? partial.budget : existing.budget,
+      },
       include: { client: { select: { name: true } } },
     });
     res.json({ data: serializeAdminJob(job) });

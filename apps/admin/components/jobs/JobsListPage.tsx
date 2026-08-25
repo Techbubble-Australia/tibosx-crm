@@ -23,6 +23,8 @@ const JOB_LIST_COLUMNS: ListColumnDef[] = [
   { id: "client", label: "Client" },
   { id: "technology", label: "Technology" },
   { id: "level", label: "Level" },
+  { id: "budget", label: "Budget" },
+  { id: "type", label: "Employment type" },
   { id: "publishedDate", label: "Published date" },
   { id: "applications", label: "Applications" },
   { id: "status", label: "Status" },
@@ -48,6 +50,7 @@ interface JobListing {
   isHot?: boolean;
   order?: number;
   level?: string;
+  budget?: string;
   publishedDate?: string | null;
   createdAt: string;
 }
@@ -79,6 +82,10 @@ type SortKey =
   | "country"
   | "clientName"
   | "technology"
+  | "level"
+  | "budget"
+  | "type"
+  | "publishedDate"
   | "applicationCount";
 type SortDir = "asc" | "desc";
 
@@ -100,6 +107,14 @@ function compareJobs(a: JobListing, b: JobListing, key: SortKey): number {
       return (a.clientName || "").localeCompare(b.clientName || "");
     case "technology":
       return (a.technology || "").localeCompare(b.technology || "");
+    case "level":
+      return (a.level || "").localeCompare(b.level || "");
+    case "budget":
+      return (a.budget || "").localeCompare(b.budget || "");
+    case "type":
+      return (a.type || "").localeCompare(b.type || "");
+    case "publishedDate":
+      return new Date(a.publishedDate ?? 0).getTime() - new Date(b.publishedDate ?? 0).getTime();
     case "applicationCount":
       return (a.applicationCount ?? 0) - (b.applicationCount ?? 0);
     default:
@@ -174,6 +189,8 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
   const [selectedTechnology, setSelectedTechnology] = useState<string | null>(null);
   const [orderDrafts, setOrderDrafts] = useState<Record<string, string>>({});
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [editingPublishedDateId, setEditingPublishedDateId] = useState<string | null>(null);
+  const [publishedDateDrafts, setPublishedDateDrafts] = useState<Record<string, string>>({});
   const [sortKey, setSortKey] = useState<SortKey>("order");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
@@ -265,6 +282,55 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
     } catch (error) {
       console.error("Error updating job order:", error);
     }
+  }
+
+  async function savePublishedDate(job: JobListing) {
+    if (!canManageJobs) return;
+    const raw = publishedDateDrafts[job.id];
+    if (!raw?.trim()) {
+      cancelEditPublishedDate(job.id);
+      return;
+    }
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) {
+      cancelEditPublishedDate(job.id);
+      return;
+    }
+    try {
+      const res = await adminFetch(`/api/admin/jobs/admin/${job.id}/published-date`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publishedDate: raw }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const nextDate = data.data?.publishedDate ?? raw;
+        setJobs((prev) =>
+          prev.map((j) => (j.id === job.id ? { ...j, publishedDate: nextDate } : j)),
+        );
+        cancelEditPublishedDate(job.id);
+      }
+    } catch (error) {
+      console.error("Error updating published date:", error);
+    }
+  }
+
+  function startEditPublishedDate(job: JobListing) {
+    setEditingPublishedDateId(job.id);
+    const existing = job.publishedDate ? new Date(job.publishedDate) : new Date();
+    const value = Number.isNaN(existing.getTime())
+      ? ""
+      : existing.toISOString().slice(0, 10);
+    setPublishedDateDrafts((prev) => ({ ...prev, [job.id]: value }));
+  }
+
+  function cancelEditPublishedDate(jobId: string) {
+    setEditingPublishedDateId((current) => (current === jobId ? null : current));
+    setPublishedDateDrafts((prev) => {
+      const next = { ...prev };
+      delete next[jobId];
+      return next;
+    });
   }
 
   function handleSort(key: SortKey) {
@@ -406,10 +472,24 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                   </th>
                 ) : null}
                 {isColumnVisible("level") ? (
-                  <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Level</th>
+                  <th className="px-4 py-3 text-left">
+                    <SortHeader label="Level" sortKey="level" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                  </th>
+                ) : null}
+                {isColumnVisible("budget") ? (
+                  <th className="px-4 py-3 text-left">
+                    <SortHeader label="Budget" sortKey="budget" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                  </th>
+                ) : null}
+                {isColumnVisible("type") ? (
+                  <th className="px-4 py-3 text-left">
+                    <SortHeader label="Employment type" sortKey="type" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                  </th>
                 ) : null}
                 {isColumnVisible("publishedDate") ? (
-                  <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Published date</th>
+                  <th className="px-4 py-3 text-left">
+                    <SortHeader label="Published date" sortKey="publishedDate" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                  </th>
                 ) : null}
                 {isColumnVisible("applications") ? (
                   <th className="px-4 py-3 text-left">
@@ -535,15 +615,69 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                     {isColumnVisible("level") ? (
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.level ?? "Developer"}</td>
                     ) : null}
+                    {isColumnVisible("budget") ? (
+                      <td className="max-w-[160px] truncate px-4 py-3 text-gray-600 dark:text-gray-400" title={job.budget || undefined}>
+                        {job.budget?.trim() ? job.budget : "—"}
+                      </td>
+                    ) : null}
+                    {isColumnVisible("type") ? (
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.type || "—"}</td>
+                    ) : null}
                     {isColumnVisible("publishedDate") ? (
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                        {job.publishedDate
-                          ? new Date(job.publishedDate).toLocaleDateString("en-AU", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })
-                          : "—"}
+                        {canManageJobs ? (
+                          <div className="flex items-center gap-1">
+                            {editingPublishedDateId === job.id ? (
+                              <input
+                                type="date"
+                                value={publishedDateDrafts[job.id] ?? ""}
+                                onChange={(e) =>
+                                  setPublishedDateDrafts((prev) => ({ ...prev, [job.id]: e.target.value }))
+                                }
+                                onBlur={() => void savePublishedDate(job)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.currentTarget.blur();
+                                  } else if (e.key === "Escape") {
+                                    cancelEditPublishedDate(job.id);
+                                  }
+                                }}
+                                autoFocus
+                                className="rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                                aria-label={`Edit published date for ${job.title}`}
+                              />
+                            ) : (
+                              <>
+                                <span>
+                                  {job.publishedDate
+                                    ? new Date(job.publishedDate).toLocaleDateString("en-AU", {
+                                        day: "numeric",
+                                        month: "short",
+                                        year: "numeric",
+                                      })
+                                    : "—"}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => startEditPublishedDate(job)}
+                                  className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                                  aria-label={`Edit published date for ${job.title}`}
+                                  title="Edit published date"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" aria-hidden />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          job.publishedDate
+                            ? new Date(job.publishedDate).toLocaleDateString("en-AU", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })
+                            : "—"
+                        )}
                       </td>
                     ) : null}
                     {isColumnVisible("applications") ? (

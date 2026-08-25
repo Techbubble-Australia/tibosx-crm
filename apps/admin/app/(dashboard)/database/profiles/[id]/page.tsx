@@ -74,7 +74,7 @@ export default function EditProfilePage() {
         </div>
       </div>
       <ProfileForm
-        key={`${id}-${defaults.updatedAt ?? ""}`}
+        key={`${id}-${defaults.updatedAt ?? ""}-${defaults.careerApplications?.length ?? 0}`}
         mode="edit"
         defaults={defaults}
         onSubmit={handleSubmit}

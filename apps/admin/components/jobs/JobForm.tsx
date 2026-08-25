@@ -7,7 +7,8 @@ import { HtmlEditor } from "@/components/HtmlEditor";
 import { JobLocationsField } from "@/components/jobs/JobLocationsField";
 import { adminFetch } from "@/lib/admin-api";
 import { jobLocationsFromDefaults, type JobLocationEntry } from "@/lib/job-locations";
-import { PROFILE_LEVELS, DEFAULT_PROFILE_LEVEL } from "@/lib/profile-levels";
+import { DEFAULT_PROFILE_LEVEL } from "@/lib/profile-levels";
+import { useJobLevels } from "@/hooks/useJobLevels";
 
 export type JobFormDefaults = {
   id?: string;
@@ -31,6 +32,8 @@ export type JobFormDefaults = {
   level?: string;
   positionsCount?: number;
   publishedDate?: string | null;
+  budget?: string;
+  updatedAt?: string;
 };
 
 type TaxonomyItem = { id: string; name: string };
@@ -67,6 +70,7 @@ export function JobForm({
   cancelHref,
   submitLabel,
 }: Props) {
+  const jobLevels = useJobLevels();
   const [title, setTitle] = useState(defaults.title ?? "");
   const [categories, setCategories] = useState<TaxonomyItem[]>([]);
   const [technologies, setTechnologies] = useState<TechnologyItem[]>([]);
@@ -82,6 +86,14 @@ export function JobForm({
   const [endClient, setEndClient] = useState(defaults.endClient ?? "");
   const [level, setLevel] = useState(defaults.level ?? DEFAULT_PROFILE_LEVEL);
   const [positionsCount, setPositionsCount] = useState(String(defaults.positionsCount ?? 1));
+  const [budget, setBudget] = useState(defaults.budget ?? "");
+  const [publishedDate, setPublishedDate] = useState(() => {
+    if (!defaults.publishedDate) return "";
+    const d = new Date(defaults.publishedDate);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toISOString().slice(0, 10);
+  });
+  const [nextOrder, setNextOrder] = useState<number | null>(null);
 
   const filteredTechnologies = useMemo(() => {
     if (!category) return [];
@@ -125,6 +137,28 @@ export function JobForm({
     }
     void loadTaxonomy();
   }, []);
+
+  useEffect(() => {
+    if (defaults.level) setLevel(defaults.level);
+    if (defaults.budget !== undefined) setBudget(defaults.budget ?? "");
+    if (defaults.publishedDate) {
+      const d = new Date(defaults.publishedDate);
+      if (!Number.isNaN(d.getTime())) {
+        setPublishedDate(d.toISOString().slice(0, 10));
+      }
+    }
+  }, [defaults.level, defaults.budget, defaults.publishedDate]);
+
+  useEffect(() => {
+    if (mode !== "create") return;
+    void adminFetch("/api/admin/jobs/admin/next-order")
+      .then((res) => res.json())
+      .then((data) => {
+        const order = data.data?.order;
+        if (typeof order === "number") setNextOrder(order);
+      })
+      .catch(console.error);
+  }, [mode]);
 
   useEffect(() => {
     if (defaults.category) setCategory(defaults.category);
@@ -182,10 +216,14 @@ export function JobForm({
       endClient: endClient.trim() || null,
       level,
       positionsCount: Number.parseInt(positionsCount, 10) || 1,
+      budget: budget.trim(),
       description,
       order: mode === "create" ? 0 : parseInt(formData.get("order") as string, 10) || 0,
       published: formData.get("published") === "on",
     };
+    if (publishedDate.trim()) {
+      payload.publishedDate = publishedDate.trim();
+    }
     if (mode === "create") {
       payload.slug = slugify(formData.get("title") as string);
     }
@@ -253,23 +291,45 @@ export function JobForm({
               onChange={(e) => setLevel(e.target.value)}
               className={inputClass}
             >
-              {PROFILE_LEVELS.map((lvl) => (
+              {jobLevels.map((lvl) => (
                 <option key={lvl} value={lvl}>{lvl}</option>
               ))}
             </select>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              <Link href="/settings/levels" className="underline hover:text-gray-700 dark:hover:text-gray-300">
+                Manage levels
+              </Link>
+            </p>
           </div>
-          {mode === "edit" && defaults.publishedDate ? (
+          <div>
+            <label className={labelClass}>Budget</label>
+            <input
+              type="text"
+              value={budget}
+              onChange={(e) => setBudget(e.target.value)}
+              className={inputClass}
+              placeholder="Optional budget notes"
+              maxLength={500}
+            />
+          </div>
+          {mode === "edit" ? (
             <div>
               <label className={labelClass}>Published date</label>
-              <p className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
-                {new Date(defaults.publishedDate).toLocaleDateString("en-AU", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}
+              <input
+                type="date"
+                value={publishedDate}
+                onChange={(e) => setPublishedDate(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+          ) : (
+            <div>
+              <label className={labelClass}>Published date</label>
+              <p className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                Set automatically when the job is created
               </p>
             </div>
-          ) : null}
+          )}
           <div>
             <label className={labelClass}>No. of positions *</label>
             <input
@@ -443,9 +503,12 @@ export function JobForm({
               />
             </div>
           ) : (
-            <p className="text-xs text-gray-500 dark:text-gray-400 sm:col-span-2">
-              Display order is assigned automatically when the job is created.
-            </p>
+            <div>
+              <label className={labelClass}>Display order</label>
+              <p className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
+                {nextOrder !== null ? nextOrder : "Assigned automatically on create"}
+              </p>
+            </div>
           )}
           <div className={`flex items-center gap-3 ${mode === "edit" ? "pt-6" : ""}`}>
             <input

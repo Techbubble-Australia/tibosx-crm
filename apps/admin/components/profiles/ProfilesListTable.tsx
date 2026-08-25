@@ -29,6 +29,7 @@ export type ProfileListRow = {
   comments?: string | null;
   documentUrls?: string[];
   isDuplicate?: boolean;
+  createdAt?: string;
 };
 
 type SourcerOption = { id: string; label: string };
@@ -210,6 +211,9 @@ export function ProfilesListTable({
           ) : null}
           {isColumnVisible("sourcedBy") ? (
             <th className="px-3 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Sourced by</th>
+          ) : null}
+          {isColumnVisible("createdAt") ? (
+            <th className="px-3 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Created on</th>
           ) : null}
           {isColumnVisible("docs") ? (
             <th className="px-3 py-3 text-center font-medium text-gray-600 dark:text-gray-300">Docs</th>
@@ -422,6 +426,17 @@ export function ProfilesListTable({
                       {row.sourcedByName || "—"}
                     </span>
                   )}
+                </td>
+              ) : null}
+              {isColumnVisible("createdAt") ? (
+                <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
+                  {row.createdAt
+                    ? new Date(row.createdAt).toLocaleDateString("en-AU", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })
+                    : "—"}
                 </td>
               ) : null}
               {isColumnVisible("docs") ? (

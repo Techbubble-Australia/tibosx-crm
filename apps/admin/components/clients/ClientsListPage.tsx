@@ -135,6 +135,7 @@ export function ClientsListPage({ statusFilter, heading, description }: Props) {
         <table className="w-full text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
             <tr>
+              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Order</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Name</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Country</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Contacts</th>
@@ -146,11 +147,11 @@ export function ClientsListPage({ statusFilter, heading, description }: Props) {
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {statusFiltered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">No clients in this tab yet.</td>
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">No clients in this tab yet.</td>
               </tr>
             ) : totalItems === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">No clients match your search.</td>
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">No clients match your search.</td>
               </tr>
             ) : (
               paginated.map((row) => {
@@ -158,6 +159,7 @@ export function ClientsListPage({ statusFilter, heading, description }: Props) {
                 const oppCount = row.opportunityCount ?? 0;
                 return (
                   <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.order}</td>
                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{row.name}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.country}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.contacts?.length ?? 0}</td>

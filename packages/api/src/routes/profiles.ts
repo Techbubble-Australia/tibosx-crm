@@ -10,7 +10,7 @@ import { PHONE_REGEX, PHONE_VALIDATION_MESSAGE } from "../lib/validation";
 import { SALARY_CURRENCIES, SALARY_MODES, parseSalaryRateInput } from "../lib/careers-form";
 import { linkProfileToJobIfRequested } from "../lib/profile-to-application";
 import { computeProfileDuplicateMeta } from "../lib/profile-duplicates";
-import { PROFILE_LEVELS } from "../lib/profile-levels";
+import { getJobLevelNames } from "../lib/job-levels";
 
 const router: IRouter = Router();
 
@@ -36,7 +36,7 @@ const profileSchema = z.object({
   jobListingId: z.string().optional().nullable(),
   isCitizen: z.boolean().default(true),
   visaStatus: z.string().max(200).optional().nullable(),
-  level: z.enum(PROFILE_LEVELS).default("Developer"),
+  level: z.string().min(1).max(120).default("Developer"),
   relevantExperience: z.coerce.number().int().min(0).max(80),
 }).superRefine((data, ctx) => {
   if (!data.isCitizen && !data.visaStatus?.trim()) {
@@ -47,6 +47,61 @@ const profileSchema = z.object({
     });
   }
 });
+
+type CareerApplicationWithJob = {
+  id: string;
+  position: string;
+  status: string;
+  jobListingId: string | null;
+  createdAt: Date;
+  jobListing: { title: string; referenceNumber: string; published: boolean } | null;
+};
+
+function mapCareerApplication(app: CareerApplicationWithJob) {
+  return {
+    id: app.id,
+    position: app.position,
+    status: app.status,
+    jobListingId: app.jobListingId,
+    jobTitle: app.jobListing?.title ?? null,
+    jobReferenceNumber: app.jobListing?.referenceNumber ?? null,
+    jobPublished: app.jobListing?.published ?? null,
+    createdAt: app.createdAt,
+  };
+}
+
+async function buildProfileCareerApplications(row: {
+  careerApplicationId: string | null;
+  careerApplications: CareerApplicationWithJob[];
+}) {
+  const apps = row.careerApplications.map(mapCareerApplication);
+  const seen = new Set(apps.map((app) => app.id));
+  if (row.careerApplicationId && !seen.has(row.careerApplicationId)) {
+    const legacy = await prisma.careerApplication.findUnique({
+      where: { id: row.careerApplicationId },
+      include: {
+        jobListing: { select: { title: true, referenceNumber: true, published: true } },
+      },
+    });
+    if (legacy) {
+      apps.push(mapCareerApplication(legacy));
+    }
+  }
+  return apps;
+}
+
+async function assertValidProfileLevel(level: string): Promise<void> {
+  const allowed = await getJobLevelNames();
+  if (!allowed.includes(level)) {
+    throw new z.ZodError([
+      {
+        code: "custom",
+        message: `Invalid level. Choose from: ${allowed.join(", ")}`,
+        path: ["level"],
+      },
+    ]);
+  }
+}
 
 function makeStoredFilename(fieldname: string, originalname: string): string {
   const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
@@ -239,16 +294,7 @@ router.get("/:id", async (req, res) => {
       select: { id: true, email: true, phone: true },
     });
     const meta = computeProfileDuplicateMeta(allRows).get(row.id);
-    const careerApplications = row.careerApplications.map((app) => ({
-      id: app.id,
-      position: app.position,
-      status: app.status,
-      jobListingId: app.jobListingId,
-      jobTitle: app.jobListing?.title ?? null,
-      jobReferenceNumber: app.jobListing?.referenceNumber ?? null,
-      jobPublished: app.jobListing?.published ?? null,
-      createdAt: app.createdAt,
-    }));
+    const careerApplications = await buildProfileCareerApplications(row);
     res.json({
       data: serializeProfile({
         ...row,
@@ -278,6 +324,7 @@ router.post("/", async (req: AuthRequest, res) => {
       }
     }
     const data = profileSchema.parse(body);
+    await assertValidProfileLevel(data.level);
 
     let sourcedById = data.sourcedById ?? null;
     if (req.user?.role === "recruiter") {
@@ -325,16 +372,9 @@ router.post("/", async (req: AuthRequest, res) => {
         },
       },
     });
-    const careerApplications = (refreshed?.careerApplications ?? []).map((app) => ({
-      id: app.id,
-      position: app.position,
-      status: app.status,
-      jobListingId: app.jobListingId,
-      jobTitle: app.jobListing?.title ?? null,
-      jobReferenceNumber: app.jobListing?.referenceNumber ?? null,
-      jobPublished: app.jobListing?.published ?? null,
-      createdAt: app.createdAt,
-    }));
+    const careerApplications = refreshed
+      ? await buildProfileCareerApplications(refreshed)
+      : [];
     res.status(201).json({
       data: serializeProfile({
         ...(refreshed ?? row),
@@ -364,7 +404,7 @@ router.patch("/:id", async (req: AuthRequest, res) => {
       city: z.string().max(120).optional().nullable(),
       country: z.string().min(1).max(120).optional(),
       technology: z.string().min(1).max(120).optional(),
-      level: z.enum(PROFILE_LEVELS).optional(),
+      level: z.string().min(1).max(120).optional(),
       relevantExperience: z.coerce.number().int().min(0).max(80).optional(),
       sourcedById: z.string().nullable().optional(),
     });
@@ -434,6 +474,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
       }
     }
     const data = profileSchema.parse(body);
+    await assertValidProfileLevel(data.level);
 
     let sourcedById = data.sourcedById ?? null;
     if (req.user?.role !== "admin") {
@@ -479,16 +520,9 @@ router.put("/:id", async (req: AuthRequest, res) => {
         },
       },
     });
-    const careerApplications = (refreshed?.careerApplications ?? []).map((app) => ({
-      id: app.id,
-      position: app.position,
-      status: app.status,
-      jobListingId: app.jobListingId,
-      jobTitle: app.jobListing?.title ?? null,
-      jobReferenceNumber: app.jobListing?.referenceNumber ?? null,
-      jobPublished: app.jobListing?.published ?? null,
-      createdAt: app.createdAt,
-    }));
+    const careerApplications = refreshed
+      ? await buildProfileCareerApplications(refreshed)
+      : [];
     res.json({
       data: serializeProfile({
         ...(refreshed ?? row),

@@ -1,5 +1,10 @@
-export const PROFILE_LEVELS = ["Manager", "Architect", "Developer", "Tester"] as const;
+/** Default level when none is set. */
+export const DEFAULT_PROFILE_LEVEL = "Developer";
 
-export type ProfileLevel = (typeof PROFILE_LEVELS)[number];
+/** Used when the JobLevel settings table has no rows yet. */
+export const FALLBACK_PROFILE_LEVELS = ["Manager", "Architect", "Developer", "Tester"] as const;
 
-export const DEFAULT_PROFILE_LEVEL: ProfileLevel = "Developer";
+/** Static fallback list — prefer loading from `/api/admin/job-levels` in the UI. */
+export const PROFILE_LEVELS = [...FALLBACK_PROFILE_LEVELS] as const;
+
+export type ProfileLevel = string;
