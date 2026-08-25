@@ -305,6 +305,21 @@ router.get("/admin/applications", async (req, res) => {
       },
       orderBy: { createdAt: "desc" },
     });
+
+    const missingProfileIds = applications
+      .filter((row) => !row.profileId)
+      .map((row) => row.id);
+    const legacyProfiles =
+      missingProfileIds.length > 0
+        ? await prisma.candidateProfile.findMany({
+            where: { careerApplicationId: { in: missingProfileIds } },
+            select: { id: true, careerApplicationId: true },
+          })
+        : [];
+    const legacyProfileByAppId = new Map(
+      legacyProfiles.map((p) => [p.careerApplicationId!, p.id]),
+    );
+
     res.json({
       data: applications.map((row) => ({
         ...row,
@@ -314,6 +329,7 @@ router.get("/admin/applications", async (req, res) => {
         jobCountry: row.jobListing?.country ?? null,
         jobWorkMode: row.jobListing?.workMode ?? null,
         clientName: row.jobListing?.client?.name ?? null,
+        profileId: row.profileId ?? legacyProfileByAppId.get(row.id) ?? null,
       })),
     });
   } catch (error) {

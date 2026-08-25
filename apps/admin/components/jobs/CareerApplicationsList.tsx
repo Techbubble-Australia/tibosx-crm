@@ -44,6 +44,7 @@ interface CareerApplication {
   jobCountry?: string | null;
   jobWorkMode?: string | null;
   clientName?: string | null;
+  profileId?: string | null;
 }
 
 function formatSalary(app: CareerApplication): string | null {
@@ -129,9 +130,18 @@ function ApplicationCard({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-semibold text-gray-900 dark:text-gray-100">
-              {app.firstName} {app.lastName}
-            </p>
+            {app.profileId ? (
+              <Link
+                href={`/database/profiles/${app.profileId}`}
+                className="font-semibold text-gray-900 hover:text-blue-600 hover:underline dark:text-gray-100 dark:hover:text-blue-400"
+              >
+                {app.firstName} {app.lastName}
+              </Link>
+            ) : (
+              <p className="font-semibold text-gray-900 dark:text-gray-100">
+                {app.firstName} {app.lastName}
+              </p>
+            )}
             {canEdit ? (
               <select
                 value={status}

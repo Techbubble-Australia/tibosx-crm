@@ -116,6 +116,16 @@ function serializeProfile(row: {
   duplicateMatchReason?: string | null;
   createdAt: Date;
   updatedAt: Date;
+  careerApplications?: Array<{
+    id: string;
+    position: string;
+    status: string;
+    jobListingId: string | null;
+    jobTitle: string | null;
+    jobReferenceNumber: string | null;
+    jobPublished: boolean | null;
+    createdAt: Date;
+  }>;
 }) {
   const docs = Array.isArray(row.documentUrls)
     ? row.documentUrls.filter((url): url is string => typeof url === "string")
@@ -149,6 +159,16 @@ function serializeProfile(row: {
     duplicateMatchReason: row.duplicateMatchReason ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    careerApplications: (row.careerApplications ?? []).map((app) => ({
+      id: app.id,
+      position: app.position,
+      status: app.status,
+      jobListingId: app.jobListingId,
+      jobTitle: app.jobTitle,
+      jobReferenceNumber: app.jobReferenceNumber,
+      jobPublished: app.jobPublished,
+      createdAt: app.createdAt.toISOString(),
+    })),
   };
 }
 
@@ -202,7 +222,15 @@ router.get("/:id", async (req, res) => {
   try {
     const row = await prisma.candidateProfile.findUnique({
       where: { id: req.params.id },
-      include: { sourcedBy: { select: { name: true, email: true } } },
+      include: {
+        sourcedBy: { select: { name: true, email: true } },
+        careerApplications: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            jobListing: { select: { title: true, referenceNumber: true, published: true } },
+          },
+        },
+      },
     });
     if (!row) {
       return res.status(404).json({ error: "Not found" });
@@ -211,6 +239,16 @@ router.get("/:id", async (req, res) => {
       select: { id: true, email: true, phone: true },
     });
     const meta = computeProfileDuplicateMeta(allRows).get(row.id);
+    const careerApplications = row.careerApplications.map((app) => ({
+      id: app.id,
+      position: app.position,
+      status: app.status,
+      jobListingId: app.jobListingId,
+      jobTitle: app.jobListing?.title ?? null,
+      jobReferenceNumber: app.jobListing?.referenceNumber ?? null,
+      jobPublished: app.jobListing?.published ?? null,
+      createdAt: app.createdAt,
+    }));
     res.json({
       data: serializeProfile({
         ...row,
@@ -218,6 +256,7 @@ router.get("/:id", async (req, res) => {
         isDuplicate: meta?.isDuplicate ?? false,
         duplicateCount: meta?.duplicateCount ?? 0,
         duplicateMatchReason: meta?.duplicateMatchReason ?? null,
+        careerApplications,
       }),
     });
   } catch (error) {
@@ -276,13 +315,32 @@ router.post("/", async (req: AuthRequest, res) => {
 
     const refreshed = await prisma.candidateProfile.findUnique({
       where: { id: row.id },
-      include: { sourcedBy: { select: { name: true, email: true } } },
+      include: {
+        sourcedBy: { select: { name: true, email: true } },
+        careerApplications: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            jobListing: { select: { title: true, referenceNumber: true, published: true } },
+          },
+        },
+      },
     });
+    const careerApplications = (refreshed?.careerApplications ?? []).map((app) => ({
+      id: app.id,
+      position: app.position,
+      status: app.status,
+      jobListingId: app.jobListingId,
+      jobTitle: app.jobListing?.title ?? null,
+      jobReferenceNumber: app.jobListing?.referenceNumber ?? null,
+      jobPublished: app.jobListing?.published ?? null,
+      createdAt: app.createdAt,
+    }));
     res.status(201).json({
       data: serializeProfile({
         ...(refreshed ?? row),
         sourcedByName:
           refreshed?.sourcedBy?.name?.trim() || refreshed?.sourcedBy?.email || null,
+        careerApplications,
       }),
     });
   } catch (error) {
@@ -411,13 +469,32 @@ router.put("/:id", async (req: AuthRequest, res) => {
 
     const refreshed = await prisma.candidateProfile.findUnique({
       where: { id: row.id },
-      include: { sourcedBy: { select: { name: true, email: true } } },
+      include: {
+        sourcedBy: { select: { name: true, email: true } },
+        careerApplications: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            jobListing: { select: { title: true, referenceNumber: true, published: true } },
+          },
+        },
+      },
     });
+    const careerApplications = (refreshed?.careerApplications ?? []).map((app) => ({
+      id: app.id,
+      position: app.position,
+      status: app.status,
+      jobListingId: app.jobListingId,
+      jobTitle: app.jobListing?.title ?? null,
+      jobReferenceNumber: app.jobListing?.referenceNumber ?? null,
+      jobPublished: app.jobListing?.published ?? null,
+      createdAt: app.createdAt,
+    }));
     res.json({
       data: serializeProfile({
         ...(refreshed ?? row),
         sourcedByName:
           refreshed?.sourcedBy?.name?.trim() || refreshed?.sourcedBy?.email || null,
+        careerApplications,
       }),
     });
   } catch (error) {

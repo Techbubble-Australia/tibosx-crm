@@ -29,6 +29,7 @@ export type JobFormDefaults = {
   city?: string | null;
   endClient?: string | null;
   level?: string;
+  positionsCount?: number;
   publishedDate?: string | null;
 };
 
@@ -80,6 +81,7 @@ export function JobForm({
   const [clientId, setClientId] = useState(defaults.clientId ?? "");
   const [endClient, setEndClient] = useState(defaults.endClient ?? "");
   const [level, setLevel] = useState(defaults.level ?? DEFAULT_PROFILE_LEVEL);
+  const [positionsCount, setPositionsCount] = useState(String(defaults.positionsCount ?? 1));
 
   const filteredTechnologies = useMemo(() => {
     if (!category) return [];
@@ -179,6 +181,7 @@ export function JobForm({
       clientId,
       endClient: endClient.trim() || null,
       level,
+      positionsCount: Number.parseInt(positionsCount, 10) || 1,
       description,
       order: mode === "create" ? 0 : parseInt(formData.get("order") as string, 10) || 0,
       published: formData.get("published") === "on",
@@ -267,6 +270,17 @@ export function JobForm({
               </p>
             </div>
           ) : null}
+          <div>
+            <label className={labelClass}>No. of positions *</label>
+            <input
+              type="number"
+              required
+              min={1}
+              value={positionsCount}
+              onChange={(e) => setPositionsCount(e.target.value)}
+              className={inputClass}
+            />
+          </div>
         </div>
 
         {taxonomyReady ? (

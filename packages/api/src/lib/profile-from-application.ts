@@ -83,7 +83,7 @@ export async function createProfileFromCareerApplication(application: Applicatio
     return;
   }
 
-  const { category, technology } = await inferCategoryTechnologyFromPosition(application.position);
+  let { category, technology } = await inferCategoryTechnologyFromPosition(application.position);
 
   let country = application.country?.trim() ?? "";
   let city = application.city?.trim() || null;
@@ -113,7 +113,7 @@ export async function createProfileFromCareerApplication(application: Applicatio
     return;
   }
 
-  await prisma.candidateProfile.create({
+  const profile = await prisma.candidateProfile.create({
     data: {
       firstName: application.firstName.trim(),
       lastName: application.lastName.trim(),
@@ -134,5 +134,10 @@ export async function createProfileFromCareerApplication(application: Applicatio
       relevantExperience: application.relevantExperience ?? 0,
       careerApplicationId: application.id,
     },
+  });
+
+  await prisma.careerApplication.update({
+    where: { id: application.id },
+    data: { profileId: profile.id },
   });
 }

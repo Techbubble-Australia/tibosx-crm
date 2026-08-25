@@ -131,6 +131,8 @@ export type JobApiRow = {
   department: string;
   likeCount?: number;
   isHot?: boolean;
+  level?: string;
+  positionsCount?: number;
 };
 
 export type JobDetailApiRow = JobApiRow & {

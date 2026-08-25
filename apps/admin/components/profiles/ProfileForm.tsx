@@ -47,6 +47,18 @@ export type ProfileFormValues = {
   duplicateMatchReason?: string | null;
   createdAt?: string;
   updatedAt?: string;
+  careerApplications?: ProfileCareerApplication[];
+};
+
+export type ProfileCareerApplication = {
+  id: string;
+  position: string;
+  status: string;
+  jobListingId: string | null;
+  jobTitle: string | null;
+  jobReferenceNumber: string | null;
+  jobPublished: boolean | null;
+  createdAt: string;
 };
 
 type TaxonomyItem = { id: string; name: string };
@@ -113,6 +125,7 @@ export function ProfileForm({
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [savedNotice, setSavedNotice] = useState(false);
 
   useEffect(() => {
@@ -215,9 +228,10 @@ export function ProfileForm({
 
     const normalizedPhone = phone.replace(/\s+/g, "");
     if (!/^\+?\d{8,20}$/.test(normalizedPhone)) {
-      setError("Phone must contain digits only with no spaces (8–20 characters)");
+      setPhoneError("Phone must contain digits only (8–20 characters, optional + prefix, no spaces)");
       return;
     }
+    setPhoneError("");
 
     let nextDocumentUrls = [...documentUrls];
 
@@ -302,6 +316,7 @@ export function ProfileForm({
       });
       setSavedNotice(true);
       window.setTimeout(() => setSavedNotice(false), 4000);
+      setJobListingId("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save profile");
     }
@@ -350,11 +365,28 @@ export function ProfileForm({
               type="tel"
               required
               value={phone}
-              onChange={(e) => setPhone(e.target.value.replace(/\s+/g, ""))}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/[^\d+]/g, "");
+                const next = raw.startsWith("+")
+                  ? `+${raw.slice(1).replace(/\D/g, "")}`
+                  : raw.replace(/\D/g, "");
+                setPhone(next);
+                if (phoneError) setPhoneError("");
+              }}
+              onBlur={() => {
+                const normalized = phone.replace(/\s+/g, "");
+                if (normalized && !/^\+?\d{8,20}$/.test(normalized)) {
+                  setPhoneError("Phone must contain digits only (8–20 characters, optional + prefix, no spaces)");
+                }
+              }}
               pattern={PHONE_PATTERN}
               title="Digits only, no spaces (8–20 characters)"
               className={inputClass}
+              aria-invalid={phoneError ? true : undefined}
             />
+            {phoneError ? (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400" role="alert">{phoneError}</p>
+            ) : null}
           </div>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -527,23 +559,56 @@ export function ProfileForm({
               value={jobListingId}
               onChange={(e) => setJobListingId(e.target.value)}
               className={inputClass}
-              disabled={Boolean(defaults.careerApplicationId)}
             >
               <option value="">Optional</option>
               {jobOptions.map((job) => (
                 <option key={job.id} value={job.id}>{job.label}</option>
               ))}
             </select>
-            {defaults.careerApplicationId ? (
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Already linked to a career application.</p>
-            ) : (
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                On save, creates a career application for the selected job.
-              </p>
-            )}
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              On save, creates a career application for the selected job (you can add multiple jobs over time).
+            </p>
           </div>
         </div>
       </section>
+
+      {defaults.careerApplications && defaults.careerApplications.length > 0 ? (
+        <section className="space-y-3 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100">Career applications</h3>
+          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+            {defaults.careerApplications.map((app) => (
+              <li key={app.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-gray-100">
+                    {app.jobTitle ?? app.position}
+                    {app.jobReferenceNumber ? (
+                      <span className="ml-2 font-mono text-xs text-gray-500 dark:text-gray-400">
+                        {app.jobReferenceNumber}
+                      </span>
+                    ) : null}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Status: {app.status.replace(/_/g, " ")}
+                    {app.jobPublished === false ? " · Inactive job" : ""}
+                    {" · "}
+                    {new Date(app.createdAt).toLocaleDateString("en-AU", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+                <Link
+                  href={`/career-applications/${app.jobPublished ? "active" : "inactive"}?jobListingId=${encodeURIComponent(app.jobListingId ?? "")}`}
+                  className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  View applications
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
         <h3 className="font-semibold text-gray-900 dark:text-gray-100">Rate & compensation</h3>
@@ -697,9 +762,9 @@ export function ProfileForm({
           Cancel
         </Link>
       </div>
-      {mode === "edit" && defaults.careerApplicationId ? (
+      {mode === "edit" && defaults.careerApplicationId && !defaults.careerApplications?.length ? (
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          Linked to career application {defaults.careerApplicationId}
+          Primary career application: {defaults.careerApplicationId}
         </p>
       ) : null}
     </form>

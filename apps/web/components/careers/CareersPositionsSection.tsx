@@ -120,6 +120,9 @@ export function CareersPositionsSection({ jobs }: { jobs: JobApiRow[] }) {
                     ) : null}
                     <p className="text-[13px] font-medium leading-5 text-[#666666] dark:text-zinc-400">
                       {formatType(position.type)} · {formatType(position.workMode)}
+                      {(position.positionsCount ?? 1) > 0 ? (
+                        <> · {(position.positionsCount ?? 1)} position{(position.positionsCount ?? 1) !== 1 ? "s" : ""}</>
+                      ) : null}
                     </p>
                     <JobCategoryTechnology
                       category={position.category}

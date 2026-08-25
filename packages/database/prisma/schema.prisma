@@ -186,8 +186,12 @@ model CareerApplication {
   status            String            @default("INTERNAL_REVIEW")
   /// Years of relevant experience (from apply form).
   relevantExperience Int?
-  profile           CandidateProfile?
+  profileId         String?
+  candidateProfile  CandidateProfile? @relation("ProfileApplications", fields: [profileId], references: [id], onDelete: SetNull)
+  legacyProfile     CandidateProfile? @relation("LegacyPrimaryApplication")
   createdAt         DateTime          @default(now())
+
+  @@index([profileId])
 }
 
 model CandidateProfile {
@@ -216,7 +220,8 @@ model CandidateProfile {
   sourcedById         String?
   sourcedBy           AdminUser?         @relation("ProfileSourcedBy", fields: [sourcedById], references: [id], onDelete: SetNull)
   careerApplicationId String?            @unique
-  careerApplication   CareerApplication? @relation(fields: [careerApplicationId], references: [id], onDelete: SetNull)
+  careerApplication   CareerApplication? @relation("LegacyPrimaryApplication", fields: [careerApplicationId], references: [id], onDelete: SetNull)
+  careerApplications  CareerApplication[] @relation("ProfileApplications")
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
@@ -367,6 +372,8 @@ model JobListing {
   isHot           Boolean   @default(false)
   /// Manager | Architect | Developer | Tester
   level           String    @default("Developer")
+  /// Number of open positions for this role.
+  positionsCount  Int       @default(1)
   /// Primary city for admin list display (Any / Other / named city).
   city            String?
   /// Optional end-client name (free text).

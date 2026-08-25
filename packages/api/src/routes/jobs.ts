@@ -34,6 +34,7 @@ const jobSchema = z.object({
   endClient: z.string().max(200).optional().nullable(),
   order: z.number().int().default(0),
   level: z.enum(PROFILE_LEVELS).default("Developer"),
+  positionsCount: z.coerce.number().int().min(1).default(1),
   publishedDate: z.coerce.date().optional().nullable(),
 });
 
@@ -144,6 +145,8 @@ function serializePublicJob(job: JobListing) {
     published: job.published,
     isHot: job.isHot ?? false,
     order: job.order,
+    level: job.level ?? "Developer",
+    positionsCount: job.positionsCount ?? 1,
   };
 }
 
@@ -178,6 +181,7 @@ function serializeAdminJob(
     isHot: job.isHot ?? false,
     order: job.order,
     level: job.level ?? "Developer",
+    positionsCount: job.positionsCount ?? 1,
     publishedDate: job.publishedDate?.toISOString() ?? null,
     applicationCount: applicationCount ?? 0,
     createdAt: job.createdAt,

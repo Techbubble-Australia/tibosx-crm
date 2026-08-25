@@ -12,6 +12,9 @@ type ProfileApplicationInput = {
   currency: string;
   mode: string;
   documentUrls: unknown;
+  isCitizen?: boolean;
+  visaStatus?: string | null;
+  relevantExperience?: number;
 };
 
 export async function createCareerApplicationForProfile(
@@ -25,6 +28,14 @@ export async function createCareerApplicationForProfile(
   });
   if (!job) {
     throw new Error("Selected job listing was not found");
+  }
+
+  const duplicate = await prisma.careerApplication.findFirst({
+    where: { profileId, jobListingId: job.id },
+    select: { id: true },
+  });
+  if (duplicate) {
+    throw new Error("This profile is already linked to that job listing");
   }
 
   const docs = Array.isArray(profile.documentUrls)
@@ -41,19 +52,29 @@ export async function createCareerApplicationForProfile(
       country: profile.country,
       city: profile.city ?? null,
       jobListingId: job.id,
+      profileId,
       salaryCurrency: profile.currency,
       salaryRate: profile.expectedRate,
       salaryMode: profile.mode,
       documentUrls: docs,
       resumeUrl: docs[0] ?? null,
       message: null,
+      isCitizen: profile.isCitizen ?? true,
+      visaStatus: profile.isCitizen ? null : profile.visaStatus?.trim() ?? null,
+      relevantExperience: profile.relevantExperience ?? null,
     },
   });
 
-  await prisma.candidateProfile.update({
+  const profileRow = await prisma.candidateProfile.findUnique({
     where: { id: profileId },
-    data: { careerApplicationId: application.id },
+    select: { careerApplicationId: true },
   });
+  if (!profileRow?.careerApplicationId) {
+    await prisma.candidateProfile.update({
+      where: { id: profileId },
+      data: { careerApplicationId: application.id },
+    });
+  }
 
   return application.id;
 }
@@ -63,7 +84,12 @@ export async function linkProfileToJobIfRequested(
   jobListingId: string | null | undefined,
 ): Promise<void> {
   if (!jobListingId?.trim()) return;
-  if (profile.careerApplicationId) return;
+
+  const existing = await prisma.careerApplication.findFirst({
+    where: { profileId: profile.id, jobListingId: jobListingId.trim() },
+    select: { id: true },
+  });
+  if (existing) return;
 
   await createCareerApplicationForProfile(profile.id, jobListingId.trim(), {
     firstName: profile.firstName,
@@ -76,5 +102,8 @@ export async function linkProfileToJobIfRequested(
     currency: profile.currency,
     mode: profile.mode,
     documentUrls: profile.documentUrls,
+    isCitizen: profile.isCitizen,
+    visaStatus: profile.visaStatus,
+    relevantExperience: profile.relevantExperience,
   });
 }
