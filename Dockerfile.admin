@@ -41,6 +41,8 @@ RUN adduser --system --uid 1001 nextjs
 
 COPY --from=builder --chown=nextjs:nodejs /app/apps/admin/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/admin/.next/static ./apps/admin/.next/static
+# Standalone trace omits `public/`; without this, logos and other static files 404 in production.
+COPY --from=builder --chown=nextjs:nodejs /app/apps/admin/public ./apps/admin/public
 
 USER nextjs
 

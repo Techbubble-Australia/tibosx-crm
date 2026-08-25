@@ -57,6 +57,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./apps/
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/apps/admin/.next/standalone ./apps/admin/
 COPY --from=builder --chown=nextjs:nodejs /app/apps/admin/.next/static ./apps/admin/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/apps/admin/public ./apps/admin/public
 COPY --from=builder --chown=nextjs:nodejs /app/packages/api/dist ./packages/api/dist
 COPY --from=builder --chown=nextjs:nodejs /app/packages/database/dist ./packages/database/dist
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
