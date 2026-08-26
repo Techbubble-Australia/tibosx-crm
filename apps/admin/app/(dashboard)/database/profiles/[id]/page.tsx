@@ -13,6 +13,7 @@ export default function EditProfilePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [defaults, setDefaults] = useState<Partial<ProfileFormValues> | null>(null);
+  const [savedNotice, setSavedNotice] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -43,6 +44,8 @@ export default function EditProfilePage() {
       }
       const data = await res.json();
       setDefaults(data.data);
+      setSavedNotice(true);
+      window.setTimeout(() => setSavedNotice(false), 4000);
     } finally {
       setIsLoading(false);
     }
@@ -62,16 +65,26 @@ export default function EditProfilePage() {
 
   return (
     <div className="max-w-3xl">
-      <div className="mb-6 flex items-center gap-3">
-        <Link href="/database/profiles" className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Edit profile</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {defaults.firstName} {defaults.lastName}
-          </p>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Link href="/database/profiles" className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Edit profile</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {defaults.firstName} {defaults.lastName}
+            </p>
+          </div>
         </div>
+        {savedNotice ? (
+          <p
+            className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300"
+            role="status"
+          >
+            Data saved
+          </p>
+        ) : null}
       </div>
       <ProfileForm
         key={`${id}-${defaults.updatedAt ?? ""}-${defaults.careerApplications?.length ?? 0}`}
