@@ -173,7 +173,7 @@ export function ProfilesListTable({
   const allSelected = rows.length > 0 && rows.every((row) => selectedIds.has(row.id));
 
   return (
-    <table className="w-full text-sm">
+    <table className="w-full min-w-[1280px] text-sm">
       <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
         <tr>
           <th className="w-10 px-2 py-3">
@@ -218,7 +218,9 @@ export function ProfilesListTable({
           {isColumnVisible("docs") ? (
             <th className="px-3 py-3 text-center font-medium text-gray-600 dark:text-gray-300">Docs</th>
           ) : null}
-          <th className="px-3 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
+          <th className="sticky right-0 z-10 bg-gray-50 px-3 py-3 text-right font-medium text-gray-600 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)] dark:bg-gray-800 dark:text-gray-300">
+            Actions
+          </th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -235,7 +237,7 @@ export function ProfilesListTable({
             .join("\n");
 
           return (
-            <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+            <tr key={row.id} className="group hover:bg-gray-50 dark:hover:bg-gray-800/50">
               <td className="px-2 py-2">
                 <input
                   type="checkbox"
@@ -456,7 +458,13 @@ export function ProfilesListTable({
                   )}
                 </td>
               ) : null}
-              <td className="px-3 py-2 text-right">
+              <td
+                className={`sticky right-0 z-10 px-3 py-2 text-right shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)] ${
+                  isEditing
+                    ? "bg-amber-50 dark:bg-amber-950/30"
+                    : "bg-white dark:bg-gray-900 group-hover:bg-gray-50 dark:group-hover:bg-gray-800/50"
+                }`}
+              >
                 <div className="inline-flex items-center gap-1">
                   {isEditing ? (
                     <button

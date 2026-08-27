@@ -410,7 +410,7 @@ function ProfilesPageInner() {
                 onClick={handleSaveListEdits}
                 className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
               >
-                Save
+                Modify
               </button>
               <button
                 type="button"
@@ -538,7 +538,7 @@ function ProfilesPageInner() {
       ) : null}
 
       {viewMode === "list" ? (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
           {rows.length === 0 ? (
             <p className="px-4 py-8 text-center text-gray-400">No profile records yet.</p>
           ) : totalItems === 0 ? (
