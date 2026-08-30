@@ -3,39 +3,48 @@ import { prisma } from "@techbubble/database";
 
 const router: IRouter = Router();
 
+const activeApplicationWhere = {
+  OR: [{ jobListing: { published: true } }, { jobListingId: null }],
+};
+
 router.get("/stats", async (req, res) => {
   try {
     const countryFilter = typeof req.query.country === "string" ? req.query.country.trim() : "";
     const clientFilter = typeof req.query.clientId === "string" ? req.query.clientId.trim() : "";
 
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const [profiles, applications30d, openRoles, activeJobs, clients] = await Promise.all([
-      prisma.candidateProfile.findMany({
-        select: { technology: true, country: true },
-      }),
-      prisma.careerApplication.count({
-        where: { createdAt: { gte: thirtyDaysAgo } },
-      }),
-      prisma.jobListing.count({ where: { published: true } }),
-      prisma.jobListing.findMany({
-        where: { published: true, ...(clientFilter ? { clientId: clientFilter } : {}) },
-        select: {
-          id: true,
-          title: true,
-          clientId: true,
-          client: { select: { name: true } },
-          applications: { select: { id: true } },
-        },
-        orderBy: [{ order: "asc" }, { title: "asc" }],
-      }),
-      prisma.client.findMany({
-        where: { status: "ACTIVE" },
-        select: { id: true, name: true },
-        orderBy: { name: "asc" },
-      }),
-    ]);
+    const [profiles, activeApplications, interviewScheduled, activeRoles, activeJobs, clientsWithActiveJobs] =
+      await Promise.all([
+        prisma.candidateProfile.findMany({
+          select: { technology: true, country: true },
+        }),
+        prisma.careerApplication.count({ where: activeApplicationWhere }),
+        prisma.careerApplication.count({
+          where: {
+            status: "INTERVIEW_SCHEDULED",
+            ...activeApplicationWhere,
+          },
+        }),
+        prisma.jobListing.count({ where: { published: true } }),
+        prisma.jobListing.findMany({
+          where: { published: true, ...(clientFilter ? { clientId: clientFilter } : {}) },
+          select: {
+            id: true,
+            title: true,
+            clientId: true,
+            client: { select: { name: true } },
+            applications: { select: { id: true } },
+          },
+          orderBy: [{ order: "asc" }, { title: "asc" }],
+        }),
+        prisma.client.findMany({
+          where: {
+            status: "ACTIVE",
+            jobListings: { some: { published: true } },
+          },
+          select: { id: true, name: true },
+          orderBy: { name: "asc" },
+        }),
+      ]);
 
     const countries = [...new Set(profiles.map((p) => p.country.trim()).filter(Boolean))].sort((a, b) =>
       a.localeCompare(b),
@@ -69,10 +78,11 @@ router.get("/stats", async (req, res) => {
     res.json({
       data: {
         totalProfiles: profiles.length,
-        applications30d,
-        openRoles,
+        activeApplications,
+        interviewScheduled,
+        activeRoles,
         countries,
-        clients,
+        clients: clientsWithActiveJobs,
         profilesByTechnology,
         applicationsByActiveJob,
       },

@@ -7,7 +7,14 @@ import { CareerApplicationsList } from "@/components/jobs/CareerApplicationsList
 function ActiveCareerApplicationsInner() {
   const searchParams = useSearchParams();
   const jobListingId = searchParams.get("jobListingId")?.trim() || undefined;
-  return <CareerApplicationsList jobPublished={true} jobListingId={jobListingId} />;
+  const status = searchParams.get("status")?.trim() || undefined;
+  return (
+    <CareerApplicationsList
+      jobPublished={true}
+      jobListingId={jobListingId}
+      initialStatusFilter={status}
+    />
+  );
 }
 
 export default function ActiveCareerApplicationsPage() {

@@ -29,10 +29,10 @@ export const CAREER_APPLICATION_STATUS_COLORS: Record<
     darkText: "dark:text-gray-300",
   },
   CLIENT_REVIEW: {
-    bg: "bg-gray-100",
-    text: "text-gray-700",
-    darkBg: "dark:bg-gray-800",
-    darkText: "dark:text-gray-300",
+    bg: "bg-yellow-100",
+    text: "text-yellow-800",
+    darkBg: "dark:bg-yellow-900/40",
+    darkText: "dark:text-yellow-200",
   },
   INTERVIEW_SCHEDULED: {
     bg: "bg-amber-100",
@@ -53,10 +53,10 @@ export const CAREER_APPLICATION_STATUS_COLORS: Record<
     darkText: "dark:text-red-200",
   },
   CANCELLED: {
-    bg: "bg-red-950/10",
+    bg: "bg-red-900/15",
     text: "text-red-950",
-    darkBg: "dark:bg-red-950/50",
-    darkText: "dark:text-red-300",
+    darkBg: "dark:bg-red-950/60",
+    darkText: "dark:text-red-200",
   },
 };
 

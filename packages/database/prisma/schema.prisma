@@ -184,6 +184,10 @@ model CareerApplication {
   isCitizen         Boolean           @default(true)
   /// Pipeline status for recruiter tracking.
   status            String            @default("INTERNAL_REVIEW")
+  /// Scheduled interview date/time when status is INTERVIEW_SCHEDULED.
+  interviewScheduledAt DateTime?
+  /// Feedback or notes when status is SELECTED, REJECTED, or CANCELLED.
+  statusComments    String?           @db.Text
   /// Years of relevant experience (from apply form).
   relevantExperience Int?
   profileId         String?

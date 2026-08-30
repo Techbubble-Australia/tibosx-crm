@@ -6,8 +6,9 @@ import { adminFetch } from "@/lib/admin-api";
 
 type DashboardStats = {
   totalProfiles: number;
-  applications30d: number;
-  openRoles: number;
+  activeApplications: number;
+  interviewScheduled: number;
+  activeRoles: number;
   countries: string[];
   clients: Array<{ id: string; name: string }>;
   profilesByTechnology: Array<{ technology: string; count: number }>;
@@ -101,6 +102,17 @@ function BarChart({
   );
 }
 
+const STAT_CARDS = [
+  { key: "activeRoles", label: "Active Roles", href: "/jobs/active" },
+  { key: "activeApplications", label: "Active Applications", href: "/career-applications/active" },
+  {
+    key: "interviewScheduled",
+    label: "Interview Scheduled",
+    href: "/career-applications/active?status=INTERVIEW_SCHEDULED",
+  },
+  { key: "totalProfiles", label: "Total profiles", href: "/database/profiles" },
+] as const;
+
 export default function DatabaseDashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [country, setCountry] = useState("");
@@ -151,21 +163,20 @@ export default function DatabaseDashboardPage() {
         Overview of profiles, applications, and hiring pipeline metrics.
       </p>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {[
-          { label: "Total profiles", value: stats?.totalProfiles ?? 0 },
-          { label: "Applications (30d)", value: stats?.applications30d ?? 0 },
-          { label: "Open roles", value: stats?.openRoles ?? 0 },
-        ].map((card) => (
-          <div
-            key={card.label}
-            className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900"
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {STAT_CARDS.map((card) => (
+          <Link
+            key={card.key}
+            href={card.href}
+            className="rounded-xl border border-gray-200 bg-white p-5 transition-colors hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600 dark:hover:bg-gray-800/50"
           >
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
               {card.label}
             </p>
-            <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">{card.value}</p>
-          </div>
+            <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
+              {stats?.[card.key] ?? 0}
+            </p>
+          </Link>
         ))}
       </div>
 
@@ -191,6 +202,7 @@ export default function DatabaseDashboardPage() {
           title="Applications by active jobs"
           subtitle="Application counts for published job listings."
           items={(stats?.applicationsByActiveJob ?? []).map((row) => ({
+            jobId: row.jobId,
             jobTitle: row.clientName ? `${row.jobTitle} (${row.clientName})` : row.jobTitle,
             count: row.count,
           }))}
@@ -200,6 +212,11 @@ export default function DatabaseDashboardPage() {
           filterValue={clientId}
           filterOptions={clientOptions}
           onFilterChange={setClientId}
+          getCountHref={(item) => {
+            const params = new URLSearchParams();
+            params.set("jobListingId", String(item.jobId));
+            return `/career-applications/active?${params.toString()}`;
+          }}
         />
       </div>
     </div>

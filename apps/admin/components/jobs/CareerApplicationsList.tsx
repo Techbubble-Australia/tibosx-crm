@@ -31,6 +31,8 @@ interface CareerApplication {
   visaStatus?: string | null;
   isCitizen?: boolean;
   status?: string;
+  interviewScheduledAt?: string | null;
+  statusComments?: string | null;
   salaryCurrency?: string | null;
   salaryRate?: number | null;
   salaryMode?: string | null;
@@ -104,7 +106,112 @@ function jobGroupLabel(app: CareerApplication): string {
 type Props = {
   jobPublished: boolean;
   jobListingId?: string;
+  initialStatusFilter?: string;
 };
+
+function formatInterviewScheduledAt(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function toDatetimeLocalValue(value: string | null | undefined): string {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function StatusChangeDialog({
+  status,
+  interviewScheduledAt,
+  statusComments,
+  onInterviewScheduledAtChange,
+  onStatusCommentsChange,
+  onCancel,
+  onConfirm,
+  isSaving,
+}: {
+  status: CareerApplicationStatus;
+  interviewScheduledAt: string;
+  statusComments: string;
+  onInterviewScheduledAtChange: (value: string) => void;
+  onStatusCommentsChange: (value: string) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+  isSaving: boolean;
+}) {
+  const needsInterview = status === "INTERVIEW_SCHEDULED";
+  const needsComments =
+    status === "SELECTED" || status === "REJECTED" || status === "CANCELLED";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          Update to {CAREER_APPLICATION_STATUS_LABELS[status]}
+        </h3>
+        <div className="mt-4 space-y-4">
+          {needsInterview ? (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Interview date & time <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="datetime-local"
+                value={interviewScheduledAt}
+                onChange={(e) => onInterviewScheduledAtChange(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
+                required
+              />
+            </div>
+          ) : null}
+          {needsComments ? (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Comments <span className="text-red-600">*</span>
+              </label>
+              <textarea
+                value={statusComments}
+                onChange={(e) => onStatusCommentsChange(e.target.value)}
+                rows={4}
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
+                placeholder="Add feedback or notes…"
+                required
+              />
+            </div>
+          ) : null}
+        </div>
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isSaving}
+            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isSaving}
+            className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+          >
+            {isSaving ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ApplicationCard({
   app,
@@ -116,7 +223,7 @@ function ApplicationCard({
   app: CareerApplication;
   canEdit: boolean;
   hidePosition?: boolean;
-  onStatusChange: (id: string, status: CareerApplicationStatus) => void;
+  onStatusChange: (app: CareerApplication, status: CareerApplicationStatus) => void;
   onDelete: (id: string) => void;
 }) {
   const salary = formatSalary(app);
@@ -145,7 +252,7 @@ function ApplicationCard({
             {canEdit ? (
               <select
                 value={status}
-                onChange={(e) => void onStatusChange(app.id, e.target.value as CareerApplicationStatus)}
+                onChange={(e) => onStatusChange(app, e.target.value as CareerApplicationStatus)}
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColors.bg} ${statusColors.text} ${statusColors.darkBg} ${statusColors.darkText} border-0`}
                 aria-label="Application status"
               >
@@ -180,7 +287,15 @@ function ApplicationCard({
             {app.isCitizen !== false ? <span>Citizen: Yes</span> : null}
             {salary ? <span>Salary: {salary}</span> : null}
             {app.clientName ? <span>Client: {app.clientName}</span> : null}
+            {status === "INTERVIEW_SCHEDULED" && app.interviewScheduledAt ? (
+              <span>Interview: {formatInterviewScheduledAt(app.interviewScheduledAt)}</span>
+            ) : null}
           </div>
+          {app.statusComments ? (
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              <span className="font-medium text-gray-700 dark:text-gray-300">Status notes:</span> {app.statusComments}
+            </p>
+          ) : null}
           {app.message ? (
             <p className="mt-3 border-t border-gray-100 pt-3 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400">
               {app.message}
@@ -226,7 +341,7 @@ function ApplicationCard({
   );
 }
 
-export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
+export function CareerApplicationsList({ jobPublished, jobListingId, initialStatusFilter }: Props) {
   const { canAccessRecruitment } = useAdminSession();
   const canEdit = canAccessRecruitment;
   const [applications, setApplications] = useState<CareerApplication[]>([]);
@@ -237,15 +352,24 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
   const [filterCountry, setFilterCountry] = useState("");
   const [filterWorkMode, setFilterWorkMode] = useState("");
   const [filterClient, setFilterClient] = useState("");
+  const [filterStatus, setFilterStatus] = useState(initialStatusFilter ?? "");
+  const [statusChange, setStatusChange] = useState<{
+    app: CareerApplication;
+    status: CareerApplicationStatus;
+    interviewScheduledAt: string;
+    statusComments: string;
+  } | null>(null);
+  const [statusSaving, setStatusSaving] = useState(false);
 
   const filteredByJobMeta = useMemo(() => {
     return applications.filter((app) => {
       if (filterCountry && app.jobCountry !== filterCountry) return false;
       if (filterWorkMode && app.jobWorkMode !== filterWorkMode) return false;
       if (filterClient && app.clientName !== filterClient) return false;
+      if (filterStatus && app.status !== filterStatus) return false;
       return true;
     });
-  }, [applications, filterCountry, filterWorkMode, filterClient]);
+  }, [applications, filterCountry, filterWorkMode, filterClient, filterStatus]);
 
   const filterOptions = useMemo(() => {
     const countries = new Set<string>();
@@ -281,7 +405,11 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
 
   useEffect(() => {
     void fetchApplications();
-  }, [jobPublished, jobListingId]);
+  }, [jobPublished, jobListingId, initialStatusFilter]);
+
+  useEffect(() => {
+    setFilterStatus(initialStatusFilter ?? "");
+  }, [initialStatusFilter]);
 
   async function fetchApplications() {
     setIsLoading(true);
@@ -289,6 +417,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
       const params = new URLSearchParams();
       params.set("published", jobPublished ? "true" : "false");
       if (jobListingId) params.set("jobListingId", jobListingId);
+      if (initialStatusFilter) params.set("status", initialStatusFilter);
       const res = await adminFetch(`/api/admin/career-applications/admin/applications?${params.toString()}`);
       const data = await res.json();
       const rows = (data.data || []) as CareerApplication[];
@@ -306,20 +435,82 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
     }
   }
 
-  async function updateStatus(id: string, status: CareerApplicationStatus) {
+  async function updateStatus(
+    id: string,
+    status: CareerApplicationStatus,
+    extras?: { interviewScheduledAt?: string; statusComments?: string },
+  ) {
     try {
+      const payload: Record<string, string> = { status };
+      if (extras?.interviewScheduledAt) payload.interviewScheduledAt = extras.interviewScheduledAt;
+      if (extras?.statusComments) payload.statusComments = extras.statusComments;
+
       const res = await adminFetch(`/api/admin/career-applications/admin/applications/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         const data = await res.json();
         setApplications((prev) => prev.map((row) => (row.id === id ? { ...row, ...data.data } : row)));
+        return true;
       }
+      const err = await res.json().catch(() => null);
+      alert(err?.error ?? "Failed to update status");
+      return false;
     } catch (error) {
       console.error("Error updating application status:", error);
+      return false;
     }
+  }
+
+  function requestStatusChange(app: CareerApplication, status: CareerApplicationStatus) {
+    const current = (app.status as CareerApplicationStatus) || "INTERNAL_REVIEW";
+    if (status === current) return;
+
+    if (status === "INTERVIEW_SCHEDULED") {
+      setStatusChange({
+        app,
+        status,
+        interviewScheduledAt: toDatetimeLocalValue(app.interviewScheduledAt),
+        statusComments: app.statusComments ?? "",
+      });
+      return;
+    }
+    if (status === "SELECTED" || status === "REJECTED" || status === "CANCELLED") {
+      setStatusChange({
+        app,
+        status,
+        interviewScheduledAt: "",
+        statusComments: app.statusComments ?? "",
+      });
+      return;
+    }
+    void updateStatus(app.id, status);
+  }
+
+  async function confirmStatusChange() {
+    if (!statusChange) return;
+    if (statusChange.status === "INTERVIEW_SCHEDULED" && !statusChange.interviewScheduledAt.trim()) {
+      alert("Interview date and time is required.");
+      return;
+    }
+    if (
+      (statusChange.status === "SELECTED" ||
+        statusChange.status === "REJECTED" ||
+        statusChange.status === "CANCELLED") &&
+      !statusChange.statusComments.trim()
+    ) {
+      alert("Comments are required for this status.");
+      return;
+    }
+    setStatusSaving(true);
+    const ok = await updateStatus(statusChange.app.id, statusChange.status, {
+      interviewScheduledAt: statusChange.interviewScheduledAt,
+      statusComments: statusChange.statusComments,
+    });
+    setStatusSaving(false);
+    if (ok) setStatusChange(null);
   }
 
   async function deleteApplication(id: string) {
@@ -461,6 +652,20 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
             <option key={client} value={client}>{client}</option>
           ))}
         </select>
+        <select
+          value={filterStatus}
+          onChange={(e) => {
+            setFilterStatus(e.target.value);
+            setPage(1);
+          }}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          aria-label="Filter by status"
+        >
+          <option value="">All statuses</option>
+          {CAREER_APPLICATION_STATUSES.map((status) => (
+            <option key={status} value={status}>{CAREER_APPLICATION_STATUS_LABELS[status]}</option>
+          ))}
+        </select>
       </div>
 
       {applications.length === 0 ? (
@@ -482,7 +687,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
               key={app.id}
               app={app}
               canEdit={canEdit}
-              onStatusChange={(id, status) => void updateStatus(id, status)}
+              onStatusChange={(app, status) => requestStatusChange(app, status)}
               onDelete={(id) => void deleteApplication(id)}
             />
           ))}
@@ -530,7 +735,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
                         app={app}
                         canEdit={canEdit}
                         hidePosition
-                        onStatusChange={(id, status) => void updateStatus(id, status)}
+                        onStatusChange={(app, status) => requestStatusChange(app, status)}
                         onDelete={(id) => void deleteApplication(id)}
                       />
                     ))}
@@ -541,6 +746,23 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
           })}
         </div>
       )}
+
+      {statusChange ? (
+        <StatusChangeDialog
+          status={statusChange.status}
+          interviewScheduledAt={statusChange.interviewScheduledAt}
+          statusComments={statusChange.statusComments}
+          onInterviewScheduledAtChange={(value) =>
+            setStatusChange((prev) => (prev ? { ...prev, interviewScheduledAt: value } : prev))
+          }
+          onStatusCommentsChange={(value) =>
+            setStatusChange((prev) => (prev ? { ...prev, statusComments: value } : prev))
+          }
+          onCancel={() => setStatusChange(null)}
+          onConfirm={() => void confirmStatusChange()}
+          isSaving={statusSaving}
+        />
+      ) : null}
 
       {applications.length > 0 ? (
         <TablePagination

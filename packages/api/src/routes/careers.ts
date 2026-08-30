@@ -4,6 +4,7 @@ import multer from "multer";
 import path from "path";
 import { promises as fsp } from "fs";
 import { prisma } from "@techbubble/database";
+import type { Prisma } from "@techbubble/database";
 import { objectStorageConfigured, putUploadObject } from "../lib/object-storage";
 import { PHONE_REGEX, PHONE_VALIDATION_MESSAGE } from "../lib/validation";
 import {
@@ -266,15 +267,16 @@ router.get("/admin/applications", async (req, res) => {
   try {
     const publishedParam = typeof req.query.published === "string" ? req.query.published : "";
     const jobListingId = typeof req.query.jobListingId === "string" ? req.query.jobListingId.trim() : "";
+    const statusParam = typeof req.query.status === "string" ? req.query.status.trim() : "";
 
-    const publishedWhere =
+    const publishedWhere: Prisma.CareerApplicationWhereInput | undefined =
       publishedParam === "true"
         ? { OR: [{ jobListing: { published: true } }, { jobListingId: null }] }
         : publishedParam === "false"
           ? { jobListing: { published: false } }
           : undefined;
 
-    const jobWhere = jobListingId
+    const jobWhere: Prisma.CareerApplicationWhereInput | undefined = jobListingId
       ? {
           OR: [
             { jobListingId },
@@ -283,10 +285,17 @@ router.get("/admin/applications", async (req, res) => {
         }
       : undefined;
 
-    const where =
-      publishedWhere && jobWhere
-        ? { AND: [publishedWhere, jobWhere] }
-        : publishedWhere ?? jobWhere;
+    const statusWhere: Prisma.CareerApplicationWhereInput | undefined =
+      statusParam && (CAREER_APPLICATION_STATUSES as readonly string[]).includes(statusParam)
+        ? { status: statusParam }
+        : undefined;
+
+    const whereParts: Prisma.CareerApplicationWhereInput[] = [];
+    if (publishedWhere) whereParts.push(publishedWhere);
+    if (jobWhere) whereParts.push(jobWhere);
+    if (statusWhere) whereParts.push(statusWhere);
+    const where: Prisma.CareerApplicationWhereInput =
+      whereParts.length > 1 ? { AND: whereParts } : (whereParts[0] ?? {});
 
     const applications = await prisma.careerApplication.findMany({
       where,
@@ -340,13 +349,49 @@ router.get("/admin/applications", async (req, res) => {
 
 router.patch("/admin/applications/:id", async (req, res) => {
   try {
-    const body = z.object({
-      status: z.enum(CAREER_APPLICATION_STATUSES),
-    }).parse(req.body);
+    const body = z
+      .object({
+        status: z.enum(CAREER_APPLICATION_STATUSES),
+        interviewScheduledAt: z.coerce.date().optional(),
+        statusComments: z.string().optional(),
+      })
+      .superRefine((data, ctx) => {
+        if (data.status === "INTERVIEW_SCHEDULED" && !data.interviewScheduledAt) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Interview date and time is required",
+            path: ["interviewScheduledAt"],
+          });
+        }
+        if (
+          (data.status === "SELECTED" || data.status === "REJECTED" || data.status === "CANCELLED") &&
+          !data.statusComments?.trim()
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Comments are required for this status",
+            path: ["statusComments"],
+          });
+        }
+      })
+      .parse(req.body);
+
+    const updateData: Prisma.CareerApplicationUpdateInput = { status: body.status };
+
+    if (body.status === "INTERVIEW_SCHEDULED") {
+      updateData.interviewScheduledAt = body.interviewScheduledAt!;
+      updateData.statusComments = body.statusComments?.trim() || null;
+    } else if (body.status === "SELECTED" || body.status === "REJECTED" || body.status === "CANCELLED") {
+      updateData.statusComments = body.statusComments!.trim();
+      updateData.interviewScheduledAt = null;
+    } else {
+      updateData.interviewScheduledAt = null;
+      updateData.statusComments = null;
+    }
 
     const updated = await prisma.careerApplication.update({
       where: { id: req.params.id },
-      data: { status: body.status },
+      data: updateData,
       include: {
         jobListing: {
           select: {

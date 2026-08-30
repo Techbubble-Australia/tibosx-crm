@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useParams, usePathname, useSearchParams } from "next/navigation";
+import { useParams, usePathname, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { JobForm, type JobFormDefaults } from "@/components/jobs/JobForm";
@@ -13,6 +13,7 @@ function EditJobPageInner() {
   const params = useParams();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const id = params.id as string;
 
   const [isLoading, setIsLoading] = useState(false);
@@ -55,8 +56,7 @@ function EditJobPageInner() {
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Failed to update job");
-      const updated = await res.json();
-      setJob(updated.data ?? job);
+      router.push(listHref);
     } catch (error) {
       console.error(error);
       alert("Failed to update job listing");

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Edit, Trash2, Settings, Flame, ChevronDown, ChevronUp, Pencil } from "lucide-react";
+import { Plus, Edit, Trash2, Settings, Flame, ChevronDown, ChevronUp, Pencil, GripVertical } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { jobEditHref } from "@/lib/job-routes";
@@ -12,6 +12,7 @@ import { ViewModeToggle, type ViewMode } from "@/components/ui/ViewModeToggle";
 import { useListView } from "@/hooks/useListView";
 import { ListColumnPersonalizer } from "@/components/ui/ListColumnPersonalizer";
 import { useColumnVisibility, type ListColumnDef } from "@/hooks/useColumnVisibility";
+import { useJobLevels } from "@/hooks/useJobLevels";
 
 const JOB_LIST_COLUMNS: ListColumnDef[] = [
   { id: "ref", label: "Ref" },
@@ -46,6 +47,7 @@ interface JobListing {
   department: string;
   published: boolean;
   applicationCount: number;
+  clientId?: string;
   clientName?: string;
   isHot?: boolean;
   order?: number;
@@ -162,8 +164,11 @@ type JobsListPageProps = {
 
 export function JobsListPage({ publishedFilter, heading, description }: JobsListPageProps) {
   const { canManageJobs, canViewJobs } = useAdminSession();
+  const jobLevels = useJobLevels();
   const [jobs, setJobs] = useState<JobListing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
+  const [technologies, setTechnologies] = useState<Array<{ id: string; name: string }>>([]);
   const listTab = publishedFilter ? "active" : "inactive";
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const filteredJobs = useMemo(
@@ -191,6 +196,14 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [editingPublishedDateId, setEditingPublishedDateId] = useState<string | null>(null);
   const [publishedDateDrafts, setPublishedDateDrafts] = useState<Record<string, string>>({});
+  const [editingClientId, setEditingClientId] = useState<string | null>(null);
+  const [editingTechnologyId, setEditingTechnologyId] = useState<string | null>(null);
+  const [editingLevelId, setEditingLevelId] = useState<string | null>(null);
+  const [clientDrafts, setClientDrafts] = useState<Record<string, string>>({});
+  const [technologyDrafts, setTechnologyDrafts] = useState<Record<string, string>>({});
+  const [levelDrafts, setLevelDrafts] = useState<Record<string, string>>({});
+  const [draggingJobId, setDraggingJobId] = useState<string | null>(null);
+  const [dragOverJobId, setDragOverJobId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("order");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
@@ -200,6 +213,20 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
 
   useEffect(() => {
     void fetchJobs();
+    void adminFetch("/api/admin/clients")
+      .then((res) => res.json())
+      .then((data) => {
+        const rows = (data.data ?? []) as Array<{ id: string; name: string; status: string }>;
+        setClients(rows.filter((c) => c.status === "ACTIVE").map((c) => ({ id: c.id, name: c.name })));
+      })
+      .catch(console.error);
+    void adminFetch("/api/admin/job-technologies")
+      .then((res) => res.json())
+      .then((data) => {
+        const rows = (data.data ?? []) as Array<{ id: string; name: string }>;
+        setTechnologies(rows);
+      })
+      .catch(console.error);
   }, []);
 
   async function fetchJobs() {
@@ -333,6 +360,158 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
     });
   }
 
+  async function saveListField(
+    job: JobListing,
+    field: "clientId" | "technology" | "level",
+    value: string,
+  ) {
+    if (!canManageJobs || !value.trim()) return false;
+    try {
+      const res = await adminFetch(`/api/admin/jobs/admin/${job.id}/list-fields`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setJobs((prev) =>
+          prev.map((j) => (j.id === job.id ? { ...j, ...data.data } : j)),
+        );
+        return true;
+      }
+    } catch (error) {
+      console.error("Error updating job field:", error);
+    }
+    return false;
+  }
+
+  function startEditClient(job: JobListing) {
+    setEditingClientId(job.id);
+    setClientDrafts((prev) => ({ ...prev, [job.id]: job.clientId ?? "" }));
+  }
+
+  function cancelEditClient(jobId: string) {
+    setEditingClientId((current) => (current === jobId ? null : current));
+    setClientDrafts((prev) => {
+      const next = { ...prev };
+      delete next[jobId];
+      return next;
+    });
+  }
+
+  async function saveClient(job: JobListing) {
+    const value = clientDrafts[job.id] ?? "";
+    if (!value || value === job.clientId) {
+      cancelEditClient(job.id);
+      return;
+    }
+    const ok = await saveListField(job, "clientId", value);
+    if (ok) cancelEditClient(job.id);
+  }
+
+  function startEditTechnology(job: JobListing) {
+    setEditingTechnologyId(job.id);
+    setTechnologyDrafts((prev) => ({ ...prev, [job.id]: job.technology ?? "" }));
+  }
+
+  function cancelEditTechnology(jobId: string) {
+    setEditingTechnologyId((current) => (current === jobId ? null : current));
+    setTechnologyDrafts((prev) => {
+      const next = { ...prev };
+      delete next[jobId];
+      return next;
+    });
+  }
+
+  async function saveTechnology(job: JobListing) {
+    const value = technologyDrafts[job.id] ?? "";
+    if (!value.trim() || value === job.technology) {
+      cancelEditTechnology(job.id);
+      return;
+    }
+    const ok = await saveListField(job, "technology", value);
+    if (ok) cancelEditTechnology(job.id);
+  }
+
+  function startEditLevel(job: JobListing) {
+    setEditingLevelId(job.id);
+    setLevelDrafts((prev) => ({ ...prev, [job.id]: job.level ?? "Developer" }));
+  }
+
+  function cancelEditLevel(jobId: string) {
+    setEditingLevelId((current) => (current === jobId ? null : current));
+    setLevelDrafts((prev) => {
+      const next = { ...prev };
+      delete next[jobId];
+      return next;
+    });
+  }
+
+  async function saveLevel(job: JobListing) {
+    const value = levelDrafts[job.id] ?? "";
+    if (!value.trim() || value === job.level) {
+      cancelEditLevel(job.id);
+      return;
+    }
+    const ok = await saveListField(job, "level", value);
+    if (ok) cancelEditLevel(job.id);
+  }
+
+  const canDragReorder =
+    publishedFilter && canManageJobs && sortKey === "order" && sortDir === "asc" && !search.trim();
+
+  async function persistJobOrder(orderedIds: string[]) {
+    const orderMap = new Map(orderedIds.map((id, index) => [id, index + 1]));
+    setJobs((prev) =>
+      prev.map((job) =>
+        orderMap.has(job.id) ? { ...job, order: orderMap.get(job.id)! } : job,
+      ),
+    );
+    try {
+      await adminFetch("/api/admin/jobs/admin/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds }),
+      });
+    } catch (error) {
+      console.error("Error reordering jobs:", error);
+      void fetchJobs();
+    }
+  }
+
+  function handleDragStart(jobId: string) {
+    if (!canDragReorder) return;
+    setDraggingJobId(jobId);
+  }
+
+  function handleDragOver(event: React.DragEvent, jobId: string) {
+    if (!canDragReorder || !draggingJobId) return;
+    event.preventDefault();
+    setDragOverJobId(jobId);
+  }
+
+  function handleDrop(targetJobId: string) {
+    if (!canDragReorder || !draggingJobId || draggingJobId === targetJobId) {
+      setDraggingJobId(null);
+      setDragOverJobId(null);
+      return;
+    }
+    const ids = sortedFiltered.map((job) => job.id);
+    const fromIndex = ids.indexOf(draggingJobId);
+    const toIndex = ids.indexOf(targetJobId);
+    if (fromIndex < 0 || toIndex < 0) {
+      setDraggingJobId(null);
+      setDragOverJobId(null);
+      return;
+    }
+    const nextIds = [...ids];
+    nextIds.splice(fromIndex, 1);
+    nextIds.splice(toIndex, 0, draggingJobId);
+    setDraggingJobId(null);
+    setDragOverJobId(null);
+    void persistJobOrder(nextIds);
+  }
+
   function handleSort(key: SortKey) {
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -426,6 +605,12 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
         totalCount={totalSourceItems}
       />
 
+      {canDragReorder ? (
+        <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+          Drag jobs using the grip icon in the Order column to reorder by priority.
+        </p>
+      ) : null}
+
       {viewMode === "list" ? (
         <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
           <table className="w-full min-w-[1100px] text-sm">
@@ -517,14 +702,38 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                 </tr>
               ) : (
                 paginatedJobs.map((job) => (
-                  <tr key={job.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  <tr
+                    key={job.id}
+                    className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 ${
+                      dragOverJobId === job.id ? "bg-blue-50 dark:bg-blue-950/30" : ""
+                    } ${draggingJobId === job.id ? "opacity-60" : ""}`}
+                    onDragOver={(e) => handleDragOver(e, job.id)}
+                    onDrop={() => handleDrop(job.id)}
+                  >
                     {isColumnVisible("ref") ? (
                       <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">{job.referenceNumber}</td>
                     ) : null}
                     {isColumnVisible("order") ? (
                       <td className="px-4 py-3">
-                        {canManageJobs ? (
-                          <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1">
+                          {canDragReorder ? (
+                            <button
+                              type="button"
+                              draggable
+                              onDragStart={() => handleDragStart(job.id)}
+                              onDragEnd={() => {
+                                setDraggingJobId(null);
+                                setDragOverJobId(null);
+                              }}
+                              className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                              aria-label={`Drag to reorder ${job.title}`}
+                              title="Drag to reorder"
+                            >
+                              <GripVertical className="h-4 w-4" aria-hidden />
+                            </button>
+                          ) : null}
+                          {canManageJobs ? (
+                            <div className="flex items-center gap-1">
                             {editingOrderId === job.id ? (
                               <input
                                 type="number"
@@ -562,6 +771,7 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                         ) : (
                           <span className="text-gray-600 dark:text-gray-400">{job.order ?? 0}</span>
                         )}
+                        </div>
                       </td>
                     ) : null}
                     {isColumnVisible("title") ? (
@@ -606,14 +816,132 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                     ) : null}
                     {isColumnVisible("client") ? (
                       <td className="max-w-[200px] truncate px-4 py-3 text-gray-600 dark:text-gray-400" title={job.clientName || undefined}>
-                        {job.clientName || "—"}
+                        {canManageJobs ? (
+                          <div className="flex items-center gap-1">
+                            {editingClientId === job.id ? (
+                              <select
+                                value={clientDrafts[job.id] ?? ""}
+                                onChange={(e) =>
+                                  setClientDrafts((prev) => ({ ...prev, [job.id]: e.target.value }))
+                                }
+                                onBlur={() => void saveClient(job)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") e.currentTarget.blur();
+                                  else if (e.key === "Escape") cancelEditClient(job.id);
+                                }}
+                                autoFocus
+                                className="max-w-[180px] rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                                aria-label={`Edit client for ${job.title}`}
+                              >
+                                {clients.map((client) => (
+                                  <option key={client.id} value={client.id}>{client.name}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <>
+                                <span className="truncate">{job.clientName || "—"}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => startEditClient(job)}
+                                  className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                                  aria-label={`Edit client for ${job.title}`}
+                                  title="Edit client"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" aria-hidden />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          job.clientName || "—"
+                        )}
                       </td>
                     ) : null}
                     {isColumnVisible("technology") ? (
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.technology || "—"}</td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                        {canManageJobs ? (
+                          <div className="flex items-center gap-1">
+                            {editingTechnologyId === job.id ? (
+                              <select
+                                value={technologyDrafts[job.id] ?? ""}
+                                onChange={(e) =>
+                                  setTechnologyDrafts((prev) => ({ ...prev, [job.id]: e.target.value }))
+                                }
+                                onBlur={() => void saveTechnology(job)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") e.currentTarget.blur();
+                                  else if (e.key === "Escape") cancelEditTechnology(job.id);
+                                }}
+                                autoFocus
+                                className="max-w-[160px] rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                                aria-label={`Edit technology for ${job.title}`}
+                              >
+                                {technologies.map((tech) => (
+                                  <option key={tech.id} value={tech.name}>{tech.name}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <>
+                                <span>{job.technology || "—"}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => startEditTechnology(job)}
+                                  className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                                  aria-label={`Edit technology for ${job.title}`}
+                                  title="Edit technology"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" aria-hidden />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          job.technology || "—"
+                        )}
+                      </td>
                     ) : null}
                     {isColumnVisible("level") ? (
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.level ?? "Developer"}</td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                        {canManageJobs ? (
+                          <div className="flex items-center gap-1">
+                            {editingLevelId === job.id ? (
+                              <select
+                                value={levelDrafts[job.id] ?? "Developer"}
+                                onChange={(e) =>
+                                  setLevelDrafts((prev) => ({ ...prev, [job.id]: e.target.value }))
+                                }
+                                onBlur={() => void saveLevel(job)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") e.currentTarget.blur();
+                                  else if (e.key === "Escape") cancelEditLevel(job.id);
+                                }}
+                                autoFocus
+                                className="rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                                aria-label={`Edit level for ${job.title}`}
+                              >
+                                {jobLevels.map((lvl) => (
+                                  <option key={lvl} value={lvl}>{lvl}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <>
+                                <span>{job.level ?? "Developer"}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => startEditLevel(job)}
+                                  className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                                  aria-label={`Edit level for ${job.title}`}
+                                  title="Edit level"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" aria-hidden />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          job.level ?? "Developer"
+                        )}
+                      </td>
                     ) : null}
                     {isColumnVisible("budget") ? (
                       <td className="max-w-[160px] truncate px-4 py-3 text-gray-600 dark:text-gray-400" title={job.budget || undefined}>

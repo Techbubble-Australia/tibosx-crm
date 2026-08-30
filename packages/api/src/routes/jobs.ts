@@ -147,6 +147,61 @@ router.patch("/admin/:id/order", async (req, res) => {
   }
 });
 
+router.patch("/admin/reorder", async (req, res) => {
+  try {
+    const body = z.object({ orderedIds: z.array(z.string().min(1)).min(1) }).parse(req.body);
+    await prisma.$transaction(
+      body.orderedIds.map((id, index) =>
+        prisma.jobListing.update({ where: { id }, data: { order: index + 1 } }),
+      ),
+    );
+    res.json({ message: "Reordered" });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error reordering jobs:", error);
+    res.status(500).json({ error: "Failed to reorder jobs" });
+  }
+});
+
+router.patch("/admin/:id/list-fields", async (req, res) => {
+  try {
+    const body = z
+      .object({
+        clientId: z.string().min(1).optional(),
+        technology: z.string().min(1).optional(),
+        level: z.string().min(1).optional(),
+      })
+      .refine((data) => data.clientId || data.technology || data.level, {
+        message: "At least one field is required",
+      })
+      .parse(req.body);
+
+    const existing = await prisma.jobListing.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const job = await prisma.jobListing.update({
+      where: { id: req.params.id },
+      data: {
+        ...(body.clientId ? { clientId: body.clientId } : {}),
+        ...(body.technology ? { technology: body.technology } : {}),
+        ...(body.level ? { level: body.level } : {}),
+      },
+      include: { client: { select: { name: true } } },
+    });
+    res.json({ data: serializeAdminJob(job) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error updating job list fields:", error);
+    res.status(500).json({ error: "Failed to update job" });
+  }
+});
+
 function serializePublicJob(job: JobListing) {
   const locations = normalizeJobLocations(job);
   const legacy = syncLegacyLocationFields(locations);
