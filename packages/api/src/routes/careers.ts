@@ -398,47 +398,66 @@ router.patch("/admin/applications/:id", async (req, res) => {
   try {
     const body = z
       .object({
-        status: z.enum(CAREER_APPLICATION_STATUSES),
-        interviewScheduledAt: z.coerce.date().optional(),
-        statusComments: z.string().optional(),
-      })
-      .superRefine((data, ctx) => {
-        if (data.status === "INTERVIEW_SCHEDULED" && !data.interviewScheduledAt) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Interview date and time is required",
-            path: ["interviewScheduledAt"],
-          });
-        }
-        if (
-          (data.status === "SELECTED" || data.status === "REJECTED" || data.status === "CANCELLED") &&
-          !data.statusComments?.trim()
-        ) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Comments are required for this status",
-            path: ["statusComments"],
-          });
-        }
+        status: z.enum(CAREER_APPLICATION_STATUSES).optional(),
+        interviewScheduledAt: z.union([z.coerce.date(), z.null()]).optional(),
+        statusComments: z.string().optional().nullable(),
       })
       .parse(req.body);
 
-    const updateData: Prisma.CareerApplicationUpdateInput = { status: body.status };
+    const existing = await prisma.careerApplication.findUnique({
+      where: { id: req.params.id },
+    });
+    if (!existing) {
+      return res.status(404).json({ error: "Application not found" });
+    }
 
-    if (body.status === "INTERVIEW_SCHEDULED") {
-      updateData.interviewScheduledAt = body.interviewScheduledAt!;
-      updateData.statusComments = body.statusComments?.trim() || null;
-    } else if (body.status === "SELECTED" || body.status === "REJECTED" || body.status === "CANCELLED") {
-      updateData.statusComments = body.statusComments!.trim();
-      updateData.interviewScheduledAt = null;
+    const nextStatus = body.status ?? existing.status;
+    const isStatusChange = body.status !== undefined && body.status !== existing.status;
+
+    let nextInterview = existing.interviewScheduledAt;
+    let nextComments = existing.statusComments;
+
+    if (isStatusChange) {
+      if (nextStatus === "INTERVIEW_SCHEDULED") {
+        if (!body.interviewScheduledAt) {
+          return res.status(400).json({ error: "Interview date and time is required" });
+        }
+        nextInterview = body.interviewScheduledAt;
+        if (body.statusComments !== undefined) {
+          nextComments = body.statusComments?.trim() || null;
+        }
+      } else if (nextStatus === "SELECTED" || nextStatus === "REJECTED" || nextStatus === "CANCELLED") {
+        if (!body.statusComments?.trim()) {
+          return res.status(400).json({ error: "Comments are required for this status" });
+        }
+        nextComments = body.statusComments.trim();
+      }
     } else {
-      updateData.interviewScheduledAt = null;
-      updateData.statusComments = null;
+      if (body.interviewScheduledAt !== undefined) {
+        nextInterview = body.interviewScheduledAt;
+      }
+      if (body.statusComments !== undefined) {
+        nextComments = body.statusComments?.trim() || null;
+      }
+    }
+
+    if (nextStatus === "INTERVIEW_SCHEDULED" && !nextInterview) {
+      return res.status(400).json({ error: "Interview date and time is required" });
+    }
+    if (
+      (nextStatus === "REJECTED" || nextStatus === "CANCELLED") &&
+      !nextComments?.trim()
+    ) {
+      return res.status(400).json({ error: "Comments are required for this status" });
     }
 
     const updated = await prisma.careerApplication.update({
       where: { id: req.params.id },
-      data: updateData,
+      data: {
+        status: nextStatus,
+        interviewScheduledAt: nextInterview,
+        statusComments: nextComments,
+      },
       include: {
         jobListing: {
           select: {

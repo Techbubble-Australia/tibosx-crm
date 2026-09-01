@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Trash2, ChevronDown } from "lucide-react";
+import { Trash2, ChevronDown, Pencil } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
@@ -116,6 +116,55 @@ type Props = {
   initialStatusFilter?: string;
 };
 
+const STATUSES_WITH_INTERVIEW_FIELD: CareerApplicationStatus[] = [
+  "INTERNAL_REVIEW",
+  "CLIENT_REVIEW",
+  "INTERVIEW_SCHEDULED",
+  "REJECTED",
+  "CANCELLED",
+];
+
+const STATUSES_WITH_COMMENTS_FIELD: CareerApplicationStatus[] = [
+  "INTERNAL_REVIEW",
+  "CLIENT_REVIEW",
+  "INTERVIEW_SCHEDULED",
+  "REJECTED",
+  "CANCELLED",
+];
+
+function showsInterviewField(status: CareerApplicationStatus): boolean {
+  return STATUSES_WITH_INTERVIEW_FIELD.includes(status);
+}
+
+function showsCommentsField(status: CareerApplicationStatus): boolean {
+  return STATUSES_WITH_COMMENTS_FIELD.includes(status);
+}
+
+function isInterviewEditable(status: CareerApplicationStatus): boolean {
+  return status === "INTERVIEW_SCHEDULED";
+}
+
+function isCommentsMandatory(status: CareerApplicationStatus): boolean {
+  return status === "REJECTED" || status === "CANCELLED";
+}
+
+function statusSelectStyle(status: CareerApplicationStatus): React.CSSProperties | undefined {
+  switch (status) {
+    case "CANCELLED":
+      return { backgroundColor: "#7f1d1d", color: "#ffffff" };
+    case "REJECTED":
+      return { backgroundColor: "#dc2626", color: "#ffffff" };
+    case "CLIENT_REVIEW":
+      return { backgroundColor: "#fef9c3", color: "#854d0e" };
+    case "INTERVIEW_SCHEDULED":
+      return { backgroundColor: "#fef3c7", color: "#92400e" };
+    case "SELECTED":
+      return { backgroundColor: "#dcfce7", color: "#166534" };
+    default:
+      return undefined;
+  }
+}
+
 function StatusSelect({
   status,
   canEdit,
@@ -141,7 +190,7 @@ function StatusSelect({
       value={status}
       onChange={(e) => onChange(e.target.value as CareerApplicationStatus)}
       className={className}
-      style={status === "CANCELLED" ? { backgroundColor: "#7f1d1d", color: "#ffffff" } : undefined}
+      style={statusSelectStyle(status)}
       aria-label="Application status"
     >
       {CAREER_APPLICATION_STATUSES.map((s) => (
@@ -254,24 +303,236 @@ function StatusChangeDialog({
   );
 }
 
+function InterviewFieldRow({
+  app,
+  status,
+  canEdit,
+  onSave,
+}: {
+  app: CareerApplication;
+  status: CareerApplicationStatus;
+  canEdit: boolean;
+  onSave: (fields: { interviewScheduledAt: string | null }) => Promise<boolean>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draftDatetime, setDraftDatetime] = useState("");
+  const [draftTimezone, setDraftTimezone] = useState(DEFAULT_INTERVIEW_TIMEZONE);
+  const [saving, setSaving] = useState(false);
+
+  const interviewLabel = formatInterviewDateTime(app.interviewScheduledAt);
+  const editable = canEdit && isInterviewEditable(status);
+
+  function startEdit() {
+    setDraftDatetime(isoToWallTimeInZone(app.interviewScheduledAt, DEFAULT_INTERVIEW_TIMEZONE));
+    setDraftTimezone(DEFAULT_INTERVIEW_TIMEZONE);
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    if (!draftDatetime.trim()) {
+      alert("Interview date and time is required.");
+      return;
+    }
+    const iso = wallTimeInZoneToIso(draftDatetime, draftTimezone);
+    if (!iso) {
+      alert("Please enter a valid interview date and time.");
+      return;
+    }
+    setSaving(true);
+    const ok = await onSave({ interviewScheduledAt: iso });
+    setSaving(false);
+    if (ok) setEditing(false);
+  }
+
+  return (
+    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/30">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-amber-800 dark:text-amber-200">
+          Interview date & time{isInterviewEditable(status) ? " *" : ""}
+        </p>
+        {editable && !editing ? (
+          <button
+            type="button"
+            onClick={startEdit}
+            className="rounded p-1 text-amber-700 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/40"
+            aria-label="Edit interview date and time"
+            title="Edit interview date and time"
+          >
+            <Pencil className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        ) : null}
+      </div>
+      {editing ? (
+        <div className="mt-2 space-y-2">
+          <input
+            type="datetime-local"
+            value={draftDatetime}
+            onChange={(e) => setDraftDatetime(e.target.value)}
+            className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-amber-800 dark:bg-gray-950 dark:text-gray-100"
+          />
+          <select
+            value={draftTimezone}
+            onChange={(e) => setDraftTimezone(e.target.value)}
+            className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-amber-800 dark:bg-gray-950 dark:text-gray-100"
+          >
+            {INTERVIEW_TIMEZONE_OPTIONS.map((tz) => (
+              <option key={tz.value} value={tz.value}>{tz.label}</option>
+            ))}
+          </select>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => void saveEdit()}
+              disabled={saving}
+              className="rounded-lg bg-amber-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-900 disabled:opacity-60 dark:bg-amber-700"
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              disabled={saving}
+              className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 dark:border-amber-800 dark:text-amber-200"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-1 text-sm text-amber-950 dark:text-amber-100">
+          {interviewLabel ? (
+            interviewLabel
+          ) : (
+            <span className="text-amber-700/70 dark:text-amber-300/70">Not set</span>
+          )}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function CommentsFieldRow({
+  app,
+  status,
+  canEdit,
+  onSave,
+}: {
+  app: CareerApplication;
+  status: CareerApplicationStatus;
+  canEdit: boolean;
+  onSave: (fields: { statusComments: string | null }) => Promise<boolean>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const mandatory = isCommentsMandatory(status);
+  const value = app.statusComments?.trim() ?? "";
+
+  function startEdit() {
+    setDraft(app.statusComments ?? "");
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    if (mandatory && !draft.trim()) {
+      alert("Comments are required for this status.");
+      return;
+    }
+    setSaving(true);
+    const ok = await onSave({ statusComments: draft.trim() || null });
+    setSaving(false);
+    if (ok) setEditing(false);
+  }
+
+  return (
+    <div
+      className={`mt-2 rounded-lg border px-3 py-2 ${
+        mandatory
+          ? "border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/30"
+          : "border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p
+          className={`text-xs font-medium uppercase tracking-wide ${
+            mandatory
+              ? "text-red-800 dark:text-red-200"
+              : "text-gray-600 dark:text-gray-300"
+          }`}
+        >
+          Comments{mandatory ? " *" : ""}
+        </p>
+        {canEdit && !editing ? (
+          <button
+            type="button"
+            onClick={startEdit}
+            className="rounded p-1 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+            aria-label="Edit comments"
+            title="Edit comments"
+          >
+            <Pencil className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        ) : null}
+      </div>
+      {editing ? (
+        <div className="mt-2 space-y-2">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={3}
+            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
+            placeholder="Add feedback or notes…"
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => void saveEdit()}
+              disabled={saving}
+              className="rounded-lg bg-black px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-60 dark:bg-white dark:text-black"
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              disabled={saving}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-1 text-sm text-gray-800 dark:text-gray-200">
+          {value || <span className="text-gray-400 dark:text-gray-500">None</span>}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ApplicationCard({
   app,
   canEdit,
   hidePosition = false,
   onStatusChange,
+  onSaveFields,
   onDelete,
 }: {
   app: CareerApplication;
   canEdit: boolean;
   hidePosition?: boolean;
   onStatusChange: (app: CareerApplication, status: CareerApplicationStatus) => void;
+  onSaveFields: (
+    app: CareerApplication,
+    fields: { interviewScheduledAt?: string | null; statusComments?: string | null },
+  ) => Promise<boolean>;
   onDelete: (id: string) => void;
 }) {
   const salary = formatSalary(app);
   const docs = documentLinks(app);
   const location = formatLocation(app);
   const status = (app.status as CareerApplicationStatus) || "INTERNAL_REVIEW";
-  const interviewLabel = formatInterviewDateTime(app.interviewScheduledAt);
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
@@ -296,15 +557,21 @@ function ApplicationCard({
               onChange={(next) => onStatusChange(app, next)}
             />
           </div>
-          {interviewLabel ? (
-            <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-              <span className="font-medium">Interview:</span> {interviewLabel}
-            </p>
+          {showsInterviewField(status) ? (
+            <InterviewFieldRow
+              app={app}
+              status={status}
+              canEdit={canEdit}
+              onSave={(fields) => onSaveFields(app, fields)}
+            />
           ) : null}
-          {app.statusComments?.trim() ? (
-            <p className="mt-2 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:bg-gray-800 dark:text-gray-200">
-              <span className="font-medium">Comments:</span> {app.statusComments.trim()}
-            </p>
+          {showsCommentsField(status) ? (
+            <CommentsFieldRow
+              app={app}
+              status={status}
+              canEdit={canEdit}
+              onSave={(fields) => onSaveFields(app, fields)}
+            />
           ) : null}
           {hidePosition ? null : (
             <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
@@ -468,16 +735,11 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
     }
   }
 
-  async function updateStatus(
+  async function patchApplication(
     id: string,
-    status: CareerApplicationStatus,
-    extras?: { interviewScheduledAt?: string; statusComments?: string },
-  ) {
+    payload: Record<string, unknown>,
+  ): Promise<CareerApplication | null> {
     try {
-      const payload: Record<string, string> = { status };
-      if (extras?.interviewScheduledAt) payload.interviewScheduledAt = extras.interviewScheduledAt;
-      if (extras?.statusComments) payload.statusComments = extras.statusComments;
-
       const res = await adminFetch(`/api/admin/career-applications/admin/applications/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -489,15 +751,47 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
         setApplications((prev) =>
           prev.map((row) => (row.id === id ? { ...row, ...updated } : row)),
         );
-        return true;
+        return updated;
       }
       const err = await res.json().catch(() => null);
-      alert(err?.error ?? "Failed to update status");
-      return false;
+      alert(err?.error ?? "Failed to update application");
+      return null;
     } catch (error) {
-      console.error("Error updating application status:", error);
-      return false;
+      console.error("Error updating application:", error);
+      return null;
     }
+  }
+
+  async function saveApplicationFields(
+    app: CareerApplication,
+    fields: { interviewScheduledAt?: string | null; statusComments?: string | null },
+  ): Promise<boolean> {
+    const status = (app.status as CareerApplicationStatus) || "INTERNAL_REVIEW";
+    const payload: Record<string, unknown> = { status };
+    if ("interviewScheduledAt" in fields) {
+      payload.interviewScheduledAt = fields.interviewScheduledAt;
+    }
+    if ("statusComments" in fields) {
+      payload.statusComments = fields.statusComments;
+    }
+    const updated = await patchApplication(app.id, payload);
+    return updated !== null;
+  }
+
+  async function updateStatus(
+    id: string,
+    status: CareerApplicationStatus,
+    extras?: { interviewScheduledAt?: string; statusComments?: string },
+  ) {
+    const payload: Record<string, unknown> = { status };
+    if (extras?.interviewScheduledAt) {
+      payload.interviewScheduledAt = extras.interviewScheduledAt;
+    }
+    if (extras?.statusComments !== undefined) {
+      payload.statusComments = extras.statusComments;
+    }
+    const updated = await patchApplication(id, payload);
+    return updated !== null;
   }
 
   function requestStatusChange(app: CareerApplication, status: CareerApplicationStatus) {
@@ -734,6 +1028,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
               app={app}
               canEdit={canEdit}
               onStatusChange={(app, status) => requestStatusChange(app, status)}
+              onSaveFields={(app, fields) => saveApplicationFields(app, fields)}
               onDelete={(id) => void deleteApplication(id)}
             />
           ))}
@@ -782,6 +1077,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
                         canEdit={canEdit}
                         hidePosition
                         onStatusChange={(app, status) => requestStatusChange(app, status)}
+              onSaveFields={(app, fields) => saveApplicationFields(app, fields)}
                         onDelete={(id) => void deleteApplication(id)}
                       />
                     ))}
