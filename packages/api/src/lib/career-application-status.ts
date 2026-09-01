@@ -53,10 +53,10 @@ export const CAREER_APPLICATION_STATUS_COLORS: Record<
     darkText: "dark:text-red-200",
   },
   CANCELLED: {
-    bg: "bg-red-900/15",
-    text: "text-red-950",
-    darkBg: "dark:bg-red-950/60",
-    darkText: "dark:text-red-200",
+    bg: "bg-red-900",
+    text: "text-white",
+    darkBg: "dark:bg-red-900",
+    darkText: "dark:text-white",
   },
 };
 

@@ -262,6 +262,60 @@ async function jobTitlesForListing(jobListingId: string): Promise<string[]> {
   return job?.title ? [job.title] : [];
 }
 
+type CareerApplicationWithJob = Prisma.CareerApplicationGetPayload<{
+  include: {
+    jobListing: {
+      select: {
+        id: true;
+        title: true;
+        published: true;
+        country: true;
+        workMode: true;
+        clientId: true;
+        client: { select: { name: true } };
+      };
+    };
+  };
+}>;
+
+function serializeAdminApplication(
+  row: CareerApplicationWithJob,
+  profileId?: string | null,
+) {
+  return {
+    id: row.id,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    email: row.email,
+    phone: row.phone,
+    position: row.position,
+    company: row.company,
+    country: row.country,
+    city: row.city,
+    jobListingId: row.jobListingId,
+    visaStatus: row.visaStatus,
+    salaryCurrency: row.salaryCurrency,
+    salaryRate: row.salaryRate,
+    salaryMode: row.salaryMode,
+    salaryExpectation: row.salaryExpectation,
+    resumeUrl: row.resumeUrl,
+    documentUrls: row.documentUrls,
+    message: row.message,
+    isCitizen: row.isCitizen,
+    status: row.status,
+    interviewScheduledAt: row.interviewScheduledAt?.toISOString() ?? null,
+    statusComments: row.statusComments ?? null,
+    relevantExperience: row.relevantExperience,
+    profileId: profileId ?? row.profileId ?? null,
+    createdAt: row.createdAt.toISOString(),
+    jobTitle: row.jobListing?.title ?? null,
+    jobPublished: row.jobListing?.published ?? null,
+    jobCountry: row.jobListing?.country ?? null,
+    jobWorkMode: row.jobListing?.workMode ?? null,
+    clientName: row.jobListing?.client?.name ?? null,
+  };
+}
+
 // Admin: list all career applications
 router.get("/admin/applications", async (req, res) => {
   try {
@@ -330,16 +384,9 @@ router.get("/admin/applications", async (req, res) => {
     );
 
     res.json({
-      data: applications.map((row) => ({
-        ...row,
-        jobListingId: row.jobListingId,
-        jobTitle: row.jobListing?.title ?? null,
-        jobPublished: row.jobListing?.published ?? null,
-        jobCountry: row.jobListing?.country ?? null,
-        jobWorkMode: row.jobListing?.workMode ?? null,
-        clientName: row.jobListing?.client?.name ?? null,
-        profileId: row.profileId ?? legacyProfileByAppId.get(row.id) ?? null,
-      })),
+      data: applications.map((row) =>
+        serializeAdminApplication(row, legacyProfileByAppId.get(row.id) ?? row.profileId),
+      ),
     });
   } catch (error) {
     console.error("Error fetching career applications:", error);
@@ -408,14 +455,7 @@ router.patch("/admin/applications/:id", async (req, res) => {
     });
 
     res.json({
-      data: {
-        ...updated,
-        jobTitle: updated.jobListing?.title ?? null,
-        jobPublished: updated.jobListing?.published ?? null,
-        jobCountry: updated.jobListing?.country ?? null,
-        jobWorkMode: updated.jobListing?.workMode ?? null,
-        clientName: updated.jobListing?.client?.name ?? null,
-      },
+      data: serializeAdminApplication(updated),
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

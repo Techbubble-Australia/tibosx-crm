@@ -17,6 +17,13 @@ import {
   CAREER_APPLICATION_STATUS_LABELS,
   type CareerApplicationStatus,
 } from "@/lib/career-application-status";
+import {
+  DEFAULT_INTERVIEW_TIMEZONE,
+  INTERVIEW_TIMEZONE_OPTIONS,
+  formatInterviewDateTime,
+  isoToWallTimeInZone,
+  wallTimeInZoneToIso,
+} from "@/lib/interview-datetime";
 
 interface CareerApplication {
   id: string;
@@ -109,32 +116,48 @@ type Props = {
   initialStatusFilter?: string;
 };
 
-function formatInterviewScheduledAt(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleString("en-AU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+function StatusSelect({
+  status,
+  canEdit,
+  onChange,
+}: {
+  status: CareerApplicationStatus;
+  canEdit: boolean;
+  onChange: (next: CareerApplicationStatus) => void;
+}) {
+  const statusColors = CAREER_APPLICATION_STATUS_COLORS[status] ?? CAREER_APPLICATION_STATUS_COLORS.INTERNAL_REVIEW;
+  const className = `rounded-full px-2.5 py-0.5 text-xs font-medium border-0 ${statusColors.bg} ${statusColors.text} ${statusColors.darkBg} ${statusColors.darkText}`;
 
-function toDatetimeLocalValue(value: string | null | undefined): string {
-  if (!value) return "";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  if (!canEdit) {
+    return (
+      <span className={className}>
+        {CAREER_APPLICATION_STATUS_LABELS[status]}
+      </span>
+    );
+  }
+
+  return (
+    <select
+      value={status}
+      onChange={(e) => onChange(e.target.value as CareerApplicationStatus)}
+      className={className}
+      style={status === "CANCELLED" ? { backgroundColor: "#7f1d1d", color: "#ffffff" } : undefined}
+      aria-label="Application status"
+    >
+      {CAREER_APPLICATION_STATUSES.map((s) => (
+        <option key={s} value={s}>{CAREER_APPLICATION_STATUS_LABELS[s]}</option>
+      ))}
+    </select>
+  );
 }
 
 function StatusChangeDialog({
   status,
   interviewScheduledAt,
+  interviewTimezone,
   statusComments,
   onInterviewScheduledAtChange,
+  onInterviewTimezoneChange,
   onStatusCommentsChange,
   onCancel,
   onConfirm,
@@ -142,8 +165,10 @@ function StatusChangeDialog({
 }: {
   status: CareerApplicationStatus;
   interviewScheduledAt: string;
+  interviewTimezone: string;
   statusComments: string;
   onInterviewScheduledAtChange: (value: string) => void;
+  onInterviewTimezoneChange: (value: string) => void;
   onStatusCommentsChange: (value: string) => void;
   onCancel: () => void;
   onConfirm: () => void;
@@ -161,17 +186,33 @@ function StatusChangeDialog({
         </h3>
         <div className="mt-4 space-y-4">
           {needsInterview ? (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Interview date & time <span className="text-red-600">*</span>
-              </label>
-              <input
-                type="datetime-local"
-                value={interviewScheduledAt}
-                onChange={(e) => onInterviewScheduledAtChange(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
-                required
-              />
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Interview date & time <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  value={interviewScheduledAt}
+                  onChange={(e) => onInterviewScheduledAtChange(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Timezone
+                </label>
+                <select
+                  value={interviewTimezone}
+                  onChange={(e) => onInterviewTimezoneChange(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
+                >
+                  {INTERVIEW_TIMEZONE_OPTIONS.map((tz) => (
+                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           ) : null}
           {needsComments ? (
@@ -230,7 +271,7 @@ function ApplicationCard({
   const docs = documentLinks(app);
   const location = formatLocation(app);
   const status = (app.status as CareerApplicationStatus) || "INTERNAL_REVIEW";
-  const statusColors = CAREER_APPLICATION_STATUS_COLORS[status] ?? CAREER_APPLICATION_STATUS_COLORS.INTERNAL_REVIEW;
+  const interviewLabel = formatInterviewDateTime(app.interviewScheduledAt);
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
@@ -249,23 +290,22 @@ function ApplicationCard({
                 {app.firstName} {app.lastName}
               </p>
             )}
-            {canEdit ? (
-              <select
-                value={status}
-                onChange={(e) => onStatusChange(app, e.target.value as CareerApplicationStatus)}
-                className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColors.bg} ${statusColors.text} ${statusColors.darkBg} ${statusColors.darkText} border-0`}
-                aria-label="Application status"
-              >
-                {CAREER_APPLICATION_STATUSES.map((s) => (
-                  <option key={s} value={s}>{CAREER_APPLICATION_STATUS_LABELS[s]}</option>
-                ))}
-              </select>
-            ) : (
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColors.bg} ${statusColors.text} ${statusColors.darkBg} ${statusColors.darkText}`}>
-                {CAREER_APPLICATION_STATUS_LABELS[status]}
-              </span>
-            )}
+            <StatusSelect
+              status={status}
+              canEdit={canEdit}
+              onChange={(next) => onStatusChange(app, next)}
+            />
           </div>
+          {interviewLabel ? (
+            <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+              <span className="font-medium">Interview:</span> {interviewLabel}
+            </p>
+          ) : null}
+          {app.statusComments?.trim() ? (
+            <p className="mt-2 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+              <span className="font-medium">Comments:</span> {app.statusComments.trim()}
+            </p>
+          ) : null}
           {hidePosition ? null : (
             <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
               Applying for:{" "}
@@ -287,15 +327,7 @@ function ApplicationCard({
             {app.isCitizen !== false ? <span>Citizen: Yes</span> : null}
             {salary ? <span>Salary: {salary}</span> : null}
             {app.clientName ? <span>Client: {app.clientName}</span> : null}
-            {status === "INTERVIEW_SCHEDULED" && app.interviewScheduledAt ? (
-              <span>Interview: {formatInterviewScheduledAt(app.interviewScheduledAt)}</span>
-            ) : null}
           </div>
-          {app.statusComments ? (
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              <span className="font-medium text-gray-700 dark:text-gray-300">Status notes:</span> {app.statusComments}
-            </p>
-          ) : null}
           {app.message ? (
             <p className="mt-3 border-t border-gray-100 pt-3 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400">
               {app.message}
@@ -357,6 +389,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
     app: CareerApplication;
     status: CareerApplicationStatus;
     interviewScheduledAt: string;
+    interviewTimezone: string;
     statusComments: string;
   } | null>(null);
   const [statusSaving, setStatusSaving] = useState(false);
@@ -452,7 +485,10 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
       });
       if (res.ok) {
         const data = await res.json();
-        setApplications((prev) => prev.map((row) => (row.id === id ? { ...row, ...data.data } : row)));
+        const updated = data.data as CareerApplication;
+        setApplications((prev) =>
+          prev.map((row) => (row.id === id ? { ...row, ...updated } : row)),
+        );
         return true;
       }
       const err = await res.json().catch(() => null);
@@ -472,7 +508,8 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
       setStatusChange({
         app,
         status,
-        interviewScheduledAt: toDatetimeLocalValue(app.interviewScheduledAt),
+        interviewScheduledAt: isoToWallTimeInZone(app.interviewScheduledAt, DEFAULT_INTERVIEW_TIMEZONE),
+        interviewTimezone: DEFAULT_INTERVIEW_TIMEZONE,
         statusComments: app.statusComments ?? "",
       });
       return;
@@ -482,6 +519,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
         app,
         status,
         interviewScheduledAt: "",
+        interviewTimezone: DEFAULT_INTERVIEW_TIMEZONE,
         statusComments: app.statusComments ?? "",
       });
       return;
@@ -495,6 +533,14 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
       alert("Interview date and time is required.");
       return;
     }
+    const interviewIso =
+      statusChange.status === "INTERVIEW_SCHEDULED"
+        ? wallTimeInZoneToIso(statusChange.interviewScheduledAt, statusChange.interviewTimezone)
+        : undefined;
+    if (statusChange.status === "INTERVIEW_SCHEDULED" && !interviewIso) {
+      alert("Please enter a valid interview date and time.");
+      return;
+    }
     if (
       (statusChange.status === "SELECTED" ||
         statusChange.status === "REJECTED" ||
@@ -506,7 +552,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
     }
     setStatusSaving(true);
     const ok = await updateStatus(statusChange.app.id, statusChange.status, {
-      interviewScheduledAt: statusChange.interviewScheduledAt,
+      interviewScheduledAt: interviewIso,
       statusComments: statusChange.statusComments,
     });
     setStatusSaving(false);
@@ -751,9 +797,13 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
         <StatusChangeDialog
           status={statusChange.status}
           interviewScheduledAt={statusChange.interviewScheduledAt}
+          interviewTimezone={statusChange.interviewTimezone}
           statusComments={statusChange.statusComments}
           onInterviewScheduledAtChange={(value) =>
             setStatusChange((prev) => (prev ? { ...prev, interviewScheduledAt: value } : prev))
+          }
+          onInterviewTimezoneChange={(value) =>
+            setStatusChange((prev) => (prev ? { ...prev, interviewTimezone: value } : prev))
           }
           onStatusCommentsChange={(value) =>
             setStatusChange((prev) => (prev ? { ...prev, statusComments: value } : prev))

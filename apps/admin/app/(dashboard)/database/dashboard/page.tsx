@@ -128,8 +128,26 @@ export default function DatabaseDashboardPage() {
         if (clientId) params.set("clientId", clientId);
         const query = params.toString() ? `?${params.toString()}` : "";
         const res = await adminFetch(`/api/admin/dashboard/stats${query}`);
+        if (!res.ok) {
+          console.error("Dashboard stats failed:", res.status, await res.text());
+          return;
+        }
         const data = await res.json();
-        setStats(data.data ?? null);
+        const raw = data.data;
+        if (!raw) {
+          setStats(null);
+          return;
+        }
+        setStats({
+          totalProfiles: raw.totalProfiles ?? 0,
+          activeRoles: raw.activeRoles ?? raw.openRoles ?? 0,
+          activeApplications: raw.activeApplications ?? raw.applications30d ?? 0,
+          interviewScheduled: raw.interviewScheduled ?? 0,
+          countries: raw.countries ?? [],
+          clients: raw.clients ?? [],
+          profilesByTechnology: raw.profilesByTechnology ?? [],
+          applicationsByActiveJob: raw.applicationsByActiveJob ?? [],
+        });
       } catch (error) {
         console.error(error);
       } finally {

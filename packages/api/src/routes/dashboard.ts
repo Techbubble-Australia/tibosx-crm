@@ -20,8 +20,7 @@ router.get("/stats", async (req, res) => {
         prisma.careerApplication.count({ where: activeApplicationWhere }),
         prisma.careerApplication.count({
           where: {
-            status: "INTERVIEW_SCHEDULED",
-            ...activeApplicationWhere,
+            AND: [{ status: "INTERVIEW_SCHEDULED" }, activeApplicationWhere],
           },
         }),
         prisma.jobListing.count({ where: { published: true } }),
