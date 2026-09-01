@@ -557,22 +557,6 @@ function ApplicationCard({
               onChange={(next) => onStatusChange(app, next)}
             />
           </div>
-          {showsInterviewField(status) ? (
-            <InterviewFieldRow
-              app={app}
-              status={status}
-              canEdit={canEdit}
-              onSave={(fields) => onSaveFields(app, fields)}
-            />
-          ) : null}
-          {showsCommentsField(status) ? (
-            <CommentsFieldRow
-              app={app}
-              status={status}
-              canEdit={canEdit}
-              onSave={(fields) => onSaveFields(app, fields)}
-            />
-          ) : null}
           {hidePosition ? null : (
             <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
               Applying for:{" "}
@@ -614,6 +598,22 @@ function ApplicationCard({
                 </a>
               ))}
             </div>
+          ) : null}
+          {showsInterviewField(status) ? (
+            <InterviewFieldRow
+              app={app}
+              status={status}
+              canEdit={canEdit}
+              onSave={(fields) => onSaveFields(app, fields)}
+            />
+          ) : null}
+          {showsCommentsField(status) ? (
+            <CommentsFieldRow
+              app={app}
+              status={status}
+              canEdit={canEdit}
+              onSave={(fields) => onSaveFields(app, fields)}
+            />
           ) : null}
         </div>
         <div className="flex shrink-0 flex-row items-center justify-between gap-2 sm:flex-col sm:items-end">
