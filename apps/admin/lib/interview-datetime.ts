@@ -13,15 +13,38 @@ function getPart(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatPart
   return parts.find((part) => part.type === type)?.value ?? "";
 }
 
+function parseLocalDatetime(localValue: string): {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+} | null {
+  const [datePart, timePart] = localValue.split("T");
+  if (!datePart || !timePart) return null;
+
+  const dateBits = datePart.split("-");
+  const timeBits = timePart.split(":");
+  if (dateBits.length < 3 || timeBits.length < 2) return null;
+
+  const year = Number(dateBits[0]);
+  const month = Number(dateBits[1]);
+  const day = Number(dateBits[2]);
+  const hour = Number(timeBits[0]);
+  const minute = Number(timeBits[1]);
+
+  if ([year, month, day, hour, minute].some((n) => Number.isNaN(n))) return null;
+
+  return { year, month, day, hour, minute };
+}
+
 /** Wall-clock `datetime-local` value in a given IANA timezone → UTC ISO string. */
 export function wallTimeInZoneToIso(localValue: string, timeZone: string): string {
   if (!localValue.trim()) return "";
-  const [datePart, timePart] = localValue.split("T");
-  if (!datePart || !timePart) return "";
+  const parsed = parseLocalDatetime(localValue);
+  if (!parsed) return "";
 
-  const [year, month, day] = datePart.split("-").map(Number);
-  const [hour, minute] = timePart.split(":").map(Number);
-  if ([year, month, day, hour, minute].some((n) => Number.isNaN(n))) return "";
+  const { year, month, day, hour, minute } = parsed;
 
   let candidate = new Date(Date.UTC(year, month - 1, day, hour, minute));
   for (let attempt = 0; attempt < 4; attempt += 1) {
