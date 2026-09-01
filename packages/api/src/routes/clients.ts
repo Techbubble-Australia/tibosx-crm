@@ -81,6 +81,51 @@ router.get("/", async (_req, res) => {
   }
 });
 
+router.patch("/reorder", async (req, res) => {
+  try {
+    const body = z.object({ orderedIds: z.array(z.string().min(1)).min(1) }).parse(req.body);
+    await prisma.$transaction(
+      body.orderedIds.map((id, index) =>
+        prisma.client.update({ where: { id }, data: { order: index + 1 } }),
+      ),
+    );
+    res.json({ message: "Reordered" });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error reordering clients:", error);
+    res.status(500).json({ error: "Failed to reorder clients" });
+  }
+});
+
+router.patch("/:id/order", async (req, res) => {
+  try {
+    const body = z.object({ order: z.number().int() }).parse(req.body);
+    const existing = await prisma.client.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: "Client not found" });
+    }
+    const row = await prisma.client.update({
+      where: { id: req.params.id },
+      data: { order: body.order },
+      include: {
+        contacts: {
+          orderBy: [{ order: "asc" }, { name: "asc" }],
+        },
+        _count: { select: { opportunities: true } },
+      },
+    });
+    res.json({ data: serializeClient(row) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error updating client order:", error);
+    res.status(500).json({ error: "Failed to update client order" });
+  }
+});
+
 router.get("/:id", async (req, res) => {
   try {
     if (req.params.id === "next-order") {
