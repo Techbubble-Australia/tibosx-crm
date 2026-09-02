@@ -107,10 +107,34 @@ router.get("/:id", async (req, res) => {
       where: { id: req.params.id },
       include: {
         client: { select: { id: true, name: true, status: true } },
+        jobs: {
+          select: {
+            id: true,
+            title: true,
+            referenceNumber: true,
+            published: true,
+            type: true,
+            order: true,
+          },
+          orderBy: [{ order: "asc" }, { createdAt: "desc" }],
+        },
       },
     });
     if (!row) return res.status(404).json({ error: "Not found" });
-    res.json({ data: serializeOpportunity(row) });
+    const { jobs, ...rest } = row;
+    res.json({
+      data: {
+        ...serializeOpportunity(rest),
+        jobs: jobs.map((job) => ({
+          id: job.id,
+          title: job.title,
+          referenceNumber: job.referenceNumber,
+          published: job.published,
+          type: job.type,
+          order: job.order,
+        })),
+      },
+    });
   } catch (error) {
     console.error("Error fetching opportunity:", error);
     res.status(500).json({ error: "Failed to fetch opportunity" });
@@ -209,6 +233,109 @@ router.delete("/:id", async (req, res) => {
   } catch (error) {
     console.error("Error deleting opportunity:", error);
     res.status(500).json({ error: "Failed to delete opportunity" });
+  }
+});
+
+router.get("/:id/available-jobs", async (req, res) => {
+  try {
+    const opportunity = await prisma.opportunity.findUnique({
+      where: { id: req.params.id },
+      select: { clientId: true },
+    });
+    if (!opportunity) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const jobs = await prisma.jobListing.findMany({
+      where: {
+        clientId: opportunity.clientId,
+        OR: [{ opportunityId: null }, { opportunityId: req.params.id }],
+      },
+      select: {
+        id: true,
+        title: true,
+        referenceNumber: true,
+        published: true,
+        type: true,
+        opportunityId: true,
+      },
+      orderBy: [{ order: "asc" }, { createdAt: "desc" }],
+    });
+
+    res.json({ data: jobs });
+  } catch (error) {
+    console.error("Error fetching available jobs:", error);
+    res.status(500).json({ error: "Failed to fetch jobs" });
+  }
+});
+
+router.post("/:id/link-job", async (req, res) => {
+  try {
+    const body = z.object({ jobId: z.string().min(1) }).parse(req.body);
+    const opportunity = await prisma.opportunity.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, clientId: true },
+    });
+    if (!opportunity) {
+      return res.status(404).json({ error: "Opportunity not found" });
+    }
+
+    const job = await prisma.jobListing.findUnique({
+      where: { id: body.jobId },
+      select: { id: true, clientId: true, opportunityId: true, title: true, referenceNumber: true, published: true, type: true, order: true },
+    });
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    if (job.clientId !== opportunity.clientId) {
+      return res.status(400).json({ error: "Job must belong to the same client as the opportunity" });
+    }
+    if (job.opportunityId && job.opportunityId !== opportunity.id) {
+      return res.status(409).json({ error: "This job is already linked to another opportunity" });
+    }
+
+    const updated = await prisma.jobListing.update({
+      where: { id: job.id },
+      data: { opportunityId: opportunity.id },
+      select: {
+        id: true,
+        title: true,
+        referenceNumber: true,
+        published: true,
+        type: true,
+        order: true,
+      },
+    });
+
+    res.json({ data: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error linking job:", error);
+    res.status(500).json({ error: "Failed to link job" });
+  }
+});
+
+router.delete("/:id/jobs/:jobId", async (req, res) => {
+  try {
+    const job = await prisma.jobListing.findUnique({
+      where: { id: req.params.jobId },
+      select: { id: true, opportunityId: true },
+    });
+    if (!job || job.opportunityId !== req.params.id) {
+      return res.status(404).json({ error: "Linked job not found" });
+    }
+
+    await prisma.jobListing.update({
+      where: { id: job.id },
+      data: { opportunityId: null },
+    });
+
+    res.json({ message: "Unlinked" });
+  } catch (error) {
+    console.error("Error unlinking job:", error);
+    res.status(500).json({ error: "Failed to unlink job" });
   }
 });
 

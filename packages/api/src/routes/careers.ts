@@ -19,6 +19,7 @@ import {
   CAREER_APPLICATION_STATUSES,
 } from "../lib/career-application-status";
 import { sendCareerApplicationEmail } from "../lib/mail";
+import type { AuthRequest } from "../middleware/auth";
 
 const router: IRouter = Router();
 
@@ -254,6 +255,90 @@ router.post("/apply", async (req, res) => {
   }
 });
 
+router.post("/admin/applications/from-job", async (req: AuthRequest, res) => {
+  try {
+    const body = { ...req.body };
+    if (typeof body.salaryRate === "string") {
+      body.salaryRate = parseSalaryRateInput(body.salaryRate);
+    }
+    const validatedData = careerSchema
+      .and(z.object({ jobListingId: z.string().min(1, "Job is required") }))
+      .parse(body);
+
+    const job = await prisma.jobListing.findUnique({
+      where: { id: validatedData.jobListingId },
+      select: { id: true, title: true, country: true },
+    });
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const position = job.title;
+    const country = job.country?.trim() || validatedData.country;
+
+    const isDuplicate = await findDuplicateCareerApplication({
+      jobListingId: job.id,
+      position,
+      email: validatedData.email,
+      phone: validatedData.phone,
+    });
+    if (isDuplicate) {
+      return res.status(409).json({
+        error: "This candidate has already applied for this role.",
+      });
+    }
+
+    const application = await prisma.careerApplication.create({
+      data: {
+        firstName: validatedData.firstName,
+        lastName: validatedData.lastName,
+        email: validatedData.email,
+        phone: validatedData.phone,
+        position,
+        country,
+        city: validatedData.city,
+        jobListingId: job.id,
+        isCitizen: validatedData.isCitizen,
+        visaStatus: validatedData.isCitizen ? null : validatedData.visaStatus?.trim() ?? null,
+        salaryCurrency: validatedData.salaryCurrency,
+        salaryRate: validatedData.salaryRate,
+        salaryMode: validatedData.salaryMode,
+        salaryExpectation: validatedData.salaryRate,
+        resumeUrl: validatedData.documentUrls[0],
+        documentUrls: validatedData.documentUrls,
+        message: validatedData.message,
+        relevantExperience: validatedData.relevantExperience,
+      },
+    });
+
+    try {
+      await createProfileFromCareerApplication(application, {
+        sourcedById: req.user?.id ?? null,
+      });
+    } catch (profileError) {
+      console.error("Error creating profile from career application:", profileError);
+      return res.status(500).json({
+        error: "Application was saved but profile creation failed. Please try again or create the profile manually.",
+        data: { applicationId: application.id },
+      });
+    }
+
+    res.status(201).json({
+      message: "Profile and application created successfully.",
+      data: { id: application.id },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        error: formatZodError(error),
+        details: error.errors,
+      });
+    }
+    console.error("Error creating application from job:", error);
+    res.status(500).json({ error: "Failed to create application" });
+  }
+});
+
 async function jobTitlesForListing(jobListingId: string): Promise<string[]> {
   const job = await prisma.jobListing.findUnique({
     where: { id: jobListingId },
@@ -472,6 +557,27 @@ router.patch("/admin/applications/:id", async (req, res) => {
         },
       },
     });
+
+    if (isStatusChange && nextStatus === "SELECTED") {
+      const profileId = updated.profileId;
+      if (profileId) {
+        await prisma.candidateProfile.update({
+          where: { id: profileId },
+          data: { available: false },
+        });
+      } else {
+        const legacyProfile = await prisma.candidateProfile.findFirst({
+          where: { careerApplicationId: updated.id },
+          select: { id: true },
+        });
+        if (legacyProfile) {
+          await prisma.candidateProfile.update({
+            where: { id: legacyProfile.id },
+            data: { available: false },
+          });
+        }
+      }
+    }
 
     res.json({
       data: serializeAdminApplication(updated),

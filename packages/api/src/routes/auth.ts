@@ -44,6 +44,7 @@ const passwordChangeSchema = z.object({
 function publicUser(user: {
   id: string;
   email: string;
+  name?: string | null;
   role: string;
   mfaEnabled: boolean;
   passwordNeedsReset?: boolean;
@@ -51,6 +52,7 @@ function publicUser(user: {
   return {
     id: user.id,
     email: user.email,
+    name: user.name?.trim() || null,
     role: user.role,
     mfaEnabled: user.mfaEnabled,
     passwordNeedsReset: user.passwordNeedsReset ?? false,
@@ -180,6 +182,7 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
     select: {
       id: true,
       email: true,
+      name: true,
       role: true,
       mfaEnabled: true,
       mfaEnrolledAt: true,

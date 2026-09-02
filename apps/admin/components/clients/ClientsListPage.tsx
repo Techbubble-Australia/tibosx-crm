@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Edit, Trash2, Pencil, GripVertical } from "lucide-react";
+import { Plus, Edit, Trash2, Pencil, GripVertical, ChevronDown, ChevronUp } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
 import { TablePagination } from "@/components/ui/TablePagination";
@@ -32,6 +32,35 @@ type Props = {
   description: string;
 };
 
+type ClientSortKey = "order" | "name" | "country" | "opportunityCount" | "status";
+type SortDir = "asc" | "desc";
+
+function SortHeader({
+  label,
+  sortKey,
+  activeKey,
+  dir,
+  onSort,
+}: {
+  label: string;
+  sortKey: ClientSortKey;
+  activeKey: ClientSortKey;
+  dir: SortDir;
+  onSort: (key: ClientSortKey) => void;
+}) {
+  const active = activeKey === sortKey;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(sortKey)}
+      className="inline-flex items-center gap-1 font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
+    >
+      {label}
+      {active ? (dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />) : null}
+    </button>
+  );
+}
+
 export function ClientsListPage({ statusFilter, heading, description }: Props) {
   const [rows, setRows] = useState<ClientRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,14 +68,44 @@ export function ClientsListPage({ statusFilter, heading, description }: Props) {
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [draggingClientId, setDraggingClientId] = useState<string | null>(null);
   const [dragOverClientId, setDragOverClientId] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<ClientSortKey>("order");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
-  const statusFiltered = useMemo(
-    () =>
-      rows
-        .filter((row) => row.status === statusFilter)
-        .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)),
-    [rows, statusFilter],
-  );
+  const statusFiltered = useMemo(() => {
+    const list = rows.filter((row) => row.status === statusFilter);
+    list.sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "order":
+          cmp = (a.order ?? 0) - (b.order ?? 0);
+          break;
+        case "name":
+          cmp = a.name.localeCompare(b.name);
+          break;
+        case "country":
+          cmp = a.country.localeCompare(b.country);
+          break;
+        case "opportunityCount":
+          cmp = (a.opportunityCount ?? 0) - (b.opportunityCount ?? 0);
+          break;
+        case "status":
+          cmp = a.status.localeCompare(b.status);
+          break;
+      }
+      if (cmp === 0) cmp = a.name.localeCompare(b.name);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return list;
+  }, [rows, statusFilter, sortKey, sortDir]);
+
+  function handleSort(key: ClientSortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
   const {
     search,
@@ -75,7 +134,7 @@ export function ClientsListPage({ statusFilter, heading, description }: Props) {
     ]),
   );
 
-  const canDragReorder = !search.trim();
+  const canDragReorder = !search.trim() && sortKey === "order" && sortDir === "asc";
 
   useEffect(() => {
     void fetchRows();
@@ -243,12 +302,22 @@ export function ClientsListPage({ statusFilter, heading, description }: Props) {
         <table className="w-full text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
             <tr>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Order</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Name</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Country</th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Order" sortKey="order" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Name" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Country" sortKey="country" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
               <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Contacts</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Opportunities</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Opportunities" sortKey="opportunityCount" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Status" sortKey="status" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
               <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
             </tr>
           </thead>

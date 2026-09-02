@@ -191,7 +191,7 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
   });
   const { columns: jobColumnDefs, visibleIds, isVisible: isColumnVisible, toggleColumn } =
     useColumnVisibility("tbos:jobs-columns", JOB_LIST_COLUMNS);
-  const [selectedTechnology, setSelectedTechnology] = useState<string | null>(null);
+  const [selectedClient, setSelectedClient] = useState<string | null>(null);
   const [orderDrafts, setOrderDrafts] = useState<Record<string, string>>({});
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [editingPublishedDateId, setEditingPublishedDateId] = useState<string | null>(null);
@@ -208,7 +208,7 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   useEffect(() => {
-    setSelectedTechnology(null);
+    setSelectedClient(null);
   }, [search, viewMode, publishedFilter]);
 
   useEffect(() => {
@@ -535,10 +535,10 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
     return sortedFiltered.slice(start, start + pageSize);
   }, [sortedFiltered, page, pageSize]);
 
-  const groupedByTechnology = useMemo(() => {
+  const groupedByClient = useMemo(() => {
     const map = new Map<string, JobListing[]>();
     for (const job of sortedFiltered) {
-      const key = job.technology.trim() || "Unknown";
+      const key = job.clientName?.trim() || "Unknown";
       const list = map.get(key) ?? [];
       list.push(job);
       map.set(key, list);
@@ -546,10 +546,10 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [sortedFiltered]);
 
-  const jobsInSelectedTechnology = useMemo(() => {
-    if (!selectedTechnology) return [];
-    return groupedByTechnology.find(([tech]) => tech === selectedTechnology)?.[1] ?? [];
-  }, [groupedByTechnology, selectedTechnology]);
+  const jobsInSelectedClient = useMemo(() => {
+    if (!selectedClient) return [];
+    return groupedByClient.find(([client]) => client === selectedClient)?.[1] ?? [];
+  }, [groupedByClient, selectedClient]);
 
   if (isLoading) {
     return (
@@ -1076,27 +1076,27 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
             />
           ) : null}
         </div>
-      ) : selectedTechnology ? (
+      ) : selectedClient ? (
         <div className="space-y-4">
           <button
             type="button"
-            onClick={() => setSelectedTechnology(null)}
+            onClick={() => setSelectedClient(null)}
             className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
           >
-            ← All technologies
+            ← All clients
           </button>
           <section className="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-              <h3 className="font-semibold text-gray-900 dark:text-gray-100">{selectedTechnology}</h3>
+              <h3 className="font-semibold text-gray-900 dark:text-gray-100">{selectedClient}</h3>
               <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                {jobsInSelectedTechnology.length} listing{jobsInSelectedTechnology.length !== 1 ? "s" : ""}
+                {jobsInSelectedClient.length} listing{jobsInSelectedClient.length !== 1 ? "s" : ""}
               </span>
             </div>
-            {jobsInSelectedTechnology.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-gray-400">No listings for this technology.</p>
+            {jobsInSelectedClient.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-gray-400">No listings for this client.</p>
             ) : (
               <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-                {jobsInSelectedTechnology.map((job) => (
+                {jobsInSelectedClient.map((job) => (
                   <li
                     key={job.id}
                     className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
@@ -1104,7 +1104,7 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                     <div className="min-w-0">
                       <p className="font-medium text-gray-900 dark:text-gray-100">{job.title}</p>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {job.referenceNumber} · {job.city || "—"} · {job.country} ·{" "}
+                        {job.referenceNumber} · {job.city || "—"} · {job.country} · {job.type || "—"} ·{" "}
                         {(job.applicationCount ?? 0) > 0 ? (
                           <Link
                             href={`/career-applications/${listTab}?jobListingId=${encodeURIComponent(job.id)}`}
@@ -1117,7 +1117,7 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                         )}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Client: {job.clientName || "—"}
+                        Technology: {job.technology || "—"}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -1182,20 +1182,20 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
             <div className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:bg-gray-900">
               No listings match your search.
             </div>
-          ) : groupedByTechnology.length === 0 ? (
+          ) : groupedByClient.length === 0 ? (
             <div className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:bg-gray-900">
-              No technologies with listings on this tab.
+              No clients with listings on this tab.
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {groupedByTechnology.map(([technology, items]) => (
+              {groupedByClient.map(([client, items]) => (
                 <button
-                  key={technology}
+                  key={client}
                   type="button"
-                  onClick={() => setSelectedTechnology(technology)}
+                  onClick={() => setSelectedClient(client)}
                   className="rounded-xl border border-gray-200 bg-white p-5 text-left transition-colors hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600 dark:hover:bg-gray-800"
                 >
-                  <p className="font-semibold text-gray-900 dark:text-gray-100">{technology}</p>
+                  <p className="font-semibold text-gray-900 dark:text-gray-100">{client}</p>
                   <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                     {items.length} listing{items.length !== 1 ? "s" : ""}
                   </p>

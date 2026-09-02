@@ -220,6 +220,8 @@ model CandidateProfile {
   level               String             @default("Developer")
   /// Years of relevant experience.
   relevantExperience  Int                @default(0)
+  /// Whether the candidate is available for new roles.
+  available           Boolean            @default(true)
   /// Admin user who sourced this candidate (recruiter/admin).
   sourcedById         String?
   sourcedBy           AdminUser?         @relation("ProfileSourcedBy", fields: [sourcedById], references: [id], onDelete: SetNull)
@@ -336,6 +338,7 @@ model Opportunity {
   status    String   @default("DRAFT")
   comments  String   @default("") @db.Text
   order     Int      @default(0)
+  jobs      JobListing[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -378,6 +381,8 @@ model JobListing {
   department      String
   clientId        String
   client          Client    @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  opportunityId   String?   @unique
+  opportunity     Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
   description     String    @default("") @db.Text
   likeCount       Int       @default(0)
   published       Boolean   @default(true)

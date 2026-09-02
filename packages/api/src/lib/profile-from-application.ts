@@ -61,7 +61,10 @@ function documentUrlsFromApplication(application: ApplicationRow): string[] {
   return application.resumeUrl ? [application.resumeUrl] : [];
 }
 
-export async function createProfileFromCareerApplication(application: ApplicationRow): Promise<void> {
+export async function createProfileFromCareerApplication(
+  application: ApplicationRow,
+  options?: { sourcedById?: string | null },
+): Promise<void> {
   const existing = await prisma.candidateProfile.findUnique({
     where: { careerApplicationId: application.id },
   });
@@ -133,6 +136,7 @@ export async function createProfileFromCareerApplication(application: Applicatio
       level,
       relevantExperience: application.relevantExperience ?? 0,
       careerApplicationId: application.id,
+      sourcedById: options?.sourcedById ?? null,
     },
   });
 

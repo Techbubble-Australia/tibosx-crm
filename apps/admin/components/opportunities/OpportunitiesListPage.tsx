@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
 import { TablePagination } from "@/components/ui/TablePagination";
@@ -31,17 +31,79 @@ function formatValue(row: OpportunityRow): string {
   return `${row.currency} ${new Intl.NumberFormat("en-US").format(row.amount)}`;
 }
 
+type OpportunitySortKey = "name" | "clientName" | "amount" | "status" | "order";
+type SortDir = "asc" | "desc";
+
+function SortHeader({
+  label,
+  sortKey,
+  activeKey,
+  dir,
+  onSort,
+}: {
+  label: string;
+  sortKey: OpportunitySortKey;
+  activeKey: OpportunitySortKey;
+  dir: SortDir;
+  onSort: (key: OpportunitySortKey) => void;
+}) {
+  const active = activeKey === sortKey;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(sortKey)}
+      className="inline-flex items-center gap-1 font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
+    >
+      {label}
+      {active ? (dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />) : null}
+    </button>
+  );
+}
+
 export function OpportunitiesListPage() {
   const searchParams = useSearchParams();
   const clientIdFilter = searchParams.get("clientId")?.trim() ?? "";
   const [rows, setRows] = useState<OpportunityRow[]>([]);
   const [clientName, setClientName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [sortKey, setSortKey] = useState<OpportunitySortKey>("order");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const filteredByClient = useMemo(() => {
-    if (!clientIdFilter) return rows;
-    return rows.filter((row) => row.clientId === clientIdFilter);
-  }, [rows, clientIdFilter]);
+    const list = clientIdFilter ? rows.filter((row) => row.clientId === clientIdFilter) : rows;
+    list.sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "order":
+          cmp = (a.order ?? 0) - (b.order ?? 0);
+          break;
+        case "name":
+          cmp = a.name.localeCompare(b.name);
+          break;
+        case "clientName":
+          cmp = a.clientName.localeCompare(b.clientName);
+          break;
+        case "amount":
+          cmp = a.amount - b.amount;
+          break;
+        case "status":
+          cmp = a.status.localeCompare(b.status);
+          break;
+      }
+      if (cmp === 0) cmp = a.name.localeCompare(b.name);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return list;
+  }, [rows, clientIdFilter, sortKey, sortDir]);
+
+  function handleSort(key: OpportunitySortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
   const {
     search,
@@ -143,10 +205,18 @@ export function OpportunitiesListPage() {
         <table className="w-full min-w-[900px] text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
             <tr>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Name</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Client</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Total Value</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Name" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Client" sortKey="clientName" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Total Value" sortKey="amount" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Status" sortKey="status" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
               <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Comments</th>
               <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
             </tr>

@@ -25,6 +25,7 @@ export type ProfileListRow = {
   relevantExperience?: number;
   sourcedById?: string | null;
   sourcedByName?: string | null;
+  available?: boolean;
   isCitizen?: boolean;
   comments?: string | null;
   documentUrls?: string[];
@@ -188,6 +189,9 @@ export function ProfilesListTable({
           {isColumnVisible("name") ? (
             <th className="px-3 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Name</th>
           ) : null}
+          {isColumnVisible("available") ? (
+            <th className="px-3 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Available?</th>
+          ) : null}
           {isColumnVisible("citizen") ? (
             <th className="px-3 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Citizen</th>
           ) : null}
@@ -265,6 +269,17 @@ export function ProfilesListTable({
                         Dup
                       </span>
                     ) : null}
+                  </span>
+                </td>
+              ) : null}
+              {isColumnVisible("available") ? (
+                <td className="px-3 py-2">
+                  <span className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <span
+                      className={`inline-block h-2.5 w-2.5 rounded-full ${row.available !== false ? "bg-green-500" : "bg-red-500"}`}
+                      aria-hidden
+                    />
+                    {row.available !== false ? "Yes" : "No"}
                   </span>
                 </td>
               ) : null}

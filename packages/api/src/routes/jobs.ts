@@ -38,6 +38,7 @@ const jobSchema = z.object({
   level: z.string().min(1).max(120).default(DEFAULT_PROFILE_LEVEL),
   positionsCount: z.coerce.number().int().min(1).default(1),
   publishedDate: z.coerce.date().optional().nullable(),
+  opportunityId: z.string().optional().nullable(),
 });
 
 function prepareJobWriteData(body: z.infer<typeof jobSchema>): Record<string, unknown> {
@@ -230,7 +231,10 @@ function serializePublicJob(job: JobListing) {
 }
 
 function serializeAdminJob(
-  job: JobListing & { client?: { name: string } | null },
+  job: JobListing & {
+    client?: { name: string } | null;
+    opportunity?: { id: string; name: string } | null;
+  },
   applicationCount?: number,
 ) {
   const locations = normalizeJobLocations(job);
@@ -253,6 +257,8 @@ function serializeAdminJob(
     department: job.department,
     clientId: job.clientId,
     clientName: job.client?.name ?? "",
+    opportunityId: job.opportunityId ?? null,
+    opportunityName: job.opportunity?.name ?? "",
     endClient: job.endClient ?? "",
     budget: job.budget ?? "",
     description: job.description,
@@ -284,8 +290,23 @@ function mergeJobUpdate(
 }
 
 async function allocateNextJobOrder(): Promise<number> {
-  const result = await prisma.jobListing.aggregate({ _max: { order: true } });
-  return (result._max.order ?? 0) + 1;
+  const [agg, count] = await Promise.all([
+    prisma.jobListing.aggregate({ _max: { order: true } }),
+    prisma.jobListing.count(),
+  ]);
+  const maxOrder = agg._max.order ?? 0;
+  return Math.max(maxOrder, count) + 1;
+}
+
+async function allocateDuplicateSlug(sourceSlug: string): Promise<string> {
+  const base = sourceSlug.replace(/-copy(-\d+)?$/i, "");
+  let candidate = `${base}-copy`;
+  let suffix = 2;
+  while (await prisma.jobListing.findUnique({ where: { slug: candidate } })) {
+    candidate = `${base}-copy-${suffix}`;
+    suffix += 1;
+  }
+  return candidate;
 }
 
 async function allocateJobReferenceNumber(): Promise<string> {
@@ -344,7 +365,10 @@ router.get("/admin/next-order", async (_req, res) => {
 router.get("/admin/all", async (_req, res) => {
   try {
     const jobs = await prisma.jobListing.findMany({
-      include: { client: { select: { name: true } } },
+      include: {
+        client: { select: { name: true } },
+        opportunity: { select: { id: true, name: true } },
+      },
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
     });
     const applicationCounts = await prisma.careerApplication.groupBy({
@@ -458,7 +482,7 @@ router.post("/", async (req, res) => {
     }
     const writeData = prepareJobWriteData(data);
     const referenceNumber = await allocateJobReferenceNumber();
-    const order = data.order && data.order > 0 ? data.order : await allocateNextJobOrder();
+    const order = await allocateNextJobOrder();
     const job = await prisma.jobListing.create({
       data: {
         ...writeData,
@@ -466,8 +490,12 @@ router.post("/", async (req, res) => {
         order,
         publishedDate: data.publishedDate ?? new Date(),
         level: data.level ?? "Developer",
-      } as Prisma.JobListingCreateInput,
-      include: { client: { select: { name: true } } },
+        opportunityId: data.opportunityId ?? null,
+      } as unknown as Prisma.JobListingCreateInput,
+      include: {
+        client: { select: { name: true } },
+        opportunity: { select: { id: true, name: true } },
+      },
     });
     res.status(201).json({ data: serializeAdminJob(job) });
   } catch (error) {
@@ -506,7 +534,10 @@ router.put("/:id", async (req, res) => {
           partial.publishedDate !== undefined ? partial.publishedDate : existing.publishedDate,
         budget: partial.budget !== undefined ? partial.budget : existing.budget,
       },
-      include: { client: { select: { name: true } } },
+      include: {
+        client: { select: { name: true } },
+        opportunity: { select: { id: true, name: true } },
+      },
     });
     res.json({ data: serializeAdminJob(job) });
   } catch (error) {
@@ -515,6 +546,61 @@ router.put("/:id", async (req, res) => {
     }
     console.error("Error updating job:", error);
     res.status(500).json({ error: "Failed to update job" });
+  }
+});
+
+// Admin: duplicate job
+router.post("/:id/duplicate", async (req, res) => {
+  try {
+    const source = await prisma.jobListing.findUnique({ where: { id: req.params.id } });
+    if (!source) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const newSlug = await allocateDuplicateSlug(source.slug);
+    const referenceNumber = await allocateJobReferenceNumber();
+    const order = await allocateNextJobOrder();
+
+    const job = await prisma.jobListing.create({
+      data: {
+        slug: newSlug,
+        referenceNumber,
+        title: `${source.title} (Copy)`,
+        location: source.location,
+        country: source.country,
+        flag: source.flag,
+        locations: source.locations ?? undefined,
+        type: source.type,
+        listingType: source.listingType,
+        workMode: source.workMode,
+        category: source.category,
+        technology: source.technology,
+        department: source.department,
+        clientId: source.clientId,
+        description: source.description,
+        published: false,
+        isHot: false,
+        likeCount: 0,
+        order,
+        opportunityId: null,
+        publishedDate: new Date(),
+        level: source.level,
+        positionsCount: source.positionsCount,
+        city: source.city,
+        endClient: source.endClient,
+        budget: source.budget,
+        recruiterIds: source.recruiterIds ?? undefined,
+      },
+      include: {
+        client: { select: { name: true } },
+        opportunity: { select: { id: true, name: true } },
+      },
+    });
+
+    res.status(201).json({ data: serializeAdminJob(job) });
+  } catch (error) {
+    console.error("Error duplicating job:", error);
+    res.status(500).json({ error: "Failed to duplicate job" });
   }
 });
 

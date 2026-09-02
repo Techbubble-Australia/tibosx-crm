@@ -21,6 +21,7 @@ type AdminSession = {
   role: AdminRole;
   email: string;
   userId: string;
+  userName: string | null;
   loading: boolean;
   canAccessRecruitment: boolean;
   canAccessWebsite: boolean;
@@ -40,6 +41,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
   const [role, setRole] = useState<AdminRole>("website");
   const [email, setEmail] = useState("");
   const [userId, setUserId] = useState("");
+  const [userName, setUserName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -58,6 +60,12 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
         if (typeof id === "string") {
           setUserId(id);
         }
+        const name = data?.data?.user?.name;
+        if (typeof name === "string" && name.trim()) {
+          setUserName(name.trim());
+        } else {
+          setUserName(null);
+        }
       })
       .catch(() => undefined)
       .finally(() => setLoading(false));
@@ -68,6 +76,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       role,
       email,
       userId,
+      userName,
       loading,
       canAccessRecruitment: canAccessRecruitment(role),
       canAccessWebsite: canAccessWebsite(role),
@@ -80,7 +89,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       canDeleteProfiles: canDeleteProfiles(role),
       canManageProfileOwnership: canManageProfileOwnership(role),
     }),
-    [role, email, userId, loading],
+    [role, email, userId, userName, loading],
   );
 
   return <AdminSessionContext.Provider value={value}>{children}</AdminSessionContext.Provider>;

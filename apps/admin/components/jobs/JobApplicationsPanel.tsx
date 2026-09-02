@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2, UserPlus } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { JobAddProfileForm } from "@/components/jobs/JobAddProfileForm";
 
 type ApplicationRow = {
   id: string;
@@ -16,12 +17,21 @@ type ApplicationRow = {
   createdAt: string;
 };
 
-export function JobApplicationsPanel({ jobId }: { jobId: string }) {
+export function JobApplicationsPanel({
+  jobId,
+  jobTitle,
+  jobCountry,
+}: {
+  jobId: string;
+  jobTitle: string;
+  jobCountry: string;
+}) {
   const { canAccessWebsite, canAccessRecruitment } = useAdminSession();
   const canManageApplications = canAccessWebsite || canAccessRecruitment;
   const [rows, setRows] = useState<ApplicationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showAddProfile, setShowAddProfile] = useState(false);
 
   const fetchApplications = useCallback(async () => {
     setLoading(true);
@@ -78,6 +88,16 @@ export function JobApplicationsPanel({ jobId }: { jobId: string }) {
         <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
           {rows.length}
         </span>
+        {canManageApplications ? (
+          <button
+            type="button"
+            onClick={() => setShowAddProfile(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-black px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+          >
+            <UserPlus className="h-4 w-4" />
+            Add new profile
+          </button>
+        ) : null}
       </div>
       {rows.length === 0 ? (
         <p className="text-sm text-gray-400">No applications yet.</p>
@@ -129,6 +149,15 @@ export function JobApplicationsPanel({ jobId }: { jobId: string }) {
           </table>
         </div>
       )}
+      {showAddProfile ? (
+        <JobAddProfileForm
+          jobId={jobId}
+          jobTitle={jobTitle}
+          jobCountry={jobCountry}
+          onClose={() => setShowAddProfile(false)}
+          onCreated={() => void fetchApplications()}
+        />
+      ) : null}
     </section>
   );
 }

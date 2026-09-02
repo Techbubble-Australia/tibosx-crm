@@ -43,6 +43,7 @@ export type ProfileFormValues = {
   visaStatus?: string | null;
   level?: string;
   relevantExperience?: number;
+  available?: boolean;
   isDuplicate?: boolean;
   duplicateCount?: number;
   duplicateMatchReason?: string | null;
@@ -120,6 +121,7 @@ export function ProfileForm({
   const [isCitizen, setIsCitizen] = useState(defaults.isCitizen !== false);
   const [visaStatus, setVisaStatus] = useState(defaults.visaStatus ?? "");
   const [sourcedById, setSourcedById] = useState(defaults.sourcedById ?? "");
+  const [available, setAvailable] = useState(defaults.available !== false);
   const [jobListingId, setJobListingId] = useState(defaults.jobListingId ?? "");
   const [sourcers, setSourcers] = useState<SourcerOption[]>([]);
   const [jobOptions, setJobOptions] = useState<JobOption[]>([]);
@@ -323,6 +325,7 @@ export function ProfileForm({
         relevantExperience,
         careerApplicationId: defaults.careerApplicationId ?? null,
         sourcedById: sourcedById || null,
+        available,
         jobListingId: jobListingId || null,
       });
       setSavedNotice(true);
@@ -563,6 +566,23 @@ export function ProfileForm({
                 Only an administrator can change profile ownership.
               </p>
             ) : null}
+          </div>
+          <div>
+            <label className={labelClass}>Available?</label>
+            <div className="flex items-center gap-3">
+              <select
+                value={available ? "yes" : "no"}
+                onChange={(e) => setAvailable(e.target.value === "yes")}
+                className={inputClass}
+              >
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+              <span
+                className={`inline-block h-3 w-3 rounded-full ${available ? "bg-green-500" : "bg-red-500"}`}
+                aria-hidden
+              />
+            </div>
           </div>
           <div>
             <label className={labelClass}>Add to job</label>

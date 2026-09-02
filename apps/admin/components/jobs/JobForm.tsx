@@ -22,6 +22,7 @@ export type JobFormDefaults = {
   technology?: string;
   department?: string;
   clientId?: string;
+  opportunityId?: string | null;
   description?: string;
   order?: number;
   published?: boolean;
@@ -218,7 +219,7 @@ export function JobForm({
       positionsCount: Number.parseInt(positionsCount, 10) || 1,
       budget: budget.trim(),
       description,
-      order: mode === "create" ? 0 : parseInt(formData.get("order") as string, 10) || 0,
+      order: mode === "create" ? (nextOrder ?? 0) : parseInt(formData.get("order") as string, 10) || 0,
       published: formData.get("published") === "on",
     };
     if (publishedDate.trim()) {
@@ -226,6 +227,9 @@ export function JobForm({
     }
     if (mode === "create") {
       payload.slug = slugify(formData.get("title") as string);
+      if (defaults.opportunityId) {
+        payload.opportunityId = defaults.opportunityId;
+      }
     }
     await onSubmit(payload);
   }

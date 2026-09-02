@@ -1,15 +1,28 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { JobForm } from "@/components/jobs/JobForm";
 import { adminFetch } from "@/lib/admin-api";
 
-export default function NewJobPage() {
+function NewJobPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
+
+  const defaults = useMemo(
+    () => ({
+      clientId: searchParams.get("clientId")?.trim() || undefined,
+      opportunityId: searchParams.get("opportunityId")?.trim() || undefined,
+    }),
+    [searchParams],
+  );
+
+  const cancelHref = defaults.opportunityId
+    ? `/opportunities/${defaults.opportunityId}`
+    : "/jobs/active";
 
   async function onSubmit(payload: Record<string, unknown>) {
     setIsLoading(true);
@@ -21,6 +34,10 @@ export default function NewJobPage() {
       });
       if (!res.ok) throw new Error("Failed to create job");
       const created = await res.json();
+      if (defaults.opportunityId && created?.data?.id) {
+        router.push(`/jobs/${created.data.id}`);
+        return;
+      }
       const published = Boolean(created?.data?.published ?? payload.published ?? true);
       router.push(published ? "/jobs/active" : "/jobs/inactive");
     } catch (error) {
@@ -34,22 +51,41 @@ export default function NewJobPage() {
   return (
     <div>
       <div className="mb-6 flex items-center gap-3">
-        <Link href="/jobs/active" className="rounded p-1.5 hover:bg-gray-100">
+        <Link href={cancelHref} className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <div>
           <h2 className="text-lg font-semibold">New Job Listing</h2>
-          <p className="text-sm text-gray-500">Add an open position to the careers page</p>
+          <p className="text-sm text-gray-500">
+            {defaults.opportunityId
+              ? "Create a job listing linked to this opportunity"
+              : "Add an open position to the careers page"}
+          </p>
         </div>
       </div>
 
       <JobForm
         mode="create"
+        defaults={defaults}
         onSubmit={onSubmit}
         isLoading={isLoading}
-        cancelHref="/jobs/active"
+        cancelHref={cancelHref}
         submitLabel="Create Job Listing"
       />
     </div>
+  );
+}
+
+export default function NewJobPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-64 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-black border-t-transparent dark:border-white" />
+        </div>
+      }
+    >
+      <NewJobPageInner />
+    </Suspense>
   );
 }

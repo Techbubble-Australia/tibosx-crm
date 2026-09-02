@@ -38,6 +38,7 @@ const profileSchema = z.object({
   visaStatus: z.string().max(200).optional().nullable(),
   level: z.string().min(1).max(120).default("Developer"),
   relevantExperience: z.coerce.number().int().min(0).max(80),
+  available: z.boolean().default(true),
 }).superRefine((data, ctx) => {
   if (!data.isCitizen && !data.visaStatus?.trim()) {
     ctx.addIssue({
@@ -166,6 +167,7 @@ function serializeProfile(row: {
   visaStatus: string | null;
   level: string;
   relevantExperience: number;
+  available: boolean;
   isDuplicate?: boolean;
   duplicateCount?: number;
   duplicateMatchReason?: string | null;
@@ -209,6 +211,7 @@ function serializeProfile(row: {
     visaStatus: row.visaStatus ?? null,
     level: row.level ?? "Developer",
     relevantExperience: row.relevantExperience ?? 0,
+    available: row.available ?? true,
     isDuplicate: row.isDuplicate ?? false,
     duplicateCount: row.duplicateCount ?? 0,
     duplicateMatchReason: row.duplicateMatchReason ?? null,
@@ -355,6 +358,7 @@ router.post("/", async (req: AuthRequest, res) => {
         visaStatus: data.isCitizen ? null : data.visaStatus?.trim() ?? null,
         level: data.level,
         relevantExperience: data.relevantExperience,
+        available: data.available,
       },
     });
 
@@ -407,6 +411,7 @@ router.patch("/:id", async (req: AuthRequest, res) => {
       level: z.string().min(1).max(120).optional(),
       relevantExperience: z.coerce.number().int().min(0).max(80).optional(),
       sourcedById: z.string().nullable().optional(),
+      available: z.boolean().optional(),
     });
 
     const data = patchSchema.parse(req.body);
@@ -429,6 +434,7 @@ router.patch("/:id", async (req: AuthRequest, res) => {
         ...(data.level !== undefined ? { level: data.level } : {}),
         ...(data.relevantExperience !== undefined ? { relevantExperience: data.relevantExperience } : {}),
         ...(sourcedById !== undefined ? { sourcedById } : {}),
+        ...(data.available !== undefined ? { available: data.available } : {}),
       },
       include: { sourcedBy: { select: { name: true, email: true } } },
     });
@@ -503,6 +509,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
         visaStatus: data.isCitizen ? null : data.visaStatus?.trim() ?? null,
         level: data.level,
         relevantExperience: data.relevantExperience,
+        available: data.available,
       },
     });
 
