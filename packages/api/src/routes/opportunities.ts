@@ -2,17 +2,28 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { prisma, type Prisma } from "@techbubble/database";
 import { OPPORTUNITY_STATUSES } from "../lib/opportunity-status";
+import { OPPORTUNITY_TYPES, OPPORTUNITY_TYPE_LABELS } from "../lib/opportunity-types";
 
 const router: IRouter = Router();
 
 const opportunitySchema = z.object({
   name: z.string().min(1).max(200),
   clientId: z.string().min(1),
+  location: z.string().min(1, "Location is required").max(120),
+  type: z.enum(OPPORTUNITY_TYPES),
+  contactId: z.string().optional().nullable(),
   currency: z.string().min(1).max(8),
-  amount: z.coerce.number().positive("Amount must be greater than zero"),
+  amount: z.coerce.number().positive("Estimated value must be greater than zero"),
   status: z.enum(OPPORTUNITY_STATUSES).default("DRAFT"),
   comments: z.string().max(5000).optional().default(""),
   order: z.number().int().optional(),
+});
+
+const listFieldsSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  type: z.enum(OPPORTUNITY_TYPES).optional(),
+  amount: z.coerce.number().positive().optional(),
+  status: z.enum(OPPORTUNITY_STATUSES).optional(),
 });
 
 async function allocateNextOpportunityOrder(): Promise<number> {
@@ -31,6 +42,16 @@ async function ensureOpportunityClient(clientId: string) {
   return client;
 }
 
+async function ensureOpportunityContact(clientId: string, contactId: string | null | undefined) {
+  if (!contactId) return;
+  const contact = await prisma.clientContact.findFirst({
+    where: { id: contactId, clientId },
+  });
+  if (!contact) {
+    throw new Error("CONTACT_NOT_FOUND");
+  }
+}
+
 async function applyAcceptedClientPromotion(clientId: string, tx: Prisma.TransactionClient) {
   const client = await tx.client.findUnique({ where: { id: clientId } });
   if (client?.status === "PROSPECT") {
@@ -45,6 +66,9 @@ function serializeOpportunity(row: {
   id: string;
   name: string;
   clientId: string;
+  location: string;
+  type: string;
+  contactId: string | null;
   currency: string;
   amount: { toString(): string } | number;
   status: string;
@@ -53,14 +77,21 @@ function serializeOpportunity(row: {
   createdAt: Date;
   updatedAt: Date;
   client?: { id: string; name: string; status: string } | null;
+  contact?: { id: string; name: string; email: string } | null;
 }) {
   const amount = typeof row.amount === "number" ? row.amount : Number(row.amount.toString());
+  const type = row.type as keyof typeof OPPORTUNITY_TYPE_LABELS;
   return {
     id: row.id,
     name: row.name,
     clientId: row.clientId,
     clientName: row.client?.name ?? "",
     clientStatus: row.client?.status ?? "",
+    location: row.location,
+    type: row.type,
+    typeLabel: OPPORTUNITY_TYPE_LABELS[type] ?? row.type,
+    contactId: row.contactId,
+    contactName: row.contact?.name ?? "",
     currency: row.currency,
     amount,
     status: row.status,
@@ -70,6 +101,11 @@ function serializeOpportunity(row: {
     updatedAt: row.updatedAt,
   };
 }
+
+const opportunityInclude = {
+  client: { select: { id: true, name: true, status: true } },
+  contact: { select: { id: true, name: true, email: true } },
+};
 
 router.get("/next-order", async (_req, res) => {
   try {
@@ -87,9 +123,7 @@ router.get("/", async (req, res) => {
     const rows = await prisma.opportunity.findMany({
       where: clientId ? { clientId } : undefined,
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
-      include: {
-        client: { select: { id: true, name: true, status: true } },
-      },
+      include: opportunityInclude,
     });
     res.json({ data: rows.map(serializeOpportunity) });
   } catch (error) {
@@ -106,7 +140,7 @@ router.get("/:id", async (req, res) => {
     const row = await prisma.opportunity.findUnique({
       where: { id: req.params.id },
       include: {
-        client: { select: { id: true, name: true, status: true } },
+        ...opportunityInclude,
         jobs: {
           select: {
             id: true,
@@ -145,6 +179,7 @@ router.post("/", async (req, res) => {
   try {
     const data = opportunitySchema.parse(req.body);
     await ensureOpportunityClient(data.clientId);
+    await ensureOpportunityContact(data.clientId, data.contactId);
     const order = data.order && data.order > 0 ? data.order : await allocateNextOpportunityOrder();
 
     const row = await prisma.$transaction(async (tx) => {
@@ -152,15 +187,16 @@ router.post("/", async (req, res) => {
         data: {
           name: data.name,
           clientId: data.clientId,
+          location: data.location,
+          type: data.type,
+          contactId: data.contactId ?? null,
           currency: data.currency,
           amount: data.amount,
           status: data.status,
           comments: data.comments ?? "",
           order,
         },
-        include: {
-          client: { select: { id: true, name: true, status: true } },
-        },
+        include: opportunityInclude,
       });
       if (data.status === "ACCEPTED") {
         await applyAcceptedClientPromotion(data.clientId, tx);
@@ -179,6 +215,9 @@ router.post("/", async (req, res) => {
     if (error instanceof Error && error.message === "CLIENT_INACTIVE") {
       return res.status(400).json({ error: "Cannot link opportunity to an inactive client" });
     }
+    if (error instanceof Error && error.message === "CONTACT_NOT_FOUND") {
+      return res.status(400).json({ error: "Contact not found for this client" });
+    }
     console.error("Error creating opportunity:", error);
     res.status(500).json({ error: "Failed to create opportunity" });
   }
@@ -192,17 +231,22 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json({ error: "Not found" });
     }
 
+    const nextClientId = data.clientId ?? existing.clientId;
     if (data.clientId) {
       await ensureOpportunityClient(data.clientId);
+    }
+    if (data.contactId !== undefined) {
+      await ensureOpportunityContact(nextClientId, data.contactId);
     }
 
     const row = await prisma.$transaction(async (tx) => {
       const updated = await tx.opportunity.update({
         where: { id: req.params.id },
-        data,
-        include: {
-          client: { select: { id: true, name: true, status: true } },
+        data: {
+          ...data,
+          contactId: data.contactId === undefined ? undefined : data.contactId ?? null,
         },
+        include: opportunityInclude,
       });
       if (data.status === "ACCEPTED") {
         await applyAcceptedClientPromotion(updated.clientId, tx);
@@ -221,7 +265,40 @@ router.put("/:id", async (req, res) => {
     if (error instanceof Error && error.message === "CLIENT_INACTIVE") {
       return res.status(400).json({ error: "Cannot link opportunity to an inactive client" });
     }
+    if (error instanceof Error && error.message === "CONTACT_NOT_FOUND") {
+      return res.status(400).json({ error: "Contact not found for this client" });
+    }
     console.error("Error updating opportunity:", error);
+    res.status(500).json({ error: "Failed to update opportunity" });
+  }
+});
+
+router.patch("/:id/list-fields", async (req, res) => {
+  try {
+    const data = listFieldsSchema.parse(req.body);
+    const existing = await prisma.opportunity.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const row = await prisma.$transaction(async (tx) => {
+      const updated = await tx.opportunity.update({
+        where: { id: req.params.id },
+        data,
+        include: opportunityInclude,
+      });
+      if (data.status === "ACCEPTED") {
+        await applyAcceptedClientPromotion(updated.clientId, tx);
+      }
+      return updated;
+    });
+
+    res.json({ data: serializeOpportunity(row) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error updating opportunity list fields:", error);
     res.status(500).json({ error: "Failed to update opportunity" });
   }
 });

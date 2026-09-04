@@ -332,9 +332,15 @@ model Opportunity {
   name      String
   clientId  String
   client    Client   @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  /// Country / location for this opportunity.
+  location  String   @default("")
+  /// FIXED_PRICE | T_AND_M | SUPPORT | OTHER
+  type      String   @default("FIXED_PRICE")
+  contactId String?
+  contact   ClientContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
   currency  String
   amount    Decimal  @db.Decimal(14, 2)
-  /// DRAFT | PROPOSAL | ACCEPTED | REJECTED
+  /// DRAFT | PROPOSAL | IN_PROGRESS | ACCEPTED | REJECTED
   status    String   @default("DRAFT")
   comments  String   @default("") @db.Text
   order     Int      @default(0)
@@ -343,19 +349,21 @@ model Opportunity {
   updatedAt DateTime @updatedAt
 
   @@index([clientId])
+  @@index([contactId])
   @@index([status])
   @@index([order])
 }
 
 model ClientContact {
-  id               String   @id @default(cuid())
+  id               String        @id @default(cuid())
   clientId         String
-  client           Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client           Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name             String
   email            String
   phoneCountryCode String
   phoneNumber      String
-  order            Int      @default(0)
+  order            Int           @default(0)
+  opportunities    Opportunity[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

@@ -1,9 +1,10 @@
-export const OPPORTUNITY_STATUSES = ["DRAFT", "PROPOSAL", "ACCEPTED", "REJECTED"] as const;
+export const OPPORTUNITY_STATUSES = ["DRAFT", "PROPOSAL", "IN_PROGRESS", "ACCEPTED", "REJECTED"] as const;
 export type OpportunityStatus = (typeof OPPORTUNITY_STATUSES)[number];
 
 export const OPPORTUNITY_STATUS_LABELS: Record<OpportunityStatus, string> = {
   DRAFT: "Draft",
   PROPOSAL: "Proposal",
+  IN_PROGRESS: "In progress",
   ACCEPTED: "Accepted",
   REJECTED: "Rejected",
 };
@@ -23,6 +24,12 @@ export const OPPORTUNITY_STATUS_COLORS: Record<
     text: "text-amber-700",
     darkBg: "dark:bg-amber-900/30",
     darkText: "dark:text-amber-400",
+  },
+  IN_PROGRESS: {
+    bg: "bg-amber-100",
+    text: "text-amber-800",
+    darkBg: "dark:bg-amber-900/40",
+    darkText: "dark:text-amber-300",
   },
   ACCEPTED: {
     bg: "bg-green-50",
