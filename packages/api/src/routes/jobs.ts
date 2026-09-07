@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
-import { prisma, type JobListing, type Prisma } from "@techbubble/database";
+import { prisma, Prisma, type JobListing } from "@techbubble/database";
 import {
   jobLocationEntrySchema,
   derivePrimaryCityFromLocations,
@@ -309,6 +309,89 @@ async function allocateDuplicateSlug(sourceSlug: string): Promise<string> {
   return candidate;
 }
 
+async function allocateUniqueSlug(baseSlug: string): Promise<string> {
+  const normalized =
+    baseSlug
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, "-")
+      .replace(/(^-|-$)/g, "") || `job-${Date.now()}`;
+  let candidate = normalized;
+  let suffix = 2;
+  while (await prisma.jobListing.findUnique({ where: { slug: candidate }, select: { id: true } })) {
+    candidate = `${normalized}-${suffix}`;
+    suffix += 1;
+  }
+  return candidate;
+}
+
+function buildJobListingCreateData(
+  writeData: Record<string, unknown>,
+  data: z.infer<typeof jobSchema>,
+  extras: {
+    slug: string;
+    referenceNumber: string;
+    order: number;
+    publishedDate: Date;
+  },
+): Prisma.JobListingUncheckedCreateInput {
+  return {
+    slug: extras.slug,
+    referenceNumber: extras.referenceNumber,
+    title: String(writeData.title),
+    location: String(writeData.location),
+    country: String(writeData.country),
+    flag: String(writeData.flag),
+    locations: (writeData.locations ?? []) as Prisma.InputJsonValue,
+    type: String(writeData.type),
+    listingType: String(writeData.listingType ?? "Internal"),
+    workMode: String(writeData.workMode),
+    category: String(writeData.category),
+    technology: String(writeData.technology),
+    department: String(writeData.department),
+    clientId: String(writeData.clientId),
+    description: String(writeData.description ?? ""),
+    published: Boolean(writeData.published),
+    isHot: Boolean(writeData.isHot ?? false),
+    city: (writeData.city as string | null | undefined) ?? null,
+    endClient: (writeData.endClient as string | null | undefined) ?? null,
+    budget: String(writeData.budget ?? ""),
+    positionsCount: Number(writeData.positionsCount ?? 1),
+    order: extras.order,
+    publishedDate: extras.publishedDate,
+    level: data.level ?? "Developer",
+    opportunityId: data.opportunityId ?? null,
+  };
+}
+
+function formatJobMutationError(error: unknown, fallback: string): string {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === "P2002") {
+      const target = Array.isArray(error.meta?.target)
+        ? error.meta.target.join(", ")
+        : "unique field";
+      return `A job with this ${target} already exists. Try a different title.`;
+    }
+    if (error.code === "P2003") {
+      return "Invalid client selected. Please choose an active client.";
+    }
+  }
+  if (error instanceof Error) {
+    if (error.message.includes("opportunityId")) {
+      return "Database is out of date. Please run the latest database migration (prisma migrate deploy).";
+    }
+    return error.message;
+  }
+  return fallback;
+}
+
+function formatZodJobError(error: z.ZodError): string {
+  const first = error.errors[0];
+  if (!first) return "Validation error";
+  const path = first.path.length > 0 ? `${first.path.join(".")}: ` : "";
+  return `${path}${first.message}`;
+}
+
 async function allocateJobReferenceNumber(): Promise<string> {
   const jobs = await prisma.jobListing.findMany({
     select: { referenceNumber: true },
@@ -483,15 +566,14 @@ router.post("/", async (req, res) => {
     const writeData = prepareJobWriteData(data);
     const referenceNumber = await allocateJobReferenceNumber();
     const order = await allocateNextJobOrder();
+    const slug = await allocateUniqueSlug(data.slug);
     const job = await prisma.jobListing.create({
-      data: {
-        ...writeData,
+      data: buildJobListingCreateData(writeData, data, {
+        slug,
         referenceNumber,
         order,
         publishedDate: data.publishedDate ?? new Date(),
-        level: data.level ?? "Developer",
-        opportunityId: data.opportunityId ?? null,
-      } as unknown as Prisma.JobListingCreateInput,
+      }),
       include: {
         client: { select: { name: true } },
         opportunity: { select: { id: true, name: true } },
@@ -500,10 +582,10 @@ router.post("/", async (req, res) => {
     res.status(201).json({ data: serializeAdminJob(job) });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: "Validation error", details: error.errors });
+      return res.status(400).json({ error: formatZodJobError(error), details: error.errors });
     }
     console.error("Error creating job:", error);
-    res.status(500).json({ error: "Failed to create job" });
+    res.status(500).json({ error: formatJobMutationError(error, "Failed to create job") });
   }
 });
 

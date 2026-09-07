@@ -32,7 +32,14 @@ function NewJobPageInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Failed to create job");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const message =
+          typeof (err as { error?: string }).error === "string"
+            ? (err as { error: string }).error
+            : "Failed to create job listing";
+        throw new Error(message);
+      }
       const created = await res.json();
       if (defaults.opportunityId && created?.data?.id) {
         router.push(`/jobs/${created.data.id}`);
@@ -42,7 +49,7 @@ function NewJobPageInner() {
       router.push(published ? "/jobs/active" : "/jobs/inactive");
     } catch (error) {
       console.error(error);
-      alert("Failed to create job listing");
+      alert(error instanceof Error ? error.message : "Failed to create job listing");
     } finally {
       setIsLoading(false);
     }
