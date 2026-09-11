@@ -7,8 +7,10 @@ import { Plus, Edit, Trash2, ChevronDown, ChevronUp, Pencil } from "lucide-react
 import { adminFetch } from "@/lib/admin-api";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
 import { TablePagination } from "@/components/ui/TablePagination";
+import { ViewModeToggle, type ViewMode } from "@/components/ui/ViewModeToggle";
 import { useListView } from "@/hooks/useListView";
 import { buildSearchHaystack } from "@/lib/search-text";
+import { getSortedCountryOptions } from "@/lib/country-flags";
 import {
   OPPORTUNITY_STATUSES,
   OPPORTUNITY_STATUS_COLORS,
@@ -29,12 +31,21 @@ interface OpportunityRow {
   location: string;
   type: OpportunityType;
   typeLabel: string;
+  contactId: string | null;
+  contactName: string;
   currency: string;
   amount: number;
   status: OpportunityStatus;
   comments: string;
   order: number;
+  active: boolean;
 }
+
+type ContactOption = { id: string; name: string; email: string };
+
+type Props = {
+  activeFilter: boolean;
+};
 
 function formatValue(row: OpportunityRow): string {
   return `${row.currency} ${new Intl.NumberFormat("en-US").format(row.amount)}`;
@@ -74,22 +85,60 @@ function SortHeader({
   );
 }
 
-export function OpportunitiesListPage() {
+function InlineEditableCell({
+  label,
+  editing,
+  onEdit,
+  editControl,
+  children,
+}: {
+  label: string;
+  editing: boolean;
+  onEdit: () => void;
+  editControl: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  if (editing) return editControl;
+  return (
+    <span className="inline-flex items-center gap-1">
+      {children}
+      <button
+        type="button"
+        onClick={onEdit}
+        className="inline-flex shrink-0 items-center justify-center rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+        aria-label={label}
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </button>
+    </span>
+  );
+}
+
+export function OpportunitiesListPage({ activeFilter }: Props) {
   const searchParams = useSearchParams();
   const clientIdFilter = searchParams.get("clientId")?.trim() ?? "";
+  const listTab = activeFilter ? "active" : "inactive";
+  const countryOptions = useMemo(() => getSortedCountryOptions(), []);
   const [rows, setRows] = useState<OpportunityRow[]>([]);
   const [clientName, setClientName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [selectedClient, setSelectedClient] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<OpportunitySortKey>("order");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingTypeId, setEditingTypeId] = useState<string | null>(null);
+  const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [editingAmountId, setEditingAmountId] = useState<string | null>(null);
   const [editingStatusId, setEditingStatusId] = useState<string | null>(null);
   const [nameDrafts, setNameDrafts] = useState<Record<string, string>>({});
   const [typeDrafts, setTypeDrafts] = useState<Record<string, string>>({});
+  const [locationDrafts, setLocationDrafts] = useState<Record<string, string>>({});
+  const [contactDrafts, setContactDrafts] = useState<Record<string, string>>({});
   const [amountDrafts, setAmountDrafts] = useState<Record<string, string>>({});
   const [statusDrafts, setStatusDrafts] = useState<Record<string, string>>({});
+  const [contactsByClient, setContactsByClient] = useState<Record<string, ContactOption[]>>({});
 
   const filteredByClient = useMemo(() => {
     const list = clientIdFilter ? rows.filter((row) => row.clientId === clientIdFilter) : rows;
@@ -124,6 +173,11 @@ export function OpportunitiesListPage() {
     return list;
   }, [rows, clientIdFilter, sortKey, sortDir]);
 
+  const cardScopeRows = useMemo(() => {
+    if (!selectedClient) return filteredByClient;
+    return filteredByClient.filter((row) => row.clientName === selectedClient);
+  }, [filteredByClient, selectedClient]);
+
   function handleSort(key: OpportunitySortKey) {
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -144,13 +198,14 @@ export function OpportunitiesListPage() {
     totalItems,
     totalSourceItems,
   } = useListView(
-    filteredByClient,
+    viewMode === "card" && selectedClient ? cardScopeRows : filteredByClient,
     (row) =>
       buildSearchHaystack([
         row.name,
         row.clientName,
         row.location,
         row.typeLabel,
+        row.contactName,
         row.currency,
         row.amount,
         row.status,
@@ -159,15 +214,50 @@ export function OpportunitiesListPage() {
     { initialPageSize: 100, pageSizeOptions: [25, 50, 100, 200] },
   );
 
+  const groupedByClient = useMemo(() => {
+    const map = new Map<string, OpportunityRow[]>();
+    for (const row of filteredByClient) {
+      const list = map.get(row.clientName) ?? [];
+      list.push(row);
+      map.set(row.clientName, list);
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [filteredByClient]);
+
+  useEffect(() => {
+    setSelectedClient(null);
+  }, [search, viewMode, activeFilter, clientIdFilter]);
+
+  useEffect(() => {
+    if (clientIdFilter && clientName) {
+      setSelectedClient(clientName);
+    }
+  }, [clientIdFilter, clientName]);
+
   useEffect(() => {
     void fetchRows();
-  }, [clientIdFilter]);
+  }, [clientIdFilter, activeFilter]);
+
+  async function loadContactsForClient(clientId: string) {
+    if (contactsByClient[clientId]) return contactsByClient[clientId];
+    try {
+      const res = await adminFetch(`/api/admin/clients/${clientId}`);
+      const data = await res.json();
+      const list = ((data.data?.contacts ?? []) as ContactOption[]).filter((c) => c.id && c.name);
+      setContactsByClient((prev) => ({ ...prev, [clientId]: list }));
+      return list;
+    } catch {
+      return [];
+    }
+  }
 
   async function fetchRows() {
     setIsLoading(true);
     try {
-      const query = clientIdFilter ? `?clientId=${encodeURIComponent(clientIdFilter)}` : "";
-      const res = await adminFetch(`/api/admin/opportunities${query}`);
+      const params = new URLSearchParams();
+      params.set("active", activeFilter ? "true" : "false");
+      if (clientIdFilter) params.set("clientId", clientIdFilter);
+      const res = await adminFetch(`/api/admin/opportunities?${params.toString()}`);
       const data = await res.json();
       const list = (data.data ?? []) as OpportunityRow[];
       setRows(list);
@@ -189,7 +279,15 @@ export function OpportunitiesListPage() {
 
   async function patchListField(
     row: OpportunityRow,
-    patch: Partial<{ name: string; type: OpportunityType; amount: number; status: OpportunityStatus }>,
+    patch: Partial<{
+      name: string;
+      type: OpportunityType;
+      location: string;
+      amount: number;
+      status: OpportunityStatus;
+      contactId: string | null;
+      active: boolean;
+    }>,
   ) {
     try {
       const res = await adminFetch(`/api/admin/opportunities/${row.id}/list-fields`, {
@@ -204,6 +302,13 @@ export function OpportunitiesListPage() {
     } catch (error) {
       console.error("Error updating opportunity:", error);
       return false;
+    }
+  }
+
+  async function toggleActive(row: OpportunityRow) {
+    const ok = await patchListField(row, { active: !row.active });
+    if (ok) {
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
     }
   }
 
@@ -253,6 +358,56 @@ export function OpportunitiesListPage() {
     }
     const ok = await patchListField(row, { type: value });
     if (ok) cancelEditType(row.id);
+  }
+
+  async function startEditLocation(row: OpportunityRow) {
+    setEditingLocationId(row.id);
+    setLocationDrafts((prev) => ({ ...prev, [row.id]: row.location }));
+  }
+
+  function cancelEditLocation(id: string) {
+    setEditingLocationId((current) => (current === id ? null : current));
+    setLocationDrafts((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }
+
+  async function saveLocation(row: OpportunityRow) {
+    const value = (locationDrafts[row.id] ?? "").trim();
+    if (!value || value === row.location) {
+      cancelEditLocation(row.id);
+      return;
+    }
+    const ok = await patchListField(row, { location: value });
+    if (ok) cancelEditLocation(row.id);
+  }
+
+  async function startEditContact(row: OpportunityRow) {
+    await loadContactsForClient(row.clientId);
+    setEditingContactId(row.id);
+    setContactDrafts((prev) => ({ ...prev, [row.id]: row.contactId ?? "" }));
+  }
+
+  function cancelEditContact(id: string) {
+    setEditingContactId((current) => (current === id ? null : current));
+    setContactDrafts((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }
+
+  async function saveContact(row: OpportunityRow) {
+    const value = contactDrafts[row.id] ?? "";
+    const nextId = value || null;
+    if (nextId === (row.contactId ?? null)) {
+      cancelEditContact(row.id);
+      return;
+    }
+    const ok = await patchListField(row, { contactId: nextId });
+    if (ok) cancelEditContact(row.id);
   }
 
   function startEditAmount(row: OpportunityRow) {
@@ -316,6 +471,192 @@ export function OpportunitiesListPage() {
     }
   }
 
+  function clientFilterHref(clientId: string) {
+    return `/opportunities/${listTab}?clientId=${encodeURIComponent(clientId)}`;
+  }
+
+  function renderTableRow(row: OpportunityRow) {
+    const colors = OPPORTUNITY_STATUS_COLORS[row.status] ?? OPPORTUNITY_STATUS_COLORS.DRAFT;
+    const contacts = contactsByClient[row.clientId] ?? [];
+    return (
+      <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+        <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
+          <InlineEditableCell
+            label={`Edit name for ${row.name}`}
+            editing={editingNameId === row.id}
+            onEdit={() => startEditName(row)}
+            editControl={
+              <input
+                value={nameDrafts[row.id] ?? ""}
+                onChange={(e) => setNameDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                onBlur={() => void saveName(row)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Escape") cancelEditName(row.id);
+                }}
+                autoFocus
+                className={inlineInputClass}
+                aria-label={`Edit name for ${row.name}`}
+              />
+            }
+          >
+            <span>{row.name}</span>
+          </InlineEditableCell>
+        </td>
+        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+          <Link href={clientFilterHref(row.clientId)} className="hover:underline">
+            {row.clientName}
+          </Link>
+        </td>
+        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+          <InlineEditableCell
+            label={`Edit contact for ${row.name}`}
+            editing={editingContactId === row.id}
+            onEdit={() => void startEditContact(row)}
+            editControl={
+              <select
+                value={contactDrafts[row.id] ?? ""}
+                onChange={(e) => setContactDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                onBlur={() => void saveContact(row)}
+                autoFocus
+                className={inlineSelectClass}
+                aria-label={`Edit contact for ${row.name}`}
+              >
+                <option value="">None</option>
+                {contacts.map((contact) => (
+                  <option key={contact.id} value={contact.id}>
+                    {contact.name}
+                  </option>
+                ))}
+              </select>
+            }
+          >
+            <span>{row.contactName || "—"}</span>
+          </InlineEditableCell>
+        </td>
+        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+          <InlineEditableCell
+            label={`Edit type for ${row.name}`}
+            editing={editingTypeId === row.id}
+            onEdit={() => startEditType(row)}
+            editControl={
+              <select
+                value={typeDrafts[row.id] ?? row.type}
+                onChange={(e) => setTypeDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                onBlur={() => void saveType(row)}
+                autoFocus
+                className={inlineSelectClass}
+                aria-label={`Edit type for ${row.name}`}
+              >
+                {OPPORTUNITY_TYPES.map((type) => (
+                  <option key={type} value={type}>{OPPORTUNITY_TYPE_LABELS[type]}</option>
+                ))}
+              </select>
+            }
+          >
+            <span>{row.typeLabel}</span>
+          </InlineEditableCell>
+        </td>
+        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+          <InlineEditableCell
+            label={`Edit location for ${row.name}`}
+            editing={editingLocationId === row.id}
+            onEdit={() => void startEditLocation(row)}
+            editControl={
+              <select
+                value={locationDrafts[row.id] ?? row.location}
+                onChange={(e) => setLocationDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                onBlur={() => void saveLocation(row)}
+                autoFocus
+                className={inlineSelectClass}
+                aria-label={`Edit location for ${row.name}`}
+              >
+                <option value="">Select country…</option>
+                {countryOptions.map((country) => (
+                  <option key={country.code} value={country.name}>{country.flag} {country.name}</option>
+                ))}
+              </select>
+            }
+          >
+            <span>{row.location || "—"}</span>
+          </InlineEditableCell>
+        </td>
+        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+          <InlineEditableCell
+            label={`Edit estimated value for ${row.name}`}
+            editing={editingAmountId === row.id}
+            onEdit={() => startEditAmount(row)}
+            editControl={
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={amountDrafts[row.id] ?? ""}
+                onChange={(e) => setAmountDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                onBlur={() => void saveAmount(row)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Escape") cancelEditAmount(row.id);
+                }}
+                autoFocus
+                className={`${inlineInputClass} w-28`}
+                aria-label={`Edit estimated value for ${row.name}`}
+              />
+            }
+          >
+            <span>{formatValue(row)}</span>
+          </InlineEditableCell>
+        </td>
+        <td className="px-4 py-3">
+          <InlineEditableCell
+            label={`Edit status for ${row.name}`}
+            editing={editingStatusId === row.id}
+            onEdit={() => startEditStatus(row)}
+            editControl={
+              <select
+                value={statusDrafts[row.id] ?? row.status}
+                onChange={(e) => setStatusDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                onBlur={() => void saveStatus(row)}
+                autoFocus
+                className={inlineSelectClass}
+                aria-label={`Edit status for ${row.name}`}
+              >
+                {OPPORTUNITY_STATUSES.map((status) => (
+                  <option key={status} value={status}>{OPPORTUNITY_STATUS_LABELS[status]}</option>
+                ))}
+              </select>
+            }
+          >
+            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`}>
+              {OPPORTUNITY_STATUS_LABELS[row.status]}
+            </span>
+          </InlineEditableCell>
+        </td>
+        <td className="max-w-[240px] truncate px-4 py-3 text-gray-600 dark:text-gray-400" title={row.comments || undefined}>
+          {row.comments || "—"}
+        </td>
+        <td className="px-4 py-3 text-right">
+          <div className="inline-flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void toggleActive(row)}
+              className="rounded px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+              title={activeFilter ? "Mark inactive" : "Mark active"}
+            >
+              {activeFilter ? "Deactivate" : "Activate"}
+            </button>
+            <Link href={`/opportunities/${row.id}`} className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-black dark:hover:bg-gray-800 dark:hover:text-white">
+              <Edit className="h-4 w-4" />
+            </Link>
+            <button type="button" onClick={() => void deleteRow(row.id)} className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20">
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -326,232 +667,153 @@ export function OpportunitiesListPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Opportunities</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {activeFilter ? "Active opportunities" : "Inactive opportunities"}
+          </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {clientIdFilter && clientName
               ? `Showing opportunities for ${clientName}.`
-              : "Track sales opportunities linked to clients."}
+              : activeFilter
+                ? "Opportunities currently being pursued."
+                : "Archived opportunities no longer being pursued."}
           </p>
           {clientIdFilter ? (
-            <Link href="/opportunities" className="mt-1 inline-block text-sm text-blue-600 hover:underline dark:text-blue-400">
+            <Link href={`/opportunities/${listTab}`} className="mt-1 inline-block text-sm text-blue-600 hover:underline dark:text-blue-400">
               Show all opportunities
             </Link>
           ) : null}
         </div>
-        <Link
-          href="/opportunities/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
-        >
-          <Plus className="h-4 w-4" />
-          Add Opportunity
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+          <Link
+            href="/opportunities/new"
+            className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+          >
+            <Plus className="h-4 w-4" />
+            Add Opportunity
+          </Link>
+        </div>
       </div>
 
       <AdminSearchField
         id="opportunity-search"
         value={search}
         onChange={setSearch}
-        placeholder="Search by name, client, type, location, status…"
+        placeholder="Search by name, client, type, location, contact, status…"
         filteredCount={totalItems}
         totalCount={totalSourceItems}
       />
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-        <table className="w-full min-w-[1100px] text-sm">
-          <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
-            <tr>
-              <th className="px-4 py-3 text-left">
-                <SortHeader label="Name" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-              </th>
-              <th className="px-4 py-3 text-left">
-                <SortHeader label="Client" sortKey="clientName" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-              </th>
-              <th className="px-4 py-3 text-left">
-                <SortHeader label="Type" sortKey="type" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-              </th>
-              <th className="px-4 py-3 text-left">
-                <SortHeader label="Location" sortKey="location" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-              </th>
-              <th className="px-4 py-3 text-left">
-                <SortHeader label="Estimated Value" sortKey="amount" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-              </th>
-              <th className="px-4 py-3 text-left">
-                <SortHeader label="Status" sortKey="status" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-              </th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Comments</th>
-              <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {filteredByClient.length === 0 ? (
+      {viewMode === "list" ? (
+        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+          <table className="w-full min-w-[1200px] text-sm">
+            <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-400">No opportunities yet.</td>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Name" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Client" sortKey="clientName" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Contact</th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Type" sortKey="type" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Location" sortKey="location" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Estimated Value" sortKey="amount" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Status" sortKey="status" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Comments</th>
+                <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
               </tr>
-            ) : totalItems === 0 ? (
-              <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-400">No opportunities match your search.</td>
-              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+              {filteredByClient.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
+                    No {activeFilter ? "active" : "inactive"} opportunities yet.
+                  </td>
+                </tr>
+              ) : totalItems === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-400">No opportunities match your search.</td>
+                </tr>
+              ) : (
+                paginated.map((row) => renderTableRow(row))
+              )}
+            </tbody>
+          </table>
+          {filteredByClient.length > 0 ? (
+            <TablePagination page={page} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
+          ) : null}
+        </div>
+      ) : selectedClient ? (
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => setSelectedClient(null)}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            ← All clients
+          </button>
+          <section className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+              <h3 className="font-semibold text-gray-900 dark:text-gray-100">{selectedClient}</h3>
+              <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                {cardScopeRows.length} opportunit{cardScopeRows.length !== 1 ? "ies" : "y"}
+              </span>
+            </div>
+            {cardScopeRows.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-gray-400">No opportunities for this client.</p>
             ) : (
-              paginated.map((row) => {
-                const colors = OPPORTUNITY_STATUS_COLORS[row.status] ?? OPPORTUNITY_STATUS_COLORS.DRAFT;
-                return (
-                  <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
-                      <div className="flex items-center gap-1">
-                        {editingNameId === row.id ? (
-                          <input
-                            value={nameDrafts[row.id] ?? ""}
-                            onChange={(e) => setNameDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))}
-                            onBlur={() => void saveName(row)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") e.currentTarget.blur();
-                              if (e.key === "Escape") cancelEditName(row.id);
-                            }}
-                            autoFocus
-                            className={inlineInputClass}
-                            aria-label={`Edit name for ${row.name}`}
-                          />
-                        ) : (
-                          <>
-                            <span>{row.name}</span>
-                            <button
-                              type="button"
-                              onClick={() => startEditName(row)}
-                              className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-                              aria-label={`Edit name for ${row.name}`}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                      <Link href={`/opportunities?clientId=${encodeURIComponent(row.clientId)}`} className="hover:underline">
-                        {row.clientName}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                      <div className="flex items-center gap-1">
-                        {editingTypeId === row.id ? (
-                          <select
-                            value={typeDrafts[row.id] ?? row.type}
-                            onChange={(e) => setTypeDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))}
-                            onBlur={() => void saveType(row)}
-                            autoFocus
-                            className={inlineSelectClass}
-                            aria-label={`Edit type for ${row.name}`}
-                          >
-                            {OPPORTUNITY_TYPES.map((type) => (
-                              <option key={type} value={type}>{OPPORTUNITY_TYPE_LABELS[type]}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <>
-                            <span>{row.typeLabel}</span>
-                            <button
-                              type="button"
-                              onClick={() => startEditType(row)}
-                              className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-                              aria-label={`Edit type for ${row.name}`}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.location || "—"}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                      <div className="flex items-center gap-1">
-                        {editingAmountId === row.id ? (
-                          <input
-                            type="number"
-                            min="0.01"
-                            step="0.01"
-                            value={amountDrafts[row.id] ?? ""}
-                            onChange={(e) => setAmountDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))}
-                            onBlur={() => void saveAmount(row)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") e.currentTarget.blur();
-                              if (e.key === "Escape") cancelEditAmount(row.id);
-                            }}
-                            autoFocus
-                            className={`${inlineInputClass} w-28`}
-                            aria-label={`Edit estimated value for ${row.name}`}
-                          />
-                        ) : (
-                          <>
-                            <span>{formatValue(row)}</span>
-                            <button
-                              type="button"
-                              onClick={() => startEditAmount(row)}
-                              className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-                              aria-label={`Edit estimated value for ${row.name}`}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        {editingStatusId === row.id ? (
-                          <select
-                            value={statusDrafts[row.id] ?? row.status}
-                            onChange={(e) => setStatusDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))}
-                            onBlur={() => void saveStatus(row)}
-                            autoFocus
-                            className={inlineSelectClass}
-                            aria-label={`Edit status for ${row.name}`}
-                          >
-                            {OPPORTUNITY_STATUSES.map((status) => (
-                              <option key={status} value={status}>{OPPORTUNITY_STATUS_LABELS[status]}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <>
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`}>
-                              {OPPORTUNITY_STATUS_LABELS[row.status]}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => startEditStatus(row)}
-                              className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-                              aria-label={`Edit status for ${row.name}`}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                    <td className="max-w-[240px] truncate px-4 py-3 text-gray-600 dark:text-gray-400" title={row.comments || undefined}>
-                      {row.comments || "—"}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="inline-flex items-center gap-2">
-                        <Link href={`/opportunities/${row.id}`} className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-black dark:hover:bg-gray-800 dark:hover:text-white">
-                          <Edit className="h-4 w-4" />
-                        </Link>
-                        <button type="button" onClick={() => void deleteRow(row.id)} className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
+              <table className="w-full min-w-[1200px] text-sm">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {cardScopeRows.map((row) => renderTableRow(row))}
+                </tbody>
+              </table>
             )}
-          </tbody>
-        </table>
-        {filteredByClient.length > 0 ? (
-          <TablePagination page={page} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
-        ) : null}
-      </div>
+          </section>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredByClient.length === 0 ? (
+            <div className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:bg-gray-900">
+              No {activeFilter ? "active" : "inactive"} opportunities.
+            </div>
+          ) : totalItems === 0 ? (
+            <div className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:bg-gray-900">
+              No opportunities match your search.
+            </div>
+          ) : groupedByClient.length === 0 ? (
+            <div className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:bg-gray-900">
+              No clients with opportunities on this tab.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {groupedByClient.map(([client, items]) => (
+                <button
+                  key={client}
+                  type="button"
+                  onClick={() => setSelectedClient(client)}
+                  className="rounded-xl border border-gray-200 bg-white p-5 text-left transition-colors hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600 dark:hover:bg-gray-800"
+                >
+                  <p className="font-semibold text-gray-900 dark:text-gray-100">{client}</p>
+                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    {items.length} opportunit{items.length !== 1 ? "ies" : "y"}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

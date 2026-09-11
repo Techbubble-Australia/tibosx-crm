@@ -233,7 +233,7 @@ export function ClientsListPage({ statusFilter, heading, description }: Props) {
                     <td className="px-4 py-3">
                       {oppCount > 0 ? (
                         <Link
-                          href={`/opportunities?clientId=${encodeURIComponent(row.id)}`}
+                          href={`/opportunities/active?clientId=${encodeURIComponent(row.id)}`}
                           className="font-medium text-blue-600 hover:underline dark:text-blue-400"
                         >
                           {oppCount}

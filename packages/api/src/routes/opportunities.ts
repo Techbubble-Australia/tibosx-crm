@@ -17,13 +17,17 @@ const opportunitySchema = z.object({
   status: z.enum(OPPORTUNITY_STATUSES).default("DRAFT"),
   comments: z.string().max(5000).optional().default(""),
   order: z.number().int().optional(),
+  active: z.boolean().optional(),
 });
 
 const listFieldsSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   type: z.enum(OPPORTUNITY_TYPES).optional(),
+  location: z.string().min(1).max(120).optional(),
   amount: z.coerce.number().positive().optional(),
   status: z.enum(OPPORTUNITY_STATUSES).optional(),
+  contactId: z.string().nullable().optional(),
+  active: z.boolean().optional(),
 });
 
 async function allocateNextOpportunityOrder(): Promise<number> {
@@ -74,6 +78,7 @@ function serializeOpportunity(row: {
   status: string;
   comments: string;
   order: number;
+  active: boolean;
   createdAt: Date;
   updatedAt: Date;
   client?: { id: string; name: string; status: string } | null;
@@ -97,6 +102,7 @@ function serializeOpportunity(row: {
     status: row.status,
     comments: row.comments,
     order: row.order,
+    active: row.active,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -120,8 +126,14 @@ router.get("/next-order", async (_req, res) => {
 router.get("/", async (req, res) => {
   try {
     const clientId = typeof req.query.clientId === "string" ? req.query.clientId.trim() : "";
+    const activeParam = typeof req.query.active === "string" ? req.query.active : "";
+    const activeFilter =
+      activeParam === "true" ? true : activeParam === "false" ? false : undefined;
+    const where: Prisma.OpportunityWhereInput = {};
+    if (clientId) where.clientId = clientId;
+    if (activeFilter !== undefined) where.active = activeFilter;
     const rows = await prisma.opportunity.findMany({
-      where: clientId ? { clientId } : undefined,
+      where: Object.keys(where).length > 0 ? where : undefined,
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
       include: opportunityInclude,
     });
@@ -149,6 +161,8 @@ router.get("/:id", async (req, res) => {
             published: true,
             type: true,
             order: true,
+            country: true,
+            city: true,
           },
           orderBy: [{ order: "asc" }, { createdAt: "desc" }],
         },
@@ -166,6 +180,7 @@ router.get("/:id", async (req, res) => {
           published: job.published,
           type: job.type,
           order: job.order,
+          location: [job.city, job.country].filter(Boolean).join(", ") || job.country || "",
         })),
       },
     });
@@ -195,6 +210,7 @@ router.post("/", async (req, res) => {
           status: data.status,
           comments: data.comments ?? "",
           order,
+          active: data.active ?? true,
         },
         include: opportunityInclude,
       });
@@ -281,10 +297,17 @@ router.patch("/:id/list-fields", async (req, res) => {
       return res.status(404).json({ error: "Not found" });
     }
 
+    if (data.contactId !== undefined) {
+      await ensureOpportunityContact(existing.clientId, data.contactId);
+    }
+
     const row = await prisma.$transaction(async (tx) => {
       const updated = await tx.opportunity.update({
         where: { id: req.params.id },
-        data,
+        data: {
+          ...data,
+          contactId: data.contactId === undefined ? undefined : data.contactId ?? null,
+        },
         include: opportunityInclude,
       });
       if (data.status === "ACCEPTED") {
@@ -359,7 +382,18 @@ router.post("/:id/link-job", async (req, res) => {
 
     const job = await prisma.jobListing.findUnique({
       where: { id: body.jobId },
-      select: { id: true, clientId: true, opportunityId: true, title: true, referenceNumber: true, published: true, type: true, order: true },
+      select: {
+        id: true,
+        clientId: true,
+        opportunityId: true,
+        title: true,
+        referenceNumber: true,
+        published: true,
+        type: true,
+        order: true,
+        country: true,
+        city: true,
+      },
     });
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
@@ -381,13 +415,26 @@ router.post("/:id/link-job", async (req, res) => {
         published: true,
         type: true,
         order: true,
+        country: true,
+        city: true,
       },
     });
 
-    res.json({ data: updated });
+    res.json({
+      data: {
+        ...updated,
+        location: [updated.city, updated.country].filter(Boolean).join(", ") || updated.country || "",
+      },
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    const code = error && typeof error === "object" && "code" in error ? (error as { code: string }).code : "";
+    if (code === "P2002") {
+      return res.status(409).json({
+        error: "This job is already linked to another opportunity. Unlink it first or run the latest database migration.",
+      });
     }
     console.error("Error linking job:", error);
     res.status(500).json({ error: "Failed to link job" });

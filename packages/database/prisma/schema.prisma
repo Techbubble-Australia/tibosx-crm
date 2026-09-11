@@ -188,6 +188,8 @@ model CareerApplication {
   interviewScheduledAt DateTime?
   /// Feedback or notes when status is SELECTED, REJECTED, or CANCELLED.
   statusComments    String?           @db.Text
+  /// Rate charged to the client for this candidate placement.
+  chargeRate        String            @default("")
   /// Years of relevant experience (from apply form).
   relevantExperience Int?
   profileId         String?
@@ -344,6 +346,8 @@ model Opportunity {
   status    String   @default("DRAFT")
   comments  String   @default("") @db.Text
   order     Int      @default(0)
+  /// Whether this opportunity is still active (false = archived / no longer pursued).
+  active    Boolean  @default(true)
   jobs      JobListing[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -352,6 +356,7 @@ model Opportunity {
   @@index([contactId])
   @@index([status])
   @@index([order])
+  @@index([active])
 }
 
 model ClientContact {
@@ -389,7 +394,7 @@ model JobListing {
   department      String
   clientId        String
   client          Client    @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  opportunityId   String?   @unique
+  opportunityId   String?
   opportunity     Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
   description     String    @default("") @db.Text
   likeCount       Int       @default(0)
@@ -421,6 +426,7 @@ model JobListing {
   @@index([technology])
   @@index([department])
   @@index([clientId])
+  @@index([opportunityId])
 }
 
 model JobLike {

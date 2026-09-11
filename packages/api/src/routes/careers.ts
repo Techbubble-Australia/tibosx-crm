@@ -390,6 +390,7 @@ function serializeAdminApplication(
     status: row.status,
     interviewScheduledAt: row.interviewScheduledAt?.toISOString() ?? null,
     statusComments: row.statusComments ?? null,
+    chargeRate: row.chargeRate ?? "",
     relevantExperience: row.relevantExperience,
     profileId: profileId ?? row.profileId ?? null,
     createdAt: row.createdAt.toISOString(),
@@ -486,6 +487,7 @@ router.patch("/admin/applications/:id", async (req, res) => {
         status: z.enum(CAREER_APPLICATION_STATUSES).optional(),
         interviewScheduledAt: z.union([z.coerce.date(), z.null()]).optional(),
         statusComments: z.string().optional().nullable(),
+        chargeRate: z.string().max(200).optional(),
       })
       .parse(req.body);
 
@@ -542,6 +544,7 @@ router.patch("/admin/applications/:id", async (req, res) => {
         status: nextStatus,
         interviewScheduledAt: nextInterview,
         statusComments: nextComments,
+        ...(body.chargeRate !== undefined ? { chargeRate: body.chargeRate.trim() } : {}),
       },
       include: {
         jobListing: {
@@ -588,6 +591,64 @@ router.patch("/admin/applications/:id", async (req, res) => {
     }
     console.error("Error updating career application:", error);
     res.status(500).json({ error: "Failed to update application" });
+  }
+});
+
+router.post("/admin/applications/:id/move", async (req, res) => {
+  try {
+    const body = z.object({ jobListingId: z.string().min(1) }).parse(req.body);
+    const existing = await prisma.careerApplication.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, jobListingId: true },
+    });
+    if (!existing) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    const job = await prisma.jobListing.findUnique({
+      where: { id: body.jobListingId },
+      select: {
+        id: true,
+        title: true,
+        published: true,
+        country: true,
+        workMode: true,
+        clientId: true,
+        client: { select: { name: true } },
+      },
+    });
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const updated = await prisma.careerApplication.update({
+      where: { id: req.params.id },
+      data: {
+        jobListingId: job.id,
+        position: job.title,
+      },
+      include: {
+        jobListing: {
+          select: {
+            id: true,
+            title: true,
+            published: true,
+            country: true,
+            workMode: true,
+            clientId: true,
+            client: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    res.json({ data: serializeAdminApplication(updated) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error moving career application:", error);
+    res.status(500).json({ error: "Failed to move application" });
   }
 });
 

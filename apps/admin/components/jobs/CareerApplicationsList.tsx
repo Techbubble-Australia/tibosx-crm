@@ -2,14 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Trash2, ChevronDown, Pencil } from "lucide-react";
+import { Trash2, ChevronDown, Pencil, ArrowRightLeft, Download } from "lucide-react";
+import { exportCareerApplicationsAsExcel } from "@/lib/export-career-applications-excel";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { ViewModeToggle, type ViewMode } from "@/components/ui/ViewModeToggle";
 import { useListView } from "@/hooks/useListView";
-import { buildSearchHaystack } from "@/lib/search-text";
+import { buildSearchHaystack, matchesSearch } from "@/lib/search-text";
 import { resolveDocumentFileName, resolveDocumentHref } from "@/lib/media-url";
 import {
   CAREER_APPLICATION_STATUSES,
@@ -40,6 +41,7 @@ interface CareerApplication {
   status?: string;
   interviewScheduledAt?: string | null;
   statusComments?: string | null;
+  chargeRate?: string | null;
   salaryCurrency?: string | null;
   salaryRate?: number | null;
   salaryMode?: string | null;
@@ -197,6 +199,218 @@ function StatusSelect({
         <option key={s} value={s}>{CAREER_APPLICATION_STATUS_LABELS[s]}</option>
       ))}
     </select>
+  );
+}
+
+type ClientOption = { id: string; name: string; status: string };
+type JobOption = { id: string; title: string; referenceNumber: string; published: boolean; clientId: string };
+
+function MoveApplicationDialog({
+  app,
+  jobPublished,
+  onCancel,
+  onMoved,
+}: {
+  app: CareerApplication;
+  jobPublished: boolean;
+  onCancel: () => void;
+  onMoved: (updated: CareerApplication) => void;
+}) {
+  const [clients, setClients] = useState<ClientOption[]>([]);
+  const [jobs, setJobs] = useState<JobOption[]>([]);
+  const [clientId, setClientId] = useState("");
+  const [jobListingId, setJobListingId] = useState("");
+  const [loadingJobs, setLoadingJobs] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    void adminFetch("/api/admin/clients")
+      .then((res) => res.json())
+      .then((data) => {
+        const list = (data.data ?? []) as ClientOption[];
+        setClients(list.filter((c) => c.status === "ACTIVE" || c.status === "PROSPECT"));
+      })
+      .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    if (!clientId) {
+      setJobs([]);
+      setJobListingId("");
+      return;
+    }
+    setLoadingJobs(true);
+    void adminFetch("/api/admin/jobs/admin/all")
+      .then((res) => res.json())
+      .then((data) => {
+        const list = (data.data ?? []) as JobOption[];
+        setJobs(
+          list.filter(
+            (job) =>
+              job.clientId === clientId &&
+              job.published === jobPublished &&
+              job.id !== app.jobListingId,
+          ),
+        );
+      })
+      .catch(console.error)
+      .finally(() => setLoadingJobs(false));
+  }, [clientId, jobPublished, app.jobListingId]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!clientId || !jobListingId) {
+      alert("Please select a client and job.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await adminFetch(`/api/admin/career-applications/admin/applications/${app.id}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobListingId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Failed to move application");
+      }
+      onMoved(data.data as CareerApplication);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to move application");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <form
+        onSubmit={(e) => void handleSubmit(e)}
+        className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900"
+      >
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Move application</h3>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          Move {app.firstName} {app.lastName} to another {jobPublished ? "active" : "inactive"} job.
+        </p>
+        <div className="mt-4 space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Client name <span className="text-red-600">*</span>
+            </label>
+            <select
+              value={clientId}
+              onChange={(e) => {
+                setClientId(e.target.value);
+                setJobListingId("");
+              }}
+              required
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
+            >
+              <option value="">Select client…</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>{client.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Job name <span className="text-red-600">*</span>
+            </label>
+            <select
+              value={jobListingId}
+              onChange={(e) => setJobListingId(e.target.value)}
+              required
+              disabled={!clientId || loadingJobs}
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
+            >
+              <option value="">
+                {loadingJobs ? "Loading jobs…" : clientId ? "Select job…" : "Select a client first"}
+              </option>
+              {jobs.map((job) => (
+                <option key={job.id} value={job.id}>
+                  {job.title} ({job.referenceNumber})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={saving}
+            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+          >
+            {saving ? "Moving…" : "Submit"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function ChargeRateField({
+  app,
+  canEdit,
+  onSave,
+}: {
+  app: CareerApplication;
+  canEdit: boolean;
+  onSave: (chargeRate: string) => Promise<boolean>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    const ok = await onSave(draft.trim());
+    setSaving(false);
+    if (ok) setEditing(false);
+  }
+
+  return (
+    <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+      <span className="font-medium text-gray-700 dark:text-gray-300">Charge rate: </span>
+      {editing ? (
+        <span className="inline-flex items-center gap-2">
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            className="rounded border border-gray-200 px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
+            placeholder="e.g. AUD 120/hr"
+          />
+          <button type="button" onClick={() => void save()} disabled={saving} className="text-xs font-medium text-blue-600">
+            {saving ? "Saving…" : "Save"}
+          </button>
+          <button type="button" onClick={() => setEditing(false)} className="text-xs text-gray-500">Cancel</button>
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-1">
+          {app.chargeRate?.trim() || <span className="text-gray-400">Not set</span>}
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={() => {
+                setDraft(app.chargeRate ?? "");
+                setEditing(true);
+              }}
+              className="rounded p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+              aria-label="Edit charge rate"
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+          ) : null}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -517,6 +731,8 @@ function ApplicationCard({
   hidePosition = false,
   onStatusChange,
   onSaveFields,
+  onSaveChargeRate,
+  onMove,
   onDelete,
 }: {
   app: CareerApplication;
@@ -527,6 +743,8 @@ function ApplicationCard({
     app: CareerApplication,
     fields: { interviewScheduledAt?: string | null; statusComments?: string | null },
   ) => Promise<boolean>;
+  onSaveChargeRate: (app: CareerApplication, chargeRate: string) => Promise<boolean>;
+  onMove: (app: CareerApplication) => void;
   onDelete: (id: string) => void;
 }) {
   const salary = formatSalary(app);
@@ -579,6 +797,11 @@ function ApplicationCard({
             {salary ? <span>Salary: {salary}</span> : null}
             {app.clientName ? <span>Client: {app.clientName}</span> : null}
           </div>
+          <ChargeRateField
+            app={app}
+            canEdit={canEdit}
+            onSave={(chargeRate) => onSaveChargeRate(app, chargeRate)}
+          />
           {app.message ? (
             <p className="mt-3 border-t border-gray-100 pt-3 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400">
               {app.message}
@@ -625,14 +848,25 @@ function ApplicationCard({
             })}
           </span>
           {canEdit ? (
-            <button
-              type="button"
-              onClick={() => void onDelete(app.id)}
-              className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
-              aria-label="Delete application"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => onMove(app)}
+                className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                aria-label="Move application"
+                title="Move to another job"
+              >
+                <ArrowRightLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => void onDelete(app.id)}
+                className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                aria-label="Delete application"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
           ) : null}
         </div>
       </div>
@@ -660,6 +894,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
     statusComments: string;
   } | null>(null);
   const [statusSaving, setStatusSaving] = useState(false);
+  const [moveTarget, setMoveTarget] = useState<CareerApplication | null>(null);
 
   const filteredByJobMeta = useMemo(() => {
     return applications.filter((app) => {
@@ -760,6 +995,19 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
       console.error("Error updating application:", error);
       return null;
     }
+  }
+
+  async function saveChargeRate(app: CareerApplication, chargeRate: string): Promise<boolean> {
+    const updated = await patchApplication(app.id, { chargeRate });
+    return updated !== null;
+  }
+
+  function handleExportExcel() {
+    const q = search.trim().toLowerCase();
+    const exportRows = q
+      ? filteredByJobMeta.filter((app) => matchesSearch(applicationSearchHaystack(app), q))
+      : filteredByJobMeta;
+    exportCareerApplicationsAsExcel(exportRows);
   }
 
   async function saveApplicationFields(
@@ -937,7 +1185,19 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
             </p>
           ) : null}
         </div>
-        <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+        <div className="flex flex-wrap items-center gap-3">
+          {canEdit && applications.length > 0 ? (
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              <Download className="h-4 w-4" />
+              Export as Excel
+            </button>
+          ) : null}
+          <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+        </div>
       </div>
 
       <AdminSearchField
@@ -1029,6 +1289,8 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
               canEdit={canEdit}
               onStatusChange={(app, status) => requestStatusChange(app, status)}
               onSaveFields={(app, fields) => saveApplicationFields(app, fields)}
+              onSaveChargeRate={(app, chargeRate) => saveChargeRate(app, chargeRate)}
+              onMove={(app) => setMoveTarget(app)}
               onDelete={(id) => void deleteApplication(id)}
             />
           ))}
@@ -1078,6 +1340,8 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
                         hidePosition
                         onStatusChange={(app, status) => requestStatusChange(app, status)}
               onSaveFields={(app, fields) => saveApplicationFields(app, fields)}
+                        onSaveChargeRate={(app, chargeRate) => saveChargeRate(app, chargeRate)}
+                        onMove={(app) => setMoveTarget(app)}
                         onDelete={(id) => void deleteApplication(id)}
                       />
                     ))}
@@ -1088,6 +1352,24 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
           })}
         </div>
       )}
+
+      {moveTarget ? (
+        <MoveApplicationDialog
+          app={moveTarget}
+          jobPublished={jobPublished}
+          onCancel={() => setMoveTarget(null)}
+          onMoved={(updated) => {
+            setApplications((prev) => {
+              const onThisTab = updated.jobPublished === jobPublished;
+              if (!onThisTab) {
+                return prev.filter((row) => row.id !== updated.id);
+              }
+              return prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row));
+            });
+            setMoveTarget(null);
+          }}
+        />
+      ) : null}
 
       {statusChange ? (
         <StatusChangeDialog

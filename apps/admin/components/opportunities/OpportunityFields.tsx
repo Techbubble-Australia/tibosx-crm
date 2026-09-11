@@ -31,6 +31,7 @@ export type OpportunityFormValues = {
   currency: string;
   amount: number;
   comments: string;
+  active?: boolean;
 };
 
 type Props = {
@@ -181,6 +182,19 @@ export function OpportunityFields({ defaults = {}, presetClientId = "" }: Props)
         <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Comments</label>
         <textarea name="comments" rows={4} defaultValue={defaults.comments ?? ""} className={inputClass} placeholder="Optional notes" />
       </div>
+
+      {defaults.clientId ? (
+        <label className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
+          <input
+            type="checkbox"
+            name="active"
+            value="true"
+            defaultChecked={defaults.active !== false}
+            className="h-4 w-4 rounded border-gray-300"
+          />
+          Active opportunity
+        </label>
+      ) : null}
     </>
   );
 }
@@ -197,5 +211,6 @@ export function readOpportunityFormData(formData: FormData) {
     currency: String(formData.get("currency") ?? "").trim(),
     amount: formData.get("amount"),
     comments: String(formData.get("comments") ?? "").trim(),
+    ...(formData.has("active") ? { active: formData.get("active") === "true" } : {}),
   };
 }

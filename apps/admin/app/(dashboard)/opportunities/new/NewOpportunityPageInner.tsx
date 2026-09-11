@@ -28,7 +28,7 @@ export default function NewOpportunityPageInner() {
         const err = await res.json().catch(() => ({}));
         throw new Error((err as { error?: string }).error || "Failed");
       }
-      router.push("/opportunities");
+      router.push("/opportunities/active");
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to create opportunity");
     } finally {

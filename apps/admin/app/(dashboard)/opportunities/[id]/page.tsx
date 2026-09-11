@@ -14,6 +14,7 @@ type LinkedJob = {
   published: boolean;
   type: string;
   order: number;
+  location?: string;
 };
 
 type AvailableJob = LinkedJob & {
@@ -86,7 +87,6 @@ export default function EditOpportunityPage() {
         return exists ? prev.map((job) => (job.id === data.data.id ? data.data : job)) : [...prev, data.data];
       });
       setAvailableJobs((prev) => prev.filter((job) => job.id !== jobId));
-      setShowLinkJob(false);
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to link job");
     } finally {
@@ -122,7 +122,7 @@ export default function EditOpportunityPage() {
         const err = await res.json().catch(() => ({}));
         throw new Error((err as { error?: string }).error || "Failed");
       }
-      router.push("/opportunities");
+      router.push("/opportunities/active");
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to update opportunity");
     } finally {
@@ -143,7 +143,7 @@ export default function EditOpportunityPage() {
     <div className="max-w-3xl space-y-6">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link href="/opportunities" className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
+          <Link href="/opportunities/active" className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Edit Opportunity</h2>
@@ -190,7 +190,7 @@ export default function EditOpportunityPage() {
                     {job.title}
                   </Link>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {job.referenceNumber} · {job.type} · {job.published ? "Active" : "Inactive"}
+                    {job.referenceNumber} · {job.location || "—"} · {job.type} · {job.published ? "Active" : "Inactive"}
                   </p>
                 </div>
                 <button
