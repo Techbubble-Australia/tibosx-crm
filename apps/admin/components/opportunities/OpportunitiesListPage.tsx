@@ -39,6 +39,7 @@ interface OpportunityRow {
   comments: string;
   order: number;
   active: boolean;
+  activeJobsCount: number;
 }
 
 type ContactOption = { id: string; name: string; email: string };
@@ -141,7 +142,7 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
   const [contactsByClient, setContactsByClient] = useState<Record<string, ContactOption[]>>({});
 
   const filteredByClient = useMemo(() => {
-    const list = clientIdFilter ? rows.filter((row) => row.clientId === clientIdFilter) : rows;
+    const list = [...(clientIdFilter ? rows.filter((row) => row.clientId === clientIdFilter) : rows)];
     list.sort((a, b) => {
       let cmp = 0;
       switch (sortKey) {
@@ -297,7 +298,16 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
       });
       if (!res.ok) return false;
       const data = await res.json();
-      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, ...data.data } : r)));
+      const updated = data.data as OpportunityRow;
+      setRows((prev) => {
+        if (activeFilter && (updated.active === false || updated.status === "REJECTED")) {
+          return prev.filter((r) => r.id !== row.id);
+        }
+        if (!activeFilter && updated.active !== false) {
+          return prev.filter((r) => r.id !== row.id);
+        }
+        return prev.map((r) => (r.id === row.id ? { ...r, ...updated } : r));
+      });
       return true;
     } catch (error) {
       console.error("Error updating opportunity:", error);
@@ -475,6 +485,14 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
     return `/opportunities/${listTab}?clientId=${encodeURIComponent(clientId)}`;
   }
 
+  function activeJobsHref(row: OpportunityRow) {
+    const params = new URLSearchParams();
+    params.set("clientId", row.clientId);
+    if (row.location) params.set("country", row.location);
+    params.set("opportunityId", row.id);
+    return `/jobs/active?${params.toString()}`;
+  }
+
   function renderTableRow(row: OpportunityRow) {
     const colors = OPPORTUNITY_STATUS_COLORS[row.status] ?? OPPORTUNITY_STATUS_COLORS.DRAFT;
     const contacts = contactsByClient[row.clientId] ?? [];
@@ -580,6 +598,15 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
           >
             <span>{row.location || "—"}</span>
           </InlineEditableCell>
+        </td>
+        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+          {(row.activeJobsCount ?? 0) > 0 ? (
+            <Link href={activeJobsHref(row)} className="font-medium text-blue-600 hover:underline dark:text-blue-400">
+              {row.activeJobsCount}
+            </Link>
+          ) : (
+            "0"
+          )}
         </td>
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
           <InlineEditableCell
@@ -724,6 +751,7 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
                 <th className="px-4 py-3 text-left">
                   <SortHeader label="Location" sortKey="location" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                 </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Active jobs</th>
                 <th className="px-4 py-3 text-left">
                   <SortHeader label="Estimated Value" sortKey="amount" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                 </th>
@@ -737,13 +765,13 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {filteredByClient.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
                     No {activeFilter ? "active" : "inactive"} opportunities yet.
                   </td>
                 </tr>
               ) : totalItems === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-gray-400">No opportunities match your search.</td>
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">No opportunities match your search.</td>
                 </tr>
               ) : (
                 paginated.map((row) => renderTableRow(row))

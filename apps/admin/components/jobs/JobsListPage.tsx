@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Plus, Edit, Trash2, Settings, Flame, ChevronDown, ChevronUp, Pencil, GripVertical } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
@@ -49,6 +50,7 @@ interface JobListing {
   applicationCount: number;
   clientId?: string;
   clientName?: string;
+  opportunityId?: string | null;
   isHot?: boolean;
   order?: number;
   level?: string;
@@ -164,17 +166,27 @@ type JobsListPageProps = {
 
 export function JobsListPage({ publishedFilter, heading, description }: JobsListPageProps) {
   const { canManageJobs, canViewJobs } = useAdminSession();
+  const searchParams = useSearchParams();
+  const presetClientId = searchParams.get("clientId")?.trim() ?? "";
+  const presetCountry = searchParams.get("country")?.trim() ?? "";
+  const presetOpportunityId = searchParams.get("opportunityId")?.trim() ?? "";
   const jobLevels = useJobLevels();
   const [jobs, setJobs] = useState<JobListing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
   const [technologies, setTechnologies] = useState<Array<{ id: string; name: string }>>([]);
   const listTab = publishedFilter ? "active" : "inactive";
+  const hasPresetFilters = Boolean(presetClientId || presetCountry || presetOpportunityId);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const filteredJobs = useMemo(
-    () => jobs.filter((job) => job.published === publishedFilter),
-    [jobs, publishedFilter],
-  );
+  const filteredJobs = useMemo(() => {
+    return jobs.filter((job) => {
+      if (job.published !== publishedFilter) return false;
+      if (presetClientId && job.clientId !== presetClientId) return false;
+      if (presetCountry && job.country !== presetCountry) return false;
+      if (presetOpportunityId && job.opportunityId !== presetOpportunityId) return false;
+      return true;
+    });
+  }, [jobs, publishedFilter, presetClientId, presetCountry, presetOpportunityId]);
   const {
     search,
     setSearch,
@@ -565,6 +577,17 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{heading}</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>
+          {hasPresetFilters ? (
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+              Filtered view
+              {presetClientId ? " · client" : ""}
+              {presetCountry ? ` · ${presetCountry}` : ""}
+              {presetOpportunityId ? " · linked to opportunity" : ""}.{" "}
+              <Link href={publishedFilter ? "/jobs/active" : "/jobs/inactive"} className="text-blue-600 hover:underline dark:text-blue-400">
+                Clear filters
+              </Link>
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <ViewModeToggle mode={viewMode} onChange={setViewMode} />

@@ -15,6 +15,7 @@ import {
   Building2,
   Handshake,
   CircleDollarSign,
+  ScrollText,
   Shield,
   Globe,
   Settings,
@@ -61,6 +62,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/clients/active", label: "Clients", icon: Handshake, roles: ["admin", "sales"] },
       { href: "/opportunities", label: "Opportunities", icon: CircleDollarSign, roles: ["admin", "sales"] },
+      { href: "/contracts", label: "Contracts", icon: ScrollText, roles: ["admin", "sales"] },
     ],
   },
   {
@@ -115,6 +117,9 @@ function headerTitle(pathname: string): string {
   if (pathname.startsWith("/opportunities")) {
     return "Opportunities";
   }
+  if (pathname.startsWith("/contracts")) {
+    return "Contracts";
+  }
   if (pathname.startsWith("/clients")) {
     return "Clients";
   }
@@ -129,7 +134,7 @@ function groupIsActive(group: NavGroup, pathname: string): boolean {
   if (group.id === "recruitment" && (isJobListingsPath(pathname) || isCareerApplicationsPath(pathname))) {
     return true;
   }
-  if (group.id === "sales" && (pathname.startsWith("/clients") || pathname.startsWith("/opportunities"))) {
+  if (group.id === "sales" && (pathname.startsWith("/clients") || pathname.startsWith("/opportunities") || pathname.startsWith("/contracts"))) {
     return true;
   }
   return group.items.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
@@ -147,6 +152,9 @@ function navItemIsActive(item: NavItem, pathname: string): boolean {
   }
   if (item.href === "/opportunities") {
     return pathname === "/opportunities" || pathname.startsWith("/opportunities/");
+  }
+  if (item.href === "/contracts") {
+    return pathname === "/contracts" || pathname.startsWith("/contracts/");
   }
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }

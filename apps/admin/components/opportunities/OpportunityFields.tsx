@@ -192,7 +192,7 @@ export function OpportunityFields({ defaults = {}, presetClientId = "" }: Props)
             defaultChecked={defaults.active !== false}
             className="h-4 w-4 rounded border-gray-300"
           />
-          Active opportunity
+          Active
         </label>
       ) : null}
     </>

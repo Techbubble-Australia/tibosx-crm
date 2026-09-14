@@ -322,6 +322,7 @@ model Client {
   jobs          JobListing[]
   contacts      ClientContact[]
   opportunities Opportunity[]
+  contracts     Contract[]
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
@@ -357,6 +358,52 @@ model Opportunity {
   @@index([status])
   @@index([order])
   @@index([active])
+}
+
+model Contract {
+  id             String              @id @default(cuid())
+  contractNumber String              @unique
+  title          String
+  clientId       String
+  client         Client              @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  /// FIXED_PRICE | T_AND_M | SUPPORT | OTHER
+  type           String              @default("FIXED_PRICE")
+  /// DRAFT | ACTIVE | EXPIRED | CANCELED
+  status         String              @default("DRAFT")
+  startDate      DateTime
+  endDate        DateTime?
+  /// HOUR | DAY — only for T&M contracts
+  unit           String?
+  currency       String
+  rate           Decimal             @db.Decimal(14, 2)
+  contractValue  Decimal             @db.Decimal(14, 2)
+  totalVariation Decimal             @default(0) @db.Decimal(14, 2)
+  consumed       Decimal             @default(0) @db.Decimal(14, 2)
+  comments       String              @default("") @db.Text
+  fileUrls       Json?
+  variations     ContractVariation[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([clientId])
+  @@index([status])
+  @@index([type])
+}
+
+model ContractVariation {
+  id             String   @id @default(cuid())
+  contractId     String
+  contract       Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  variationDate  DateTime
+  comments       String   @db.Text
+  /// HOUR | DAY for T&M variations
+  unit           String?
+  rate           Decimal? @db.Decimal(14, 2)
+  /// Monetary value added to total variation
+  variationValue Decimal  @db.Decimal(14, 2)
+  createdAt      DateTime @default(now())
+
+  @@index([contractId])
 }
 
 model ClientContact {

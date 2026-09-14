@@ -23,6 +23,7 @@ import { faqRoutes } from "./routes/faqs";
 import { siteContentPublicRoutes, siteContentAdminRoutes } from "./routes/siteContent";
 import { clientRoutes } from "./routes/clients";
 import { opportunityRoutes } from "./routes/opportunities";
+import { contractRoutes } from "./routes/contracts";
 import { profileRoutes } from "./routes/profiles";
 import { adminUserRoutes } from "./routes/adminUsers";
 import { authMiddleware } from "./middleware/auth";
@@ -99,6 +100,7 @@ app.use("/api/admin/profiles", authMiddleware, requireMfaEnrolled, requireModule
 app.use("/api/admin/contact-submissions", authMiddleware, requireMfaEnrolled, requireModule("website"), contactRoutes);
 app.use("/api/admin/clients", authMiddleware, requireMfaEnrolled, requireModule("sales"), clientRoutes);
 app.use("/api/admin/opportunities", authMiddleware, requireMfaEnrolled, requireModule("sales"), opportunityRoutes);
+app.use("/api/admin/contracts", authMiddleware, requireMfaEnrolled, requireModule("sales"), contractRoutes);
 app.use("/api/admin/users", authMiddleware, requireMfaEnrolled, requireRole("admin"), adminUserRoutes);
 app.use("/api/upload", ...websiteWrite, uploadRoutes);
 

@@ -83,6 +83,7 @@ function serializeOpportunity(row: {
   updatedAt: Date;
   client?: { id: string; name: string; status: string } | null;
   contact?: { id: string; name: string; email: string } | null;
+  jobs?: Array<{ id: string; published: boolean }>;
 }) {
   const amount = typeof row.amount === "number" ? row.amount : Number(row.amount.toString());
   const type = row.type as keyof typeof OPPORTUNITY_TYPE_LABELS;
@@ -103,6 +104,7 @@ function serializeOpportunity(row: {
     comments: row.comments,
     order: row.order,
     active: row.active,
+    activeJobsCount: row.jobs?.filter((job) => job.published).length ?? 0,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -135,7 +137,10 @@ router.get("/", async (req, res) => {
     const rows = await prisma.opportunity.findMany({
       where: Object.keys(where).length > 0 ? where : undefined,
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
-      include: opportunityInclude,
+      include: {
+        ...opportunityInclude,
+        jobs: { select: { id: true, published: true } },
+      },
     });
     res.json({ data: rows.map(serializeOpportunity) });
   } catch (error) {
@@ -255,14 +260,21 @@ router.put("/:id", async (req, res) => {
       await ensureOpportunityContact(nextClientId, data.contactId);
     }
 
+    const updateData = {
+      ...data,
+      contactId: data.contactId === undefined ? undefined : data.contactId ?? null,
+      ...(data.status === "REJECTED" ? { active: false } : {}),
+      ...(data.active === false ? { active: false } : {}),
+    };
+
     const row = await prisma.$transaction(async (tx) => {
       const updated = await tx.opportunity.update({
         where: { id: req.params.id },
-        data: {
-          ...data,
-          contactId: data.contactId === undefined ? undefined : data.contactId ?? null,
+        data: updateData,
+        include: {
+          ...opportunityInclude,
+          jobs: { select: { id: true, published: true } },
         },
-        include: opportunityInclude,
       });
       if (data.status === "ACCEPTED") {
         await applyAcceptedClientPromotion(updated.clientId, tx);
@@ -301,14 +313,20 @@ router.patch("/:id/list-fields", async (req, res) => {
       await ensureOpportunityContact(existing.clientId, data.contactId);
     }
 
+    const listUpdateData = {
+      ...data,
+      contactId: data.contactId === undefined ? undefined : data.contactId ?? null,
+      ...(data.status === "REJECTED" ? { active: false } : {}),
+    };
+
     const row = await prisma.$transaction(async (tx) => {
       const updated = await tx.opportunity.update({
         where: { id: req.params.id },
-        data: {
-          ...data,
-          contactId: data.contactId === undefined ? undefined : data.contactId ?? null,
+        data: listUpdateData,
+        include: {
+          ...opportunityInclude,
+          jobs: { select: { id: true, published: true } },
         },
-        include: opportunityInclude,
       });
       if (data.status === "ACCEPTED") {
         await applyAcceptedClientPromotion(updated.clientId, tx);
@@ -340,7 +358,7 @@ router.get("/:id/available-jobs", async (req, res) => {
   try {
     const opportunity = await prisma.opportunity.findUnique({
       where: { id: req.params.id },
-      select: { clientId: true },
+      select: { clientId: true, location: true },
     });
     if (!opportunity) {
       return res.status(404).json({ error: "Not found" });
@@ -349,6 +367,7 @@ router.get("/:id/available-jobs", async (req, res) => {
     const jobs = await prisma.jobListing.findMany({
       where: {
         clientId: opportunity.clientId,
+        country: opportunity.location,
         OR: [{ opportunityId: null }, { opportunityId: req.params.id }],
       },
       select: {

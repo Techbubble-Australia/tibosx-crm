@@ -112,17 +112,19 @@ export default function EditOpportunityPage() {
     e.preventDefault();
     setIsLoading(true);
     const formData = new FormData(e.currentTarget);
+    const payload = readOpportunityFormData(formData);
     try {
       const res = await adminFetch(`/api/admin/opportunities/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(readOpportunityFormData(formData)),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error((err as { error?: string }).error || "Failed");
       }
-      router.push("/opportunities/active");
+      const inactive = payload.active === false || payload.status === "REJECTED";
+      router.push(inactive ? "/opportunities/inactive" : "/opportunities/active");
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to update opportunity");
     } finally {
