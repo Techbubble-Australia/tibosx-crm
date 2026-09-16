@@ -17,7 +17,6 @@ import { useJobLevels } from "@/hooks/useJobLevels";
 
 const JOB_LIST_COLUMNS: ListColumnDef[] = [
   { id: "ref", label: "Ref" },
-  { id: "order", label: "Order" },
   { id: "title", label: "Title" },
   { id: "hot", label: "Hot" },
   { id: "city", label: "City" },
@@ -204,8 +203,6 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
   const { columns: jobColumnDefs, visibleIds, isVisible: isColumnVisible, toggleColumn } =
     useColumnVisibility("tbos:jobs-columns", JOB_LIST_COLUMNS);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
-  const [orderDrafts, setOrderDrafts] = useState<Record<string, string>>({});
-  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [editingPublishedDateId, setEditingPublishedDateId] = useState<string | null>(null);
   const [publishedDateDrafts, setPublishedDateDrafts] = useState<Record<string, string>>({});
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
@@ -279,47 +276,6 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
       }
     } catch (error) {
       console.error("Error toggling hot status:", error);
-    }
-  }
-
-  function startEditOrder(job: JobListing) {
-    setEditingOrderId(job.id);
-    setOrderDrafts((prev) => ({ ...prev, [job.id]: String(job.order ?? 0) }));
-  }
-
-  function cancelEditOrder(jobId: string) {
-    setEditingOrderId((current) => (current === jobId ? null : current));
-    setOrderDrafts((prev) => {
-      const next = { ...prev };
-      delete next[jobId];
-      return next;
-    });
-  }
-
-  async function saveOrder(job: JobListing) {
-    if (!canManageJobs) return;
-    const raw = orderDrafts[job.id] ?? String(job.order ?? 0);
-    const order = Number.parseInt(raw, 10);
-    if (Number.isNaN(order)) {
-      cancelEditOrder(job.id);
-      return;
-    }
-    if (order === job.order) {
-      cancelEditOrder(job.id);
-      return;
-    }
-    try {
-      const res = await adminFetch(`/api/admin/jobs/admin/${job.id}/order`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order }),
-      });
-      if (res.ok) {
-        setJobs((prev) => prev.map((j) => (j.id === job.id ? { ...j, order } : j)));
-        cancelEditOrder(job.id);
-      }
-    } catch (error) {
-      console.error("Error updating job order:", error);
     }
   }
 
@@ -630,7 +586,7 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
 
       {canDragReorder ? (
         <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
-          Drag jobs using the grip icon in the Order column to reorder by priority.
+          Drag jobs using the grip icon next to the title to reorder by priority.
         </p>
       ) : null}
 
@@ -642,11 +598,6 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                 {isColumnVisible("ref") ? (
                   <th className="px-4 py-3 text-left">
                     <SortHeader label="Ref" sortKey="referenceNumber" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                  </th>
-                ) : null}
-                {isColumnVisible("order") ? (
-                  <th className="px-4 py-3 text-left">
-                    <SortHeader label="Order" sortKey="order" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                   </th>
                 ) : null}
                 {isColumnVisible("title") ? (
@@ -689,11 +640,9 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                     <SortHeader label="Budget" sortKey="budget" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                   </th>
                 ) : null}
-                {isColumnVisible("type") ? (
-                  <th className="px-4 py-3 text-left">
-                    <SortHeader label="Employment type" sortKey="type" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                  </th>
-                ) : null}
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Employment type" sortKey="type" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
                 {isColumnVisible("publishedDate") ? (
                   <th className="px-4 py-3 text-left">
                     <SortHeader label="Published date" sortKey="publishedDate" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
@@ -736,8 +685,8 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                     {isColumnVisible("ref") ? (
                       <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">{job.referenceNumber}</td>
                     ) : null}
-                    {isColumnVisible("order") ? (
-                      <td className="px-4 py-3">
+                    {isColumnVisible("title") ? (
+                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
                         <div className="flex items-center gap-1">
                           {canDragReorder ? (
                             <button
@@ -755,50 +704,9 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                               <GripVertical className="h-4 w-4" aria-hidden />
                             </button>
                           ) : null}
-                          {canManageJobs ? (
-                            <div className="flex items-center gap-1">
-                            {editingOrderId === job.id ? (
-                              <input
-                                type="number"
-                                value={orderDrafts[job.id] ?? String(job.order ?? 0)}
-                                onChange={(e) =>
-                                  setOrderDrafts((prev) => ({ ...prev, [job.id]: e.target.value }))
-                                }
-                                onBlur={() => void saveOrder(job)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    e.currentTarget.blur();
-                                  } else if (e.key === "Escape") {
-                                    cancelEditOrder(job.id);
-                                  }
-                                }}
-                                autoFocus
-                                className="w-16 rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-                                aria-label={`Edit order for ${job.title}`}
-                              />
-                            ) : (
-                              <>
-                                <span className="text-gray-600 dark:text-gray-400">{job.order ?? 0}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => startEditOrder(job)}
-                                  className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-                                  aria-label={`Edit order for ${job.title}`}
-                                  title="Edit order"
-                                >
-                                  <Pencil className="h-3.5 w-3.5" aria-hidden />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-gray-600 dark:text-gray-400">{job.order ?? 0}</span>
-                        )}
+                          <span>{job.title}</span>
                         </div>
                       </td>
-                    ) : null}
-                    {isColumnVisible("title") ? (
-                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{job.title}</td>
                     ) : null}
                     {isColumnVisible("hot") ? (
                       <td className="px-4 py-3">
@@ -971,9 +879,7 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                         {job.budget?.trim() ? job.budget : "—"}
                       </td>
                     ) : null}
-                    {isColumnVisible("type") ? (
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.type || "—"}</td>
-                    ) : null}
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{job.type || "—"}</td>
                     {isColumnVisible("publishedDate") ? (
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                         {canManageJobs ? (

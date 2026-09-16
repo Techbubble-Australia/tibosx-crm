@@ -184,16 +184,19 @@ export function OpportunityFields({ defaults = {}, presetClientId = "" }: Props)
       </div>
 
       {defaults.clientId ? (
-        <label className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
-          <input
-            type="checkbox"
-            name="active"
-            value="true"
-            defaultChecked={defaults.active !== false}
-            className="h-4 w-4 rounded border-gray-300"
-          />
-          Active
-        </label>
+        <>
+          <input type="hidden" name="_hasActiveField" value="1" />
+          <label className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
+            <input
+              type="checkbox"
+              name="active"
+              value="true"
+              defaultChecked={defaults.active !== false}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Active
+          </label>
+        </>
       ) : null}
     </>
   );
@@ -211,6 +214,8 @@ export function readOpportunityFormData(formData: FormData) {
     currency: String(formData.get("currency") ?? "").trim(),
     amount: formData.get("amount"),
     comments: String(formData.get("comments") ?? "").trim(),
-    ...(formData.has("active") ? { active: formData.get("active") === "true" } : {}),
+    ...(formData.get("_hasActiveField") === "1"
+      ? { active: formData.get("active") === "true" }
+      : {}),
   };
 }

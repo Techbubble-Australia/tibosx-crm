@@ -654,7 +654,7 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
               </select>
             }
           >
-            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`}>
+            <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`}>
               {OPPORTUNITY_STATUS_LABELS[row.status]}
             </span>
           </InlineEditableCell>

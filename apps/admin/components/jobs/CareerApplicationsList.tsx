@@ -55,6 +55,7 @@ interface CareerApplication {
   jobCountry?: string | null;
   jobWorkMode?: string | null;
   clientName?: string | null;
+  clientId?: string | null;
   profileId?: string | null;
 }
 
@@ -886,6 +887,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
   const [filterWorkMode, setFilterWorkMode] = useState("");
   const [filterClient, setFilterClient] = useState("");
   const [filterStatus, setFilterStatus] = useState(initialStatusFilter ?? "");
+  const [jobClientOptions, setJobClientOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [statusChange, setStatusChange] = useState<{
     app: CareerApplication;
     status: CareerApplicationStatus;
@@ -900,7 +902,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
     return applications.filter((app) => {
       if (filterCountry && app.jobCountry !== filterCountry) return false;
       if (filterWorkMode && app.jobWorkMode !== filterWorkMode) return false;
-      if (filterClient && app.clientName !== filterClient) return false;
+      if (filterClient && app.clientId !== filterClient && app.clientName !== filterClient) return false;
       if (filterStatus && app.status !== filterStatus) return false;
       return true;
     });
@@ -909,18 +911,23 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
   const filterOptions = useMemo(() => {
     const countries = new Set<string>();
     const workModes = new Set<string>();
-    const clients = new Set<string>();
+    const clients = new Map<string, string>();
     for (const app of applications) {
       if (app.jobCountry) countries.add(app.jobCountry);
       if (app.jobWorkMode) workModes.add(app.jobWorkMode);
-      if (app.clientName) clients.add(app.clientName);
+      if (app.clientId && app.clientName) clients.set(app.clientId, app.clientName);
+    }
+    for (const client of jobClientOptions) {
+      clients.set(client.id, client.name);
     }
     return {
       countries: [...countries].sort((a, b) => a.localeCompare(b)),
       workModes: [...workModes].sort((a, b) => a.localeCompare(b)),
-      clients: [...clients].sort((a, b) => a.localeCompare(b)),
+      clients: [...clients.entries()]
+        .map(([id, name]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
     };
-  }, [applications]);
+  }, [applications, jobClientOptions]);
 
   const {
     search,
@@ -941,6 +948,22 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
   useEffect(() => {
     void fetchApplications();
   }, [jobPublished, jobListingId, initialStatusFilter]);
+
+  useEffect(() => {
+    void adminFetch("/api/admin/jobs/admin/all")
+      .then((res) => res.json())
+      .then((data) => {
+        const jobs = (data.data ?? []) as Array<{ published: boolean; clientId?: string; clientName?: string }>;
+        const clients = new Map<string, string>();
+        for (const job of jobs) {
+          if (job.published === jobPublished && job.clientId && job.clientName) {
+            clients.set(job.clientId, job.clientName);
+          }
+        }
+        setJobClientOptions([...clients.entries()].map(([id, name]) => ({ id, name })));
+      })
+      .catch(console.error);
+  }, [jobPublished]);
 
   useEffect(() => {
     setFilterStatus(initialStatusFilter ?? "");
@@ -1249,7 +1272,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
         >
           <option value="">All clients</option>
           {filterOptions.clients.map((client) => (
-            <option key={client} value={client}>{client}</option>
+            <option key={client.id} value={client.id}>{client.name}</option>
           ))}
         </select>
         <select

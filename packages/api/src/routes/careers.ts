@@ -399,6 +399,7 @@ function serializeAdminApplication(
     jobCountry: row.jobListing?.country ?? null,
     jobWorkMode: row.jobListing?.workMode ?? null,
     clientName: row.jobListing?.client?.name ?? null,
+    clientId: row.jobListing?.clientId ?? null,
   };
 }
 
