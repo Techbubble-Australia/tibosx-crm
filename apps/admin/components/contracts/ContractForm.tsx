@@ -38,6 +38,8 @@ export type ContractFormValues = {
   clientId: string;
   type: ContractType;
   status: ContractStatus;
+  ownerId?: string | null;
+  ownerName?: string;
   startDate: string;
   endDate: string;
   unit: ContractUnit | "";
@@ -52,8 +54,11 @@ export type ContractFormValues = {
   variations: ContractVariation[];
 };
 
+type UserOption = { id: string; name: string | null; email: string; active: boolean };
+
 type Props = {
   defaults?: Partial<ContractFormValues>;
+  defaultOwnerId?: string;
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
   isSaving: boolean;
 };
@@ -69,12 +74,14 @@ function formatMoney(currency: string, amount: number) {
   return `${currency} ${new Intl.NumberFormat("en-US").format(amount)}`;
 }
 
-export function ContractForm({ defaults = {}, onSubmit, isSaving }: Props) {
+export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving }: Props) {
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
+  const [users, setUsers] = useState<UserOption[]>([]);
   const [title, setTitle] = useState(defaults.title ?? "");
   const [clientId, setClientId] = useState(defaults.clientId ?? "");
   const [type, setType] = useState<ContractType>((defaults.type as ContractType) ?? "FIXED_PRICE");
   const [status, setStatus] = useState<ContractStatus>((defaults.status as ContractStatus) ?? "DRAFT");
+  const [ownerId, setOwnerId] = useState(defaults.ownerId ?? defaultOwnerId ?? "");
   const [startDate, setStartDate] = useState(toDateInput(defaults.startDate));
   const [endDate, setEndDate] = useState(toDateInput(defaults.endDate));
   const [unit, setUnit] = useState<ContractUnit | "">((defaults.unit as ContractUnit) ?? "");
@@ -106,6 +113,12 @@ export function ContractForm({ defaults = {}, onSubmit, isSaving }: Props) {
 
   const contractValueReadOnly = type === "T_AND_M" || status !== "DRAFT";
   const consumedReadOnly = true;
+  const ownerReadOnly = status !== "DRAFT";
+  const ownerDisplayName =
+    defaults.ownerName ||
+    users.find((user) => user.id === ownerId)?.name ||
+    users.find((user) => user.id === ownerId)?.email ||
+    "";
 
   useEffect(() => {
     void adminFetch("/api/admin/clients")
@@ -116,6 +129,16 @@ export function ContractForm({ defaults = {}, onSubmit, isSaving }: Props) {
       })
       .catch(console.error);
   }, [defaults.clientId]);
+
+  useEffect(() => {
+    void adminFetch("/api/admin/users")
+      .then((res) => res.json())
+      .then((data) => {
+        const list = (data.data ?? []) as UserOption[];
+        setUsers(list.filter((user) => user.active || user.id === defaults.ownerId || user.id === defaultOwnerId));
+      })
+      .catch(console.error);
+  }, [defaults.ownerId, defaultOwnerId]);
 
   useEffect(() => {
     if (type === "T_AND_M") {
@@ -210,6 +233,9 @@ export function ContractForm({ defaults = {}, onSubmit, isSaving }: Props) {
       comments: comments.trim(),
       fileUrls,
     };
+    if (!ownerReadOnly && ownerId) {
+      payload.ownerId = ownerId;
+    }
     await onSubmit(payload);
   }
 
@@ -247,13 +273,32 @@ export function ContractForm({ defaults = {}, onSubmit, isSaving }: Props) {
         </div>
       </div>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Status *</label>
-        <select value={status} onChange={(e) => setStatus(e.target.value as ContractStatus)} required className={inputClass}>
-          {CONTRACT_STATUSES.map((value) => (
-            <option key={value} value={value}>{CONTRACT_STATUS_LABELS[value]}</option>
-          ))}
-        </select>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Status *</label>
+          <select value={status} onChange={(e) => setStatus(e.target.value as ContractStatus)} required className={inputClass}>
+            {CONTRACT_STATUSES.map((value) => (
+              <option key={value} value={value}>{CONTRACT_STATUS_LABELS[value]}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Contract owner</label>
+          {ownerReadOnly ? (
+            <p className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+              {ownerDisplayName || "—"}
+            </p>
+          ) : (
+            <select value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className={inputClass}>
+              <option value="">Select owner…</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name || user.email}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

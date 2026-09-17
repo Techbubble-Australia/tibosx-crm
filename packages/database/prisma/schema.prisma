@@ -381,13 +381,34 @@ model Contract {
   consumed       Decimal             @default(0) @db.Decimal(14, 2)
   comments       String              @default("") @db.Text
   fileUrls       Json?
+  ownerId        String?
+  owner          AdminUser?          @relation("ContractOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   variations     ContractVariation[]
+  activityLogs   ContractActivityLog[]
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
   @@index([clientId])
   @@index([status])
   @@index([type])
+  @@index([ownerId])
+}
+
+model ContractActivityLog {
+  id            String     @id @default(cuid())
+  contractId    String
+  contract      Contract   @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  /// MOVE_TO_DRAFT | AUTO_EXPIRED
+  action        String
+  /// INCORRECT_CONTRACT_VALUE | INCORRECT_RATE_VALUE | ERROR_IN_TYPE | OTHER
+  reason        String?
+  otherReason   String?    @db.Text
+  performedById String?
+  performedBy   AdminUser? @relation("ContractActivityPerformer", fields: [performedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime   @default(now())
+
+  @@index([contractId])
+  @@index([createdAt])
 }
 
 model ContractVariation {
@@ -563,6 +584,8 @@ model AdminUser {
   mfaEnrolledAt DateTime?
   passwordNeedsReset Boolean @default(false)
   sourcedProfiles CandidateProfile[] @relation("ProfileSourcedBy")
+  ownedContracts Contract[] @relation("ContractOwner")
+  contractActivities ContractActivityLog[] @relation("ContractActivityPerformer")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

@@ -5,5 +5,5 @@ export const CONTRACT_STATUS_LABELS: Record<ContractStatus, string> = {
   DRAFT: "Draft",
   ACTIVE: "Active",
   EXPIRED: "Expired",
-  CANCELED: "Canceled",
+  CANCELED: "Terminated",
 };

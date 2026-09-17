@@ -1,5 +1,5 @@
-import { ContractsListPage } from "@/components/contracts/ContractsListPage";
+import { redirect } from "next/navigation";
 
-export default function ContractsPage() {
-  return <ContractsListPage />;
+export default function ContractsIndexPage() {
+  redirect("/contracts/active");
 }
