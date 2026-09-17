@@ -374,6 +374,8 @@ model Contract {
   endDate        DateTime?
   /// HOUR | DAY — only for T&M contracts
   unit           String?
+  /// Number of units — only for T&M contracts
+  numberOfUnits  Int?
   currency       String
   rate           Decimal             @db.Decimal(14, 2)
   contractValue  Decimal             @db.Decimal(14, 2)
@@ -398,8 +400,11 @@ model ContractActivityLog {
   id            String     @id @default(cuid())
   contractId    String
   contract      Contract   @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  /// MOVE_TO_DRAFT | AUTO_EXPIRED
+  /// CREATED | FIELD_UPDATED | ACTIVATED | TERMINATED | MOVE_TO_DRAFT | AUTO_EXPIRED
   action        String
+  fieldName     String?
+  oldValue      String?    @db.Text
+  newValue      String?    @db.Text
   /// INCORRECT_CONTRACT_VALUE | INCORRECT_RATE_VALUE | ERROR_IN_TYPE | OTHER
   reason        String?
   otherReason   String?    @db.Text

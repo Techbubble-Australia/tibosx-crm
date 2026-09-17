@@ -1,37 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { ContractForm, type ContractFormValues } from "@/components/contracts/ContractForm";
+import { ContractActivityLogSection } from "@/components/contracts/ContractActivityLogSection";
 import { contractsListPathForStatus } from "@/lib/contract-redirect";
 import type { ContractStatus } from "@/lib/contract-status";
+import type { ContractActivityLogEntry } from "@/lib/contract-activity";
 import {
   CONTRACT_MOVE_TO_DRAFT_REASONS,
   CONTRACT_MOVE_TO_DRAFT_REASON_LABELS,
   type ContractMoveToDraftReason,
 } from "@/lib/contract-groups";
 
-type ContractActivityLog = {
-  id: string;
-  action: string;
-  reason: string | null;
-  reasonLabel: string | null;
-  otherReason: string | null;
-  performedByName: string;
-  createdAt: string;
-};
-
 type ContractDetail = ContractFormValues & {
   status: ContractStatus;
-  activityLogs?: ContractActivityLog[];
-};
-
-const ACTIVITY_ACTION_LABELS: Record<string, string> = {
-  MOVE_TO_DRAFT: "Moved to Draft",
-  AUTO_EXPIRED: "Auto-expired",
+  activityLogs?: ContractActivityLogEntry[];
 };
 
 function MoveToDraftDialog({
@@ -144,32 +131,31 @@ function MoveToDraftDialog({
   );
 }
 
-function formatActivityDate(value: string) {
-  return new Date(value).toLocaleString("en-AU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 export default function EditContractPage() {
-  const router = useRouter();
   const params = useParams();
   const id = params.id as string;
   const [defaults, setDefaults] = useState<ContractDetail | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [showMoveToDraft, setShowMoveToDraft] = useState(false);
 
   useEffect(() => {
-    void adminFetch(`/api/admin/contracts/${id}`)
-      .then((res) => res.json())
-      .then((data) => setDefaults(data.data as ContractDetail))
-      .catch(console.error)
-      .finally(() => setFetching(false));
+    void refreshContract();
   }, [id]);
+
+  async function refreshContract() {
+    setFetching(true);
+    try {
+      const res = await adminFetch(`/api/admin/contracts/${id}`);
+      const data = await res.json();
+      setDefaults(data.data as ContractDetail);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setFetching(false);
+    }
+  }
 
   async function handleSubmit(payload: Record<string, unknown>) {
     setIsSaving(true);
@@ -181,13 +167,40 @@ export default function EditContractPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to update contract");
-      const updated = data.data as ContractDetail;
-      setDefaults(updated);
-      router.push(contractsListPathForStatus(updated.status));
+      setDefaults(data.data as ContractDetail);
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to update contract");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleActivate() {
+    setActionLoading(true);
+    try {
+      const res = await adminFetch(`/api/admin/contracts/${id}/activate`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to activate contract");
+      setDefaults(data.data as ContractDetail);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to activate contract");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleTerminate() {
+    if (!confirm("Terminate this contract?")) return;
+    setActionLoading(true);
+    try {
+      const res = await adminFetch(`/api/admin/contracts/${id}/terminate`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to terminate contract");
+      setDefaults(data.data as ContractDetail);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to terminate contract");
+    } finally {
+      setActionLoading(false);
     }
   }
 
@@ -217,43 +230,42 @@ export default function EditContractPage() {
           </Link>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Edit Contract</h2>
         </div>
-        {defaults.status !== "DRAFT" ? (
-          <button
-            type="button"
-            onClick={() => setShowMoveToDraft(true)}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-          >
-            Move to Draft
-          </button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {defaults.status === "DRAFT" ? (
+            <button
+              type="button"
+              onClick={() => void handleActivate()}
+              disabled={actionLoading}
+              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+            >
+              Activate
+            </button>
+          ) : null}
+          {defaults.status === "ACTIVE" ? (
+            <button
+              type="button"
+              onClick={() => void handleTerminate()}
+              disabled={actionLoading}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              Terminate
+            </button>
+          ) : null}
+          {defaults.status !== "DRAFT" ? (
+            <button
+              type="button"
+              onClick={() => setShowMoveToDraft(true)}
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              Move to Draft
+            </button>
+          ) : null}
+        </div>
       </div>
       <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-        <ContractForm key={defaults.id} defaults={defaults} onSubmit={handleSubmit} isSaving={isSaving} />
+        <ContractForm key={`${defaults.id}-${defaults.status}`} defaults={defaults} onSubmit={handleSubmit} isSaving={isSaving} />
       </div>
-      {activityLogs.length > 0 ? (
-        <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-          <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Activity log</h3>
-          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-            {activityLogs.map((log) => (
-              <li key={log.id} className="py-3 text-sm">
-                <p className="font-medium text-gray-900 dark:text-gray-100">
-                  {ACTIVITY_ACTION_LABELS[log.action] ?? log.action}
-                </p>
-                {log.reasonLabel ? (
-                  <p className="text-gray-600 dark:text-gray-400">Reason: {log.reasonLabel}</p>
-                ) : null}
-                {log.otherReason ? (
-                  <p className="text-gray-600 dark:text-gray-400">{log.otherReason}</p>
-                ) : null}
-                <p className="mt-1 text-xs text-gray-400">
-                  {formatActivityDate(log.createdAt)}
-                  {log.performedByName ? ` · ${log.performedByName}` : ""}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <ContractActivityLogSection logs={activityLogs} />
       {showMoveToDraft ? (
         <MoveToDraftDialog
           contractId={id}

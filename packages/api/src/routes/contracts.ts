@@ -2,7 +2,6 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { prisma, type Prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth";
-import { CONTRACT_STATUSES } from "../lib/contract-status";
 import {
   CONTRACT_TYPES,
   CONTRACT_TYPE_LABELS,
@@ -15,23 +14,29 @@ import {
   CONTRACT_MOVE_TO_DRAFT_REASONS,
   CONTRACT_MOVE_TO_DRAFT_REASON_LABELS,
 } from "../lib/contract-groups";
+import {
+  CONTRACT_FIELD_LABELS,
+  contractSnapshotFromRow,
+  logContractFieldChanges,
+  logContractStatusChange,
+} from "../lib/contract-activity";
 
 const router: IRouter = Router();
 
 const decimalField = z.coerce.number().nonnegative();
+const optionalDecimalField = z.coerce.number().nonnegative().optional();
 
 const contractBaseSchema = z.object({
   title: z.string().min(1).max(200),
   clientId: z.string().min(1),
   type: z.enum(CONTRACT_TYPES),
-  status: z.enum(CONTRACT_STATUSES).default("DRAFT"),
   startDate: z.coerce.date(),
   endDate: z.union([z.coerce.date(), z.null()]).optional(),
   unit: z.enum(CONTRACT_UNITS).optional().nullable(),
+  numberOfUnits: z.coerce.number().int().positive().optional().nullable(),
   currency: z.string().min(1).max(8),
-  rate: decimalField,
-  contractValue: decimalField,
-  consumed: decimalField.optional().default(0),
+  rate: optionalDecimalField,
+  contractValue: optionalDecimalField,
   comments: z.string().max(10000).optional().default(""),
   fileUrls: z.array(z.string().min(1)).optional().default([]),
   ownerId: z.string().optional().nullable(),
@@ -78,6 +83,50 @@ function isPastEndDate(endDate: Date): boolean {
   return today > end;
 }
 
+type ResolvedFinancials = {
+  unit: string | null;
+  numberOfUnits: number | null;
+  rate: number;
+  contractValue: number;
+};
+
+function resolveContractFinancials(
+  type: ContractType,
+  data: {
+    unit?: string | null;
+    numberOfUnits?: number | null;
+    rate?: number;
+    contractValue?: number;
+  },
+): ResolvedFinancials {
+  if (type === "T_AND_M") {
+    if (!data.unit) throw new Error("UNIT_REQUIRED");
+    if (!data.numberOfUnits || data.numberOfUnits <= 0) throw new Error("NUMBER_OF_UNITS_REQUIRED");
+    if (data.rate == null || data.rate < 0) throw new Error("RATE_REQUIRED");
+    return {
+      unit: data.unit,
+      numberOfUnits: data.numberOfUnits,
+      rate: data.rate,
+      contractValue: data.numberOfUnits * data.rate,
+    };
+  }
+  if (type === "FIXED_PRICE") {
+    if (data.contractValue == null || data.contractValue < 0) throw new Error("CONTRACT_VALUE_REQUIRED");
+    return {
+      unit: null,
+      numberOfUnits: null,
+      rate: 0,
+      contractValue: data.contractValue,
+    };
+  }
+  return {
+    unit: null,
+    numberOfUnits: null,
+    rate: data.rate ?? 0,
+    contractValue: data.contractValue ?? 0,
+  };
+}
+
 async function expirePastDueContracts(): Promise<void> {
   const candidates = await prisma.contract.findMany({
     where: {
@@ -96,12 +145,7 @@ async function expirePastDueContracts(): Promise<void> {
         where: { id: row.id },
         data: { status: "EXPIRED" },
       });
-      await tx.contractActivityLog.create({
-        data: {
-          contractId: row.id,
-          action: "AUTO_EXPIRED",
-        },
-      });
+      await logContractStatusChange(tx, row.id, "AUTO_EXPIRED", "ACTIVE", "EXPIRED", null);
     }
   });
 }
@@ -134,22 +178,6 @@ async function ensureContractOwner(ownerId: string | null | undefined) {
   if (!owner) throw new Error("OWNER_NOT_FOUND");
 }
 
-function validateContractPayload(
-  data: z.infer<typeof contractBaseSchema>,
-  existingStatus?: string,
-) {
-  if (data.type === "T_AND_M" && !data.unit) {
-    throw new Error("UNIT_REQUIRED");
-  }
-  if (data.type !== "T_AND_M" && data.unit) {
-    data.unit = null;
-  }
-  const status = data.status ?? existingStatus ?? "DRAFT";
-  if (status !== "DRAFT" && data.contractValue < 0) {
-    throw new Error("CONTRACT_VALUE_REQUIRED");
-  }
-}
-
 function variationValueForType(
   type: ContractType,
   input: z.infer<typeof variationSchema>,
@@ -170,6 +198,9 @@ function serializeActivityLog(row: {
   id: string;
   contractId: string;
   action: string;
+  fieldName: string | null;
+  oldValue: string | null;
+  newValue: string | null;
   reason: string | null;
   otherReason: string | null;
   createdAt: Date;
@@ -179,10 +210,15 @@ function serializeActivityLog(row: {
     row.reason && row.reason in CONTRACT_MOVE_TO_DRAFT_REASON_LABELS
       ? CONTRACT_MOVE_TO_DRAFT_REASON_LABELS[row.reason as keyof typeof CONTRACT_MOVE_TO_DRAFT_REASON_LABELS]
       : row.reason;
+  const fieldLabel = row.fieldName ? CONTRACT_FIELD_LABELS[row.fieldName] ?? row.fieldName : null;
   return {
     id: row.id,
     contractId: row.contractId,
     action: row.action,
+    fieldName: row.fieldName,
+    fieldLabel,
+    oldValue: row.oldValue,
+    newValue: row.newValue,
     reason: row.reason,
     reasonLabel,
     otherReason: row.otherReason,
@@ -224,6 +260,7 @@ function serializeContract(row: {
   startDate: Date;
   endDate: Date | null;
   unit: string | null;
+  numberOfUnits: number | null;
   currency: string;
   rate: { toString(): string } | number;
   contractValue: { toString(): string } | number;
@@ -250,6 +287,9 @@ function serializeContract(row: {
     id: string;
     contractId: string;
     action: string;
+    fieldName: string | null;
+    oldValue: string | null;
+    newValue: string | null;
     reason: string | null;
     otherReason: string | null;
     createdAt: Date;
@@ -276,6 +316,7 @@ function serializeContract(row: {
     startDate: row.startDate.toISOString(),
     endDate: row.endDate?.toISOString() ?? null,
     unit: row.unit,
+    numberOfUnits: row.numberOfUnits,
     currency: row.currency,
     rate: toNumber(row.rate),
     contractValue,
@@ -301,6 +342,22 @@ const contractInclude = {
 const activityInclude = {
   performedBy: { select: { id: true, name: true, email: true } },
 };
+
+const detailInclude = {
+  ...contractInclude,
+  variations: { orderBy: { variationDate: "desc" as const } },
+  activityLogs: {
+    orderBy: { createdAt: "desc" as const },
+    include: activityInclude,
+  },
+};
+
+async function fetchContractDetail(id: string) {
+  return prisma.contract.findUnique({
+    where: { id },
+    include: detailInclude,
+  });
+}
 
 router.get("/", async (req, res) => {
   try {
@@ -329,17 +386,7 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     await expirePastDueContracts();
-    const row = await prisma.contract.findUnique({
-      where: { id: req.params.id },
-      include: {
-        ...contractInclude,
-        variations: { orderBy: { variationDate: "desc" } },
-        activityLogs: {
-          orderBy: { createdAt: "desc" },
-          include: activityInclude,
-        },
-      },
-    });
+    const row = await fetchContractDetail(req.params.id);
     if (!row) return res.status(404).json({ error: "Not found" });
     res.json({ data: serializeContract(row) });
   } catch (error) {
@@ -351,32 +398,46 @@ router.get("/:id", async (req, res) => {
 router.post("/", async (req: AuthRequest, res) => {
   try {
     const data = contractBaseSchema.parse(req.body);
-    validateContractPayload(data);
+    const financials = resolveContractFinancials(data.type, data);
     await ensureContractClient(data.clientId);
     const ownerId = data.ownerId ?? req.user?.id ?? null;
     await ensureContractOwner(ownerId);
     const contractNumber = await allocateContractNumber();
-    const contractValue = data.type === "T_AND_M" ? 0 : data.contractValue;
 
-    const row = await prisma.contract.create({
-      data: {
-        contractNumber,
-        title: data.title,
-        clientId: data.clientId,
-        type: data.type,
-        status: data.status,
-        startDate: data.startDate,
-        endDate: data.endDate ?? null,
-        unit: data.type === "T_AND_M" ? data.unit : null,
-        currency: data.currency,
-        rate: data.rate,
-        contractValue,
-        consumed: data.consumed ?? 0,
-        comments: data.comments ?? "",
-        fileUrls: data.fileUrls ?? [],
-        ownerId,
-      },
-      include: contractInclude,
+    const row = await prisma.$transaction(async (tx) => {
+      const created = await tx.contract.create({
+        data: {
+          contractNumber,
+          title: data.title,
+          clientId: data.clientId,
+          type: data.type,
+          status: "DRAFT",
+          startDate: data.startDate,
+          endDate: data.endDate ?? null,
+          unit: financials.unit,
+          numberOfUnits: financials.numberOfUnits,
+          currency: data.currency,
+          rate: financials.rate,
+          contractValue: financials.contractValue,
+          comments: data.comments ?? "",
+          fileUrls: data.fileUrls ?? [],
+          ownerId,
+        },
+        include: contractInclude,
+      });
+      await tx.contractActivityLog.create({
+        data: {
+          contractId: created.id,
+          action: "CREATED",
+          performedById: req.user?.id ?? null,
+        },
+      });
+      const logs = await tx.contractActivityLog.findMany({
+        where: { contractId: created.id },
+        orderBy: { createdAt: "desc" },
+        include: activityInclude,
+      });
+      return { ...created, activityLogs: logs };
     });
 
     res.status(201).json({ data: serializeContract(row) });
@@ -393,36 +454,52 @@ router.post("/", async (req: AuthRequest, res) => {
     if (error instanceof Error && error.message === "UNIT_REQUIRED") {
       return res.status(400).json({ error: "Unit is required for T&M contracts" });
     }
+    if (error instanceof Error && error.message === "NUMBER_OF_UNITS_REQUIRED") {
+      return res.status(400).json({ error: "No. of units is required for T&M contracts" });
+    }
+    if (error instanceof Error && error.message === "RATE_REQUIRED") {
+      return res.status(400).json({ error: "Rate is required for T&M contracts" });
+    }
+    if (error instanceof Error && error.message === "CONTRACT_VALUE_REQUIRED") {
+      return res.status(400).json({ error: "Contract value is required for fixed price contracts" });
+    }
     console.error("Error creating contract:", error);
     res.status(500).json({ error: "Failed to create contract" });
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", async (req: AuthRequest, res) => {
   try {
     const data = contractBaseSchema.partial().parse(req.body);
     const existing = await prisma.contract.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: "Not found" });
+    if (existing.status !== "DRAFT") {
+      return res.status(400).json({ error: "Contract can only be edited in Draft status" });
+    }
 
     const nextType = (data.type ?? existing.type) as ContractType;
-    const nextStatus = data.status ?? existing.status;
+    const financials = resolveContractFinancials(nextType, {
+      unit: data.unit !== undefined ? data.unit : existing.unit,
+      numberOfUnits:
+        data.numberOfUnits !== undefined ? data.numberOfUnits : existing.numberOfUnits,
+      rate: data.rate !== undefined ? data.rate : toNumber(existing.rate),
+      contractValue:
+        data.contractValue !== undefined ? data.contractValue : toNumber(existing.contractValue),
+    });
+
     const merged = {
       title: data.title ?? existing.title,
       clientId: data.clientId ?? existing.clientId,
       type: nextType,
-      status: nextStatus,
+      status: existing.status,
       startDate: data.startDate ?? existing.startDate,
       endDate: data.endDate !== undefined ? data.endDate : existing.endDate,
-      unit: data.unit !== undefined ? data.unit : existing.unit,
+      unit: financials.unit,
+      numberOfUnits: financials.numberOfUnits,
       currency: data.currency ?? existing.currency,
-      rate: data.rate ?? toNumber(existing.rate),
-      contractValue:
-        nextStatus !== "DRAFT"
-          ? toNumber(existing.contractValue)
-          : nextType === "T_AND_M"
-            ? 0
-            : data.contractValue ?? toNumber(existing.contractValue),
-      consumed: data.consumed ?? toNumber(existing.consumed),
+      rate: financials.rate,
+      contractValue: financials.contractValue,
+      consumed: toNumber(existing.consumed),
       comments: data.comments ?? existing.comments,
       fileUrls:
         data.fileUrls ??
@@ -432,50 +509,52 @@ router.put("/:id", async (req, res) => {
       ownerId: existing.ownerId,
     };
 
-    if (existing.status === "DRAFT" && data.ownerId !== undefined) {
+    if (data.ownerId !== undefined) {
       await ensureContractOwner(data.ownerId);
       merged.ownerId = data.ownerId;
     }
 
-    validateContractPayload(
-      {
-        ...merged,
-        endDate: merged.endDate,
-      } as z.infer<typeof contractBaseSchema>,
-      existing.status,
-    );
-
     if (data.clientId) await ensureContractClient(data.clientId);
 
-    const row = await prisma.contract.update({
-      where: { id: req.params.id },
-      data: {
-        title: merged.title,
-        clientId: merged.clientId,
-        type: merged.type,
-        status: merged.status,
-        startDate: merged.startDate,
-        endDate: merged.endDate,
-        unit: merged.type === "T_AND_M" ? merged.unit : null,
-        currency: merged.currency,
-        rate: merged.rate,
-        contractValue: merged.contractValue,
-        consumed: merged.consumed,
-        comments: merged.comments,
-        fileUrls: merged.fileUrls,
-        ownerId: merged.ownerId,
-      },
-      include: {
-        ...contractInclude,
-        variations: { orderBy: { variationDate: "desc" } },
-        activityLogs: {
-          orderBy: { createdAt: "desc" },
-          include: activityInclude,
+    const beforeSnapshot = contractSnapshotFromRow(existing);
+
+    const row = await prisma.$transaction(async (tx) => {
+      const updated = await tx.contract.update({
+        where: { id: req.params.id },
+        data: {
+          title: merged.title,
+          clientId: merged.clientId,
+          type: merged.type,
+          startDate: merged.startDate,
+          endDate: merged.endDate,
+          unit: merged.unit,
+          numberOfUnits: merged.numberOfUnits,
+          currency: merged.currency,
+          rate: merged.rate,
+          contractValue: merged.contractValue,
+          comments: merged.comments,
+          fileUrls: merged.fileUrls,
+          ownerId: merged.ownerId,
         },
-      },
+        include: contractInclude,
+      });
+      await logContractFieldChanges(
+        tx,
+        existing.id,
+        beforeSnapshot,
+        contractSnapshotFromRow(updated),
+        req.user?.id,
+      );
+      const logs = await tx.contractActivityLog.findMany({
+        where: { contractId: existing.id },
+        orderBy: { createdAt: "desc" },
+        include: activityInclude,
+      });
+      return { ...updated, variations: [], activityLogs: logs };
     });
 
-    res.json({ data: serializeContract(row) });
+    const detail = await fetchContractDetail(row.id);
+    res.json({ data: serializeContract(detail ?? row) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
@@ -489,8 +568,100 @@ router.put("/:id", async (req, res) => {
     if (error instanceof Error && error.message === "UNIT_REQUIRED") {
       return res.status(400).json({ error: "Unit is required for T&M contracts" });
     }
+    if (error instanceof Error && error.message === "NUMBER_OF_UNITS_REQUIRED") {
+      return res.status(400).json({ error: "No. of units is required for T&M contracts" });
+    }
+    if (error instanceof Error && error.message === "RATE_REQUIRED") {
+      return res.status(400).json({ error: "Rate is required for T&M contracts" });
+    }
+    if (error instanceof Error && error.message === "CONTRACT_VALUE_REQUIRED") {
+      return res.status(400).json({ error: "Contract value is required for fixed price contracts" });
+    }
     console.error("Error updating contract:", error);
     res.status(500).json({ error: "Failed to update contract" });
+  }
+});
+
+router.post("/:id/activate", async (req: AuthRequest, res) => {
+  try {
+    const existing = await prisma.contract.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: "Not found" });
+    if (existing.status !== "DRAFT") {
+      return res.status(400).json({ error: "Only draft contracts can be activated" });
+    }
+
+    resolveContractFinancials(existing.type as ContractType, {
+      unit: existing.unit,
+      numberOfUnits: existing.numberOfUnits,
+      rate: toNumber(existing.rate),
+      contractValue: toNumber(existing.contractValue),
+    });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.contract.update({
+        where: { id: existing.id },
+        data: { status: "ACTIVE" },
+      });
+      await logContractStatusChange(
+        tx,
+        existing.id,
+        "ACTIVATED",
+        "DRAFT",
+        "ACTIVE",
+        req.user?.id,
+      );
+    });
+
+    const row = await fetchContractDetail(existing.id);
+    if (!row) return res.status(404).json({ error: "Not found" });
+    res.json({ data: serializeContract(row) });
+  } catch (error) {
+    if (error instanceof Error && error.message === "UNIT_REQUIRED") {
+      return res.status(400).json({ error: "Unit is required for T&M contracts" });
+    }
+    if (error instanceof Error && error.message === "NUMBER_OF_UNITS_REQUIRED") {
+      return res.status(400).json({ error: "No. of units is required for T&M contracts" });
+    }
+    if (error instanceof Error && error.message === "RATE_REQUIRED") {
+      return res.status(400).json({ error: "Rate is required for T&M contracts" });
+    }
+    if (error instanceof Error && error.message === "CONTRACT_VALUE_REQUIRED") {
+      return res.status(400).json({ error: "Contract value is required for fixed price contracts" });
+    }
+    console.error("Error activating contract:", error);
+    res.status(500).json({ error: "Failed to activate contract" });
+  }
+});
+
+router.post("/:id/terminate", async (req: AuthRequest, res) => {
+  try {
+    const existing = await prisma.contract.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: "Not found" });
+    if (existing.status !== "ACTIVE") {
+      return res.status(400).json({ error: "Only active contracts can be terminated" });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.contract.update({
+        where: { id: existing.id },
+        data: { status: "CANCELED" },
+      });
+      await logContractStatusChange(
+        tx,
+        existing.id,
+        "TERMINATED",
+        "ACTIVE",
+        "CANCELED",
+        req.user?.id,
+      );
+    });
+
+    const row = await fetchContractDetail(existing.id);
+    if (!row) return res.status(404).json({ error: "Not found" });
+    res.json({ data: serializeContract(row) });
+  } catch (error) {
+    console.error("Error terminating contract:", error);
+    res.status(500).json({ error: "Failed to terminate contract" });
   }
 });
 
@@ -503,29 +674,27 @@ router.post("/:id/move-to-draft", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Contract is already in Draft status" });
     }
 
-    const row = await prisma.$transaction(async (tx) => {
-      const updated = await tx.contract.update({
+    await prisma.$transaction(async (tx) => {
+      await tx.contract.update({
         where: { id: existing.id },
         data: { status: "DRAFT" },
-        include: contractInclude,
       });
-      await tx.contractActivityLog.create({
-        data: {
-          contractId: existing.id,
-          action: "MOVE_TO_DRAFT",
+      await logContractStatusChange(
+        tx,
+        existing.id,
+        "MOVE_TO_DRAFT",
+        existing.status,
+        "DRAFT",
+        req.user?.id,
+        {
           reason: body.reason,
           otherReason: body.reason === "OTHER" ? body.otherReason?.trim() ?? null : null,
-          performedById: req.user?.id ?? null,
         },
-      });
-      const logs = await tx.contractActivityLog.findMany({
-        where: { contractId: existing.id },
-        orderBy: { createdAt: "desc" },
-        include: activityInclude,
-      });
-      return { ...updated, activityLogs: logs };
+      );
     });
 
+    const row = await fetchContractDetail(existing.id);
+    if (!row) return res.status(404).json({ error: "Not found" });
     res.json({ data: serializeContract(row) });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -541,6 +710,9 @@ router.post("/:id/variations", async (req, res) => {
     const input = variationSchema.parse(req.body);
     const contract = await prisma.contract.findUnique({ where: { id: req.params.id } });
     if (!contract) return res.status(404).json({ error: "Not found" });
+    if (contract.status !== "ACTIVE") {
+      return res.status(400).json({ error: "Variations can only be added to active contracts" });
+    }
 
     const variationValue = variationValueForType(contract.type as ContractType, input);
 
