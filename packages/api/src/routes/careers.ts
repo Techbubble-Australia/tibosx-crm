@@ -16,6 +16,11 @@ import {
 import { createProfileFromCareerApplication } from "../lib/profile-from-application";
 import { findDuplicateCareerApplication } from "../lib/career-application-dedup";
 import {
+  buildJobClientByTitleLookup,
+  resolveApplicationClient,
+  type JobClientInfo,
+} from "../lib/career-application-clients";
+import {
   CAREER_APPLICATION_STATUSES,
 } from "../lib/career-application-status";
 import { sendCareerApplicationEmail } from "../lib/mail";
@@ -366,7 +371,10 @@ type CareerApplicationWithJob = Prisma.CareerApplicationGetPayload<{
 function serializeAdminApplication(
   row: CareerApplicationWithJob,
   profileId?: string | null,
+  jobClientByTitle?: Map<string, JobClientInfo>,
 ) {
+  const { clientId, clientName } = resolveApplicationClient(row, jobClientByTitle ?? new Map());
+
   return {
     id: row.id,
     firstName: row.firstName,
@@ -398,8 +406,8 @@ function serializeAdminApplication(
     jobPublished: row.jobListing?.published ?? null,
     jobCountry: row.jobListing?.country ?? null,
     jobWorkMode: row.jobListing?.workMode ?? null,
-    clientName: row.jobListing?.client?.name ?? null,
-    clientId: row.jobListing?.clientId ?? null,
+    clientName,
+    clientId,
   };
 }
 
@@ -438,6 +446,10 @@ router.get("/admin/applications", async (req, res) => {
     const where: Prisma.CareerApplicationWhereInput =
       whereParts.length > 1 ? { AND: whereParts } : (whereParts[0] ?? {});
 
+    const publishedFilter =
+      publishedParam === "true" ? true : publishedParam === "false" ? false : undefined;
+    const jobClientByTitle = await buildJobClientByTitleLookup(publishedFilter);
+
     const applications = await prisma.careerApplication.findMany({
       where,
       include: {
@@ -472,7 +484,11 @@ router.get("/admin/applications", async (req, res) => {
 
     res.json({
       data: applications.map((row) =>
-        serializeAdminApplication(row, legacyProfileByAppId.get(row.id) ?? row.profileId),
+        serializeAdminApplication(
+          row,
+          legacyProfileByAppId.get(row.id) ?? row.profileId,
+          jobClientByTitle,
+        ),
       ),
     });
   } catch (error) {

@@ -898,16 +898,6 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
   const [statusSaving, setStatusSaving] = useState(false);
   const [moveTarget, setMoveTarget] = useState<CareerApplication | null>(null);
 
-  const filteredByJobMeta = useMemo(() => {
-    return applications.filter((app) => {
-      if (filterCountry && app.jobCountry !== filterCountry) return false;
-      if (filterWorkMode && app.jobWorkMode !== filterWorkMode) return false;
-      if (filterClient && app.clientId !== filterClient && app.clientName !== filterClient) return false;
-      if (filterStatus && app.status !== filterStatus) return false;
-      return true;
-    });
-  }, [applications, filterCountry, filterWorkMode, filterClient, filterStatus]);
-
   const filterOptions = useMemo(() => {
     const countries = new Set<string>();
     const workModes = new Set<string>();
@@ -928,6 +918,23 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
         .sort((a, b) => a.name.localeCompare(b.name)),
     };
   }, [applications, jobClientOptions]);
+
+  const filteredByJobMeta = useMemo(() => {
+    const selectedClientName = filterClient
+      ? filterOptions.clients.find((client) => client.id === filterClient)?.name
+      : undefined;
+    return applications.filter((app) => {
+      if (filterCountry && app.jobCountry !== filterCountry) return false;
+      if (filterWorkMode && app.jobWorkMode !== filterWorkMode) return false;
+      if (filterClient) {
+        const matchesId = app.clientId === filterClient;
+        const matchesName = Boolean(selectedClientName && app.clientName === selectedClientName);
+        if (!matchesId && !matchesName) return false;
+      }
+      if (filterStatus && app.status !== filterStatus) return false;
+      return true;
+    });
+  }, [applications, filterCountry, filterWorkMode, filterClient, filterStatus, filterOptions.clients]);
 
   const {
     search,
