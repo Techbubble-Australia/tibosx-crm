@@ -113,6 +113,25 @@ function jobGroupLabel(app: CareerApplication): string {
   return app.jobTitle ?? app.position ?? "Unknown role";
 }
 
+function careerApplicationsEmptyMessage(options: {
+  jobListingId?: string;
+  selectedClientName?: string;
+  scenario: "no-applications" | "no-filter-match" | "no-search-match";
+}): string {
+  const { jobListingId, selectedClientName, scenario } = options;
+  if (jobListingId) {
+    if (scenario === "no-applications") return "There are no profiles for this job.";
+    if (scenario === "no-filter-match") return "No profiles for this job match your filters.";
+    return "No profiles for this job match your search.";
+  }
+  if (scenario === "no-applications") return "No applications in this tab yet.";
+  if (scenario === "no-filter-match") {
+    if (selectedClientName) return `There are no applications for ${selectedClientName}.`;
+    return "No applications match your filters.";
+  }
+  return "No applications match your search.";
+}
+
 type Props = {
   jobPublished: boolean;
   jobListingId?: string;
@@ -1188,6 +1207,9 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
   }
 
   const clearJobFilterHref = jobPublished ? "/career-applications/active" : "/career-applications/inactive";
+  const selectedClientName = filterClient
+    ? filterOptions.clients.find((client) => client.id === filterClient)?.name
+    : undefined;
 
   if (isLoading) {
     return (
@@ -1300,15 +1322,27 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
 
       {applications.length === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-gray-400 dark:border-gray-700 dark:bg-gray-900">
-          No applications in this tab yet.
+          {careerApplicationsEmptyMessage({
+            jobListingId,
+            selectedClientName,
+            scenario: "no-applications",
+          })}
         </div>
       ) : filteredByJobMeta.length === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-gray-400 dark:border-gray-700 dark:bg-gray-900">
-          No applications match your filters.
+          {careerApplicationsEmptyMessage({
+            jobListingId,
+            selectedClientName,
+            scenario: "no-filter-match",
+          })}
         </div>
       ) : totalItems === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-gray-400 dark:border-gray-700 dark:bg-gray-900">
-          No applications match your search.
+          {careerApplicationsEmptyMessage({
+            jobListingId,
+            selectedClientName,
+            scenario: "no-search-match",
+          })}
         </div>
       ) : viewMode === "list" ? (
         <div className="space-y-3">

@@ -100,7 +100,7 @@ export function JobApplicationsPanel({
         ) : null}
       </div>
       {rows.length === 0 ? (
-        <p className="text-sm text-gray-400">No applications yet.</p>
+        <p className="text-sm text-gray-400">There are no profiles for this job.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-sm">
