@@ -5,6 +5,7 @@ import {
   actualRevenueByClientForYear,
   actualRevenueForYear,
   forecastRevenueByClientForYear,
+  forecastRevenueByMonthForYear,
   forecastRevenueForYear,
   isDateInMonth,
   resolveContractExpiryDate,
@@ -23,10 +24,22 @@ function isValidEndDate(endDate: Date | null | undefined): boolean {
   return endDate.getUTCFullYear() >= 1971;
 }
 
-router.get("/stats", async (_req, res) => {
+function parseForecastYear(queryYear: unknown, now: Date): number {
+  const currentYear = now.getUTCFullYear();
+  if (typeof queryYear !== "string" || !/^\d{4}$/.test(queryYear.trim())) {
+    return currentYear;
+  }
+  const year = Number.parseInt(queryYear, 10);
+  if (year < currentYear - 5 || year > currentYear + 5) {
+    return currentYear;
+  }
+  return year;
+}
+
+router.get("/stats", async (req, res) => {
   try {
     const now = new Date();
-    const year = now.getUTCFullYear();
+    const year = parseForecastYear(req.query.year, now);
     const thisMonth = now.getUTCMonth();
     const nextMonth = thisMonth === 11 ? 0 : thisMonth + 1;
     const nextMonthYear = thisMonth === 11 ? year + 1 : year;
@@ -154,6 +167,7 @@ router.get("/stats", async (_req, res) => {
           forecastedRevenueThisYear: forecastRevenueForYear(forecastContracts, year),
           actualRevenueThisYear: actualRevenueForYear(forecastInvoices, year),
           forecastVsActualByClient,
+          forecastByMonth: forecastRevenueByMonthForYear(forecastContracts, forecastInvoices, year),
         },
       },
     });

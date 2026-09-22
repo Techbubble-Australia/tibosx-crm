@@ -1,4 +1,14 @@
 import type { ContractType } from "./contract-types";
+import { countWorkingDaysInRange } from "./working-days-calendar";
+
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+
+export type ForecastMonthRow = {
+  month: number;
+  label: string;
+  forecast: number;
+  actual: number;
+};
 
 export type ForecastContract = {
   id: string;
@@ -26,11 +36,6 @@ export type ForecastInvoice = {
   currency: string;
 };
 
-function isWeekday(date: Date): boolean {
-  const day = date.getUTCDay();
-  return day !== 0 && day !== 6;
-}
-
 function startOfUtcDay(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
@@ -40,32 +45,56 @@ function isValidEndDate(endDate: Date | null | undefined): boolean {
   return endDate.getUTCFullYear() >= 1971;
 }
 
-export function workingDaysInRange(start: Date, end: Date): number {
+export function workingDaysInRange(start: Date, end: Date, country = ""): number {
   const from = startOfUtcDay(start);
   const to = startOfUtcDay(end);
   if (to < from) return 0;
-  let count = 0;
-  const cursor = new Date(from);
-  while (cursor <= to) {
-    if (isWeekday(cursor)) count += 1;
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-  return count;
+  return countWorkingDaysInRange(from, to, country);
 }
 
-export function workingDaysInMonth(year: number, month: number, rangeStart: Date, rangeEnd: Date): number {
+export function workingDaysInMonth(
+  year: number,
+  month: number,
+  rangeStart: Date,
+  rangeEnd: Date,
+  country = "",
+): number {
   const monthStart = new Date(Date.UTC(year, month, 1));
   const monthEnd = new Date(Date.UTC(year, month + 1, 0));
-  const start = rangeStart > monthStart ? rangeStart : monthStart;
-  const end = rangeEnd < monthEnd ? rangeEnd : monthEnd;
+  const from = startOfUtcDay(rangeStart);
+  const to = startOfUtcDay(rangeEnd);
+  const start = from > monthStart ? from : monthStart;
+  const end = to < monthEnd ? to : monthEnd;
   if (end < start) return 0;
-  return workingDaysInRange(start, end);
+  return workingDaysInRange(start, end, country);
 }
 
 function addUtcDays(date: Date, days: number): Date {
   const next = new Date(date);
   next.setUTCDate(next.getUTCDate() + days);
   return next;
+}
+
+function yearBounds(year: number): { start: Date; end: Date } {
+  return {
+    start: new Date(Date.UTC(year, 0, 1)),
+    end: new Date(Date.UTC(year, 11, 31)),
+  };
+}
+
+/** Intersect a date range with a calendar year (inclusive, UTC days). */
+export function clipRangeToYear(
+  rangeStart: Date,
+  rangeEnd: Date,
+  year: number,
+): { start: Date; end: Date } | null {
+  const { start: yearStart, end: yearEnd } = yearBounds(year);
+  const start = startOfUtcDay(rangeStart);
+  const end = startOfUtcDay(rangeEnd);
+  const clippedStart = start > yearStart ? start : yearStart;
+  const clippedEnd = end < yearEnd ? end : yearEnd;
+  if (clippedEnd < clippedStart) return null;
+  return { start: clippedStart, end: clippedEnd };
 }
 
 /** Base contract period, then extension periods for variations beyond base end. */
@@ -110,17 +139,36 @@ function tmMonthlyAmount(rate: number, unit: string | null, workingDays: number)
   return rate * workingDays;
 }
 
-export function forecastTmRevenueForYear(contract: ForecastContract, year: number): number {
-  if (contract.type !== "T_AND_M" || contract.status !== "ACTIVE") return 0;
+function tmWorkingDaysInYear(
+  contract: ForecastContract,
+  year: number,
+  month?: number,
+): number {
   const periods = forecastPeriods(contract.startDate, contract.endDate, contract.variations);
+  const country = contract.clientCountry || "Australia";
   let total = 0;
   for (const period of periods) {
-    for (let month = 0; month < 12; month += 1) {
-      const days = workingDaysInMonth(year, month, period.start, period.end);
-      total += tmMonthlyAmount(contract.rate, contract.unit, days);
+    if (month === undefined) {
+      const clipped = clipRangeToYear(period.start, period.end, year);
+      if (!clipped) continue;
+      total += workingDaysInRange(clipped.start, clipped.end, country);
+    } else {
+      total += workingDaysInMonth(year, month, period.start, period.end, country);
     }
   }
   return total;
+}
+
+export function forecastTmRevenueForMonth(contract: ForecastContract, year: number, month: number): number {
+  if (contract.type !== "T_AND_M" || contract.status !== "ACTIVE") return 0;
+  const days = tmWorkingDaysInYear(contract, year, month);
+  return tmMonthlyAmount(contract.rate, contract.unit, days);
+}
+
+export function forecastTmRevenueForYear(contract: ForecastContract, year: number): number {
+  if (contract.type !== "T_AND_M" || contract.status !== "ACTIVE") return 0;
+  const days = tmWorkingDaysInYear(contract, year);
+  return tmMonthlyAmount(contract.rate, contract.unit, days);
 }
 
 export function forecastMilestoneRevenueForYear(contract: ForecastContract, year: number): number {
@@ -128,6 +176,53 @@ export function forecastMilestoneRevenueForYear(contract: ForecastContract, year
   return contract.milestones
     .filter((row) => row.milestoneDate.getUTCFullYear() === year)
     .reduce((sum, row) => sum + row.amount, 0);
+}
+
+export function forecastMilestoneRevenueForMonth(
+  contract: ForecastContract,
+  year: number,
+  month: number,
+): number {
+  if (contract.type === "T_AND_M" || contract.status !== "ACTIVE") return 0;
+  return contract.milestones
+    .filter(
+      (row) =>
+        row.milestoneDate.getUTCFullYear() === year && row.milestoneDate.getUTCMonth() === month,
+    )
+    .reduce((sum, row) => sum + row.amount, 0);
+}
+
+function forecastRevenueForMonth(contracts: ForecastContract[], year: number, month: number): number {
+  return contracts.reduce((sum, contract) => {
+    if (contract.type === "T_AND_M") {
+      return sum + forecastTmRevenueForMonth(contract, year, month);
+    }
+    return sum + forecastMilestoneRevenueForMonth(contract, year, month);
+  }, 0);
+}
+
+export function actualRevenueForMonth(invoices: ForecastInvoice[], year: number, month: number): number {
+  return invoices
+    .filter(
+      (row) =>
+        row.status !== "CANCELED" &&
+        row.dueDate.getUTCFullYear() === year &&
+        row.dueDate.getUTCMonth() === month,
+    )
+    .reduce((sum, row) => sum + row.amount, 0);
+}
+
+export function forecastRevenueByMonthForYear(
+  contracts: ForecastContract[],
+  invoices: ForecastInvoice[],
+  year: number,
+): ForecastMonthRow[] {
+  return MONTH_LABELS.map((label, month) => ({
+    month,
+    label,
+    forecast: forecastRevenueForMonth(contracts, year, month),
+    actual: actualRevenueForMonth(invoices, year, month),
+  }));
 }
 
 export function forecastRevenueForYear(contracts: ForecastContract[], year: number): number {

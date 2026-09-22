@@ -51,7 +51,9 @@ const variationSchema = z.object({
   variationEndDate: z
     .preprocess((val) => (val === "" || val === null || val === undefined ? null : val), z.union([z.coerce.date(), z.null()]))
     .optional(),
-  variationValue: decimalField,
+  variationValue: optionalDecimalField,
+  qty: z.coerce.number().int().positive().optional(),
+  rate: optionalDecimalField,
   comments: z.string().max(5000).optional().default(""),
 });
 
@@ -82,6 +84,8 @@ const invoiceStatusSchema = z.object({
   status: z.enum(CONTRACT_INVOICE_STATUSES),
 });
 
+const invoiceUpdateSchema = invoiceSchema.partial();
+
 const moveToDraftSchema = z
   .object({
     reason: z.enum(CONTRACT_MOVE_TO_DRAFT_REASONS),
@@ -103,6 +107,81 @@ function toNumber(value: { toString(): string } | number): number {
 
 function computeRemaining(contractValue: number, totalVariation: number, consumed: number): number {
   return contractValue - totalVariation - consumed;
+}
+
+async function ensureActiveContract(contractId: string) {
+  const contract = await prisma.contract.findUnique({ where: { id: contractId } });
+  if (!contract) throw new Error("NOT_FOUND");
+  if (contract.status !== "ACTIVE") throw new Error("NOT_ACTIVE");
+  return contract;
+}
+
+type VariationInput = {
+  variationDate: Date;
+  variationEndDate?: Date | null;
+  variationValue?: number;
+  qty?: number;
+  rate?: number;
+  comments?: string;
+};
+
+function resolveVariationPayload(
+  contract: { type: string; unit: string | null },
+  input: VariationInput,
+) {
+  if (contract.type === "T_AND_M") {
+    if (!input.variationEndDate) throw new Error("VARIATION_END_REQUIRED");
+    if (!input.qty || input.qty <= 0) throw new Error("VARIATION_QTY_REQUIRED");
+    if (input.rate == null || input.rate < 0) throw new Error("VARIATION_RATE_REQUIRED");
+    const variationValue = input.qty * input.rate;
+    return {
+      variationDate: input.variationDate,
+      variationEndDate: normalizeEndDate(input.variationEndDate),
+      comments: input.comments?.trim() ?? "",
+      qty: input.qty,
+      rate: input.rate,
+      unit: contract.unit,
+      variationValue,
+    };
+  }
+  if (input.variationValue == null || input.variationValue < 0) {
+    throw new Error("VARIATION_VALUE_REQUIRED");
+  }
+  return {
+    variationDate: input.variationDate,
+    variationEndDate: normalizeEndDate(input.variationEndDate ?? null),
+    comments: input.comments?.trim() ?? "",
+    qty: null,
+    rate: null,
+    unit: null,
+    variationValue: input.variationValue,
+  };
+}
+
+async function syncContractTotalVariation(tx: Prisma.TransactionClient, contractId: string) {
+  const agg = await tx.contractVariation.aggregate({
+    where: { contractId },
+    _sum: { variationValue: true },
+  });
+  const total = agg._sum.variationValue == null ? 0 : toNumber(agg._sum.variationValue);
+  await tx.contract.update({
+    where: { id: contractId },
+    data: { totalVariation: total },
+  });
+  return total;
+}
+
+async function syncContractConsumed(tx: Prisma.TransactionClient, contractId: string) {
+  const agg = await tx.contractInvoice.aggregate({
+    where: { contractId },
+    _sum: { totalAmount: true },
+  });
+  const total = agg._sum.totalAmount == null ? 0 : toNumber(agg._sum.totalAmount);
+  await tx.contract.update({
+    where: { id: contractId },
+    data: { consumed: total },
+  });
+  return total;
 }
 
 function startOfUtcDay(date = new Date()): Date {
@@ -301,6 +380,7 @@ function serializeVariation(row: {
   variationDate: Date;
   variationEndDate: Date | null;
   comments: string;
+  qty?: number | null;
   unit: string | null;
   rate: { toString(): string } | number | null;
   variationValue: { toString(): string } | number;
@@ -312,6 +392,7 @@ function serializeVariation(row: {
     variationDate: row.variationDate.toISOString(),
     variationEndDate: row.variationEndDate?.toISOString() ?? null,
     comments: row.comments,
+    qty: row.qty ?? null,
     unit: row.unit,
     rate: row.rate == null ? null : toNumber(row.rate),
     variationValue: toNumber(row.variationValue),
@@ -408,6 +489,7 @@ function serializeContract(row: {
     variationDate: Date;
     variationEndDate: Date | null;
     comments: string;
+    qty?: number | null;
     unit: string | null;
     rate: { toString(): string } | number | null;
     variationValue: { toString(): string } | number;
@@ -954,35 +1036,76 @@ router.post("/:id/milestones", async (req, res) => {
   }
 });
 
+router.patch("/:id/milestones/:milestoneId", async (req, res) => {
+  try {
+    const input = milestoneSchema.parse(req.body);
+    await ensureActiveContract(req.params.id);
+    const existing = await prisma.contractMilestone.findFirst({
+      where: { id: req.params.milestoneId, contractId: req.params.id },
+    });
+    if (!existing) return res.status(404).json({ error: "Milestone not found" });
+
+    const row = await prisma.contractMilestone.update({
+      where: { id: existing.id },
+      data: {
+        description: input.description.trim(),
+        milestoneDate: input.milestoneDate,
+        amount: input.amount,
+      },
+    });
+
+    res.json({ data: serializeMilestone(row) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return res.status(404).json({ error: "Not found" });
+    }
+    if (error instanceof Error && error.message === "NOT_ACTIVE") {
+      return res.status(400).json({ error: "Milestones can only be edited on active contracts" });
+    }
+    console.error("Error updating contract milestone:", error);
+    res.status(500).json({ error: "Failed to update milestone" });
+  }
+});
+
+router.delete("/:id/milestones/:milestoneId", async (req, res) => {
+  try {
+    await ensureActiveContract(req.params.id);
+    const existing = await prisma.contractMilestone.findFirst({
+      where: { id: req.params.milestoneId, contractId: req.params.id },
+    });
+    if (!existing) return res.status(404).json({ error: "Milestone not found" });
+
+    await prisma.contractMilestone.delete({ where: { id: existing.id } });
+    res.json({ message: "Deleted" });
+  } catch (error) {
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return res.status(404).json({ error: "Not found" });
+    }
+    if (error instanceof Error && error.message === "NOT_ACTIVE") {
+      return res.status(400).json({ error: "Milestones can only be deleted on active contracts" });
+    }
+    console.error("Error deleting contract milestone:", error);
+    res.status(500).json({ error: "Failed to delete milestone" });
+  }
+});
+
 router.post("/:id/variations", async (req, res) => {
   try {
     const input = variationSchema.parse(req.body);
-    const contract = await prisma.contract.findUnique({ where: { id: req.params.id } });
-    if (!contract) return res.status(404).json({ error: "Not found" });
-    if (contract.status !== "ACTIVE") {
-      return res.status(400).json({ error: "Variations can only be added to active contracts" });
-    }
-    if (contract.type === "T_AND_M" && !input.variationEndDate) {
-      return res.status(400).json({ error: "Variation end date is required for T&M contracts" });
-    }
-
-    const variationValue = input.variationValue;
+    const contract = await ensureActiveContract(req.params.id);
+    const payload = resolveVariationPayload(contract, input);
 
     const row = await prisma.$transaction(async (tx) => {
       const created = await tx.contractVariation.create({
         data: {
           contractId: contract.id,
-          variationDate: input.variationDate,
-          variationEndDate: normalizeEndDate(input.variationEndDate ?? null),
-          comments: input.comments?.trim() ?? "",
-          variationValue,
+          ...payload,
         },
       });
-      const nextTotal = toNumber(contract.totalVariation) + variationValue;
-      await tx.contract.update({
-        where: { id: contract.id },
-        data: { totalVariation: nextTotal },
-      });
+      await syncContractTotalVariation(tx, contract.id);
       return created;
     });
 
@@ -991,8 +1114,99 @@ router.post("/:id/variations", async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
     }
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return res.status(404).json({ error: "Not found" });
+    }
+    if (error instanceof Error && error.message === "NOT_ACTIVE") {
+      return res.status(400).json({ error: "Variations can only be added to active contracts" });
+    }
+    if (error instanceof Error && error.message === "VARIATION_END_REQUIRED") {
+      return res.status(400).json({ error: "Variation end date is required for T&M contracts" });
+    }
+    if (error instanceof Error && error.message === "VARIATION_QTY_REQUIRED") {
+      return res.status(400).json({ error: "Qty is required for T&M variations" });
+    }
+    if (error instanceof Error && error.message === "VARIATION_RATE_REQUIRED") {
+      return res.status(400).json({ error: "Rate is required for T&M variations" });
+    }
+    if (error instanceof Error && error.message === "VARIATION_VALUE_REQUIRED") {
+      return res.status(400).json({ error: "Variation value is required" });
+    }
     console.error("Error adding contract variation:", error);
     res.status(500).json({ error: "Failed to add variation" });
+  }
+});
+
+router.patch("/:id/variations/:variationId", async (req, res) => {
+  try {
+    const input = variationSchema.parse(req.body);
+    const contract = await ensureActiveContract(req.params.id);
+    const existing = await prisma.contractVariation.findFirst({
+      where: { id: req.params.variationId, contractId: contract.id },
+    });
+    if (!existing) return res.status(404).json({ error: "Variation not found" });
+
+    const payload = resolveVariationPayload(contract, input);
+    const row = await prisma.$transaction(async (tx) => {
+      const updated = await tx.contractVariation.update({
+        where: { id: existing.id },
+        data: payload,
+      });
+      await syncContractTotalVariation(tx, contract.id);
+      return updated;
+    });
+
+    res.json({ data: serializeVariation(row) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return res.status(404).json({ error: "Not found" });
+    }
+    if (error instanceof Error && error.message === "NOT_ACTIVE") {
+      return res.status(400).json({ error: "Variations can only be edited on active contracts" });
+    }
+    if (error instanceof Error && error.message === "VARIATION_END_REQUIRED") {
+      return res.status(400).json({ error: "Variation end date is required for T&M contracts" });
+    }
+    if (error instanceof Error && error.message === "VARIATION_QTY_REQUIRED") {
+      return res.status(400).json({ error: "Qty is required for T&M variations" });
+    }
+    if (error instanceof Error && error.message === "VARIATION_RATE_REQUIRED") {
+      return res.status(400).json({ error: "Rate is required for T&M variations" });
+    }
+    if (error instanceof Error && error.message === "VARIATION_VALUE_REQUIRED") {
+      return res.status(400).json({ error: "Variation value is required" });
+    }
+    console.error("Error updating contract variation:", error);
+    res.status(500).json({ error: "Failed to update variation" });
+  }
+});
+
+router.delete("/:id/variations/:variationId", async (req, res) => {
+  try {
+    await ensureActiveContract(req.params.id);
+    const existing = await prisma.contractVariation.findFirst({
+      where: { id: req.params.variationId, contractId: req.params.id },
+    });
+    if (!existing) return res.status(404).json({ error: "Variation not found" });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.contractVariation.delete({ where: { id: existing.id } });
+      await syncContractTotalVariation(tx, req.params.id);
+    });
+
+    res.json({ message: "Deleted" });
+  } catch (error) {
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return res.status(404).json({ error: "Not found" });
+    }
+    if (error instanceof Error && error.message === "NOT_ACTIVE") {
+      return res.status(400).json({ error: "Variations can only be deleted on active contracts" });
+    }
+    console.error("Error deleting contract variation:", error);
+    res.status(500).json({ error: "Failed to delete variation" });
   }
 });
 
@@ -1052,15 +1266,57 @@ router.post("/:id/invoices", async (req, res) => {
 
 router.patch("/:id/invoices/:invoiceId", async (req, res) => {
   try {
-    const body = invoiceStatusSchema.parse(req.body);
+    const contract = await ensureActiveContract(req.params.id);
     const invoice = await prisma.contractInvoice.findFirst({
-      where: { id: req.params.invoiceId, contractId: req.params.id },
+      where: { id: req.params.invoiceId, contractId: contract.id },
     });
     if (!invoice) return res.status(404).json({ error: "Invoice not found" });
 
-    const row = await prisma.contractInvoice.update({
-      where: { id: invoice.id },
-      data: { status: body.status },
+    const body = invoiceUpdateSchema.parse(req.body);
+    const onlyStatus =
+      body.status !== undefined &&
+      Object.keys(body).every((key) => key === "status" || body[key as keyof typeof body] === undefined);
+
+    if (invoice.status !== "DRAFT" && !onlyStatus) {
+      return res.status(400).json({
+        error: "Only status can be updated when invoice is not in Draft status",
+      });
+    }
+
+    if (invoice.status !== "DRAFT") {
+      const row = await prisma.contractInvoice.update({
+        where: { id: invoice.id },
+        data: { status: body.status! },
+      });
+      return res.json({ data: serializeInvoice(row) });
+    }
+
+    const qty = body.qty ?? invoice.qty;
+    const rate = body.rate != null ? body.rate : toNumber(invoice.rate);
+    const taxRate = body.taxRate != null ? body.taxRate : toNumber(invoice.taxRate);
+    const { amount, taxAmount, totalAmount } = computeInvoiceAmounts(qty, rate, taxRate);
+
+    const row = await prisma.$transaction(async (tx) => {
+      const updated = await tx.contractInvoice.update({
+        where: { id: invoice.id },
+        data: {
+          reference: body.reference ?? invoice.reference,
+          issueDate: body.issueDate ?? invoice.issueDate,
+          dueDate: body.dueDate ?? invoice.dueDate,
+          status: body.status ?? invoice.status,
+          currency: body.currency ?? invoice.currency,
+          description: body.description?.trim() ?? invoice.description,
+          qty,
+          rate,
+          amount,
+          taxRate,
+          taxAmount,
+          totalAmount,
+          fileUrl: body.fileUrl !== undefined ? body.fileUrl : invoice.fileUrl,
+        },
+      });
+      await syncContractConsumed(tx, contract.id);
+      return updated;
     });
 
     res.json({ data: serializeInvoice(row) });
@@ -1068,8 +1324,40 @@ router.patch("/:id/invoices/:invoiceId", async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
     }
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return res.status(404).json({ error: "Not found" });
+    }
+    if (error instanceof Error && error.message === "NOT_ACTIVE") {
+      return res.status(400).json({ error: "Invoices can only be edited on active contracts" });
+    }
     console.error("Error updating contract invoice:", error);
     res.status(500).json({ error: "Failed to update invoice" });
+  }
+});
+
+router.delete("/:id/invoices/:invoiceId", async (req, res) => {
+  try {
+    await ensureActiveContract(req.params.id);
+    const invoice = await prisma.contractInvoice.findFirst({
+      where: { id: req.params.invoiceId, contractId: req.params.id },
+    });
+    if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.contractInvoice.delete({ where: { id: invoice.id } });
+      await syncContractConsumed(tx, req.params.id);
+    });
+
+    res.json({ message: "Deleted" });
+  } catch (error) {
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return res.status(404).json({ error: "Not found" });
+    }
+    if (error instanceof Error && error.message === "NOT_ACTIVE") {
+      return res.status(400).json({ error: "Invoices can only be deleted on active contracts" });
+    }
+    console.error("Error deleting contract invoice:", error);
+    res.status(500).json({ error: "Failed to delete invoice" });
   }
 });
 

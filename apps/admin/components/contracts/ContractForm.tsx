@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { readUploadImageUrlFromJson } from "@/lib/upload-response";
 import { SALES_CURRENCIES } from "@/lib/opportunity-status";
@@ -33,6 +33,7 @@ export type ContractVariation = {
   variationDate: string;
   variationEndDate?: string | null;
   comments: string;
+  qty?: number | null;
   unit: string | null;
   rate: number | null;
   variationValue: number;
@@ -155,7 +156,11 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const [variationEndDate, setVariationEndDate] = useState("");
   const [variationComments, setVariationComments] = useState("");
   const [variationValue, setVariationValue] = useState("");
+  const [variationQty, setVariationQty] = useState("");
+  const [variationRate, setVariationRate] = useState("");
+  const [editingVariationId, setEditingVariationId] = useState<string | null>(null);
   const [addingVariation, setAddingVariation] = useState(false);
+  const [deletingVariationId, setDeletingVariationId] = useState<string | null>(null);
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [invoiceReference, setInvoiceReference] = useState("");
   const [invoiceIssueDate, setInvoiceIssueDate] = useState(todayDateInput());
@@ -168,13 +173,17 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const [invoiceTaxRate, setInvoiceTaxRate] = useState("10");
   const [invoiceFileUrl, setInvoiceFileUrl] = useState("");
   const [addingInvoice, setAddingInvoice] = useState(false);
+  const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
   const [invoiceUploading, setInvoiceUploading] = useState(false);
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
+  const [deletingInvoiceId, setDeletingInvoiceId] = useState<string | null>(null);
   const [showMilestoneForm, setShowMilestoneForm] = useState(false);
   const [milestoneDescription, setMilestoneDescription] = useState("");
   const [milestoneDate, setMilestoneDate] = useState("");
   const [milestoneAmount, setMilestoneAmount] = useState("");
+  const [editingMilestoneId, setEditingMilestoneId] = useState<string | null>(null);
   const [addingMilestone, setAddingMilestone] = useState(false);
+  const [deletingMilestoneId, setDeletingMilestoneId] = useState<string | null>(null);
   const [savingFiles, setSavingFiles] = useState(false);
 
   const isEditable = status === "DRAFT";
@@ -202,6 +211,13 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   }, [invoicePreviewAmount, invoiceTaxRate]);
 
   const invoicePreviewTotal = invoicePreviewAmount + invoicePreviewTaxAmount;
+
+  const variationPreviewValue = useMemo(() => {
+    if (type !== "T_AND_M") return Number.parseFloat(variationValue) || 0;
+    const qty = Number.parseInt(variationQty, 10) || 0;
+    const rateVal = Number.parseFloat(variationRate) || 0;
+    return qty * rateVal;
+  }, [type, variationValue, variationQty, variationRate]);
 
   const totalVariation = useMemo(
     () => variations.reduce((sum, row) => sum + row.variationValue, 0),
@@ -296,7 +312,23 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
     await persistFileUrls(nextUrls);
   }
 
-  async function addMilestone() {
+  function resetMilestoneForm() {
+    setShowMilestoneForm(false);
+    setEditingMilestoneId(null);
+    setMilestoneDescription("");
+    setMilestoneDate("");
+    setMilestoneAmount("");
+  }
+
+  function startEditMilestone(milestone: ContractMilestone) {
+    setEditingMilestoneId(milestone.id);
+    setMilestoneDescription(milestone.description);
+    setMilestoneDate(toDateInput(milestone.milestoneDate));
+    setMilestoneAmount(String(milestone.amount));
+    setShowMilestoneForm(true);
+  }
+
+  async function saveMilestone() {
     if (!defaults.id || !canAddMilestones) return;
     if (!milestoneDescription.trim()) {
       alert("Description is required.");
@@ -313,28 +345,55 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
     }
     setAddingMilestone(true);
     try {
-      const res = await adminFetch(`/api/admin/contracts/${defaults.id}/milestones`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          description: milestoneDescription.trim(),
-          milestoneDate,
-          amount,
-        }),
-      });
+      const isEdit = Boolean(editingMilestoneId);
+      const res = await adminFetch(
+        isEdit
+          ? `/api/admin/contracts/${defaults.id}/milestones/${editingMilestoneId}`
+          : `/api/admin/contracts/${defaults.id}/milestones`,
+        {
+          method: isEdit ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            description: milestoneDescription.trim(),
+            milestoneDate,
+            amount,
+          }),
+        },
+      );
       const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to add milestone");
-      setMilestones((prev) => [...prev, data.data as ContractMilestone].sort(
-        (a, b) => new Date(a.milestoneDate).getTime() - new Date(b.milestoneDate).getTime(),
-      ));
-      setShowMilestoneForm(false);
-      setMilestoneDescription("");
-      setMilestoneDate("");
-      setMilestoneAmount("");
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save milestone");
+      const saved = data.data as ContractMilestone;
+      setMilestones((prev) => {
+        const next = isEdit
+          ? prev.map((row) => (row.id === saved.id ? saved : row))
+          : [...prev, saved];
+        return next.sort(
+          (a, b) => new Date(a.milestoneDate).getTime() - new Date(b.milestoneDate).getTime(),
+        );
+      });
+      resetMilestoneForm();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to add milestone");
+      alert(error instanceof Error ? error.message : "Failed to save milestone");
     } finally {
       setAddingMilestone(false);
+    }
+  }
+
+  async function deleteMilestone(milestoneId: string) {
+    if (!defaults.id || !canAddMilestones) return;
+    if (!window.confirm("Delete this milestone?")) return;
+    setDeletingMilestoneId(milestoneId);
+    try {
+      const res = await adminFetch(`/api/admin/contracts/${defaults.id}/milestones/${milestoneId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to delete milestone");
+      setMilestones((prev) => prev.filter((row) => row.id !== milestoneId));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to delete milestone");
+    } finally {
+      setDeletingMilestoneId(null);
     }
   }
 
@@ -357,52 +416,157 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
     }
   }
 
-  async function addVariation() {
+  function resetVariationForm() {
+    setShowVariationForm(false);
+    setEditingVariationId(null);
+    setVariationDate("");
+    setVariationEndDate("");
+    setVariationComments("");
+    setVariationValue("");
+    setVariationQty("");
+    setVariationRate("");
+  }
+
+  function startEditVariation(variation: ContractVariation) {
+    setEditingVariationId(variation.id);
+    setVariationDate(toDateInput(variation.variationDate));
+    setVariationEndDate(toDateInput(variation.variationEndDate));
+    setVariationComments(variation.comments);
+    setVariationValue(String(variation.variationValue));
+    setVariationQty(variation.qty != null ? String(variation.qty) : "");
+    setVariationRate(variation.rate != null ? String(variation.rate) : "");
+    setShowVariationForm(true);
+  }
+
+  async function saveVariation() {
     if (!defaults.id || !canAddVariations) return;
     if (!variationDate) {
       alert("Variation start date is required.");
-      return;
-    }
-    const value = Number.parseFloat(variationValue);
-    if (Number.isNaN(value)) {
-      alert("Variation value is required.");
       return;
     }
     if (type === "T_AND_M" && !variationEndDate) {
       alert("Variation end date is required for T&M contracts.");
       return;
     }
+
+    let body: Record<string, unknown>;
+    if (type === "T_AND_M") {
+      const qty = Number.parseInt(variationQty, 10);
+      const rateVal = Number.parseFloat(variationRate);
+      if (!qty || qty <= 0) {
+        alert("Qty is required for T&M variations.");
+        return;
+      }
+      if (Number.isNaN(rateVal) || rateVal < 0) {
+        alert("Rate is required for T&M variations.");
+        return;
+      }
+      body = {
+        variationDate,
+        variationEndDate,
+        qty,
+        rate: rateVal,
+        comments: variationComments.trim(),
+      };
+    } else {
+      const value = Number.parseFloat(variationValue);
+      if (Number.isNaN(value)) {
+        alert("Variation value is required.");
+        return;
+      }
+      body = {
+        variationDate,
+        variationEndDate: variationEndDate || null,
+        variationValue: value,
+        comments: variationComments.trim(),
+      };
+    }
+
     setAddingVariation(true);
     try {
-      const res = await adminFetch(`/api/admin/contracts/${defaults.id}/variations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          variationDate,
-          variationEndDate: variationEndDate || null,
-          variationValue: value,
-          comments: variationComments.trim(),
-        }),
-      });
+      const isEdit = Boolean(editingVariationId);
+      const res = await adminFetch(
+        isEdit
+          ? `/api/admin/contracts/${defaults.id}/variations/${editingVariationId}`
+          : `/api/admin/contracts/${defaults.id}/variations`,
+        {
+          method: isEdit ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
       const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to add variation");
-      setVariations((prev) => [data.data as ContractVariation, ...prev]);
-      setShowVariationForm(false);
-      setVariationDate("");
-      setVariationEndDate("");
-      setVariationComments("");
-      setVariationValue("");
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save variation");
+      const saved = data.data as ContractVariation;
+      setVariations((prev) =>
+        isEdit
+          ? prev.map((row) => (row.id === saved.id ? saved : row))
+          : [saved, ...prev],
+      );
+      resetVariationForm();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to add variation");
+      alert(error instanceof Error ? error.message : "Failed to save variation");
     } finally {
       setAddingVariation(false);
     }
   }
 
-  async function addInvoice() {
+  async function deleteVariation(variationId: string) {
+    if (!defaults.id || !canAddVariations) return;
+    if (!window.confirm("Delete this variation?")) return;
+    setDeletingVariationId(variationId);
+    try {
+      const res = await adminFetch(`/api/admin/contracts/${defaults.id}/variations/${variationId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to delete variation");
+      setVariations((prev) => prev.filter((row) => row.id !== variationId));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to delete variation");
+    } finally {
+      setDeletingVariationId(null);
+    }
+  }
+
+  function syncConsumedFromInvoices(nextInvoices: ContractInvoice[]) {
+    setConsumed(String(nextInvoices.reduce((sum, row) => sum + row.totalAmount, 0)));
+  }
+
+  function resetInvoiceForm() {
+    setShowInvoiceForm(false);
+    setEditingInvoiceId(null);
+    setInvoiceReference("");
+    setInvoiceIssueDate(todayDateInput());
+    setInvoiceDueDate(defaultDueDateInput());
+    setInvoiceStatus("DRAFT");
+    setInvoiceDescription("");
+    setInvoiceCurrency(currency);
+    setInvoiceQty("");
+    setInvoiceRate("");
+    setInvoiceTaxRate("10");
+    setInvoiceFileUrl("");
+  }
+
+  function startEditInvoice(invoice: ContractInvoice) {
+    setEditingInvoiceId(invoice.id);
+    setInvoiceReference(invoice.reference);
+    setInvoiceIssueDate(toDateInput(invoice.issueDate));
+    setInvoiceDueDate(toDateInput(invoice.dueDate));
+    setInvoiceStatus(invoice.status);
+    setInvoiceDescription(invoice.description);
+    setInvoiceCurrency(invoice.currency || currency);
+    setInvoiceQty(String(invoice.qty));
+    setInvoiceRate(String(invoice.rate));
+    setInvoiceTaxRate(String(invoice.taxRate));
+    setInvoiceFileUrl(invoice.fileUrl ?? "");
+    setShowInvoiceForm(true);
+  }
+
+  async function saveInvoice() {
     if (!defaults.id || !canAddInvoices) return;
     const qty = Number.parseInt(invoiceQty, 10);
-    const rate = Number.parseFloat(invoiceRate);
+    const rateVal = Number.parseFloat(invoiceRate);
     const taxRate = Number.parseFloat(invoiceTaxRate);
     if (!invoiceIssueDate || !invoiceDueDate) {
       alert("Issue date and due date are required.");
@@ -416,7 +580,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       alert("Qty is required.");
       return;
     }
-    if (Number.isNaN(rate) || rate < 0) {
+    if (Number.isNaN(rateVal) || rateVal < 0) {
       alert("Rate is required.");
       return;
     }
@@ -426,42 +590,71 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
     }
     setAddingInvoice(true);
     try {
-      const res = await adminFetch(`/api/admin/contracts/${defaults.id}/invoices`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reference: invoiceReference.trim(),
-          issueDate: invoiceIssueDate,
-          dueDate: invoiceDueDate,
-          status: invoiceStatus,
-          currency: invoiceCurrency,
-          description: invoiceDescription.trim(),
-          qty,
-          rate,
-          taxRate,
-          fileUrl: invoiceFileUrl || null,
-        }),
-      });
+      const isEdit = Boolean(editingInvoiceId);
+      const editingInvoice = isEdit ? invoices.find((row) => row.id === editingInvoiceId) : null;
+      const payload = {
+        reference: invoiceReference.trim(),
+        issueDate: invoiceIssueDate,
+        dueDate: invoiceDueDate,
+        status: invoiceStatus,
+        currency: invoiceCurrency,
+        description: invoiceDescription.trim(),
+        qty,
+        rate: rateVal,
+        taxRate,
+        fileUrl: invoiceFileUrl || null,
+      };
+      const res = await adminFetch(
+        isEdit
+          ? `/api/admin/contracts/${defaults.id}/invoices/${editingInvoiceId}`
+          : `/api/admin/contracts/${defaults.id}/invoices`,
+        {
+          method: isEdit ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            editingInvoice && editingInvoice.status !== "DRAFT"
+              ? { status: invoiceStatus }
+              : payload,
+          ),
+        },
+      );
       const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to add invoice");
-      const created = data.data as ContractInvoice;
-      setInvoices((prev) => [created, ...prev]);
-      setConsumed((prev) => String((Number.parseFloat(prev) || 0) + created.totalAmount));
-      setShowInvoiceForm(false);
-      setInvoiceReference("");
-      setInvoiceIssueDate(todayDateInput());
-      setInvoiceDueDate(defaultDueDateInput());
-      setInvoiceStatus("DRAFT");
-      setInvoiceDescription("");
-      setInvoiceCurrency(currency);
-      setInvoiceQty("");
-      setInvoiceRate("");
-      setInvoiceTaxRate("10");
-      setInvoiceFileUrl("");
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save invoice");
+      const saved = data.data as ContractInvoice;
+      setInvoices((prev) => {
+        const next = isEdit
+          ? prev.map((row) => (row.id === saved.id ? saved : row))
+          : [saved, ...prev];
+        syncConsumedFromInvoices(next);
+        return next;
+      });
+      resetInvoiceForm();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to add invoice");
+      alert(error instanceof Error ? error.message : "Failed to save invoice");
     } finally {
       setAddingInvoice(false);
+    }
+  }
+
+  async function deleteInvoice(invoiceId: string) {
+    if (!defaults.id || !canAddInvoices) return;
+    if (!window.confirm("Delete this invoice?")) return;
+    setDeletingInvoiceId(invoiceId);
+    try {
+      const res = await adminFetch(`/api/admin/contracts/${defaults.id}/invoices/${invoiceId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to delete invoice");
+      setInvoices((prev) => {
+        const next = prev.filter((row) => row.id !== invoiceId);
+        syncConsumedFromInvoices(next);
+        return next;
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to delete invoice");
+    } finally {
+      setDeletingInvoiceId(null);
     }
   }
 
@@ -477,7 +670,11 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       const data = await res.json();
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to update invoice");
       const updated = data.data as ContractInvoice;
-      setInvoices((prev) => prev.map((row) => (row.id === invoiceId ? updated : row)));
+      setInvoices((prev) => {
+        const next = prev.map((row) => (row.id === invoiceId ? updated : row));
+        syncConsumedFromInvoices(next);
+        return next;
+      });
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to update invoice status");
     } finally {
@@ -758,7 +955,14 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
             {canAddVariations ? (
               <button
                 type="button"
-                onClick={() => setShowVariationForm((v) => !v)}
+                onClick={() => {
+                  if (showVariationForm && !editingVariationId) {
+                    resetVariationForm();
+                  } else {
+                    resetVariationForm();
+                    setShowVariationForm(true);
+                  }
+                }}
                 className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
               >
                 <Plus className="h-4 w-4" />
@@ -771,31 +975,73 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
           ) : null}
           {showVariationForm ? (
             <div className="mb-4 space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/40">
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={variationValue}
-                onChange={(e) => setVariationValue(e.target.value)}
-                placeholder={`Variation value (${currency}) *`}
-                className={inputClass}
-              />
+              {type === "T_AND_M" ? (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Qty *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={variationQty}
+                      onChange={(e) => setVariationQty(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Rate *</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={variationRate}
+                      onChange={(e) => setVariationRate(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Variation value</label>
+                    <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
+                      {formatMoney(currency, variationPreviewValue)}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Variation value *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={variationValue}
+                    onChange={(e) => setVariationValue(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <input
-                  type="date"
-                  value={variationDate}
-                  onChange={(e) => setVariationDate(e.target.value)}
-                  className={inputClass}
-                  aria-label="Variation start date"
-                />
-                <input
-                  type="date"
-                  value={variationEndDate}
-                  onChange={(e) => setVariationEndDate(e.target.value)}
-                  className={inputClass}
-                  aria-label="Variation end date"
-                  required={type === "T_AND_M"}
-                />
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Start date *</label>
+                  <input
+                    type="date"
+                    value={variationDate}
+                    onChange={(e) => setVariationDate(e.target.value)}
+                    required
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                    End date{type === "T_AND_M" ? " *" : ""}
+                  </label>
+                  <input
+                    type="date"
+                    value={variationEndDate}
+                    onChange={(e) => setVariationEndDate(e.target.value)}
+                    required={type === "T_AND_M"}
+                    className={inputClass}
+                  />
+                </div>
               </div>
               <textarea
                 value={variationComments}
@@ -805,10 +1051,10 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                 className={inputClass}
               />
               <div className="flex gap-2">
-                <button type="button" onClick={() => void addVariation()} disabled={addingVariation} className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black">
-                  {addingVariation ? "Adding…" : "Save variation"}
+                <button type="button" onClick={() => void saveVariation()} disabled={addingVariation} className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black">
+                  {addingVariation ? "Saving…" : editingVariationId ? "Update variation" : "Save variation"}
                 </button>
-                <button type="button" onClick={() => setShowVariationForm(false)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm dark:border-gray-600">
+                <button type="button" onClick={resetVariationForm} className="rounded-lg border border-gray-200 px-4 py-2 text-sm dark:border-gray-600">
                   Cancel
                 </button>
               </div>
@@ -819,13 +1065,41 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
           ) : (
             <ul className="divide-y divide-gray-100 dark:divide-gray-800">
               {variations.map((variation) => (
-                <li key={variation.id} className="py-3 text-sm">
-                  <p className="font-medium text-gray-900 dark:text-gray-100">
-                    {formatMoney(currency, variation.variationValue)} · {formatDate(variation.variationDate)}
-                    {variation.variationEndDate ? ` – ${formatDate(variation.variationEndDate)}` : ""}
-                  </p>
-                  {variation.comments ? (
-                    <p className="text-gray-500 dark:text-gray-400">{variation.comments}</p>
+                <li key={variation.id} className="flex items-start justify-between gap-3 py-3 text-sm">
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-gray-100">
+                      {formatMoney(currency, variation.variationValue)} · {formatDate(variation.variationDate)}
+                      {variation.variationEndDate ? ` – ${formatDate(variation.variationEndDate)}` : ""}
+                    </p>
+                    {type === "T_AND_M" && variation.qty != null ? (
+                      <p className="text-gray-500 dark:text-gray-400">
+                        Qty: {variation.qty} × {formatMoney(currency, variation.rate ?? 0)}
+                      </p>
+                    ) : null}
+                    {variation.comments ? (
+                      <p className="text-gray-500 dark:text-gray-400">{variation.comments}</p>
+                    ) : null}
+                  </div>
+                  {canAddVariations ? (
+                    <div className="flex shrink-0 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => startEditVariation(variation)}
+                        className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                        aria-label="Edit variation"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void deleteVariation(variation.id)}
+                        disabled={deletingVariationId === variation.id}
+                        className="rounded p-1 text-red-600 hover:bg-red-50 disabled:opacity-50 dark:hover:bg-red-950/30"
+                        aria-label="Delete variation"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   ) : null}
                 </li>
               ))}
@@ -841,7 +1115,14 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
             {canAddMilestones ? (
               <button
                 type="button"
-                onClick={() => setShowMilestoneForm((v) => !v)}
+                onClick={() => {
+                  if (showMilestoneForm && !editingMilestoneId) {
+                    resetMilestoneForm();
+                  } else {
+                    resetMilestoneForm();
+                    setShowMilestoneForm(true);
+                  }
+                }}
                 className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
               >
                 <Plus className="h-4 w-4" />
@@ -879,10 +1160,10 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                 />
               </div>
               <div className="flex gap-2">
-                <button type="button" onClick={() => void addMilestone()} disabled={addingMilestone} className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black">
-                  {addingMilestone ? "Adding…" : "Save milestone"}
+                <button type="button" onClick={() => void saveMilestone()} disabled={addingMilestone} className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black">
+                  {addingMilestone ? "Saving…" : editingMilestoneId ? "Update milestone" : "Save milestone"}
                 </button>
-                <button type="button" onClick={() => setShowMilestoneForm(false)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm dark:border-gray-600">
+                <button type="button" onClick={resetMilestoneForm} className="rounded-lg border border-gray-200 px-4 py-2 text-sm dark:border-gray-600">
                   Cancel
                 </button>
               </div>
@@ -893,11 +1174,34 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
           ) : (
             <ul className="divide-y divide-gray-100 dark:divide-gray-800">
               {milestones.map((milestone) => (
-                <li key={milestone.id} className="py-3 text-sm">
-                  <p className="font-medium text-gray-900 dark:text-gray-100">
-                    {formatMoney(currency, milestone.amount)} · {formatDate(milestone.milestoneDate)}
-                  </p>
-                  <p className="text-gray-500 dark:text-gray-400">{milestone.description}</p>
+                <li key={milestone.id} className="flex items-start justify-between gap-3 py-3 text-sm">
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-gray-100">
+                      {formatMoney(currency, milestone.amount)} · {formatDate(milestone.milestoneDate)}
+                    </p>
+                    <p className="text-gray-500 dark:text-gray-400">{milestone.description}</p>
+                  </div>
+                  {canAddMilestones ? (
+                    <div className="flex shrink-0 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => startEditMilestone(milestone)}
+                        className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                        aria-label="Edit milestone"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void deleteMilestone(milestone.id)}
+                        disabled={deletingMilestoneId === milestone.id}
+                        className="rounded p-1 text-red-600 hover:bg-red-50 disabled:opacity-50 dark:hover:bg-red-950/30"
+                        aria-label="Delete milestone"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -912,7 +1216,14 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
             {canAddInvoices ? (
               <button
                 type="button"
-                onClick={() => setShowInvoiceForm((v) => !v)}
+                onClick={() => {
+                  if (showInvoiceForm && !editingInvoiceId) {
+                    resetInvoiceForm();
+                  } else {
+                    resetInvoiceForm();
+                    setShowInvoiceForm(true);
+                  }
+                }}
                 className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
               >
                 <Plus className="h-4 w-4" />
@@ -925,12 +1236,18 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
           ) : null}
           {showInvoiceForm ? (
             <div className="mb-4 space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/40">
+              {editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT" ? (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Only status can be changed for non-draft invoices. Use the status dropdown in the list or below.
+                </p>
+              ) : null}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <input
                   value={invoiceReference}
                   onChange={(e) => setInvoiceReference(e.target.value)}
                   placeholder="Reference"
-                  className={inputClass}
+                  readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
+                  className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
                 />
                 <select
                   value={invoiceStatus}
@@ -945,11 +1262,25 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Issue date *</label>
-                  <input type="date" value={invoiceIssueDate} onChange={(e) => setInvoiceIssueDate(e.target.value)} required className={inputClass} />
+                  <input
+                    type="date"
+                    value={invoiceIssueDate}
+                    onChange={(e) => setInvoiceIssueDate(e.target.value)}
+                    required
+                    readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
+                    className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                  />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Due date *</label>
-                  <input type="date" value={invoiceDueDate} onChange={(e) => setInvoiceDueDate(e.target.value)} required className={inputClass} />
+                  <input
+                    type="date"
+                    value={invoiceDueDate}
+                    onChange={(e) => setInvoiceDueDate(e.target.value)}
+                    required
+                    readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
+                    className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                  />
                 </div>
               </div>
               <textarea
@@ -957,17 +1288,50 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                 onChange={(e) => setInvoiceDescription(e.target.value)}
                 rows={3}
                 placeholder="Description *"
-                className={inputClass}
+                readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
+                className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
               />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                <select value={invoiceCurrency} onChange={(e) => setInvoiceCurrency(e.target.value)} className={inputClass}>
+                <select
+                  value={invoiceCurrency}
+                  onChange={(e) => setInvoiceCurrency(e.target.value)}
+                  disabled={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
+                  className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                >
                   {SALES_CURRENCIES.map((c) => (
                     <option key={c.code} value={c.code}>{c.label}</option>
                   ))}
                 </select>
-                <input type="number" min="1" step="1" value={invoiceQty} onChange={(e) => setInvoiceQty(e.target.value)} placeholder="Qty *" className={inputClass} />
-                <input type="number" min="0" step="0.01" value={invoiceRate} onChange={(e) => setInvoiceRate(e.target.value)} placeholder="Rate *" className={inputClass} />
-                <input type="number" min="0" step="0.01" value={invoiceTaxRate} onChange={(e) => setInvoiceTaxRate(e.target.value)} placeholder="Tax rate % *" className={inputClass} />
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={invoiceQty}
+                  onChange={(e) => setInvoiceQty(e.target.value)}
+                  placeholder="Qty *"
+                  readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
+                  className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                />
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={invoiceRate}
+                  onChange={(e) => setInvoiceRate(e.target.value)}
+                  placeholder="Rate *"
+                  readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
+                  className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                />
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={invoiceTaxRate}
+                  onChange={(e) => setInvoiceTaxRate(e.target.value)}
+                  placeholder="Tax rate % *"
+                  readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
+                  className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                />
                 <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
                   Amount: {formatMoney(invoiceCurrency, invoicePreviewAmount)}
                 </p>
@@ -982,7 +1346,9 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Invoice file</label>
-                <input type="file" onChange={(e) => void uploadInvoiceFile(e.target.files)} className="block w-full text-sm" />
+                {(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT") ? (
+                  <input type="file" onChange={(e) => void uploadInvoiceFile(e.target.files)} className="block w-full text-sm" />
+                ) : null}
                 {invoiceUploading ? <p className="mt-1 text-xs text-gray-500">Uploading…</p> : null}
                 {invoiceFileUrl ? (
                   <a href={invoiceFileUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-sm text-blue-600 hover:underline dark:text-blue-400">
@@ -991,10 +1357,10 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                 ) : null}
               </div>
               <div className="flex gap-2">
-                <button type="button" onClick={() => void addInvoice()} disabled={addingInvoice} className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black">
-                  {addingInvoice ? "Adding…" : "Save invoice"}
+                <button type="button" onClick={() => void saveInvoice()} disabled={addingInvoice} className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black">
+                  {addingInvoice ? "Saving…" : editingInvoiceId ? "Update invoice" : "Save invoice"}
                 </button>
-                <button type="button" onClick={() => setShowInvoiceForm(false)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm dark:border-gray-600">
+                <button type="button" onClick={resetInvoiceForm} className="rounded-lg border border-gray-200 px-4 py-2 text-sm dark:border-gray-600">
                   Cancel
                 </button>
               </div>
@@ -1012,16 +1378,39 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                   <li key={invoice.id} className="space-y-2 py-4 text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="font-medium text-gray-900 dark:text-gray-100">{invoice.invoiceNumber}</p>
-                      <select
-                        value={invoice.status}
-                        disabled={updatingInvoiceId === invoice.id}
-                        onChange={(e) => void updateInvoiceStatus(invoice.id, e.target.value as ContractInvoiceStatus)}
-                        className={`rounded-full border-0 px-2.5 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`}
-                      >
-                        {CONTRACT_INVOICE_STATUSES.map((value) => (
-                          <option key={value} value={value}>{CONTRACT_INVOICE_STATUS_LABELS[value]}</option>
-                        ))}
-                      </select>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={invoice.status}
+                          disabled={updatingInvoiceId === invoice.id}
+                          onChange={(e) => void updateInvoiceStatus(invoice.id, e.target.value as ContractInvoiceStatus)}
+                          className={`rounded-full border-0 px-2.5 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`}
+                        >
+                          {CONTRACT_INVOICE_STATUSES.map((value) => (
+                            <option key={value} value={value}>{CONTRACT_INVOICE_STATUS_LABELS[value]}</option>
+                          ))}
+                        </select>
+                        {canAddInvoices ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => startEditInvoice(invoice)}
+                              className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                              aria-label="Edit invoice"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void deleteInvoice(invoice.id)}
+                              disabled={deletingInvoiceId === invoice.id}
+                              className="rounded p-1 text-red-600 hover:bg-red-50 disabled:opacity-50 dark:hover:bg-red-950/30"
+                              aria-label="Delete invoice"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
                     </div>
                     <div className={`grid grid-cols-1 gap-2 sm:grid-cols-2 ${readOnly ? "text-gray-500" : ""}`}>
                       <p>Reference: {invoice.reference || "—"}</p>

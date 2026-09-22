@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { adminFetch } from "@/lib/admin-api";
 import { ClientsOnlyGuard } from "@/components/ClientsOnlyGuard";
@@ -8,6 +8,7 @@ import { ClientsOnlyGuard } from "@/components/ClientsOnlyGuard";
 type ClientCount = { clientId: string; clientName: string; count: number };
 type ClientAmount = { clientId: string; clientName: string; amount: number };
 type ForecastVsActual = { clientId: string; clientName: string; forecast: number; actual: number };
+type ForecastMonthRow = { month: number; label: string; forecast: number; actual: number };
 
 type SalesDashboardStats = {
   year: number;
@@ -24,11 +25,16 @@ type SalesDashboardStats = {
     forecastedRevenueThisYear: number;
     actualRevenueThisYear: number;
     forecastVsActualByClient: ForecastVsActual[];
+    forecastByMonth: ForecastMonthRow[];
   };
 };
 
 function formatAmount(value: number) {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
+}
+
+function yearOptions(anchorYear: number) {
+  return Array.from({ length: 7 }, (_, index) => anchorYear - 2 + index);
 }
 
 function BarChart({
@@ -125,6 +131,55 @@ function DualBarChart({ title, subtitle, items }: { title: string; subtitle: str
   );
 }
 
+function MonthlyForecastChart({ year, items }: { year: number; items: ForecastMonthRow[] }) {
+  const max = useMemo(
+    () => Math.max(...items.map((item) => Math.max(item.forecast, item.actual)), 1),
+    [items],
+  );
+
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+      <div className="mb-6">
+        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Forecast vs actual by month</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Monthly breakdown for {year} — forecast (amber) vs actual (green).
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+        {items.map((item) => (
+          <div key={item.month} className="space-y-2 rounded-lg border border-gray-100 p-3 dark:border-gray-800">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.label}</p>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
+                <span>Forecast</span>
+                <span className="tabular-nums">{formatAmount(item.forecast)}</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                <div
+                  className="h-full rounded-full bg-amber-500"
+                  style={{ width: `${(item.forecast / max) * 100}%` }}
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
+                <span>Actual</span>
+                <span className="tabular-nums">{formatAmount(item.actual)}</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                <div
+                  className="h-full rounded-full bg-green-600"
+                  style={{ width: `${(item.actual / max) * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function StatCard({ label, value, href }: { label: string; value: number | string; href: string }) {
   return (
     <Link
@@ -138,101 +193,130 @@ function StatCard({ label, value, href }: { label: string; value: number | strin
 }
 
 export default function SalesDashboardPage() {
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
   const [stats, setStats] = useState<SalesDashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    void adminFetch("/api/admin/sales-dashboard/stats")
+  const loadStats = useCallback((year: number) => {
+    setLoading(true);
+    void adminFetch(`/api/admin/sales-dashboard/stats?year=${year}`)
       .then((res) => res.json())
       .then((data) => setStats(data.data as SalesDashboardStats))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading && !stats) {
-    return (
-      <ClientsOnlyGuard>
-        <div className="flex h-64 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-black border-t-transparent dark:border-white" />
-        </div>
-      </ClientsOnlyGuard>
-    );
-  }
+  useEffect(() => {
+    loadStats(selectedYear);
+  }, [loadStats, selectedYear]);
 
-  const year = stats?.year ?? new Date().getFullYear();
+  const year = stats?.year ?? selectedYear;
+  const isCurrentYear = year === currentYear;
 
   return (
     <ClientsOnlyGuard>
       <div className="space-y-8">
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Sales pipeline overview — actuals and forecast for {year}.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Sales pipeline overview — actuals and forecast for {year}.
+          </p>
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <span className="font-medium">Year</span>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number.parseInt(e.target.value, 10))}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
+            >
+              {yearOptions(currentYear).map((value) => (
+                <option key={value} value={value}>{value}</option>
+              ))}
+            </select>
+          </label>
+        </div>
 
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Actuals</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            <StatCard label="Active opportunities" value={stats?.actuals.activeOpportunities ?? 0} href="/opportunities/active" />
-            <StatCard label="Active contracts" value={stats?.actuals.activeContracts ?? 0} href="/contracts/active" />
-            <StatCard label="Expiring this month" value={stats?.actuals.contractsExpiringThisMonth ?? 0} href="/contracts/active?expiring=thisMonth" />
-            <StatCard label="Expiring next month" value={stats?.actuals.contractsExpiringNextMonth ?? 0} href="/contracts/active?expiring=nextMonth" />
-            <StatCard label="Invoices awaiting payment" value={stats?.actuals.invoicesAwaitingPayment ?? 0} href="/invoices?status=AWAITING_PAYMENT" />
+        {loading && !stats ? (
+          <div className="flex h-64 items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-black border-t-transparent dark:border-white" />
           </div>
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <BarChart
-              title="Active contracts by client"
-              subtitle="Number of active contracts per client."
-              items={(stats?.actuals.activeContractsByClient ?? []).map((row) => ({
-                clientName: row.clientName,
-                count: row.count,
-                clientId: row.clientId,
-              }))}
-              labelKey="clientName"
-              valueKey="count"
-              getHref={(item) => `/contracts/active?clientId=${encodeURIComponent(String(item.clientId))}`}
-            />
-            <BarChart
-              title="Amount owed by client"
-              subtitle="Total invoice amounts (draft and awaiting payment)."
-              items={(stats?.actuals.amountOwedByClient ?? []).map((row) => ({
-                clientName: row.clientName,
-                amount: row.amount,
-                clientId: row.clientId,
-              }))}
-              labelKey="clientName"
-              valueKey="amount"
-              getHref={() => "/invoices?status=AWAITING_PAYMENT"}
-            />
-          </div>
-        </section>
+        ) : (
+          <>
+            <section className="space-y-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Actuals</h2>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                <StatCard label="Active opportunities" value={stats?.actuals.activeOpportunities ?? 0} href="/opportunities/active" />
+                <StatCard label="Active contracts" value={stats?.actuals.activeContracts ?? 0} href="/contracts/active" />
+                <StatCard
+                  label={isCurrentYear ? "Expiring this month" : "Expiring this month (live)"}
+                  value={stats?.actuals.contractsExpiringThisMonth ?? 0}
+                  href="/contracts/active?expiring=thisMonth"
+                />
+                <StatCard
+                  label={isCurrentYear ? "Expiring next month" : "Expiring next month (live)"}
+                  value={stats?.actuals.contractsExpiringNextMonth ?? 0}
+                  href="/contracts/active?expiring=nextMonth"
+                />
+                <StatCard label="Invoices awaiting payment" value={stats?.actuals.invoicesAwaitingPayment ?? 0} href="/invoices?status=AWAITING_PAYMENT" />
+              </div>
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <BarChart
+                  title="Active contracts by client"
+                  subtitle="Number of active contracts per client."
+                  items={(stats?.actuals.activeContractsByClient ?? []).map((row) => ({
+                    clientName: row.clientName,
+                    count: row.count,
+                    clientId: row.clientId,
+                  }))}
+                  labelKey="clientName"
+                  valueKey="count"
+                  getHref={(item) => `/contracts/active?clientId=${encodeURIComponent(String(item.clientId))}`}
+                />
+                <BarChart
+                  title="Amount owed by client"
+                  subtitle="Total invoice amounts (draft and awaiting payment)."
+                  items={(stats?.actuals.amountOwedByClient ?? []).map((row) => ({
+                    clientName: row.clientName,
+                    amount: row.amount,
+                    clientId: row.clientId,
+                  }))}
+                  labelKey="clientName"
+                  valueKey="amount"
+                  getHref={() => "/invoices?status=AWAITING_PAYMENT"}
+                />
+              </div>
+            </section>
 
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Forecast</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                Forecasted revenue this year
-              </p>
-              <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
-                {formatAmount(stats?.forecast.forecastedRevenueThisYear ?? 0)}
-              </p>
-              <p className="mt-1 text-xs text-gray-500">T&M working days + milestone amounts</p>
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                Actual revenue this year
-              </p>
-              <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
-                {formatAmount(stats?.forecast.actualRevenueThisYear ?? 0)}
-              </p>
-              <p className="mt-1 text-xs text-gray-500">Invoice amounts (excl. tax) by due date</p>
-            </div>
-          </div>
-          <DualBarChart
-            title="Forecast vs actual this year"
-            subtitle="Grouped by client — forecast (amber) vs actual (green)."
-            items={stats?.forecast.forecastVsActualByClient ?? []}
-          />
-        </section>
+            <section className="space-y-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Forecast</h2>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    Forecasted revenue ({year})
+                  </p>
+                  <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
+                    {formatAmount(stats?.forecast.forecastedRevenueThisYear ?? 0)}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">T&M working days (incl. AU public holidays) + milestones</p>
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    Actual revenue ({year})
+                  </p>
+                  <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
+                    {formatAmount(stats?.forecast.actualRevenueThisYear ?? 0)}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">Invoice amounts (excl. tax) by due date</p>
+                </div>
+              </div>
+              <MonthlyForecastChart year={year} items={stats?.forecast.forecastByMonth ?? []} />
+              <DualBarChart
+                title={`Forecast vs actual (${year})`}
+                subtitle="Grouped by client — forecast (amber) vs actual (green)."
+                items={stats?.forecast.forecastVsActualByClient ?? []}
+              />
+            </section>
+          </>
+        )}
       </div>
     </ClientsOnlyGuard>
   );

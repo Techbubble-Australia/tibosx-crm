@@ -428,6 +428,8 @@ model ContractVariation {
   variationDate    DateTime
   variationEndDate DateTime?
   comments         String    @default("") @db.Text
+  /// Qty for T&M variations
+  qty              Int?
   /// HOUR | DAY for T&M variations (legacy)
   unit             String?
   rate             Decimal?  @db.Decimal(14, 2)
