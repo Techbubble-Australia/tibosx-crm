@@ -20,6 +20,7 @@ import {
   logContractFieldChanges,
   logContractStatusChange,
 } from "../lib/contract-activity";
+import { CONTRACT_INVOICE_STATUSES } from "../lib/contract-invoice-status";
 
 const router: IRouter = Router();
 
@@ -31,7 +32,9 @@ const contractBaseSchema = z.object({
   clientId: z.string().min(1),
   type: z.enum(CONTRACT_TYPES),
   startDate: z.coerce.date(),
-  endDate: z.union([z.coerce.date(), z.null()]).optional(),
+  endDate: z
+    .preprocess((val) => (val === "" || val === null || val === undefined ? null : val), z.union([z.coerce.date(), z.null()]))
+    .optional(),
   unit: z.enum(CONTRACT_UNITS).optional().nullable(),
   numberOfUnits: z.coerce.number().int().positive().optional().nullable(),
   currency: z.string().min(1).max(8),
@@ -44,10 +47,27 @@ const contractBaseSchema = z.object({
 
 const variationSchema = z.object({
   variationDate: z.coerce.date(),
-  comments: z.string().min(1).max(5000),
-  unit: z.enum(CONTRACT_UNITS).optional().nullable(),
-  rate: decimalField.optional().nullable(),
-  variationValue: decimalField.optional(),
+  variationEndDate: z
+    .preprocess((val) => (val === "" || val === null || val === undefined ? null : val), z.union([z.coerce.date(), z.null()]))
+    .optional(),
+  variationValue: decimalField,
+  comments: z.string().max(5000).optional().default(""),
+});
+
+const invoiceSchema = z.object({
+  reference: z.string().max(200).optional().default(""),
+  issueDate: z.coerce.date(),
+  dueDate: z.coerce.date(),
+  status: z.enum(CONTRACT_INVOICE_STATUSES).default("DRAFT"),
+  description: z.string().min(1).max(10000),
+  qty: z.coerce.number().int().positive(),
+  rate: decimalField,
+  taxRate: z.coerce.number().nonnegative().default(10),
+  fileUrl: z.string().min(1).optional().nullable(),
+});
+
+const invoiceStatusSchema = z.object({
+  status: z.enum(CONTRACT_INVOICE_STATUSES),
 });
 
 const moveToDraftSchema = z
@@ -77,10 +97,34 @@ function startOfUtcDay(date = new Date()): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
+function isValidEndDate(endDate: Date | null | undefined): boolean {
+  if (!endDate) return false;
+  return endDate.getUTCFullYear() >= 1971;
+}
+
+function normalizeEndDate(endDate: Date | null | undefined): Date | null {
+  if (!endDate || !isValidEndDate(endDate)) return null;
+  return endDate;
+}
+
 function isPastEndDate(endDate: Date): boolean {
+  if (!isValidEndDate(endDate)) return false;
   const end = startOfUtcDay(endDate);
   const today = startOfUtcDay();
   return today > end;
+}
+
+function resolveContractExpiryDate(contract: {
+  endDate: Date | null;
+  variations: Array<{ variationEndDate: Date | null; variationDate: Date }>;
+}): Date | null {
+  const withEnd = contract.variations
+    .filter((row) => row.variationEndDate && isValidEndDate(row.variationEndDate))
+    .sort((a, b) => b.variationEndDate!.getTime() - a.variationEndDate!.getTime());
+  if (withEnd.length > 0) {
+    return withEnd[0]!.variationEndDate;
+  }
+  return normalizeEndDate(contract.endDate);
 }
 
 type ResolvedFinancials = {
@@ -129,14 +173,20 @@ function resolveContractFinancials(
 
 async function expirePastDueContracts(): Promise<void> {
   const candidates = await prisma.contract.findMany({
-    where: {
-      status: "ACTIVE",
-      endDate: { not: null },
+    where: { status: "ACTIVE" },
+    select: {
+      id: true,
+      endDate: true,
+      variations: {
+        select: { variationEndDate: true, variationDate: true },
+      },
     },
-    select: { id: true, endDate: true },
   });
 
-  const toExpire = candidates.filter((row) => row.endDate && isPastEndDate(row.endDate));
+  const toExpire = candidates.filter((row) => {
+    const expiryDate = resolveContractExpiryDate(row);
+    return expiryDate && isPastEndDate(expiryDate);
+  });
   if (toExpire.length === 0) return;
 
   await prisma.$transaction(async (tx) => {
@@ -178,20 +228,25 @@ async function ensureContractOwner(ownerId: string | null | undefined) {
   if (!owner) throw new Error("OWNER_NOT_FOUND");
 }
 
-function variationValueForType(
-  type: ContractType,
-  input: z.infer<typeof variationSchema>,
-): number {
-  if (type === "T_AND_M") {
-    if (!input.unit || input.rate == null) {
-      throw new Error("VARIATION_TM_FIELDS_REQUIRED");
+async function allocateInvoiceNumber(): Promise<string> {
+  const rows = await prisma.contractInvoice.findMany({
+    select: { invoiceNumber: true },
+  });
+  let max = 0;
+  for (const row of rows) {
+    const match = row.invoiceNumber.match(/^INV-(\d+)$/i);
+    if (match) {
+      max = Math.max(max, Number.parseInt(match[1] ?? "0", 10));
     }
-    return input.rate;
   }
-  if (input.variationValue == null) {
-    throw new Error("VARIATION_VALUE_REQUIRED");
-  }
-  return input.variationValue;
+  return `INV-${String(max + 1).padStart(4, "0")}`;
+}
+
+function computeInvoiceAmounts(qty: number, rate: number, taxRate: number) {
+  const amount = qty * rate;
+  const taxAmount = amount * (taxRate / 100);
+  const totalAmount = amount + taxAmount;
+  return { amount, taxAmount, totalAmount };
 }
 
 function serializeActivityLog(row: {
@@ -232,6 +287,7 @@ function serializeVariation(row: {
   id: string;
   contractId: string;
   variationDate: Date;
+  variationEndDate: Date | null;
   comments: string;
   unit: string | null;
   rate: { toString(): string } | number | null;
@@ -242,11 +298,52 @@ function serializeVariation(row: {
     id: row.id,
     contractId: row.contractId,
     variationDate: row.variationDate.toISOString(),
+    variationEndDate: row.variationEndDate?.toISOString() ?? null,
     comments: row.comments,
     unit: row.unit,
     rate: row.rate == null ? null : toNumber(row.rate),
     variationValue: toNumber(row.variationValue),
     createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function serializeInvoice(row: {
+  id: string;
+  contractId: string;
+  invoiceNumber: string;
+  reference: string;
+  issueDate: Date;
+  dueDate: Date;
+  status: string;
+  description: string;
+  qty: number;
+  rate: { toString(): string } | number;
+  amount: { toString(): string } | number;
+  taxRate: { toString(): string } | number;
+  taxAmount: { toString(): string } | number;
+  totalAmount: { toString(): string } | number;
+  fileUrl: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: row.id,
+    contractId: row.contractId,
+    invoiceNumber: row.invoiceNumber,
+    reference: row.reference,
+    issueDate: row.issueDate.toISOString(),
+    dueDate: row.dueDate.toISOString(),
+    status: row.status,
+    description: row.description,
+    qty: row.qty,
+    rate: toNumber(row.rate),
+    amount: toNumber(row.amount),
+    taxRate: toNumber(row.taxRate),
+    taxAmount: toNumber(row.taxAmount),
+    totalAmount: toNumber(row.totalAmount),
+    fileUrl: row.fileUrl,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
@@ -273,15 +370,35 @@ function serializeContract(row: {
   updatedAt: Date;
   client?: { id: string; name: string } | null;
   owner?: { id: string; name: string | null; email: string } | null;
-  variations?: Array<{
+    variations?: Array<{
     id: string;
     contractId: string;
     variationDate: Date;
+    variationEndDate: Date | null;
     comments: string;
     unit: string | null;
     rate: { toString(): string } | number | null;
     variationValue: { toString(): string } | number;
     createdAt: Date;
+  }>;
+  invoices?: Array<{
+    id: string;
+    contractId: string;
+    invoiceNumber: string;
+    reference: string;
+    issueDate: Date;
+    dueDate: Date;
+    status: string;
+    description: string;
+    qty: number;
+    rate: { toString(): string } | number;
+    amount: { toString(): string } | number;
+    taxRate: { toString(): string } | number;
+    taxAmount: { toString(): string } | number;
+    totalAmount: { toString(): string } | number;
+    fileUrl: string | null;
+    createdAt: Date;
+    updatedAt: Date;
   }>;
   activityLogs?: Array<{
     id: string;
@@ -314,7 +431,7 @@ function serializeContract(row: {
     typeLabel: CONTRACT_TYPE_LABELS[type] ?? row.type,
     status: row.status,
     startDate: row.startDate.toISOString(),
-    endDate: row.endDate?.toISOString() ?? null,
+    endDate: normalizeEndDate(row.endDate)?.toISOString() ?? null,
     unit: row.unit,
     numberOfUnits: row.numberOfUnits,
     currency: row.currency,
@@ -330,6 +447,7 @@ function serializeContract(row: {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     variations: row.variations?.map(serializeVariation) ?? undefined,
+    invoices: row.invoices?.map(serializeInvoice) ?? undefined,
     activityLogs: row.activityLogs?.map(serializeActivityLog) ?? undefined,
   };
 }
@@ -346,6 +464,7 @@ const activityInclude = {
 const detailInclude = {
   ...contractInclude,
   variations: { orderBy: { variationDate: "desc" as const } },
+  invoices: { orderBy: { issueDate: "desc" as const } },
   activityLogs: {
     orderBy: { createdAt: "desc" as const },
     include: activityInclude,
@@ -413,7 +532,7 @@ router.post("/", async (req: AuthRequest, res) => {
           type: data.type,
           status: "DRAFT",
           startDate: data.startDate,
-          endDate: data.endDate ?? null,
+          endDate: normalizeEndDate(data.endDate ?? null),
           unit: financials.unit,
           numberOfUnits: financials.numberOfUnits,
           currency: data.currency,
@@ -493,7 +612,10 @@ router.put("/:id", async (req: AuthRequest, res) => {
       type: nextType,
       status: existing.status,
       startDate: data.startDate ?? existing.startDate,
-      endDate: data.endDate !== undefined ? data.endDate : existing.endDate,
+      endDate:
+        data.endDate !== undefined
+          ? normalizeEndDate(data.endDate)
+          : normalizeEndDate(existing.endDate),
       unit: financials.unit,
       numberOfUnits: financials.numberOfUnits,
       currency: data.currency ?? existing.currency,
@@ -713,17 +835,19 @@ router.post("/:id/variations", async (req, res) => {
     if (contract.status !== "ACTIVE") {
       return res.status(400).json({ error: "Variations can only be added to active contracts" });
     }
+    if (contract.type === "T_AND_M" && !input.variationEndDate) {
+      return res.status(400).json({ error: "Variation end date is required for T&M contracts" });
+    }
 
-    const variationValue = variationValueForType(contract.type as ContractType, input);
+    const variationValue = input.variationValue;
 
     const row = await prisma.$transaction(async (tx) => {
       const created = await tx.contractVariation.create({
         data: {
           contractId: contract.id,
           variationDate: input.variationDate,
-          comments: input.comments.trim(),
-          unit: contract.type === "T_AND_M" ? input.unit : null,
-          rate: contract.type === "T_AND_M" ? input.rate : null,
+          variationEndDate: normalizeEndDate(input.variationEndDate ?? null),
+          comments: input.comments?.trim() ?? "",
           variationValue,
         },
       });
@@ -740,14 +864,84 @@ router.post("/:id/variations", async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
     }
-    if (error instanceof Error && error.message === "VARIATION_TM_FIELDS_REQUIRED") {
-      return res.status(400).json({ error: "Unit and rate are required for T&M variations" });
-    }
-    if (error instanceof Error && error.message === "VARIATION_VALUE_REQUIRED") {
-      return res.status(400).json({ error: "Variation value is required" });
-    }
     console.error("Error adding contract variation:", error);
     res.status(500).json({ error: "Failed to add variation" });
+  }
+});
+
+router.post("/:id/invoices", async (req, res) => {
+  try {
+    const input = invoiceSchema.parse(req.body);
+    const contract = await prisma.contract.findUnique({ where: { id: req.params.id } });
+    if (!contract) return res.status(404).json({ error: "Not found" });
+    if (contract.status !== "ACTIVE") {
+      return res.status(400).json({ error: "Invoices can only be added to active contracts" });
+    }
+
+    const invoiceNumber = await allocateInvoiceNumber();
+    const { amount, taxAmount, totalAmount } = computeInvoiceAmounts(
+      input.qty,
+      input.rate,
+      input.taxRate,
+    );
+
+    const row = await prisma.$transaction(async (tx) => {
+      const created = await tx.contractInvoice.create({
+        data: {
+          contractId: contract.id,
+          invoiceNumber,
+          reference: input.reference ?? "",
+          issueDate: input.issueDate,
+          dueDate: input.dueDate,
+          status: input.status,
+          description: input.description.trim(),
+          qty: input.qty,
+          rate: input.rate,
+          amount,
+          taxRate: input.taxRate,
+          taxAmount,
+          totalAmount,
+          fileUrl: input.fileUrl ?? null,
+        },
+      });
+      const nextConsumed = toNumber(contract.consumed) + totalAmount;
+      await tx.contract.update({
+        where: { id: contract.id },
+        data: { consumed: nextConsumed },
+      });
+      return created;
+    });
+
+    res.status(201).json({ data: serializeInvoice(row) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error adding contract invoice:", error);
+    res.status(500).json({ error: "Failed to add invoice" });
+  }
+});
+
+router.patch("/:id/invoices/:invoiceId", async (req, res) => {
+  try {
+    const body = invoiceStatusSchema.parse(req.body);
+    const invoice = await prisma.contractInvoice.findFirst({
+      where: { id: req.params.invoiceId, contractId: req.params.id },
+    });
+    if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+
+    const row = await prisma.contractInvoice.update({
+      where: { id: invoice.id },
+      data: { status: body.status },
+    });
+
+    res.json({ data: serializeInvoice(row) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error updating contract invoice:", error);
+    res.status(500).json({ error: "Failed to update invoice" });
   }
 });
 

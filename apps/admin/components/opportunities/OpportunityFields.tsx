@@ -21,12 +21,16 @@ const inputClass =
 type ClientOption = { id: string; name: string; status: string };
 type ContactOption = { id: string; name: string; email: string };
 
+type UserOption = { id: string; name: string | null; email: string; active: boolean };
+
 export type OpportunityFormValues = {
   name: string;
   clientId: string;
   location: string;
   type: OpportunityType;
   contactId: string | null;
+  ownerId?: string | null;
+  ownerName?: string;
   status: OpportunityStatus;
   currency: string;
   amount: number;
@@ -37,14 +41,17 @@ export type OpportunityFormValues = {
 type Props = {
   defaults?: Partial<OpportunityFormValues>;
   presetClientId?: string;
+  defaultOwnerId?: string;
 };
 
-export function OpportunityFields({ defaults = {}, presetClientId = "" }: Props) {
+export function OpportunityFields({ defaults = {}, presetClientId = "", defaultOwnerId }: Props) {
   const countryOptions = useMemo(() => getSortedCountryOptions(), []);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [contacts, setContacts] = useState<ContactOption[]>([]);
+  const [users, setUsers] = useState<UserOption[]>([]);
   const [clientId, setClientId] = useState(defaults.clientId ?? presetClientId ?? "");
   const [contactId, setContactId] = useState(defaults.contactId ?? "");
+  const [ownerId, setOwnerId] = useState(defaults.ownerId ?? defaultOwnerId ?? "");
 
   useEffect(() => {
     void adminFetch("/api/admin/clients")
@@ -77,6 +84,27 @@ export function OpportunityFields({ defaults = {}, presetClientId = "" }: Props)
       })
       .catch(() => setContacts([]));
   }, [clientId, defaults.contactId]);
+
+  useEffect(() => {
+    if (defaults.ownerId) setOwnerId(defaults.ownerId);
+    else if (!ownerId && defaultOwnerId) setOwnerId(defaultOwnerId);
+  }, [defaults.ownerId, defaultOwnerId, ownerId]);
+
+  useEffect(() => {
+    void adminFetch("/api/admin/users")
+      .then((res) => res.json())
+      .then((data) => {
+        const list = (data.data ?? []) as UserOption[];
+        setUsers(list.filter((user) => user.active || user.id === defaults.ownerId || user.id === defaultOwnerId));
+      })
+      .catch(console.error);
+  }, [defaults.ownerId, defaultOwnerId]);
+
+  const ownerDisplayName =
+    defaults.ownerName ||
+    users.find((user) => user.id === ownerId)?.name ||
+    users.find((user) => user.id === ownerId)?.email ||
+    "";
 
   return (
     <>
@@ -145,13 +173,35 @@ export function OpportunityFields({ defaults = {}, presetClientId = "" }: Props)
         ) : null}
       </div>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Status *</label>
-        <select name="status" required defaultValue={defaults.status ?? "DRAFT"} className={inputClass}>
-          {OPPORTUNITY_STATUSES.map((status) => (
-            <option key={status} value={status}>{OPPORTUNITY_STATUS_LABELS[status]}</option>
-          ))}
-        </select>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Owner *</label>
+          <select
+            name="ownerId"
+            required
+            value={ownerId}
+            onChange={(e) => setOwnerId(e.target.value)}
+            className={inputClass}
+          >
+            <option value="">Select owner…</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.name || user.email}
+              </option>
+            ))}
+          </select>
+          {!ownerId && ownerDisplayName ? (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Current owner: {ownerDisplayName}</p>
+          ) : null}
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Status *</label>
+          <select name="status" required defaultValue={defaults.status ?? "DRAFT"} className={inputClass}>
+            {OPPORTUNITY_STATUSES.map((status) => (
+              <option key={status} value={status}>{OPPORTUNITY_STATUS_LABELS[status]}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -210,6 +260,7 @@ export function readOpportunityFormData(formData: FormData) {
     location: String(formData.get("location") ?? "").trim(),
     type: String(formData.get("type") ?? "").trim(),
     contactId: contactRaw || null,
+    ownerId: String(formData.get("ownerId") ?? "").trim() || null,
     status: String(formData.get("status") ?? "DRAFT").trim(),
     currency: String(formData.get("currency") ?? "").trim(),
     amount: formData.get("amount"),

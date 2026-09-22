@@ -33,6 +33,8 @@ interface OpportunityRow {
   typeLabel: string;
   contactId: string | null;
   contactName: string;
+  ownerId: string | null;
+  ownerName: string;
   currency: string;
   amount: number;
   status: OpportunityStatus;
@@ -52,7 +54,7 @@ function formatValue(row: OpportunityRow): string {
   return `${row.currency} ${new Intl.NumberFormat("en-US").format(row.amount)}`;
 }
 
-type OpportunitySortKey = "name" | "clientName" | "location" | "type" | "amount" | "status" | "order";
+type OpportunitySortKey = "name" | "clientName" | "location" | "type" | "amount" | "status" | "order" | "ownerName";
 type SortDir = "asc" | "desc";
 
 const inlineInputClass =
@@ -167,6 +169,9 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
         case "status":
           cmp = a.status.localeCompare(b.status);
           break;
+        case "ownerName":
+          cmp = a.ownerName.localeCompare(b.ownerName);
+          break;
       }
       if (cmp === 0) cmp = a.name.localeCompare(b.name);
       return sortDir === "asc" ? cmp : -cmp;
@@ -207,6 +212,7 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
         row.location,
         row.typeLabel,
         row.contactName,
+        row.ownerName,
         row.currency,
         row.amount,
         row.status,
@@ -552,6 +558,7 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
             <span>{row.contactName || "—"}</span>
           </InlineEditableCell>
         </td>
+        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.ownerName || "—"}</td>
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
           <InlineEditableCell
             label={`Edit type for ${row.name}`}
@@ -746,6 +753,9 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Contact</th>
                 <th className="px-4 py-3 text-left">
+                  <SortHeader label="Owner" sortKey="ownerName" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                </th>
+                <th className="px-4 py-3 text-left">
                   <SortHeader label="Type" sortKey="type" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                 </th>
                 <th className="px-4 py-3 text-left">
@@ -765,13 +775,13 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {filteredByClient.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={11} className="px-4 py-8 text-center text-gray-400">
                     No {activeFilter ? "active" : "inactive"} opportunities yet.
                   </td>
                 </tr>
               ) : totalItems === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">No opportunities match your search.</td>
+                  <td colSpan={11} className="px-4 py-8 text-center text-gray-400">No opportunities match your search.</td>
                 </tr>
               ) : (
                 paginated.map((row) => renderTableRow(row))

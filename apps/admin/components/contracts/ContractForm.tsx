@@ -17,6 +17,12 @@ import {
   type ContractType,
   type ContractUnit,
 } from "@/lib/contract-types";
+import {
+  CONTRACT_INVOICE_STATUSES,
+  CONTRACT_INVOICE_STATUS_COLORS,
+  CONTRACT_INVOICE_STATUS_LABELS,
+  type ContractInvoiceStatus,
+} from "@/lib/contract-invoice-status";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
@@ -25,10 +31,28 @@ const readOnlyClass = "bg-gray-50 dark:bg-gray-900 cursor-not-allowed";
 export type ContractVariation = {
   id: string;
   variationDate: string;
+  variationEndDate?: string | null;
   comments: string;
   unit: string | null;
   rate: number | null;
   variationValue: number;
+};
+
+export type ContractInvoice = {
+  id: string;
+  invoiceNumber: string;
+  reference: string;
+  issueDate: string;
+  dueDate: string;
+  status: ContractInvoiceStatus;
+  description: string;
+  qty: number;
+  rate: number;
+  amount: number;
+  taxRate: number;
+  taxAmount: number;
+  totalAmount: number;
+  fileUrl: string | null;
 };
 
 export type ContractFormValues = {
@@ -53,6 +77,7 @@ export type ContractFormValues = {
   comments: string;
   fileUrls: string[];
   variations: ContractVariation[];
+  invoices?: ContractInvoice[];
 };
 
 type UserOption = { id: string; name: string | null; email: string; active: boolean };
@@ -68,6 +93,17 @@ function toDateInput(value?: string | null) {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
+  if (date.getUTCFullYear() < 1971) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+function todayDateInput() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function defaultDueDateInput() {
+  const date = new Date();
+  date.setDate(date.getDate() + 30);
   return date.toISOString().slice(0, 10);
 }
 
@@ -98,18 +134,31 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const [contractValue, setContractValue] = useState(
     defaults.contractValue != null ? String(defaults.contractValue) : "",
   );
-  const [consumed] = useState(String(defaults.consumed ?? "0"));
+  const [consumed, setConsumed] = useState(String(defaults.consumed ?? "0"));
   const [comments, setComments] = useState(defaults.comments ?? "");
   const [fileUrls, setFileUrls] = useState<string[]>(defaults.fileUrls ?? []);
   const [variations, setVariations] = useState<ContractVariation[]>(defaults.variations ?? []);
+  const [invoices, setInvoices] = useState<ContractInvoice[]>(defaults.invoices ?? []);
   const [uploading, setUploading] = useState(false);
   const [showVariationForm, setShowVariationForm] = useState(false);
   const [variationDate, setVariationDate] = useState("");
+  const [variationEndDate, setVariationEndDate] = useState("");
   const [variationComments, setVariationComments] = useState("");
-  const [variationUnit, setVariationUnit] = useState<ContractUnit | "">("");
-  const [variationRate, setVariationRate] = useState("");
   const [variationValue, setVariationValue] = useState("");
   const [addingVariation, setAddingVariation] = useState(false);
+  const [showInvoiceForm, setShowInvoiceForm] = useState(false);
+  const [invoiceReference, setInvoiceReference] = useState("");
+  const [invoiceIssueDate, setInvoiceIssueDate] = useState(todayDateInput());
+  const [invoiceDueDate, setInvoiceDueDate] = useState(defaultDueDateInput());
+  const [invoiceStatus, setInvoiceStatus] = useState<ContractInvoiceStatus>("DRAFT");
+  const [invoiceDescription, setInvoiceDescription] = useState("");
+  const [invoiceQty, setInvoiceQty] = useState("");
+  const [invoiceRate, setInvoiceRate] = useState("");
+  const [invoiceTaxRate, setInvoiceTaxRate] = useState("10");
+  const [invoiceFileUrl, setInvoiceFileUrl] = useState("");
+  const [addingInvoice, setAddingInvoice] = useState(false);
+  const [invoiceUploading, setInvoiceUploading] = useState(false);
+  const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
 
   const isEditable = status === "DRAFT";
   const showRate = type !== "FIXED_PRICE";
@@ -119,6 +168,20 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const contractValueRequired = type === "FIXED_PRICE";
   const numberOfUnitsReadOnly = !isEditable;
   const canAddVariations = Boolean(defaults.id) && status === "ACTIVE";
+  const canAddInvoices = Boolean(defaults.id) && status === "ACTIVE";
+
+  const invoicePreviewAmount = useMemo(() => {
+    const qty = Number.parseInt(invoiceQty, 10) || 0;
+    const rate = Number.parseFloat(invoiceRate) || 0;
+    return qty * rate;
+  }, [invoiceQty, invoiceRate]);
+
+  const invoicePreviewTaxAmount = useMemo(() => {
+    const taxRate = Number.parseFloat(invoiceTaxRate) || 0;
+    return invoicePreviewAmount * (taxRate / 100);
+  }, [invoicePreviewAmount, invoiceTaxRate]);
+
+  const invoicePreviewTotal = invoicePreviewAmount + invoicePreviewTaxAmount;
 
   const totalVariation = useMemo(
     () => variations.reduce((sum, row) => sum + row.variationValue, 0),
@@ -186,51 +249,148 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
     }
   }
 
+  async function uploadInvoiceFile(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    setInvoiceUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("resume", file);
+      const res = await adminFetch("/api/upload/resume", { method: "POST", body: formData });
+      const data = await res.json();
+      const url = readUploadImageUrlFromJson(data);
+      if (url) setInvoiceFileUrl(url);
+    } catch (error) {
+      console.error(error);
+      alert("Failed to upload invoice file");
+    } finally {
+      setInvoiceUploading(false);
+    }
+  }
+
   async function addVariation() {
     if (!defaults.id || !canAddVariations) return;
-    if (!variationDate || !variationComments.trim()) {
-      alert("Variation date and comments are required.");
+    if (!variationDate) {
+      alert("Variation start date is required.");
+      return;
+    }
+    const value = Number.parseFloat(variationValue);
+    if (Number.isNaN(value)) {
+      alert("Variation value is required.");
+      return;
+    }
+    if (type === "T_AND_M" && !variationEndDate) {
+      alert("Variation end date is required for T&M contracts.");
       return;
     }
     setAddingVariation(true);
     try {
-      const body: Record<string, unknown> = {
-        variationDate,
-        comments: variationComments.trim(),
-      };
-      if (type === "T_AND_M") {
-        if (!variationUnit || !variationRate) {
-          alert("Unit and rate are required for T&M variations.");
-          return;
-        }
-        body.unit = variationUnit;
-        body.rate = Number.parseFloat(variationRate);
-      } else {
-        const value = Number.parseFloat(variationValue);
-        if (Number.isNaN(value)) {
-          alert("Variation value is required.");
-          return;
-        }
-        body.variationValue = value;
-      }
       const res = await adminFetch(`/api/admin/contracts/${defaults.id}/variations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          variationDate,
+          variationEndDate: variationEndDate || null,
+          variationValue: value,
+          comments: variationComments.trim(),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to add variation");
       setVariations((prev) => [data.data as ContractVariation, ...prev]);
       setShowVariationForm(false);
       setVariationDate("");
+      setVariationEndDate("");
       setVariationComments("");
-      setVariationUnit("");
-      setVariationRate("");
       setVariationValue("");
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to add variation");
     } finally {
       setAddingVariation(false);
+    }
+  }
+
+  async function addInvoice() {
+    if (!defaults.id || !canAddInvoices) return;
+    const qty = Number.parseInt(invoiceQty, 10);
+    const rate = Number.parseFloat(invoiceRate);
+    const taxRate = Number.parseFloat(invoiceTaxRate);
+    if (!invoiceIssueDate || !invoiceDueDate) {
+      alert("Issue date and due date are required.");
+      return;
+    }
+    if (!invoiceDescription.trim()) {
+      alert("Description is required.");
+      return;
+    }
+    if (!qty || qty <= 0) {
+      alert("Qty is required.");
+      return;
+    }
+    if (Number.isNaN(rate) || rate < 0) {
+      alert("Rate is required.");
+      return;
+    }
+    if (Number.isNaN(taxRate) || taxRate < 0) {
+      alert("Tax rate is required.");
+      return;
+    }
+    setAddingInvoice(true);
+    try {
+      const res = await adminFetch(`/api/admin/contracts/${defaults.id}/invoices`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reference: invoiceReference.trim(),
+          issueDate: invoiceIssueDate,
+          dueDate: invoiceDueDate,
+          status: invoiceStatus,
+          description: invoiceDescription.trim(),
+          qty,
+          rate,
+          taxRate,
+          fileUrl: invoiceFileUrl || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to add invoice");
+      const created = data.data as ContractInvoice;
+      setInvoices((prev) => [created, ...prev]);
+      setConsumed((prev) => String((Number.parseFloat(prev) || 0) + created.totalAmount));
+      setShowInvoiceForm(false);
+      setInvoiceReference("");
+      setInvoiceIssueDate(todayDateInput());
+      setInvoiceDueDate(defaultDueDateInput());
+      setInvoiceStatus("DRAFT");
+      setInvoiceDescription("");
+      setInvoiceQty("");
+      setInvoiceRate("");
+      setInvoiceTaxRate("10");
+      setInvoiceFileUrl("");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to add invoice");
+    } finally {
+      setAddingInvoice(false);
+    }
+  }
+
+  async function updateInvoiceStatus(invoiceId: string, nextStatus: ContractInvoiceStatus) {
+    if (!defaults.id) return;
+    setUpdatingInvoiceId(invoiceId);
+    try {
+      const res = await adminFetch(`/api/admin/contracts/${defaults.id}/invoices/${invoiceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to update invoice");
+      const updated = data.data as ContractInvoice;
+      setInvoices((prev) => prev.map((row) => (row.id === invoiceId ? updated : row)));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to update invoice status");
+    } finally {
+      setUpdatingInvoiceId(null);
     }
   }
 
@@ -461,16 +621,21 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
             Contract value{contractValueRequired ? " *" : ""}
           </label>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={contractValue}
-            onChange={(e) => setContractValue(e.target.value)}
-            required={contractValueRequired}
-            readOnly={contractValueReadOnly}
-            className={`${inputClass} ${contractValueReadOnly ? readOnlyClass : ""}`}
-          />
+          {contractValueReadOnly ? (
+            <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
+              {formatMoney(currency, Number.parseFloat(contractValue) || 0)}
+            </p>
+          ) : (
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={contractValue}
+              onChange={(e) => setContractValue(e.target.value)}
+              required={contractValueRequired}
+              className={inputClass}
+            />
+          )}
           {type === "T_AND_M" ? (
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Calculated as No. of units × Rate</p>
           ) : null}
@@ -483,14 +648,9 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Consumed</label>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={consumed}
-            readOnly
-            className={`${inputClass} ${readOnlyClass}`}
-          />
+          <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
+            {formatMoney(currency, Number.parseFloat(consumed) || 0)}
+          </p>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Remaining</label>
@@ -516,25 +676,43 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
             ) : null}
           </div>
           {!canAddVariations && status !== "ACTIVE" ? (
-            <p className="text-sm text-gray-400">Variations can be added once the contract is active.</p>
+            <p className="text-sm text-gray-400">Variations can be added when the contract is active.</p>
           ) : null}
           {showVariationForm ? (
             <div className="mb-4 space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/40">
-              {type === "T_AND_M" ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <select value={variationUnit} onChange={(e) => setVariationUnit(e.target.value as ContractUnit)} className={inputClass}>
-                    <option value="">Unit *</option>
-                    {CONTRACT_UNITS.map((value) => (
-                      <option key={value} value={value}>{CONTRACT_UNIT_LABELS[value]}</option>
-                    ))}
-                  </select>
-                  <input type="number" min="0" step="0.01" value={variationRate} onChange={(e) => setVariationRate(e.target.value)} placeholder="Rate *" className={inputClass} />
-                </div>
-              ) : (
-                <input type="number" min="0" step="0.01" value={variationValue} onChange={(e) => setVariationValue(e.target.value)} placeholder="Variation value *" className={inputClass} />
-              )}
-              <input type="date" value={variationDate} onChange={(e) => setVariationDate(e.target.value)} className={inputClass} />
-              <textarea value={variationComments} onChange={(e) => setVariationComments(e.target.value)} rows={3} placeholder="Variation comments *" className={inputClass} />
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={variationValue}
+                onChange={(e) => setVariationValue(e.target.value)}
+                placeholder={`Variation value (${currency}) *`}
+                className={inputClass}
+              />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <input
+                  type="date"
+                  value={variationDate}
+                  onChange={(e) => setVariationDate(e.target.value)}
+                  className={inputClass}
+                  aria-label="Variation start date"
+                />
+                <input
+                  type="date"
+                  value={variationEndDate}
+                  onChange={(e) => setVariationEndDate(e.target.value)}
+                  className={inputClass}
+                  aria-label="Variation end date"
+                  required={type === "T_AND_M"}
+                />
+              </div>
+              <textarea
+                value={variationComments}
+                onChange={(e) => setVariationComments(e.target.value)}
+                rows={3}
+                placeholder="Comments (optional)"
+                className={inputClass}
+              />
               <div className="flex gap-2">
                 <button type="button" onClick={() => void addVariation()} disabled={addingVariation} className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black">
                   {addingVariation ? "Adding…" : "Save variation"}
@@ -553,10 +731,147 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                 <li key={variation.id} className="py-3 text-sm">
                   <p className="font-medium text-gray-900 dark:text-gray-100">
                     {formatMoney(currency, variation.variationValue)} · {formatDate(variation.variationDate)}
+                    {variation.variationEndDate ? ` – ${formatDate(variation.variationEndDate)}` : ""}
                   </p>
-                  <p className="text-gray-500 dark:text-gray-400">{variation.comments}</p>
+                  {variation.comments ? (
+                    <p className="text-gray-500 dark:text-gray-400">{variation.comments}</p>
+                  ) : null}
                 </li>
               ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
+
+      {defaults.id ? (
+        <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100">Invoices</h3>
+            {canAddInvoices ? (
+              <button
+                type="button"
+                onClick={() => setShowInvoiceForm((v) => !v)}
+                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+              >
+                <Plus className="h-4 w-4" />
+                Add invoice
+              </button>
+            ) : null}
+          </div>
+          {!canAddInvoices && status !== "ACTIVE" ? (
+            <p className="text-sm text-gray-400">Invoices can be added when the contract is active.</p>
+          ) : null}
+          {showInvoiceForm ? (
+            <div className="mb-4 space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/40">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <input
+                  value={invoiceReference}
+                  onChange={(e) => setInvoiceReference(e.target.value)}
+                  placeholder="Reference"
+                  className={inputClass}
+                />
+                <select
+                  value={invoiceStatus}
+                  onChange={(e) => setInvoiceStatus(e.target.value as ContractInvoiceStatus)}
+                  className={inputClass}
+                >
+                  {CONTRACT_INVOICE_STATUSES.map((value) => (
+                    <option key={value} value={value}>{CONTRACT_INVOICE_STATUS_LABELS[value]}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Issue date *</label>
+                  <input type="date" value={invoiceIssueDate} onChange={(e) => setInvoiceIssueDate(e.target.value)} required className={inputClass} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Due date *</label>
+                  <input type="date" value={invoiceDueDate} onChange={(e) => setInvoiceDueDate(e.target.value)} required className={inputClass} />
+                </div>
+              </div>
+              <textarea
+                value={invoiceDescription}
+                onChange={(e) => setInvoiceDescription(e.target.value)}
+                rows={3}
+                placeholder="Description *"
+                className={inputClass}
+              />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <input type="number" min="1" step="1" value={invoiceQty} onChange={(e) => setInvoiceQty(e.target.value)} placeholder="Qty *" className={inputClass} />
+                <input type="number" min="0" step="0.01" value={invoiceRate} onChange={(e) => setInvoiceRate(e.target.value)} placeholder="Rate *" className={inputClass} />
+                <input type="number" min="0" step="0.01" value={invoiceTaxRate} onChange={(e) => setInvoiceTaxRate(e.target.value)} placeholder="Tax rate % *" className={inputClass} />
+                <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
+                  Amount: {formatMoney(currency, invoicePreviewAmount)}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
+                  Tax amount: {formatMoney(currency, invoicePreviewTaxAmount)}
+                </p>
+                <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
+                  Total amount: {formatMoney(currency, invoicePreviewTotal)}
+                </p>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Invoice file</label>
+                <input type="file" onChange={(e) => void uploadInvoiceFile(e.target.files)} className="block w-full text-sm" />
+                {invoiceUploading ? <p className="mt-1 text-xs text-gray-500">Uploading…</p> : null}
+                {invoiceFileUrl ? (
+                  <a href={invoiceFileUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-sm text-blue-600 hover:underline dark:text-blue-400">
+                    View uploaded file
+                  </a>
+                ) : null}
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => void addInvoice()} disabled={addingInvoice} className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black">
+                  {addingInvoice ? "Adding…" : "Save invoice"}
+                </button>
+                <button type="button" onClick={() => setShowInvoiceForm(false)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm dark:border-gray-600">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {invoices.length === 0 ? (
+            <p className="text-sm text-gray-400">No invoices yet.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+              {invoices.map((invoice) => {
+                const colors = CONTRACT_INVOICE_STATUS_COLORS[invoice.status] ?? CONTRACT_INVOICE_STATUS_COLORS.DRAFT;
+                const readOnly = invoice.status !== "DRAFT";
+                return (
+                  <li key={invoice.id} className="space-y-2 py-4 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-medium text-gray-900 dark:text-gray-100">{invoice.invoiceNumber}</p>
+                      <select
+                        value={invoice.status}
+                        disabled={updatingInvoiceId === invoice.id}
+                        onChange={(e) => void updateInvoiceStatus(invoice.id, e.target.value as ContractInvoiceStatus)}
+                        className={`rounded-full border-0 px-2.5 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`}
+                      >
+                        {CONTRACT_INVOICE_STATUSES.map((value) => (
+                          <option key={value} value={value}>{CONTRACT_INVOICE_STATUS_LABELS[value]}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className={`grid grid-cols-1 gap-2 sm:grid-cols-2 ${readOnly ? "text-gray-500" : ""}`}>
+                      <p>Reference: {invoice.reference || "—"}</p>
+                      <p>Issue: {formatDate(invoice.issueDate)} · Due: {formatDate(invoice.dueDate)}</p>
+                      <p className="sm:col-span-2">{invoice.description}</p>
+                      <p>Qty: {invoice.qty} × {formatMoney(currency, invoice.rate)}</p>
+                      <p>Amount: {formatMoney(currency, invoice.amount)}</p>
+                      <p>Tax ({invoice.taxRate}%): {formatMoney(currency, invoice.taxAmount)}</p>
+                      <p className="font-medium">Total: {formatMoney(currency, invoice.totalAmount)}</p>
+                    </div>
+                    {invoice.fileUrl ? (
+                      <a href={invoice.fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline dark:text-blue-400">
+                        View invoice file
+                      </a>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>

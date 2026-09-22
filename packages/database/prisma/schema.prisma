@@ -349,6 +349,8 @@ model Opportunity {
   order     Int      @default(0)
   /// Whether this opportunity is still active (false = archived / no longer pursued).
   active    Boolean  @default(true)
+  ownerId   String?
+  owner     AdminUser? @relation("OpportunityOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   jobs      JobListing[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -358,6 +360,7 @@ model Opportunity {
   @@index([status])
   @@index([order])
   @@index([active])
+  @@index([ownerId])
 }
 
 model Contract {
@@ -386,6 +389,7 @@ model Contract {
   ownerId        String?
   owner          AdminUser?          @relation("ContractOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   variations     ContractVariation[]
+  invoices       ContractInvoice[]
   activityLogs   ContractActivityLog[]
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
@@ -417,19 +421,45 @@ model ContractActivityLog {
 }
 
 model ContractVariation {
-  id             String   @id @default(cuid())
-  contractId     String
-  contract       Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  variationDate  DateTime
-  comments       String   @db.Text
-  /// HOUR | DAY for T&M variations
-  unit           String?
-  rate           Decimal? @db.Decimal(14, 2)
+  id               String    @id @default(cuid())
+  contractId       String
+  contract         Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  variationDate    DateTime
+  variationEndDate DateTime?
+  comments         String    @default("") @db.Text
+  /// HOUR | DAY for T&M variations (legacy)
+  unit             String?
+  rate             Decimal?  @db.Decimal(14, 2)
   /// Monetary value added to total variation
-  variationValue Decimal  @db.Decimal(14, 2)
-  createdAt      DateTime @default(now())
+  variationValue   Decimal   @db.Decimal(14, 2)
+  createdAt        DateTime  @default(now())
 
   @@index([contractId])
+}
+
+model ContractInvoice {
+  id            String   @id @default(cuid())
+  contractId    String
+  contract      Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  invoiceNumber String
+  reference     String   @default("")
+  issueDate     DateTime
+  dueDate       DateTime
+  /// DRAFT | AWAITING_PAYMENT | PAID | CANCELED
+  status        String   @default("DRAFT")
+  description   String   @db.Text
+  qty           Int
+  rate          Decimal  @db.Decimal(14, 2)
+  amount        Decimal  @db.Decimal(14, 2)
+  taxRate       Decimal  @default(10) @db.Decimal(5, 2)
+  taxAmount     Decimal  @db.Decimal(14, 2)
+  totalAmount   Decimal  @db.Decimal(14, 2)
+  fileUrl       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([contractId])
+  @@index([status])
 }
 
 model ClientContact {
@@ -590,6 +620,7 @@ model AdminUser {
   passwordNeedsReset Boolean @default(false)
   sourcedProfiles CandidateProfile[] @relation("ProfileSourcedBy")
   ownedContracts Contract[] @relation("ContractOwner")
+  ownedOpportunities Opportunity[] @relation("OpportunityOwner")
   contractActivities ContractActivityLog[] @relation("ContractActivityPerformer")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

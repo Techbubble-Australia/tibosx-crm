@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { prisma, type Prisma } from "@techbubble/database";
+import type { AuthRequest } from "../middleware/auth";
 import { OPPORTUNITY_STATUSES } from "../lib/opportunity-status";
 import { OPPORTUNITY_TYPES, OPPORTUNITY_TYPE_LABELS } from "../lib/opportunity-types";
 
@@ -16,6 +17,7 @@ const opportunitySchema = z.object({
   amount: z.coerce.number().positive("Estimated value must be greater than zero"),
   status: z.enum(OPPORTUNITY_STATUSES).default("DRAFT"),
   comments: z.string().max(5000).optional().default(""),
+  ownerId: z.string().min(1).optional().nullable(),
   order: z.number().int().optional(),
   active: z.boolean().optional(),
 });
@@ -46,6 +48,14 @@ async function ensureOpportunityClient(clientId: string) {
   return client;
 }
 
+async function ensureOpportunityOwner(ownerId: string | null | undefined) {
+  if (!ownerId) throw new Error("OWNER_REQUIRED");
+  const owner = await prisma.adminUser.findFirst({
+    where: { id: ownerId, active: true },
+  });
+  if (!owner) throw new Error("OWNER_NOT_FOUND");
+}
+
 async function ensureOpportunityContact(clientId: string, contactId: string | null | undefined) {
   if (!contactId) return;
   const contact = await prisma.clientContact.findFirst({
@@ -73,6 +83,7 @@ function serializeOpportunity(row: {
   location: string;
   type: string;
   contactId: string | null;
+  ownerId: string | null;
   currency: string;
   amount: { toString(): string } | number;
   status: string;
@@ -83,6 +94,7 @@ function serializeOpportunity(row: {
   updatedAt: Date;
   client?: { id: string; name: string; status: string } | null;
   contact?: { id: string; name: string; email: string } | null;
+  owner?: { id: string; name: string | null; email: string } | null;
   jobs?: Array<{ id: string; published: boolean }>;
 }) {
   const amount = typeof row.amount === "number" ? row.amount : Number(row.amount.toString());
@@ -98,6 +110,8 @@ function serializeOpportunity(row: {
     typeLabel: OPPORTUNITY_TYPE_LABELS[type] ?? row.type,
     contactId: row.contactId,
     contactName: row.contact?.name ?? "",
+    ownerId: row.ownerId,
+    ownerName: row.owner?.name || row.owner?.email || "",
     currency: row.currency,
     amount,
     status: row.status,
@@ -113,6 +127,7 @@ function serializeOpportunity(row: {
 const opportunityInclude = {
   client: { select: { id: true, name: true, status: true } },
   contact: { select: { id: true, name: true, email: true } },
+  owner: { select: { id: true, name: true, email: true } },
 };
 
 router.get("/next-order", async (_req, res) => {
@@ -195,11 +210,13 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", async (req: AuthRequest, res) => {
   try {
     const data = opportunitySchema.parse(req.body);
     await ensureOpportunityClient(data.clientId);
     await ensureOpportunityContact(data.clientId, data.contactId);
+    const ownerId = data.ownerId ?? req.user?.id ?? null;
+    await ensureOpportunityOwner(ownerId);
     const order = data.order && data.order > 0 ? data.order : await allocateNextOpportunityOrder();
 
     const row = await prisma.$transaction(async (tx) => {
@@ -210,6 +227,7 @@ router.post("/", async (req, res) => {
           location: data.location,
           type: data.type,
           contactId: data.contactId ?? null,
+          ownerId,
           currency: data.currency,
           amount: data.amount,
           status: data.status,
@@ -239,6 +257,12 @@ router.post("/", async (req, res) => {
     if (error instanceof Error && error.message === "CONTACT_NOT_FOUND") {
       return res.status(400).json({ error: "Contact not found for this client" });
     }
+    if (error instanceof Error && error.message === "OWNER_REQUIRED") {
+      return res.status(400).json({ error: "Owner is required" });
+    }
+    if (error instanceof Error && error.message === "OWNER_NOT_FOUND") {
+      return res.status(400).json({ error: "Owner not found" });
+    }
     console.error("Error creating opportunity:", error);
     res.status(500).json({ error: "Failed to create opportunity" });
   }
@@ -259,10 +283,14 @@ router.put("/:id", async (req, res) => {
     if (data.contactId !== undefined) {
       await ensureOpportunityContact(nextClientId, data.contactId);
     }
+    if (data.ownerId !== undefined) {
+      await ensureOpportunityOwner(data.ownerId);
+    }
 
     const updateData = {
       ...data,
       contactId: data.contactId === undefined ? undefined : data.contactId ?? null,
+      ownerId: data.ownerId === undefined ? undefined : data.ownerId ?? null,
       ...(data.status === "REJECTED" ? { active: false } : {}),
       ...(data.active === false ? { active: false } : {}),
     };

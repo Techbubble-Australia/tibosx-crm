@@ -224,6 +224,16 @@ function StatusSelect({
 
 type ClientOption = { id: string; name: string; status: string };
 type JobOption = { id: string; title: string; referenceNumber: string; published: boolean; clientId: string };
+type TabJob = {
+  id: string;
+  title: string;
+  referenceNumber: string;
+  published: boolean;
+  clientId: string;
+  clientName?: string;
+  country?: string | null;
+  workMode?: string | null;
+};
 
 function MoveApplicationDialog({
   app,
@@ -907,6 +917,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
   const [filterClient, setFilterClient] = useState("");
   const [filterStatus, setFilterStatus] = useState(initialStatusFilter ?? "");
   const [jobClientOptions, setJobClientOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [tabJobs, setTabJobs] = useState<TabJob[]>([]);
   const [statusChange, setStatusChange] = useState<{
     app: CareerApplication;
     status: CareerApplicationStatus;
@@ -979,10 +990,12 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
     void adminFetch("/api/admin/jobs/admin/all")
       .then((res) => res.json())
       .then((data) => {
-        const jobs = (data.data ?? []) as Array<{ published: boolean; clientId?: string; clientName?: string }>;
+        const jobs = (data.data ?? []) as TabJob[];
+        const publishedJobs = jobs.filter((job) => job.published === jobPublished);
+        setTabJobs(publishedJobs);
         const clients = new Map<string, string>();
-        for (const job of jobs) {
-          if (job.published === jobPublished && job.clientId && job.clientName) {
+        for (const job of publishedJobs) {
+          if (job.clientId && job.clientName) {
             clients.set(job.clientId, job.clientName);
           }
         }
@@ -1168,7 +1181,64 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
     }
   }
 
+  const searchFilteredApps = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return filteredByJobMeta;
+    return filteredByJobMeta.filter((app) => matchesSearch(applicationSearchHaystack(app), q));
+  }, [filteredByJobMeta, search]);
+
+  const hasClientJobsToShow = useMemo(() => {
+    if (!filterClient) return false;
+    return tabJobs.some(
+      (job) =>
+        job.clientId === filterClient &&
+        (!filterCountry || job.country === filterCountry) &&
+        (!filterWorkMode || job.workMode === filterWorkMode),
+    );
+  }, [filterClient, filterCountry, filterWorkMode, tabJobs]);
+
   const groupedByJob = useMemo(() => {
+    if (filterClient) {
+      const matchingJobs = tabJobs.filter(
+        (job) =>
+          job.clientId === filterClient &&
+          (!filterCountry || job.country === filterCountry) &&
+          (!filterWorkMode || job.workMode === filterWorkMode),
+      );
+
+      const appsByJobId = new Map<string, CareerApplication[]>();
+      for (const app of searchFilteredApps) {
+        if (!app.jobListingId) continue;
+        const list = appsByJobId.get(app.jobListingId) ?? [];
+        list.push(app);
+        appsByJobId.set(app.jobListingId, list);
+      }
+
+      const q = search.trim().toLowerCase();
+      return matchingJobs
+        .map((job) => ({
+          key: job.id,
+          group: {
+            label: job.title,
+            country: job.country ?? null,
+            workMode: job.workMode ?? null,
+            clientName: job.clientName ?? null,
+            items: appsByJobId.get(job.id) ?? [],
+          },
+        }))
+        .filter(({ group }) => {
+          if (!q) return true;
+          const haystack = buildSearchHaystack([
+            group.label,
+            group.country,
+            group.workMode,
+            group.clientName,
+          ]);
+          return matchesSearch(haystack, q) || group.items.length > 0;
+        })
+        .sort((a, b) => a.group.label.localeCompare(b.group.label));
+    }
+
     const map = new Map<
       string,
       {
@@ -1194,8 +1264,10 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
         });
       }
     }
-    return [...map.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label));
-  }, [paginated]);
+    return [...map.entries()]
+      .map(([key, group]) => ({ key, group }))
+      .sort((a, b) => a.group.label.localeCompare(b.group.label));
+  }, [filterClient, filterCountry, filterWorkMode, tabJobs, searchFilteredApps, search, paginated]);
 
   function toggleJobGroup(key: string) {
     setExpandedJobs((prev) => {
@@ -1328,7 +1400,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
             scenario: "no-applications",
           })}
         </div>
-      ) : filteredByJobMeta.length === 0 ? (
+      ) : filteredByJobMeta.length === 0 && !hasClientJobsToShow ? (
         <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-gray-400 dark:border-gray-700 dark:bg-gray-900">
           {careerApplicationsEmptyMessage({
             jobListingId,
@@ -1336,7 +1408,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
             scenario: "no-filter-match",
           })}
         </div>
-      ) : totalItems === 0 ? (
+      ) : totalItems === 0 && !hasClientJobsToShow ? (
         <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-gray-400 dark:border-gray-700 dark:bg-gray-900">
           {careerApplicationsEmptyMessage({
             jobListingId,
@@ -1361,7 +1433,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
         </div>
       ) : (
         <div className="space-y-4">
-          {groupedByJob.map(([key, group]) => {
+          {groupedByJob.map(({ key, group }) => {
             const isExpanded = expandedJobs.has(key);
             const panelId = `career-app-group-${key.replace(/\s+/g, "-").toLowerCase()}`;
             return (

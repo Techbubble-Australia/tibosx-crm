@@ -6,10 +6,12 @@ import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { OpportunityFields, readOpportunityFormData } from "@/components/opportunities/OpportunityFields";
+import { useAdminSession } from "@/contexts/AdminSessionContext";
 
 export default function NewOpportunityPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { userId } = useAdminSession();
   const presetClientId = searchParams.get("clientId")?.trim() ?? "";
   const [isLoading, setIsLoading] = useState(false);
 
@@ -45,7 +47,7 @@ export default function NewOpportunityPageInner() {
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">New Opportunity</h2>
       </div>
       <form onSubmit={onSubmit} className="space-y-6 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-        <OpportunityFields presetClientId={presetClientId} />
+        <OpportunityFields presetClientId={presetClientId} defaultOwnerId={userId} />
         <button type="submit" disabled={isLoading} className="inline-flex items-center gap-2 rounded-lg bg-black px-6 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black">
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Create Opportunity
