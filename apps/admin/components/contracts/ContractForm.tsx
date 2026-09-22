@@ -234,8 +234,8 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       const nextUrls = [...fileUrls];
       for (const file of Array.from(files)) {
         const formData = new FormData();
-        formData.append("resume", file);
-        const res = await adminFetch("/api/upload/resume", { method: "POST", body: formData });
+        formData.append("document", file);
+        const res = await adminFetch("/api/upload/document", { method: "POST", body: formData });
         const data = await res.json();
         const url = readUploadImageUrlFromJson(data);
         if (url) nextUrls.push(url);
@@ -255,8 +255,8 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
     setInvoiceUploading(true);
     try {
       const formData = new FormData();
-      formData.append("resume", file);
-      const res = await adminFetch("/api/upload/resume", { method: "POST", body: formData });
+      formData.append("document", file);
+      const res = await adminFetch("/api/upload/document", { method: "POST", body: formData });
       const data = await res.json();
       const url = readUploadImageUrlFromJson(data);
       if (url) setInvoiceFileUrl(url);

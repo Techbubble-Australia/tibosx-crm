@@ -102,4 +102,30 @@ router.post("/resume", upload.single("resume"), async (req, res, next) => {
   }
 });
 
+// Upload general document endpoint (contracts, invoices, etc.)
+router.post("/document", upload.single("document"), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const filename = makeStoredFilename(req.file.fieldname, req.file.originalname);
+    await persistUploadedFile(req.file, filename);
+
+    const fileUrl = `/uploads/${filename}`;
+
+    res.json({
+      message: "Document uploaded successfully",
+      data: {
+        url: fileUrl,
+        filename,
+        size: req.file.size,
+      },
+    });
+  } catch (error) {
+    console.error("Error uploading document:", error);
+    next(error);
+  }
+});
+
 export { router as uploadRoutes };
