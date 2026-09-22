@@ -38,6 +38,13 @@ export type ContractVariation = {
   variationValue: number;
 };
 
+export type ContractMilestone = {
+  id: string;
+  description: string;
+  milestoneDate: string;
+  amount: number;
+};
+
 export type ContractInvoice = {
   id: string;
   invoiceNumber: string;
@@ -45,6 +52,7 @@ export type ContractInvoice = {
   issueDate: string;
   dueDate: string;
   status: ContractInvoiceStatus;
+  currency: string;
   description: string;
   qty: number;
   rate: number;
@@ -77,6 +85,7 @@ export type ContractFormValues = {
   comments: string;
   fileUrls: string[];
   variations: ContractVariation[];
+  milestones?: ContractMilestone[];
   invoices?: ContractInvoice[];
 };
 
@@ -138,6 +147,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const [comments, setComments] = useState(defaults.comments ?? "");
   const [fileUrls, setFileUrls] = useState<string[]>(defaults.fileUrls ?? []);
   const [variations, setVariations] = useState<ContractVariation[]>(defaults.variations ?? []);
+  const [milestones, setMilestones] = useState<ContractMilestone[]>(defaults.milestones ?? []);
   const [invoices, setInvoices] = useState<ContractInvoice[]>(defaults.invoices ?? []);
   const [uploading, setUploading] = useState(false);
   const [showVariationForm, setShowVariationForm] = useState(false);
@@ -152,6 +162,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const [invoiceDueDate, setInvoiceDueDate] = useState(defaultDueDateInput());
   const [invoiceStatus, setInvoiceStatus] = useState<ContractInvoiceStatus>("DRAFT");
   const [invoiceDescription, setInvoiceDescription] = useState("");
+  const [invoiceCurrency, setInvoiceCurrency] = useState(defaults.currency ?? "AUD");
   const [invoiceQty, setInvoiceQty] = useState("");
   const [invoiceRate, setInvoiceRate] = useState("");
   const [invoiceTaxRate, setInvoiceTaxRate] = useState("10");
@@ -159,8 +170,15 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const [addingInvoice, setAddingInvoice] = useState(false);
   const [invoiceUploading, setInvoiceUploading] = useState(false);
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
+  const [showMilestoneForm, setShowMilestoneForm] = useState(false);
+  const [milestoneDescription, setMilestoneDescription] = useState("");
+  const [milestoneDate, setMilestoneDate] = useState("");
+  const [milestoneAmount, setMilestoneAmount] = useState("");
+  const [addingMilestone, setAddingMilestone] = useState(false);
+  const [savingFiles, setSavingFiles] = useState(false);
 
   const isEditable = status === "DRAFT";
+  const canEditFiles = status !== "CANCELED";
   const showRate = type !== "FIXED_PRICE";
   const rateRequired = type === "T_AND_M";
   const showNumberOfUnits = type === "T_AND_M";
@@ -168,7 +186,9 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const contractValueRequired = type === "FIXED_PRICE";
   const numberOfUnitsReadOnly = !isEditable;
   const canAddVariations = Boolean(defaults.id) && status === "ACTIVE";
+  const canAddMilestones = Boolean(defaults.id) && status === "ACTIVE" && type !== "T_AND_M";
   const canAddInvoices = Boolean(defaults.id) && status === "ACTIVE";
+  const showMilestones = type !== "T_AND_M";
 
   const invoicePreviewAmount = useMemo(() => {
     const qty = Number.parseInt(invoiceQty, 10) || 0;
@@ -227,8 +247,30 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
     }
   }, [type, numberOfUnits, rate]);
 
+  async function persistFileUrls(nextUrls: string[]) {
+    if (!defaults.id || isEditable) {
+      setFileUrls(nextUrls);
+      return;
+    }
+    setSavingFiles(true);
+    try {
+      const res = await adminFetch(`/api/admin/contracts/${defaults.id}/files`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileUrls: nextUrls }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save files");
+      setFileUrls((data.data as { fileUrls?: string[] }).fileUrls ?? nextUrls);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to save files");
+    } finally {
+      setSavingFiles(false);
+    }
+  }
+
   async function uploadFiles(files: FileList | null) {
-    if (!files?.length || !isEditable) return;
+    if (!files?.length || !canEditFiles) return;
     setUploading(true);
     try {
       const nextUrls = [...fileUrls];
@@ -240,12 +282,59 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
         const url = readUploadImageUrlFromJson(data);
         if (url) nextUrls.push(url);
       }
-      setFileUrls(nextUrls);
+      await persistFileUrls(nextUrls);
     } catch (error) {
       console.error(error);
       alert("Failed to upload file");
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function removeFile(index: number) {
+    const nextUrls = fileUrls.filter((_, i) => i !== index);
+    await persistFileUrls(nextUrls);
+  }
+
+  async function addMilestone() {
+    if (!defaults.id || !canAddMilestones) return;
+    if (!milestoneDescription.trim()) {
+      alert("Description is required.");
+      return;
+    }
+    if (!milestoneDate) {
+      alert("Milestone date is required.");
+      return;
+    }
+    const amount = Number.parseFloat(milestoneAmount);
+    if (Number.isNaN(amount)) {
+      alert("Amount is required.");
+      return;
+    }
+    setAddingMilestone(true);
+    try {
+      const res = await adminFetch(`/api/admin/contracts/${defaults.id}/milestones`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          description: milestoneDescription.trim(),
+          milestoneDate,
+          amount,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to add milestone");
+      setMilestones((prev) => [...prev, data.data as ContractMilestone].sort(
+        (a, b) => new Date(a.milestoneDate).getTime() - new Date(b.milestoneDate).getTime(),
+      ));
+      setShowMilestoneForm(false);
+      setMilestoneDescription("");
+      setMilestoneDate("");
+      setMilestoneAmount("");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to add milestone");
+    } finally {
+      setAddingMilestone(false);
     }
   }
 
@@ -345,6 +434,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
           issueDate: invoiceIssueDate,
           dueDate: invoiceDueDate,
           status: invoiceStatus,
+          currency: invoiceCurrency,
           description: invoiceDescription.trim(),
           qty,
           rate,
@@ -363,6 +453,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       setInvoiceDueDate(defaultDueDateInput());
       setInvoiceStatus("DRAFT");
       setInvoiceDescription("");
+      setInvoiceCurrency(currency);
       setInvoiceQty("");
       setInvoiceRate("");
       setInvoiceTaxRate("10");
@@ -743,6 +834,77 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
         </section>
       ) : null}
 
+      {defaults.id && showMilestones ? (
+        <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100">Milestones</h3>
+            {canAddMilestones ? (
+              <button
+                type="button"
+                onClick={() => setShowMilestoneForm((v) => !v)}
+                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+              >
+                <Plus className="h-4 w-4" />
+                Add milestone
+              </button>
+            ) : null}
+          </div>
+          {!canAddMilestones && status !== "ACTIVE" ? (
+            <p className="text-sm text-gray-400">Milestones can be added when the contract is active.</p>
+          ) : null}
+          {showMilestoneForm ? (
+            <div className="mb-4 space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/40">
+              <input
+                value={milestoneDescription}
+                onChange={(e) => setMilestoneDescription(e.target.value)}
+                placeholder="Description *"
+                className={inputClass}
+              />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <input
+                  type="date"
+                  value={milestoneDate}
+                  onChange={(e) => setMilestoneDate(e.target.value)}
+                  className={inputClass}
+                  aria-label="Milestone date"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={milestoneAmount}
+                  onChange={(e) => setMilestoneAmount(e.target.value)}
+                  placeholder={`Amount (${currency}) *`}
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => void addMilestone()} disabled={addingMilestone} className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black">
+                  {addingMilestone ? "Adding…" : "Save milestone"}
+                </button>
+                <button type="button" onClick={() => setShowMilestoneForm(false)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm dark:border-gray-600">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {milestones.length === 0 ? (
+            <p className="text-sm text-gray-400">No milestones yet.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+              {milestones.map((milestone) => (
+                <li key={milestone.id} className="py-3 text-sm">
+                  <p className="font-medium text-gray-900 dark:text-gray-100">
+                    {formatMoney(currency, milestone.amount)} · {formatDate(milestone.milestoneDate)}
+                  </p>
+                  <p className="text-gray-500 dark:text-gray-400">{milestone.description}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
+
       {defaults.id ? (
         <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -797,20 +959,25 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                 placeholder="Description *"
                 className={inputClass}
               />
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <select value={invoiceCurrency} onChange={(e) => setInvoiceCurrency(e.target.value)} className={inputClass}>
+                  {SALES_CURRENCIES.map((c) => (
+                    <option key={c.code} value={c.code}>{c.label}</option>
+                  ))}
+                </select>
                 <input type="number" min="1" step="1" value={invoiceQty} onChange={(e) => setInvoiceQty(e.target.value)} placeholder="Qty *" className={inputClass} />
                 <input type="number" min="0" step="0.01" value={invoiceRate} onChange={(e) => setInvoiceRate(e.target.value)} placeholder="Rate *" className={inputClass} />
                 <input type="number" min="0" step="0.01" value={invoiceTaxRate} onChange={(e) => setInvoiceTaxRate(e.target.value)} placeholder="Tax rate % *" className={inputClass} />
                 <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
-                  Amount: {formatMoney(currency, invoicePreviewAmount)}
+                  Amount: {formatMoney(invoiceCurrency, invoicePreviewAmount)}
                 </p>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
-                  Tax amount: {formatMoney(currency, invoicePreviewTaxAmount)}
+                  Tax amount: {formatMoney(invoiceCurrency, invoicePreviewTaxAmount)}
                 </p>
                 <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
-                  Total amount: {formatMoney(currency, invoicePreviewTotal)}
+                  Total amount: {formatMoney(invoiceCurrency, invoicePreviewTotal)}
                 </p>
               </div>
               <div>
@@ -838,6 +1005,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
           ) : (
             <ul className="divide-y divide-gray-100 dark:divide-gray-800">
               {invoices.map((invoice) => {
+                const invoiceCurrencyLabel = invoice.currency || currency;
                 const colors = CONTRACT_INVOICE_STATUS_COLORS[invoice.status] ?? CONTRACT_INVOICE_STATUS_COLORS.DRAFT;
                 const readOnly = invoice.status !== "DRAFT";
                 return (
@@ -859,10 +1027,10 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                       <p>Reference: {invoice.reference || "—"}</p>
                       <p>Issue: {formatDate(invoice.issueDate)} · Due: {formatDate(invoice.dueDate)}</p>
                       <p className="sm:col-span-2">{invoice.description}</p>
-                      <p>Qty: {invoice.qty} × {formatMoney(currency, invoice.rate)}</p>
-                      <p>Amount: {formatMoney(currency, invoice.amount)}</p>
-                      <p>Tax ({invoice.taxRate}%): {formatMoney(currency, invoice.taxAmount)}</p>
-                      <p className="font-medium">Total: {formatMoney(currency, invoice.totalAmount)}</p>
+                      <p>Qty: {invoice.qty} × {formatMoney(invoiceCurrencyLabel, invoice.rate)}</p>
+                      <p>Amount: {formatMoney(invoiceCurrencyLabel, invoice.amount)}</p>
+                      <p>Tax ({invoice.taxRate}%): {formatMoney(invoiceCurrencyLabel, invoice.taxAmount)}</p>
+                      <p className="font-medium">Total: {formatMoney(invoiceCurrencyLabel, invoice.totalAmount)}</p>
                     </div>
                     {invoice.fileUrl ? (
                       <a href={invoice.fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline dark:text-blue-400">
@@ -890,10 +1058,12 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Files</label>
-        {isEditable ? (
+        {canEditFiles ? (
           <input type="file" multiple onChange={(e) => void uploadFiles(e.target.files)} className="block w-full text-sm" />
         ) : null}
-        {uploading ? <p className="mt-1 text-xs text-gray-500">Uploading…</p> : null}
+        {uploading || savingFiles ? (
+          <p className="mt-1 text-xs text-gray-500">{uploading ? "Uploading…" : "Saving files…"}</p>
+        ) : null}
         {fileUrls.length > 0 ? (
           <ul className="mt-2 space-y-1">
             {fileUrls.map((url, index) => (
@@ -901,8 +1071,8 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                 <a href={url} target="_blank" rel="noopener noreferrer" className="truncate text-blue-600 hover:underline dark:text-blue-400">
                   {url.split("/").pop()}
                 </a>
-                {isEditable ? (
-                  <button type="button" onClick={() => setFileUrls((prev) => prev.filter((_, i) => i !== index))} className="text-red-600">
+                {canEditFiles ? (
+                  <button type="button" onClick={() => void removeFile(index)} className="text-red-600">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 ) : null}

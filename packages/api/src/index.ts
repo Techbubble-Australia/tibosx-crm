@@ -30,6 +30,8 @@ import { authMiddleware } from "./middleware/auth";
 import { requireMfaEnrolled } from "./middleware/requireMfaEnrolled";
 import { requireRole, requireModule, requireAnyModule, blockModuleMutations } from "./middleware/requireRole";
 import { dashboardRoutes } from "./routes/dashboard";
+import { salesDashboardRoutes } from "./routes/sales-dashboard";
+import { invoiceRoutes } from "./routes/invoices";
 
 dotenv.config();
 
@@ -101,6 +103,8 @@ app.use("/api/admin/contact-submissions", authMiddleware, requireMfaEnrolled, re
 app.use("/api/admin/clients", authMiddleware, requireMfaEnrolled, requireModule("sales"), clientRoutes);
 app.use("/api/admin/opportunities", authMiddleware, requireMfaEnrolled, requireModule("sales"), opportunityRoutes);
 app.use("/api/admin/contracts", authMiddleware, requireMfaEnrolled, requireModule("sales"), contractRoutes);
+app.use("/api/admin/sales-dashboard", authMiddleware, requireMfaEnrolled, requireModule("sales"), salesDashboardRoutes);
+app.use("/api/admin/invoices", authMiddleware, requireMfaEnrolled, requireModule("sales"), invoiceRoutes);
 app.use("/api/admin/users", authMiddleware, requireMfaEnrolled, requireRole("admin"), adminUserRoutes);
 app.use("/api/upload", ...websiteWrite, uploadRoutes);
 

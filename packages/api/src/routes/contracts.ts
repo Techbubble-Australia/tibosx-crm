@@ -21,6 +21,7 @@ import {
   logContractStatusChange,
 } from "../lib/contract-activity";
 import { CONTRACT_INVOICE_STATUSES } from "../lib/contract-invoice-status";
+import { isDateInMonth, resolveContractExpiryDate as resolveExpiryForForecast } from "../lib/sales-forecast";
 
 const router: IRouter = Router();
 
@@ -54,16 +55,27 @@ const variationSchema = z.object({
   comments: z.string().max(5000).optional().default(""),
 });
 
+const milestoneSchema = z.object({
+  description: z.string().min(1).max(5000),
+  milestoneDate: z.coerce.date(),
+  amount: decimalField,
+});
+
 const invoiceSchema = z.object({
   reference: z.string().max(200).optional().default(""),
   issueDate: z.coerce.date(),
   dueDate: z.coerce.date(),
   status: z.enum(CONTRACT_INVOICE_STATUSES).default("DRAFT"),
+  currency: z.string().min(1).max(8).optional(),
   description: z.string().min(1).max(10000),
   qty: z.coerce.number().int().positive(),
   rate: decimalField,
   taxRate: z.coerce.number().nonnegative().default(10),
   fileUrl: z.string().min(1).optional().nullable(),
+});
+
+const fileUrlsSchema = z.object({
+  fileUrls: z.array(z.string().min(1)),
 });
 
 const invoiceStatusSchema = z.object({
@@ -307,6 +319,24 @@ function serializeVariation(row: {
   };
 }
 
+function serializeMilestone(row: {
+  id: string;
+  contractId: string;
+  description: string;
+  milestoneDate: Date;
+  amount: { toString(): string } | number;
+  createdAt: Date;
+}) {
+  return {
+    id: row.id,
+    contractId: row.contractId,
+    description: row.description,
+    milestoneDate: row.milestoneDate.toISOString(),
+    amount: toNumber(row.amount),
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
 function serializeInvoice(row: {
   id: string;
   contractId: string;
@@ -315,6 +345,7 @@ function serializeInvoice(row: {
   issueDate: Date;
   dueDate: Date;
   status: string;
+  currency: string;
   description: string;
   qty: number;
   rate: { toString(): string } | number;
@@ -334,6 +365,7 @@ function serializeInvoice(row: {
     issueDate: row.issueDate.toISOString(),
     dueDate: row.dueDate.toISOString(),
     status: row.status,
+    currency: row.currency,
     description: row.description,
     qty: row.qty,
     rate: toNumber(row.rate),
@@ -381,6 +413,14 @@ function serializeContract(row: {
     variationValue: { toString(): string } | number;
     createdAt: Date;
   }>;
+  milestones?: Array<{
+    id: string;
+    contractId: string;
+    description: string;
+    milestoneDate: Date;
+    amount: { toString(): string } | number;
+    createdAt: Date;
+  }>;
   invoices?: Array<{
     id: string;
     contractId: string;
@@ -389,6 +429,7 @@ function serializeContract(row: {
     issueDate: Date;
     dueDate: Date;
     status: string;
+    currency: string;
     description: string;
     qty: number;
     rate: { toString(): string } | number;
@@ -447,6 +488,7 @@ function serializeContract(row: {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     variations: row.variations?.map(serializeVariation) ?? undefined,
+    milestones: row.milestones?.map(serializeMilestone) ?? undefined,
     invoices: row.invoices?.map(serializeInvoice) ?? undefined,
     activityLogs: row.activityLogs?.map(serializeActivityLog) ?? undefined,
   };
@@ -464,6 +506,7 @@ const activityInclude = {
 const detailInclude = {
   ...contractInclude,
   variations: { orderBy: { variationDate: "desc" as const } },
+  milestones: { orderBy: { milestoneDate: "asc" as const } },
   invoices: { orderBy: { issueDate: "desc" as const } },
   activityLogs: {
     orderBy: { createdAt: "desc" as const },
@@ -483,6 +526,7 @@ router.get("/", async (req, res) => {
     await expirePastDueContracts();
     const clientId = typeof req.query.clientId === "string" ? req.query.clientId.trim() : "";
     const tab = typeof req.query.tab === "string" ? req.query.tab.trim() : "";
+    const expiring = typeof req.query.expiring === "string" ? req.query.expiring.trim() : "";
     const where: Prisma.ContractWhereInput = {};
     if (clientId) where.clientId = clientId;
     if (tab === "active") {
@@ -490,12 +534,38 @@ router.get("/", async (req, res) => {
     } else if (tab === "inactive") {
       where.status = { in: [...CONTRACT_INACTIVE_STATUSES] };
     }
+    if (expiring) {
+      where.status = "ACTIVE";
+    }
     const rows = await prisma.contract.findMany({
       where,
-      include: contractInclude,
+      include: expiring
+        ? {
+            ...contractInclude,
+            variations: { select: { variationEndDate: true } },
+          }
+        : contractInclude,
       orderBy: [{ createdAt: "desc" }],
     });
-    res.json({ data: rows.map(serializeContract) });
+    const now = new Date();
+    const year = now.getUTCFullYear();
+    const thisMonth = now.getUTCMonth();
+    const nextMonth = thisMonth === 11 ? 0 : thisMonth + 1;
+    const nextMonthYear = thisMonth === 11 ? year + 1 : year;
+    const filtered = expiring
+      ? rows.filter((row) => {
+          const variations =
+            "variations" in row && Array.isArray(row.variations)
+              ? (row.variations as Array<{ variationEndDate: Date | null }>)
+              : [];
+          const expiry = resolveExpiryForForecast(row.endDate, variations);
+          if (!expiry) return false;
+          if (expiring === "thisMonth") return isDateInMonth(expiry, year, thisMonth);
+          if (expiring === "nextMonth") return isDateInMonth(expiry, nextMonthYear, nextMonth);
+          return true;
+        })
+      : rows;
+    res.json({ data: filtered.map(serializeContract) });
   } catch (error) {
     console.error("Error fetching contracts:", error);
     res.status(500).json({ error: "Failed to fetch contracts" });
@@ -827,6 +897,63 @@ router.post("/:id/move-to-draft", async (req: AuthRequest, res) => {
   }
 });
 
+router.patch("/:id/files", async (req, res) => {
+  try {
+    const body = fileUrlsSchema.parse(req.body);
+    const existing = await prisma.contract.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: "Not found" });
+    if (existing.status === "CANCELED") {
+      return res.status(400).json({ error: "Files cannot be updated on canceled contracts" });
+    }
+
+    await prisma.contract.update({
+      where: { id: existing.id },
+      data: { fileUrls: body.fileUrls },
+    });
+
+    const row = await fetchContractDetail(existing.id);
+    if (!row) return res.status(404).json({ error: "Not found" });
+    res.json({ data: serializeContract(row) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error updating contract files:", error);
+    res.status(500).json({ error: "Failed to update contract files" });
+  }
+});
+
+router.post("/:id/milestones", async (req, res) => {
+  try {
+    const input = milestoneSchema.parse(req.body);
+    const contract = await prisma.contract.findUnique({ where: { id: req.params.id } });
+    if (!contract) return res.status(404).json({ error: "Not found" });
+    if (contract.status !== "ACTIVE") {
+      return res.status(400).json({ error: "Milestones can only be added to active contracts" });
+    }
+    if (contract.type === "T_AND_M") {
+      return res.status(400).json({ error: "Milestones are not used for T&M contracts" });
+    }
+
+    const row = await prisma.contractMilestone.create({
+      data: {
+        contractId: contract.id,
+        description: input.description.trim(),
+        milestoneDate: input.milestoneDate,
+        amount: input.amount,
+      },
+    });
+
+    res.status(201).json({ data: serializeMilestone(row) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error adding contract milestone:", error);
+    res.status(500).json({ error: "Failed to add milestone" });
+  }
+});
+
 router.post("/:id/variations", async (req, res) => {
   try {
     const input = variationSchema.parse(req.body);
@@ -894,6 +1021,7 @@ router.post("/:id/invoices", async (req, res) => {
           issueDate: input.issueDate,
           dueDate: input.dueDate,
           status: input.status,
+          currency: input.currency ?? contract.currency,
           description: input.description.trim(),
           qty: input.qty,
           rate: input.rate,

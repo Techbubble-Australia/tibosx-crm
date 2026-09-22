@@ -389,6 +389,7 @@ model Contract {
   ownerId        String?
   owner          AdminUser?          @relation("ContractOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   variations     ContractVariation[]
+  milestones     ContractMilestone[]
   invoices       ContractInvoice[]
   activityLogs   ContractActivityLog[]
   createdAt      DateTime            @default(now())
@@ -437,6 +438,19 @@ model ContractVariation {
   @@index([contractId])
 }
 
+model ContractMilestone {
+  id            String   @id @default(cuid())
+  contractId    String
+  contract      Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  description   String
+  milestoneDate DateTime
+  amount        Decimal  @db.Decimal(14, 2)
+  createdAt     DateTime @default(now())
+
+  @@index([contractId])
+  @@index([milestoneDate])
+}
+
 model ContractInvoice {
   id            String   @id @default(cuid())
   contractId    String
@@ -447,6 +461,7 @@ model ContractInvoice {
   dueDate       DateTime
   /// DRAFT | AWAITING_PAYMENT | PAID | CANCELED
   status        String   @default("DRAFT")
+  currency      String   @default("AUD")
   description   String   @db.Text
   qty           Int
   rate          Decimal  @db.Decimal(14, 2)

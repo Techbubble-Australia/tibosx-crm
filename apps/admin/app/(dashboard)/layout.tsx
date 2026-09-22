@@ -60,9 +60,11 @@ const navGroups: NavGroup[] = [
     icon: Building2,
     roles: ["admin", "sales"],
     items: [
+      { href: "/sales/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "sales"] },
       { href: "/clients/active", label: "Clients", icon: Handshake, roles: ["admin", "sales"] },
       { href: "/opportunities", label: "Opportunities", icon: CircleDollarSign, roles: ["admin", "sales"] },
       { href: "/contracts", label: "Contracts", icon: ScrollText, roles: ["admin", "sales"] },
+      { href: "/invoices", label: "Invoices", icon: FileText, roles: ["admin", "sales"] },
     ],
   },
   {
@@ -120,6 +122,12 @@ function headerTitle(pathname: string): string {
   if (pathname.startsWith("/contracts")) {
     return "Contracts";
   }
+  if (pathname.startsWith("/invoices")) {
+    return "Invoices";
+  }
+  if (pathname.startsWith("/sales/dashboard")) {
+    return "Sales Dashboard";
+  }
   if (pathname.startsWith("/clients")) {
     return "Clients";
   }
@@ -134,7 +142,14 @@ function groupIsActive(group: NavGroup, pathname: string): boolean {
   if (group.id === "recruitment" && (isJobListingsPath(pathname) || isCareerApplicationsPath(pathname))) {
     return true;
   }
-  if (group.id === "sales" && (pathname.startsWith("/clients") || pathname.startsWith("/opportunities") || pathname.startsWith("/contracts"))) {
+  if (
+    group.id === "sales" &&
+    (pathname.startsWith("/sales") ||
+      pathname.startsWith("/clients") ||
+      pathname.startsWith("/opportunities") ||
+      pathname.startsWith("/contracts") ||
+      pathname.startsWith("/invoices"))
+  ) {
     return true;
   }
   return group.items.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));

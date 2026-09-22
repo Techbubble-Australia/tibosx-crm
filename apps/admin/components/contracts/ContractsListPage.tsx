@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Plus, Edit, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
@@ -79,6 +80,9 @@ function formatDate(value: string | null) {
 }
 
 export function ContractsListPage({ activeFilter }: Props) {
+  const searchParams = useSearchParams();
+  const clientIdFilter = searchParams.get("clientId")?.trim() ?? "";
+  const expiringFilter = searchParams.get("expiring")?.trim() ?? "";
   const listTab = activeFilter ? "active" : "inactive";
   const [rows, setRows] = useState<ContractRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -168,13 +172,15 @@ export function ContractsListPage({ activeFilter }: Props) {
 
   useEffect(() => {
     void fetchRows();
-  }, [activeFilter]);
+  }, [activeFilter, clientIdFilter, expiringFilter]);
 
   async function fetchRows() {
     setIsLoading(true);
     try {
       const params = new URLSearchParams();
       params.set("tab", listTab);
+      if (clientIdFilter) params.set("clientId", clientIdFilter);
+      if (expiringFilter) params.set("expiring", expiringFilter);
       const res = await adminFetch(`/api/admin/contracts?${params.toString()}`);
       const data = await res.json();
       setRows((data.data ?? []) as ContractRow[]);
