@@ -21,6 +21,7 @@ import {
   logContractStatusChange,
 } from "../lib/contract-activity";
 import { CONTRACT_INVOICE_STATUSES } from "../lib/contract-invoice-status";
+import { expirePastDueContracts } from "../lib/contract-expiry";
 import { isDateInMonth, resolveContractExpiryDate as resolveExpiryForForecast } from "../lib/sales-forecast";
 import {
   generateWorkUnitMonths,
@@ -29,6 +30,15 @@ import {
 } from "../lib/contract-work-units";
 
 const router: IRouter = Router();
+
+router.use(async (_req, _res, next) => {
+  try {
+    await expirePastDueContracts();
+  } catch (error) {
+    console.error("Error expiring past-due contracts:", error);
+  }
+  next();
+});
 
 const decimalField = z.coerce.number().nonnegative();
 const optionalDecimalField = z.coerce.number().nonnegative().optional();
@@ -241,10 +251,6 @@ async function syncContractConsumed(tx: Prisma.TransactionClient, contractId: st
   return total;
 }
 
-function startOfUtcDay(date = new Date()): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
-
 function isValidEndDate(endDate: Date | null | undefined): boolean {
   if (!endDate) return false;
   return endDate.getUTCFullYear() >= 1971;
@@ -253,26 +259,6 @@ function isValidEndDate(endDate: Date | null | undefined): boolean {
 function normalizeEndDate(endDate: Date | null | undefined): Date | null {
   if (!endDate || !isValidEndDate(endDate)) return null;
   return endDate;
-}
-
-function isPastEndDate(endDate: Date): boolean {
-  if (!isValidEndDate(endDate)) return false;
-  const end = startOfUtcDay(endDate);
-  const today = startOfUtcDay();
-  return today > end;
-}
-
-function resolveContractExpiryDate(contract: {
-  endDate: Date | null;
-  variations: Array<{ variationEndDate: Date | null; variationDate: Date }>;
-}): Date | null {
-  const withEnd = contract.variations
-    .filter((row) => row.variationEndDate && isValidEndDate(row.variationEndDate))
-    .sort((a, b) => b.variationEndDate!.getTime() - a.variationEndDate!.getTime());
-  if (withEnd.length > 0) {
-    return withEnd[0]!.variationEndDate;
-  }
-  return normalizeEndDate(contract.endDate);
 }
 
 type ResolvedFinancials = {
@@ -322,35 +308,6 @@ function resolveContractFinancials(
     rate: data.rate ?? 0,
     contractValue: data.contractValue ?? 0,
   };
-}
-
-async function expirePastDueContracts(): Promise<void> {
-  const candidates = await prisma.contract.findMany({
-    where: { status: "ACTIVE" },
-    select: {
-      id: true,
-      endDate: true,
-      variations: {
-        select: { variationEndDate: true, variationDate: true },
-      },
-    },
-  });
-
-  const toExpire = candidates.filter((row) => {
-    const expiryDate = resolveContractExpiryDate(row);
-    return expiryDate && isPastEndDate(expiryDate);
-  });
-  if (toExpire.length === 0) return;
-
-  await prisma.$transaction(async (tx) => {
-    for (const row of toExpire) {
-      await tx.contract.update({
-        where: { id: row.id },
-        data: { status: "EXPIRED" },
-      });
-      await logContractStatusChange(tx, row.id, "AUTO_EXPIRED", "ACTIVE", "EXPIRED", null);
-    }
-  });
 }
 
 async function allocateContractNumber(): Promise<string> {
@@ -696,7 +653,6 @@ async function fetchContractDetail(id: string) {
 
 router.get("/", async (req, res) => {
   try {
-    await expirePastDueContracts();
     const clientId = typeof req.query.clientId === "string" ? req.query.clientId.trim() : "";
     const tab = typeof req.query.tab === "string" ? req.query.tab.trim() : "";
     const expiring = typeof req.query.expiring === "string" ? req.query.expiring.trim() : "";
@@ -747,7 +703,6 @@ router.get("/", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
-    await expirePastDueContracts();
     const row = await fetchContractDetail(req.params.id);
     if (!row) return res.status(404).json({ error: "Not found" });
     res.json({ data: serializeContract(row) });

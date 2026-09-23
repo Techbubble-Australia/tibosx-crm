@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { prisma } from "@techbubble/database";
+import { expirePastDueContracts } from "../lib/contract-expiry";
 import type { ContractType } from "../lib/contract-types";
 import {
   forecastMilestoneRevenueForMonth,
@@ -90,6 +91,7 @@ function forecastContractForMonth(
 
 router.get("/stats", async (req, res) => {
   try {
+    await expirePastDueContracts();
     const now = new Date();
     const year = parseForecastYear(req.query.year, now);
     const baseCurrency = parseBaseCurrency(req.query.baseCurrency);
