@@ -22,11 +22,22 @@ import {
 } from "../lib/contract-activity";
 import { CONTRACT_INVOICE_STATUSES } from "../lib/contract-invoice-status";
 import { isDateInMonth, resolveContractExpiryDate as resolveExpiryForForecast } from "../lib/sales-forecast";
+import {
+  generateWorkUnitMonths,
+  sumWorkUnits,
+  type WorkUnitMonthInput,
+} from "../lib/contract-work-units";
 
 const router: IRouter = Router();
 
 const decimalField = z.coerce.number().nonnegative();
 const optionalDecimalField = z.coerce.number().nonnegative().optional();
+
+const workUnitMonthSchema = z.object({
+  year: z.coerce.number().int(),
+  month: z.coerce.number().int().min(0).max(11),
+  workUnits: z.coerce.number().int().positive(),
+});
 
 const contractBaseSchema = z.object({
   title: z.string().min(1).max(200),
@@ -38,6 +49,7 @@ const contractBaseSchema = z.object({
     .optional(),
   unit: z.enum(CONTRACT_UNITS).optional().nullable(),
   numberOfUnits: z.coerce.number().int().positive().optional().nullable(),
+  workUnitMonths: z.array(workUnitMonthSchema).optional(),
   currency: z.string().min(1).max(8),
   rate: optionalDecimalField,
   contractValue: optionalDecimalField,
@@ -54,6 +66,7 @@ const variationSchema = z.object({
   variationValue: optionalDecimalField,
   qty: z.coerce.number().int().positive().optional(),
   rate: optionalDecimalField,
+  workUnitMonths: z.array(workUnitMonthSchema).optional(),
   comments: z.string().max(5000).optional().default(""),
 });
 
@@ -122,8 +135,43 @@ type VariationInput = {
   variationValue?: number;
   qty?: number;
   rate?: number;
+  workUnitMonths?: WorkUnitMonthInput[];
   comments?: string;
 };
+
+async function replaceWorkUnitMonths(
+  tx: Prisma.TransactionClient,
+  contractId: string,
+  segmentKey: string,
+  rows: WorkUnitMonthInput[],
+) {
+  await tx.contractWorkUnitMonth.deleteMany({ where: { contractId, segmentKey } });
+  if (!rows.length) return;
+  await tx.contractWorkUnitMonth.createMany({
+    data: rows.map((row) => ({
+      contractId,
+      segmentKey,
+      year: row.year,
+      month: row.month,
+      workUnits: row.workUnits,
+    })),
+  });
+}
+
+function resolveTmWorkUnitMonths(
+  startDate: Date,
+  endDate: Date | null | undefined,
+  unit: string,
+  provided?: WorkUnitMonthInput[],
+): WorkUnitMonthInput[] {
+  if (provided?.length) return provided;
+  if (!endDate) return [];
+  return generateWorkUnitMonths(startDate, endDate, unit).map((row) => ({
+    year: row.year,
+    month: row.month,
+    workUnits: row.workUnits,
+  }));
+}
 
 function resolveVariationPayload(
   contract: { type: string; unit: string | null },
@@ -131,17 +179,26 @@ function resolveVariationPayload(
 ) {
   if (contract.type === "T_AND_M") {
     if (!input.variationEndDate) throw new Error("VARIATION_END_REQUIRED");
-    if (!input.qty || input.qty <= 0) throw new Error("VARIATION_QTY_REQUIRED");
+    if (!contract.unit) throw new Error("UNIT_REQUIRED");
+    const workUnitMonths = resolveTmWorkUnitMonths(
+      input.variationDate,
+      input.variationEndDate,
+      contract.unit,
+      input.workUnitMonths,
+    );
+    const qty = workUnitMonths.length ? sumWorkUnits(workUnitMonths) : input.qty;
+    if (!qty || qty <= 0) throw new Error("VARIATION_QTY_REQUIRED");
     if (input.rate == null || input.rate < 0) throw new Error("VARIATION_RATE_REQUIRED");
-    const variationValue = input.qty * input.rate;
+    const variationValue = qty * input.rate;
     return {
       variationDate: input.variationDate,
       variationEndDate: normalizeEndDate(input.variationEndDate),
       comments: input.comments?.trim() ?? "",
-      qty: input.qty,
+      qty,
       rate: input.rate,
       unit: contract.unit,
       variationValue,
+      workUnitMonths,
     };
   }
   if (input.variationValue == null || input.variationValue < 0) {
@@ -232,17 +289,22 @@ function resolveContractFinancials(
     numberOfUnits?: number | null;
     rate?: number;
     contractValue?: number;
+    workUnitMonths?: WorkUnitMonthInput[];
   },
 ): ResolvedFinancials {
   if (type === "T_AND_M") {
     if (!data.unit) throw new Error("UNIT_REQUIRED");
-    if (!data.numberOfUnits || data.numberOfUnits <= 0) throw new Error("NUMBER_OF_UNITS_REQUIRED");
+    const numberOfUnits =
+      data.workUnitMonths?.length
+        ? sumWorkUnits(data.workUnitMonths)
+        : data.numberOfUnits;
+    if (!numberOfUnits || numberOfUnits <= 0) throw new Error("NUMBER_OF_UNITS_REQUIRED");
     if (data.rate == null || data.rate < 0) throw new Error("RATE_REQUIRED");
     return {
       unit: data.unit,
-      numberOfUnits: data.numberOfUnits,
+      numberOfUnits,
       rate: data.rate,
-      contractValue: data.numberOfUnits * data.rate,
+      contractValue: numberOfUnits * data.rate,
     };
   }
   if (type === "FIXED_PRICE") {
@@ -374,18 +436,29 @@ function serializeActivityLog(row: {
   };
 }
 
-function serializeVariation(row: {
-  id: string;
-  contractId: string;
-  variationDate: Date;
-  variationEndDate: Date | null;
-  comments: string;
-  qty?: number | null;
-  unit: string | null;
-  rate: { toString(): string } | number | null;
-  variationValue: { toString(): string } | number;
-  createdAt: Date;
-}) {
+function serializeWorkUnitMonth(row: { year: number; month: number; workUnits: number }) {
+  return {
+    year: row.year,
+    month: row.month,
+    workUnits: row.workUnits,
+  };
+}
+
+function serializeVariation(
+  row: {
+    id: string;
+    contractId: string;
+    variationDate: Date;
+    variationEndDate: Date | null;
+    comments: string;
+    qty?: number | null;
+    unit: string | null;
+    rate: { toString(): string } | number | null;
+    variationValue: { toString(): string } | number;
+    createdAt: Date;
+  },
+  workUnitMonths?: Array<{ year: number; month: number; workUnits: number }>,
+) {
   return {
     id: row.id,
     contractId: row.contractId,
@@ -396,6 +469,7 @@ function serializeVariation(row: {
     unit: row.unit,
     rate: row.rate == null ? null : toNumber(row.rate),
     variationValue: toNumber(row.variationValue),
+    workUnitMonths: workUnitMonths?.map(serializeWorkUnitMonth) ?? [],
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -535,6 +609,12 @@ function serializeContract(row: {
     createdAt: Date;
     performedBy?: { id: string; name: string | null; email: string } | null;
   }>;
+  workUnitMonths?: Array<{
+    segmentKey: string;
+    year: number;
+    month: number;
+    workUnits: number;
+  }>;
 }) {
   const type = row.type as keyof typeof CONTRACT_TYPE_LABELS;
   const contractValue = toNumber(row.contractValue);
@@ -569,7 +649,17 @@ function serializeContract(row: {
     ownerName: row.owner?.name || row.owner?.email || "",
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    variations: row.variations?.map(serializeVariation) ?? undefined,
+    workUnitMonths:
+      row.workUnitMonths
+        ?.filter((w) => w.segmentKey === "base")
+        .map(serializeWorkUnitMonth) ?? [],
+    variations:
+      row.variations?.map((variation) =>
+        serializeVariation(
+          variation,
+          row.workUnitMonths?.filter((w) => w.segmentKey === variation.id),
+        ),
+      ) ?? undefined,
     milestones: row.milestones?.map(serializeMilestone) ?? undefined,
     invoices: row.invoices?.map(serializeInvoice) ?? undefined,
     activityLogs: row.activityLogs?.map(serializeActivityLog) ?? undefined,
@@ -587,6 +677,7 @@ const activityInclude = {
 
 const detailInclude = {
   ...contractInclude,
+  workUnitMonths: { orderBy: [{ year: "asc" as const }, { month: "asc" as const }] },
   variations: { orderBy: { variationDate: "desc" as const } },
   milestones: { orderBy: { milestoneDate: "asc" as const } },
   invoices: { orderBy: { issueDate: "desc" as const } },
@@ -669,7 +760,12 @@ router.get("/:id", async (req, res) => {
 router.post("/", async (req: AuthRequest, res) => {
   try {
     const data = contractBaseSchema.parse(req.body);
-    const financials = resolveContractFinancials(data.type, data);
+    const endDate = normalizeEndDate(data.endDate ?? null);
+    const workUnitMonths =
+      data.type === "T_AND_M" && data.unit
+        ? resolveTmWorkUnitMonths(data.startDate, endDate, data.unit, data.workUnitMonths)
+        : [];
+    const financials = resolveContractFinancials(data.type, { ...data, workUnitMonths });
     await ensureContractClient(data.clientId);
     const ownerId = data.ownerId ?? req.user?.id ?? null;
     await ensureContractOwner(ownerId);
@@ -684,7 +780,7 @@ router.post("/", async (req: AuthRequest, res) => {
           type: data.type,
           status: "DRAFT",
           startDate: data.startDate,
-          endDate: normalizeEndDate(data.endDate ?? null),
+          endDate,
           unit: financials.unit,
           numberOfUnits: financials.numberOfUnits,
           currency: data.currency,
@@ -696,6 +792,9 @@ router.post("/", async (req: AuthRequest, res) => {
         },
         include: contractInclude,
       });
+      if (data.type === "T_AND_M" && workUnitMonths.length) {
+        await replaceWorkUnitMonths(tx, created.id, "base", workUnitMonths);
+      }
       await tx.contractActivityLog.create({
         data: {
           contractId: created.id,
@@ -708,7 +807,11 @@ router.post("/", async (req: AuthRequest, res) => {
         orderBy: { createdAt: "desc" },
         include: activityInclude,
       });
-      return { ...created, activityLogs: logs };
+      const workUnits = await tx.contractWorkUnitMonth.findMany({
+        where: { contractId: created.id },
+        orderBy: [{ year: "asc" }, { month: "asc" }],
+      });
+      return { ...created, workUnitMonths: workUnits, activityLogs: logs };
     });
 
     res.status(201).json({ data: serializeContract(row) });
@@ -749,13 +852,29 @@ router.put("/:id", async (req: AuthRequest, res) => {
     }
 
     const nextType = (data.type ?? existing.type) as ContractType;
+    const mergedStartDate = data.startDate ?? existing.startDate;
+    const mergedEndDate =
+      data.endDate !== undefined
+        ? normalizeEndDate(data.endDate)
+        : normalizeEndDate(existing.endDate);
+    const mergedUnit = data.unit !== undefined ? data.unit : existing.unit;
+    const workUnitMonths =
+      nextType === "T_AND_M" && mergedUnit
+        ? resolveTmWorkUnitMonths(
+            mergedStartDate,
+            mergedEndDate,
+            mergedUnit,
+            data.workUnitMonths,
+          )
+        : [];
     const financials = resolveContractFinancials(nextType, {
-      unit: data.unit !== undefined ? data.unit : existing.unit,
+      unit: mergedUnit,
       numberOfUnits:
         data.numberOfUnits !== undefined ? data.numberOfUnits : existing.numberOfUnits,
       rate: data.rate !== undefined ? data.rate : toNumber(existing.rate),
       contractValue:
         data.contractValue !== undefined ? data.contractValue : toNumber(existing.contractValue),
+      workUnitMonths,
     });
 
     const merged = {
@@ -763,11 +882,8 @@ router.put("/:id", async (req: AuthRequest, res) => {
       clientId: data.clientId ?? existing.clientId,
       type: nextType,
       status: existing.status,
-      startDate: data.startDate ?? existing.startDate,
-      endDate:
-        data.endDate !== undefined
-          ? normalizeEndDate(data.endDate)
-          : normalizeEndDate(existing.endDate),
+      startDate: mergedStartDate,
+      endDate: mergedEndDate,
       unit: financials.unit,
       numberOfUnits: financials.numberOfUnits,
       currency: data.currency ?? existing.currency,
@@ -812,6 +928,13 @@ router.put("/:id", async (req: AuthRequest, res) => {
         },
         include: contractInclude,
       });
+      if (nextType === "T_AND_M") {
+        await replaceWorkUnitMonths(tx, existing.id, "base", workUnitMonths);
+      } else {
+        await tx.contractWorkUnitMonth.deleteMany({
+          where: { contractId: existing.id, segmentKey: "base" },
+        });
+      }
       await logContractFieldChanges(
         tx,
         existing.id,
@@ -1097,19 +1220,32 @@ router.post("/:id/variations", async (req, res) => {
     const input = variationSchema.parse(req.body);
     const contract = await ensureActiveContract(req.params.id);
     const payload = resolveVariationPayload(contract, input);
+    const { workUnitMonths, ...variationData } = payload as typeof payload & {
+      workUnitMonths?: WorkUnitMonthInput[];
+    };
 
     const row = await prisma.$transaction(async (tx) => {
       const created = await tx.contractVariation.create({
         data: {
           contractId: contract.id,
-          ...payload,
+          ...variationData,
         },
       });
+      if (contract.type === "T_AND_M" && workUnitMonths?.length) {
+        await replaceWorkUnitMonths(tx, contract.id, created.id, workUnitMonths);
+      }
       await syncContractTotalVariation(tx, contract.id);
       return created;
     });
 
-    res.status(201).json({ data: serializeVariation(row) });
+    const workUnits =
+      contract.type === "T_AND_M"
+        ? await prisma.contractWorkUnitMonth.findMany({
+            where: { contractId: contract.id, segmentKey: row.id },
+            orderBy: [{ year: "asc" }, { month: "asc" }],
+          })
+        : [];
+    res.status(201).json({ data: serializeVariation(row, workUnits) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
@@ -1147,16 +1283,29 @@ router.patch("/:id/variations/:variationId", async (req, res) => {
     if (!existing) return res.status(404).json({ error: "Variation not found" });
 
     const payload = resolveVariationPayload(contract, input);
+    const { workUnitMonths, ...variationData } = payload as typeof payload & {
+      workUnitMonths?: WorkUnitMonthInput[];
+    };
     const row = await prisma.$transaction(async (tx) => {
       const updated = await tx.contractVariation.update({
         where: { id: existing.id },
-        data: payload,
+        data: variationData,
       });
+      if (contract.type === "T_AND_M") {
+        await replaceWorkUnitMonths(tx, contract.id, existing.id, workUnitMonths ?? []);
+      }
       await syncContractTotalVariation(tx, contract.id);
       return updated;
     });
 
-    res.json({ data: serializeVariation(row) });
+    const workUnits =
+      contract.type === "T_AND_M"
+        ? await prisma.contractWorkUnitMonth.findMany({
+            where: { contractId: contract.id, segmentKey: row.id },
+            orderBy: [{ year: "asc" }, { month: "asc" }],
+          })
+        : [];
+    res.json({ data: serializeVariation(row, workUnits) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });

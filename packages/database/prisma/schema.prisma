@@ -388,10 +388,11 @@ model Contract {
   fileUrls       Json?
   ownerId        String?
   owner          AdminUser?          @relation("ContractOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  variations     ContractVariation[]
-  milestones     ContractMilestone[]
-  invoices       ContractInvoice[]
-  activityLogs   ContractActivityLog[]
+  variations      ContractVariation[]
+  milestones      ContractMilestone[]
+  invoices        ContractInvoice[]
+  workUnitMonths  ContractWorkUnitMonth[]
+  activityLogs    ContractActivityLog[]
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
@@ -437,6 +438,23 @@ model ContractVariation {
   variationValue   Decimal   @db.Decimal(14, 2)
   createdAt        DateTime  @default(now())
 
+  @@index([contractId])
+}
+
+model ContractWorkUnitMonth {
+  id         String   @id @default(cuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  /// "base" for the contract period, or a variation id
+  segmentKey String   @default("base")
+  year       Int
+  /// 0–11 (Jan–Dec)
+  month      Int
+  workUnits  Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([contractId, segmentKey, year, month])
   @@index([contractId])
 }
 

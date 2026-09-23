@@ -10,8 +10,11 @@ type ClientAmount = { clientId: string; clientName: string; amount: number };
 type ForecastVsActual = { clientId: string; clientName: string; forecast: number; actual: number };
 type ForecastMonthRow = { month: number; label: string; forecast: number; actual: number };
 
+const BASE_CURRENCIES = ["AUD", "USD", "INR"] as const;
+
 type SalesDashboardStats = {
   year: number;
+  baseCurrency: string;
   actuals: {
     activeOpportunities: number;
     activeContracts: number;
@@ -29,7 +32,14 @@ type SalesDashboardStats = {
   };
 };
 
-function formatAmount(value: number) {
+function formatAmount(value: number, currency?: string) {
+  if (currency) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0,
+    }).format(value);
+  }
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
 }
 
@@ -44,6 +54,7 @@ function BarChart({
   labelKey,
   valueKey,
   getHref,
+  currency,
 }: {
   title: string;
   subtitle: string;
@@ -51,6 +62,7 @@ function BarChart({
   labelKey: string;
   valueKey: string;
   getHref?: (item: Record<string, string | number>) => string | undefined;
+  currency?: string;
 }) {
   const max = useMemo(() => Math.max(...items.map((item) => Number(item[valueKey])), 1), [items, valueKey]);
 
@@ -76,10 +88,10 @@ function BarChart({
               <span className="text-sm tabular-nums text-gray-600 dark:text-gray-400">
                 {getHref?.(item) ? (
                   <Link href={getHref(item)!} className="font-medium text-blue-600 hover:underline dark:text-blue-400">
-                    {formatAmount(Number(item[valueKey]))}
+                    {currency ? formatAmount(Number(item[valueKey]), currency) : formatAmount(Number(item[valueKey]))}
                   </Link>
                 ) : (
-                  formatAmount(Number(item[valueKey]))
+                  currency ? formatAmount(Number(item[valueKey]), currency) : formatAmount(Number(item[valueKey]))
                 )}
               </span>
             </div>
@@ -90,7 +102,17 @@ function BarChart({
   );
 }
 
-function DualBarChart({ title, subtitle, items }: { title: string; subtitle: string; items: ForecastVsActual[] }) {
+function DualBarChart({
+  title,
+  subtitle,
+  items,
+  currency,
+}: {
+  title: string;
+  subtitle: string;
+  items: ForecastVsActual[];
+  currency: string;
+}) {
   const max = useMemo(
     () => Math.max(...items.map((item) => Math.max(item.forecast, item.actual)), 1),
     [items],
@@ -114,14 +136,14 @@ function DualBarChart({ title, subtitle, items }: { title: string; subtitle: str
                 <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
                   <div className="h-full rounded-full bg-amber-500" style={{ width: `${(item.forecast / max) * 100}%` }} />
                 </div>
-                <span className="tabular-nums text-gray-600">{formatAmount(item.forecast)}</span>
+                <span className="tabular-nums text-gray-600">{formatAmount(item.forecast, currency)}</span>
               </div>
               <div className="grid grid-cols-[4rem_1fr_auto] items-center gap-2 text-xs">
                 <span className="text-gray-500">Actual</span>
                 <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
                   <div className="h-full rounded-full bg-green-600" style={{ width: `${(item.actual / max) * 100}%` }} />
                 </div>
-                <span className="tabular-nums text-gray-600">{formatAmount(item.actual)}</span>
+                <span className="tabular-nums text-gray-600">{formatAmount(item.actual, currency)}</span>
               </div>
             </div>
           ))}
@@ -131,7 +153,15 @@ function DualBarChart({ title, subtitle, items }: { title: string; subtitle: str
   );
 }
 
-function MonthlyForecastChart({ year, items }: { year: number; items: ForecastMonthRow[] }) {
+function MonthlyForecastChart({
+  year,
+  items,
+  currency,
+}: {
+  year: number;
+  items: ForecastMonthRow[];
+  currency: string;
+}) {
   const max = useMemo(
     () => Math.max(...items.map((item) => Math.max(item.forecast, item.actual)), 1),
     [items],
@@ -152,7 +182,7 @@ function MonthlyForecastChart({ year, items }: { year: number; items: ForecastMo
             <div className="space-y-1">
               <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
                 <span>Forecast</span>
-                <span className="tabular-nums">{formatAmount(item.forecast)}</span>
+                <span className="tabular-nums">{formatAmount(item.forecast, currency)}</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
                 <div
@@ -164,7 +194,7 @@ function MonthlyForecastChart({ year, items }: { year: number; items: ForecastMo
             <div className="space-y-1">
               <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
                 <span>Actual</span>
-                <span className="tabular-nums">{formatAmount(item.actual)}</span>
+                <span className="tabular-nums">{formatAmount(item.actual, currency)}</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
                 <div
@@ -195,12 +225,15 @@ function StatCard({ label, value, href }: { label: string; value: number | strin
 export default function SalesDashboardPage() {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [baseCurrency, setBaseCurrency] = useState("AUD");
   const [stats, setStats] = useState<SalesDashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadStats = useCallback((year: number) => {
+  const loadStats = useCallback((year: number, currency: string) => {
     setLoading(true);
-    void adminFetch(`/api/admin/sales-dashboard/stats?year=${year}`)
+    void adminFetch(
+      `/api/admin/sales-dashboard/stats?year=${year}&baseCurrency=${encodeURIComponent(currency)}`,
+    )
       .then((res) => res.json())
       .then((data) => setStats(data.data as SalesDashboardStats))
       .catch(console.error)
@@ -208,10 +241,11 @@ export default function SalesDashboardPage() {
   }, []);
 
   useEffect(() => {
-    loadStats(selectedYear);
-  }, [loadStats, selectedYear]);
+    loadStats(selectedYear, baseCurrency);
+  }, [loadStats, selectedYear, baseCurrency]);
 
   const year = stats?.year ?? selectedYear;
+  const displayCurrency = stats?.baseCurrency ?? baseCurrency;
   const isCurrentYear = year === currentYear;
 
   return (
@@ -221,18 +255,32 @@ export default function SalesDashboardPage() {
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Sales pipeline overview — actuals and forecast for {year}.
           </p>
-          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <span className="font-medium">Year</span>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number.parseInt(e.target.value, 10))}
-              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
-            >
-              {yearOptions(currentYear).map((value) => (
-                <option key={value} value={value}>{value}</option>
-              ))}
-            </select>
-          </label>
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <span className="font-medium">Year</span>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number.parseInt(e.target.value, 10))}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
+              >
+                {yearOptions(currentYear).map((value) => (
+                  <option key={value} value={value}>{value}</option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <span className="font-medium">Base currency</span>
+              <select
+                value={baseCurrency}
+                onChange={(e) => setBaseCurrency(e.target.value)}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
+              >
+                {BASE_CURRENCIES.map((code) => (
+                  <option key={code} value={code}>{code}</option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
 
         {loading && !stats ? (
@@ -273,7 +321,7 @@ export default function SalesDashboardPage() {
                 />
                 <BarChart
                   title="Amount owed by client"
-                  subtitle="Total invoice amounts (draft and awaiting payment)."
+                  subtitle={`Total invoice amounts in ${displayCurrency} (draft and awaiting payment).`}
                   items={(stats?.actuals.amountOwedByClient ?? []).map((row) => ({
                     clientName: row.clientName,
                     amount: row.amount,
@@ -281,6 +329,7 @@ export default function SalesDashboardPage() {
                   }))}
                   labelKey="clientName"
                   valueKey="amount"
+                  currency={displayCurrency}
                   getHref={() => "/invoices?status=AWAITING_PAYMENT"}
                 />
               </div>
@@ -294,25 +343,34 @@ export default function SalesDashboardPage() {
                     Forecasted revenue ({year})
                   </p>
                   <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
-                    {formatAmount(stats?.forecast.forecastedRevenueThisYear ?? 0)}
+                    {formatAmount(stats?.forecast.forecastedRevenueThisYear ?? 0, displayCurrency)}
                   </p>
-                  <p className="mt-1 text-xs text-gray-500">T&M working days (incl. AU public holidays) + milestones</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Converted to {displayCurrency} at current exchange rates
+                  </p>
                 </div>
                 <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
                   <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                     Actual revenue ({year})
                   </p>
                   <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
-                    {formatAmount(stats?.forecast.actualRevenueThisYear ?? 0)}
+                    {formatAmount(stats?.forecast.actualRevenueThisYear ?? 0, displayCurrency)}
                   </p>
-                  <p className="mt-1 text-xs text-gray-500">Invoice amounts (excl. tax) by due date</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Invoice amounts (excl. tax) in {displayCurrency} by due date
+                  </p>
                 </div>
               </div>
-              <MonthlyForecastChart year={year} items={stats?.forecast.forecastByMonth ?? []} />
+              <MonthlyForecastChart
+                year={year}
+                items={stats?.forecast.forecastByMonth ?? []}
+                currency={displayCurrency}
+              />
               <DualBarChart
                 title={`Forecast vs actual (${year})`}
-                subtitle="Grouped by client — forecast (amber) vs actual (green)."
+                subtitle={`Grouped by client in ${displayCurrency} — forecast (amber) vs actual (green).`}
                 items={stats?.forecast.forecastVsActualByClient ?? []}
+                currency={displayCurrency}
               />
             </section>
           </>

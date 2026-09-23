@@ -10,6 +10,12 @@ export type ForecastMonthRow = {
   actual: number;
 };
 
+export type WorkUnitMonth = {
+  year: number;
+  month: number;
+  workUnits: number;
+};
+
 export type ForecastContract = {
   id: string;
   type: ContractType;
@@ -22,7 +28,13 @@ export type ForecastContract = {
   clientId: string;
   clientName: string;
   clientCountry: string;
-  variations: Array<{ variationDate: Date; variationEndDate: Date | null }>;
+  workUnitMonths: WorkUnitMonth[];
+  variations: Array<{
+    variationDate: Date;
+    variationEndDate: Date | null;
+    rate?: number | null;
+    workUnitMonths?: WorkUnitMonth[];
+  }>;
   milestones: Array<{ milestoneDate: Date; amount: number }>;
 };
 
@@ -139,6 +151,33 @@ function tmMonthlyAmount(rate: number, unit: string | null, workingDays: number)
   return rate * workingDays;
 }
 
+function sumWorkUnitsForPeriod(
+  rows: WorkUnitMonth[],
+  year: number,
+  month?: number,
+): number {
+  return rows
+    .filter((row) => row.year === year && (month === undefined || row.month === month))
+    .reduce((sum, row) => sum + row.workUnits, 0);
+}
+
+function forecastTmFromWorkUnits(
+  contract: ForecastContract,
+  year: number,
+  month?: number,
+): number {
+  let total = 0;
+  if (contract.workUnitMonths.length > 0) {
+    total += contract.rate * sumWorkUnitsForPeriod(contract.workUnitMonths, year, month);
+  }
+  for (const variation of contract.variations) {
+    if (!variation.workUnitMonths?.length) continue;
+    const rate = variation.rate ?? contract.rate;
+    total += rate * sumWorkUnitsForPeriod(variation.workUnitMonths, year, month);
+  }
+  return total;
+}
+
 function tmWorkingDaysInYear(
   contract: ForecastContract,
   year: number,
@@ -159,14 +198,25 @@ function tmWorkingDaysInYear(
   return total;
 }
 
+function hasStoredWorkUnits(contract: ForecastContract): boolean {
+  if (contract.workUnitMonths.length > 0) return true;
+  return contract.variations.some((row) => (row.workUnitMonths?.length ?? 0) > 0);
+}
+
 export function forecastTmRevenueForMonth(contract: ForecastContract, year: number, month: number): number {
   if (contract.type !== "T_AND_M" || contract.status !== "ACTIVE") return 0;
+  if (hasStoredWorkUnits(contract)) {
+    return forecastTmFromWorkUnits(contract, year, month);
+  }
   const days = tmWorkingDaysInYear(contract, year, month);
   return tmMonthlyAmount(contract.rate, contract.unit, days);
 }
 
 export function forecastTmRevenueForYear(contract: ForecastContract, year: number): number {
   if (contract.type !== "T_AND_M" || contract.status !== "ACTIVE") return 0;
+  if (hasStoredWorkUnits(contract)) {
+    return forecastTmFromWorkUnits(contract, year);
+  }
   const days = tmWorkingDaysInYear(contract, year);
   return tmMonthlyAmount(contract.rate, contract.unit, days);
 }

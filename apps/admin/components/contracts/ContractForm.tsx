@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { readUploadImageUrlFromJson } from "@/lib/upload-response";
@@ -23,10 +23,18 @@ import {
   CONTRACT_INVOICE_STATUS_LABELS,
   type ContractInvoiceStatus,
 } from "@/lib/contract-invoice-status";
+import {
+  formatMonthLabel,
+  generateWorkUnitMonths,
+  sumWorkUnits,
+  type WorkUnitMonthInput,
+} from "@/lib/contract-work-units";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
 const readOnlyClass = "bg-gray-50 dark:bg-gray-900 cursor-not-allowed";
+
+export type ContractWorkUnitMonth = WorkUnitMonthInput;
 
 export type ContractVariation = {
   id: string;
@@ -37,6 +45,7 @@ export type ContractVariation = {
   unit: string | null;
   rate: number | null;
   variationValue: number;
+  workUnitMonths?: ContractWorkUnitMonth[];
 };
 
 export type ContractMilestone = {
@@ -77,6 +86,7 @@ export type ContractFormValues = {
   endDate: string;
   unit: ContractUnit | "";
   numberOfUnits?: number | null;
+  workUnitMonths?: ContractWorkUnitMonth[];
   currency: string;
   rate: number;
   contractValue: number;
@@ -125,6 +135,67 @@ function fieldClass(editable: boolean) {
   return `${inputClass} ${editable ? "" : readOnlyClass}`;
 }
 
+function WorkUnitMonthsEditor({
+  rows,
+  editable,
+  onChange,
+}: {
+  rows: WorkUnitMonthInput[];
+  editable: boolean;
+  onChange: (rows: WorkUnitMonthInput[]) => void;
+}) {
+  if (!rows.length) {
+    return (
+      <p className="text-xs text-gray-500 dark:text-gray-400">
+        Set start and end dates to generate monthly work units.
+      </p>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+      <table className="min-w-full text-sm">
+        <thead className="bg-gray-50 dark:bg-gray-900/60">
+          <tr>
+            <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Month</th>
+            <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Work units</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+          {rows.map((row) => (
+            <tr key={`${row.year}-${row.month}`}>
+              <td className="px-3 py-2 text-gray-800 dark:text-gray-200">
+                {formatMonthLabel(row.year, row.month)}
+              </td>
+              <td className="px-3 py-2">
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={row.workUnits}
+                  readOnly={!editable}
+                  onChange={(e) => {
+                    const workUnits = Number.parseInt(e.target.value, 10);
+                    if (!workUnits || workUnits <= 0) return;
+                    onChange(
+                      rows.map((item) =>
+                        item.year === row.year && item.month === row.month
+                          ? { ...item, workUnits }
+                          : item,
+                      ),
+                    );
+                  }}
+                  className={fieldClass(editable)}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving }: Props) {
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
@@ -139,6 +210,11 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const [numberOfUnits, setNumberOfUnits] = useState(
     defaults.numberOfUnits != null ? String(defaults.numberOfUnits) : "",
   );
+  const [workUnitMonths, setWorkUnitMonths] = useState<WorkUnitMonthInput[]>(
+    defaults.workUnitMonths ?? [],
+  );
+  const [variationWorkUnitMonths, setVariationWorkUnitMonths] = useState<WorkUnitMonthInput[]>([]);
+  const datesUnitRef = useRef({ startDate, endDate, unit });
   const [currency, setCurrency] = useState(defaults.currency ?? "AUD");
   const [rate, setRate] = useState(defaults.rate != null ? String(defaults.rate) : "");
   const [contractValue, setContractValue] = useState(
@@ -158,6 +234,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const [variationValue, setVariationValue] = useState("");
   const [variationQty, setVariationQty] = useState("");
   const [variationRate, setVariationRate] = useState("");
+  const variationDatesRef = useRef({ variationDate: "", variationEndDate: "" });
   const [editingVariationId, setEditingVariationId] = useState<string | null>(null);
   const [addingVariation, setAddingVariation] = useState(false);
   const [deletingVariationId, setDeletingVariationId] = useState<string | null>(null);
@@ -193,7 +270,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const showNumberOfUnits = type === "T_AND_M";
   const contractValueReadOnly = type === "T_AND_M" || !isEditable;
   const contractValueRequired = type === "FIXED_PRICE";
-  const numberOfUnitsReadOnly = !isEditable;
+  const numberOfUnitsReadOnly = true;
   const canAddVariations = Boolean(defaults.id) && status === "ACTIVE";
   const canAddMilestones = Boolean(defaults.id) && status === "ACTIVE" && type !== "T_AND_M";
   const canAddInvoices = Boolean(defaults.id) && status === "ACTIVE";
@@ -212,12 +289,17 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
 
   const invoicePreviewTotal = invoicePreviewAmount + invoicePreviewTaxAmount;
 
+  const variationQtyTotal = useMemo(() => {
+    if (type !== "T_AND_M") return Number.parseInt(variationQty, 10) || 0;
+    if (variationWorkUnitMonths.length) return sumWorkUnits(variationWorkUnitMonths);
+    return Number.parseInt(variationQty, 10) || 0;
+  }, [type, variationQty, variationWorkUnitMonths]);
+
   const variationPreviewValue = useMemo(() => {
     if (type !== "T_AND_M") return Number.parseFloat(variationValue) || 0;
-    const qty = Number.parseInt(variationQty, 10) || 0;
     const rateVal = Number.parseFloat(variationRate) || 0;
-    return qty * rateVal;
-  }, [type, variationValue, variationQty, variationRate]);
+    return variationQtyTotal * rateVal;
+  }, [type, variationValue, variationQtyTotal, variationRate]);
 
   const totalVariation = useMemo(
     () => variations.reduce((sum, row) => sum + row.variationValue, 0),
@@ -256,12 +338,64 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   }, [defaults.ownerId, defaultOwnerId]);
 
   useEffect(() => {
+    const prev = datesUnitRef.current;
+    const changed =
+      prev.startDate !== startDate || prev.endDate !== endDate || prev.unit !== unit;
+    datesUnitRef.current = { startDate, endDate, unit };
+
+    if (type !== "T_AND_M" || !isEditable) return;
+    if (!startDate || !endDate || !unit) {
+      if (changed) setWorkUnitMonths([]);
+      return;
+    }
+    if (changed || !workUnitMonths.length) {
+      setWorkUnitMonths(
+        generateWorkUnitMonths(startDate, endDate, unit).map((row) => ({
+          year: row.year,
+          month: row.month,
+          workUnits: row.workUnits,
+        })),
+      );
+    }
+  }, [type, startDate, endDate, unit, isEditable, workUnitMonths.length]);
+
+  useEffect(() => {
+    const prev = variationDatesRef.current;
+    const changed =
+      prev.variationDate !== variationDate || prev.variationEndDate !== variationEndDate;
+    variationDatesRef.current = { variationDate, variationEndDate };
+
+    if (type !== "T_AND_M" || !showVariationForm) return;
+    if (!variationDate || !variationEndDate || !unit) {
+      if (changed) setVariationWorkUnitMonths([]);
+      return;
+    }
+    if (changed || !variationWorkUnitMonths.length) {
+      setVariationWorkUnitMonths(
+        generateWorkUnitMonths(variationDate, variationEndDate, unit).map((row) => ({
+          year: row.year,
+          month: row.month,
+          workUnits: row.workUnits,
+        })),
+      );
+    }
+  }, [
+    type,
+    unit,
+    variationDate,
+    variationEndDate,
+    showVariationForm,
+    variationWorkUnitMonths.length,
+  ]);
+
+  useEffect(() => {
     if (type === "T_AND_M") {
-      const units = Number.parseInt(numberOfUnits, 10) || 0;
+      const units = workUnitMonths.length ? sumWorkUnits(workUnitMonths) : Number.parseInt(numberOfUnits, 10) || 0;
+      setNumberOfUnits(String(units));
       const rateValue = Number.parseFloat(rate) || 0;
       setContractValue(String(units * rateValue));
     }
-  }, [type, numberOfUnits, rate]);
+  }, [type, workUnitMonths, rate]);
 
   async function persistFileUrls(nextUrls: string[]) {
     if (!defaults.id || isEditable) {
@@ -425,16 +559,22 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
     setVariationValue("");
     setVariationQty("");
     setVariationRate("");
+    setVariationWorkUnitMonths([]);
+    variationDatesRef.current = { variationDate: "", variationEndDate: "" };
   }
 
   function startEditVariation(variation: ContractVariation) {
+    const start = toDateInput(variation.variationDate);
+    const end = toDateInput(variation.variationEndDate);
     setEditingVariationId(variation.id);
-    setVariationDate(toDateInput(variation.variationDate));
-    setVariationEndDate(toDateInput(variation.variationEndDate));
+    setVariationDate(start);
+    setVariationEndDate(end);
     setVariationComments(variation.comments);
     setVariationValue(String(variation.variationValue));
     setVariationQty(variation.qty != null ? String(variation.qty) : "");
     setVariationRate(variation.rate != null ? String(variation.rate) : "");
+    setVariationWorkUnitMonths(variation.workUnitMonths ?? []);
+    variationDatesRef.current = { variationDate: start, variationEndDate: end };
     setShowVariationForm(true);
   }
 
@@ -451,8 +591,12 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
 
     let body: Record<string, unknown>;
     if (type === "T_AND_M") {
-      const qty = Number.parseInt(variationQty, 10);
+      const qty = variationQtyTotal;
       const rateVal = Number.parseFloat(variationRate);
+      if (!variationWorkUnitMonths.length) {
+        alert("Work units are required for T&M variations.");
+        return;
+      }
       if (!qty || qty <= 0) {
         alert("Qty is required for T&M variations.");
         return;
@@ -466,6 +610,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
         variationEndDate,
         qty,
         rate: rateVal,
+        workUnitMonths: variationWorkUnitMonths,
         comments: variationComments.trim(),
       };
     } else {
@@ -691,7 +836,15 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
         alert("Unit is required for T&M contracts.");
         return;
       }
-      const units = Number.parseInt(numberOfUnits, 10);
+      if (!endDate) {
+        alert("End date is required for T&M contracts.");
+        return;
+      }
+      if (!workUnitMonths.length) {
+        alert("Work units are required for T&M contracts.");
+        return;
+      }
+      const units = sumWorkUnits(workUnitMonths);
       if (!units || units <= 0) {
         alert("No. of units is required for T&M contracts.");
         return;
@@ -718,12 +871,13 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       startDate,
       endDate: endDate || null,
       unit: type === "T_AND_M" ? unit : null,
-      numberOfUnits: type === "T_AND_M" ? Number.parseInt(numberOfUnits, 10) : null,
+      numberOfUnits: type === "T_AND_M" ? sumWorkUnits(workUnitMonths) : null,
+      workUnitMonths: type === "T_AND_M" ? workUnitMonths : undefined,
       currency,
       rate: type === "FIXED_PRICE" ? 0 : rate ? Number.parseFloat(rate) : 0,
       contractValue:
         type === "T_AND_M"
-          ? (Number.parseInt(numberOfUnits, 10) || 0) * (Number.parseFloat(rate) || 0)
+          ? sumWorkUnits(workUnitMonths) * (Number.parseFloat(rate) || 0)
           : contractValue
             ? Number.parseFloat(contractValue)
             : 0,
@@ -878,11 +1032,11 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
               min="1"
               step="1"
               value={numberOfUnits}
-              onChange={(e) => setNumberOfUnits(e.target.value)}
               required
               readOnly={numberOfUnitsReadOnly}
-              className={fieldClass(!numberOfUnitsReadOnly)}
+              className={fieldClass(false)}
             />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Total of all work units (read-only)</p>
           </div>
         ) : null}
         {showRate ? (
@@ -903,6 +1057,22 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
           </div>
         ) : null}
       </div>
+
+      {type === "T_AND_M" && (isEditable || workUnitMonths.length > 0) ? (
+        <div className="space-y-2">
+          <div>
+            <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Monthly work units *</h4>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Weekdays only (Mon–Fri), excluding public holidays. Hour unit = weekdays × 8.
+            </p>
+          </div>
+          <WorkUnitMonthsEditor
+            rows={workUnitMonths}
+            editable={isEditable}
+            onChange={setWorkUnitMonths}
+          />
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
@@ -976,36 +1146,47 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
           {showVariationForm ? (
             <div className="mb-4 space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/40">
               {type === "T_AND_M" ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Qty *</label>
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      value={variationQty}
-                      onChange={(e) => setVariationQty(e.target.value)}
-                      className={inputClass}
+                <>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Qty *</label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={variationQtyTotal}
+                        readOnly
+                        className={fieldClass(false)}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">Total of all work units</p>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Rate *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={variationRate}
+                        onChange={(e) => setVariationRate(e.target.value)}
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Variation value</label>
+                      <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
+                        {formatMoney(currency, variationPreviewValue)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Monthly work units *</p>
+                    <WorkUnitMonthsEditor
+                      rows={variationWorkUnitMonths}
+                      editable
+                      onChange={setVariationWorkUnitMonths}
                     />
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Rate *</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={variationRate}
-                      onChange={(e) => setVariationRate(e.target.value)}
-                      className={inputClass}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Variation value</label>
-                    <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
-                      {formatMoney(currency, variationPreviewValue)}
-                    </p>
-                  </div>
-                </div>
+                </>
               ) : (
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Variation value *</label>
