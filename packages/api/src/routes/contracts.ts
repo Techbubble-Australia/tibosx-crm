@@ -393,6 +393,55 @@ function serializeActivityLog(row: {
   };
 }
 
+function parseDateQuery(value: unknown): Date | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const date = new Date(value.trim());
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+async function ensureDraftContract(contractId: string) {
+  const contract = await prisma.contract.findUnique({ where: { id: contractId } });
+  if (!contract) throw new Error("NOT_FOUND");
+  if (contract.status !== "DRAFT") throw new Error("NOT_DRAFT");
+  return contract;
+}
+
+async function syncProfileAvailableFlag(profileId: string, tx: Prisma.TransactionClient) {
+  const count = await tx.contractProfile.count({ where: { profileId } });
+  await tx.candidateProfile.update({
+    where: { id: profileId },
+    data: { available: count === 0 },
+  });
+}
+
+function serializeContractProfile(row: {
+  id: string;
+  profileId: string;
+  createdAt: Date;
+  profile: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    category: string;
+    technology: string;
+    available: boolean;
+  };
+}) {
+  return {
+    id: row.id,
+    profileId: row.profileId,
+    firstName: row.profile.firstName,
+    lastName: row.profile.lastName,
+    email: row.profile.email,
+    category: row.profile.category,
+    technology: row.profile.technology,
+    available: row.profile.available,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
 function serializeWorkUnitMonth(row: { year: number; month: number; workUnits: number }) {
   return {
     year: row.year,
@@ -572,6 +621,20 @@ function serializeContract(row: {
     month: number;
     workUnits: number;
   }>;
+  contractProfiles?: Array<{
+    id: string;
+    profileId: string;
+    createdAt: Date;
+    profile: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      category: string;
+      technology: string;
+      available: boolean;
+    };
+  }>;
 }) {
   const type = row.type as keyof typeof CONTRACT_TYPE_LABELS;
   const contractValue = toNumber(row.contractValue);
@@ -620,6 +683,7 @@ function serializeContract(row: {
     milestones: row.milestones?.map(serializeMilestone) ?? undefined,
     invoices: row.invoices?.map(serializeInvoice) ?? undefined,
     activityLogs: row.activityLogs?.map(serializeActivityLog) ?? undefined,
+    profiles: row.contractProfiles?.map(serializeContractProfile) ?? [],
   };
 }
 
@@ -635,6 +699,22 @@ const activityInclude = {
 const detailInclude = {
   ...contractInclude,
   workUnitMonths: { orderBy: [{ year: "asc" as const }, { month: "asc" as const }] },
+  contractProfiles: {
+    orderBy: { createdAt: "asc" as const },
+    include: {
+      profile: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          category: true,
+          technology: true,
+          available: true,
+        },
+      },
+    },
+  },
   variations: { orderBy: { variationDate: "desc" as const } },
   milestones: { orderBy: { milestoneDate: "asc" as const } },
   invoices: { orderBy: { issueDate: "desc" as const } },
@@ -651,13 +731,76 @@ async function fetchContractDetail(id: string) {
   });
 }
 
+router.get("/profile-options", async (req, res) => {
+  try {
+    const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+    const contractId = typeof req.query.contractId === "string" ? req.query.contractId.trim() : "";
+    let excludeIds: string[] = [];
+    if (contractId) {
+      const linked = await prisma.contractProfile.findMany({
+        where: { contractId },
+        select: { profileId: true },
+      });
+      excludeIds = linked.map((row) => row.profileId);
+    }
+    const profiles = await prisma.candidateProfile.findMany({
+      where: search
+        ? {
+            OR: [
+              { firstName: { contains: search, mode: "insensitive" } },
+              { lastName: { contains: search, mode: "insensitive" } },
+              { email: { contains: search, mode: "insensitive" } },
+            ],
+          }
+        : undefined,
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+      take: 50,
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        category: true,
+        technology: true,
+        available: true,
+      },
+    });
+    res.json({
+      data: profiles.filter((row) => !excludeIds.includes(row.id)),
+    });
+  } catch (error) {
+    console.error("Error fetching contract profile options:", error);
+    res.status(500).json({ error: "Failed to fetch profile options" });
+  }
+});
+
 router.get("/", async (req, res) => {
   try {
     const clientId = typeof req.query.clientId === "string" ? req.query.clientId.trim() : "";
     const tab = typeof req.query.tab === "string" ? req.query.tab.trim() : "";
     const expiring = typeof req.query.expiring === "string" ? req.query.expiring.trim() : "";
+    const type = typeof req.query.type === "string" ? req.query.type.trim() : "";
+    const startDateFrom = parseDateQuery(req.query.startDateFrom);
+    const startDateTo = parseDateQuery(req.query.startDateTo);
+    const endDateFrom = parseDateQuery(req.query.endDateFrom);
+    const endDateTo = parseDateQuery(req.query.endDateTo);
     const where: Prisma.ContractWhereInput = {};
     if (clientId) where.clientId = clientId;
+    if (type && (CONTRACT_TYPES as readonly string[]).includes(type)) {
+      where.type = type;
+    }
+    if (startDateFrom || startDateTo) {
+      where.startDate = {
+        ...(startDateFrom ? { gte: startDateFrom } : {}),
+        ...(startDateTo ? { lte: startDateTo } : {}),
+      };
+    }
+    if (endDateFrom || endDateTo) {
+      where.endDate = {
+        ...(endDateFrom ? { gte: endDateFrom } : {}),
+        ...(endDateTo ? { lte: endDateTo } : {}),
+      };
+    }
     if (tab === "active") {
       where.status = { in: [...CONTRACT_ACTIVE_STATUSES] };
     } else if (tab === "inactive") {
@@ -709,6 +852,100 @@ router.get("/:id", async (req, res) => {
   } catch (error) {
     console.error("Error fetching contract:", error);
     res.status(500).json({ error: "Failed to fetch contract" });
+  }
+});
+
+const contractProfileSchema = z.object({
+  profileId: z.string().min(1),
+});
+
+router.post("/:id/profiles", async (req, res) => {
+  try {
+    const input = contractProfileSchema.parse(req.body);
+    await ensureDraftContract(req.params.id);
+    const profile = await prisma.candidateProfile.findUnique({ where: { id: input.profileId } });
+    if (!profile) return res.status(404).json({ error: "Profile not found" });
+
+    const row = await prisma.$transaction(async (tx) => {
+      const existing = await tx.contractProfile.findUnique({
+        where: { contractId_profileId: { contractId: req.params.id, profileId: input.profileId } },
+        include: {
+          profile: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              category: true,
+              technology: true,
+              available: true,
+            },
+          },
+        },
+      });
+      if (existing) return existing;
+      const created = await tx.contractProfile.create({
+        data: { contractId: req.params.id, profileId: input.profileId },
+        include: {
+          profile: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              category: true,
+              technology: true,
+              available: true,
+            },
+          },
+        },
+      });
+      await tx.candidateProfile.update({
+        where: { id: input.profileId },
+        data: { available: false },
+      });
+      return created;
+    });
+
+    res.status(201).json({ data: serializeContractProfile(row) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return res.status(404).json({ error: "Not found" });
+    }
+    if (error instanceof Error && error.message === "NOT_DRAFT") {
+      return res.status(400).json({ error: "Profiles can only be added to draft contracts" });
+    }
+    console.error("Error adding contract profile:", error);
+    res.status(500).json({ error: "Failed to add profile" });
+  }
+});
+
+router.delete("/:id/profiles/:contractProfileId", async (req, res) => {
+  try {
+    await ensureDraftContract(req.params.id);
+    const existing = await prisma.contractProfile.findFirst({
+      where: { id: req.params.contractProfileId, contractId: req.params.id },
+    });
+    if (!existing) return res.status(404).json({ error: "Profile link not found" });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.contractProfile.delete({ where: { id: existing.id } });
+      await syncProfileAvailableFlag(existing.profileId, tx);
+    });
+
+    res.json({ message: "Removed" });
+  } catch (error) {
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return res.status(404).json({ error: "Not found" });
+    }
+    if (error instanceof Error && error.message === "NOT_DRAFT") {
+      return res.status(400).json({ error: "Profiles can only be removed from draft contracts" });
+    }
+    console.error("Error removing contract profile:", error);
+    res.status(500).json({ error: "Failed to remove profile" });
   }
 });
 

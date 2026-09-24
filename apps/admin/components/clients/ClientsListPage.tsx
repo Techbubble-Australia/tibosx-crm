@@ -175,11 +175,11 @@ export function ClientsListPage({ statusFilter, heading, description }: Props) {
           <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>
         </div>
         <Link
-          href="/clients/new"
+          href={statusFilter === "PROSPECT" ? "/clients/new?prospect=1" : "/clients/new"}
           className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
         >
           <Plus className="h-4 w-4" />
-          Add Client
+          {statusFilter === "PROSPECT" ? "Add Prospect" : "Add Client"}
         </Link>
       </div>
 

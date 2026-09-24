@@ -1,19 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { CountryFlagPicker } from "@/components/CountryFlagPicker";
 import { ClientContactsField, type ClientContactInput } from "@/components/clients/ClientContactsField";
-import { CLIENT_STATUSES, CLIENT_STATUS_LABELS } from "@/lib/client-status";
+import {
+  ClientStatusFields,
+  clientListPathForStatus,
+  readClientStatusFromForm,
+} from "@/components/clients/ClientStatusFields";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
 
 export default function NewClientPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const defaultProspect = searchParams.get("prospect") === "1";
+  const backHref = defaultProspect ? "/clients/prospect" : "/clients/active";
   const [isLoading, setIsLoading] = useState(false);
   const [nextOrder, setNextOrder] = useState<number | null>(null);
   const [contacts, setContacts] = useState<ClientContactInput[]>([
@@ -37,6 +44,7 @@ export default function NewClientPage() {
     e.preventDefault();
     setIsLoading(true);
     const formData = new FormData(e.currentTarget);
+    const status = readClientStatusFromForm(formData);
     try {
       const res = await adminFetch("/api/admin/clients", {
         method: "POST",
@@ -45,7 +53,7 @@ export default function NewClientPage() {
           name: formData.get("name"),
           website: formData.get("website") ?? "",
           country: formData.get("country"),
-          status: formData.get("status"),
+          status,
           contacts,
         }),
       });
@@ -53,7 +61,7 @@ export default function NewClientPage() {
         const err = await res.json().catch(() => ({}));
         throw new Error((err as { error?: string }).error || "Failed");
       }
-      router.push("/clients/active");
+      router.push(clientListPathForStatus(status));
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to create client");
     } finally {
@@ -64,10 +72,12 @@ export default function NewClientPage() {
   return (
     <div className="max-w-2xl">
       <div className="mb-6 flex items-center gap-3">
-        <Link href="/clients/active" className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
+        <Link href={backHref} className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">New Client</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          {defaultProspect ? "New Prospect" : "New Client"}
+        </h2>
       </div>
       <form
         onSubmit={onSubmit}
@@ -85,14 +95,7 @@ export default function NewClientPage() {
           selectClassName={inputClass}
           labelClassName="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100"
         />
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Status *</label>
-          <select name="status" required defaultValue="ACTIVE" className={inputClass}>
-            {CLIENT_STATUSES.map((status) => (
-              <option key={status} value={status}>{CLIENT_STATUS_LABELS[status]}</option>
-            ))}
-          </select>
-        </div>
+        <ClientStatusFields defaultProspect={defaultProspect} inputClass={inputClass} />
         <p className="text-xs text-gray-500 dark:text-gray-400">
           Display order: {nextOrder ?? "…"} (assigned automatically)
         </p>
@@ -103,7 +106,7 @@ export default function NewClientPage() {
           className="inline-flex items-center gap-2 rounded-lg bg-black px-6 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
         >
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Create Client
+          {defaultProspect ? "Create Prospect" : "Create Client"}
         </button>
       </form>
     </div>

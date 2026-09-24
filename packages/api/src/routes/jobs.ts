@@ -424,7 +424,7 @@ router.get("/", async (_req, res) => {
 router.get("/admin/recruiters", async (_req, res) => {
   try {
     const rows = await prisma.adminUser.findMany({
-      where: { active: true, role: { in: ["admin", "recruiter"] } },
+      where: { active: true, role: { in: ["admin", "recruiter_admin", "recruiter"] } },
       select: { id: true, email: true, role: true, active: true },
       orderBy: { email: "asc" },
     });

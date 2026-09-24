@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { readUploadImageUrlFromJson } from "@/lib/upload-response";
@@ -35,6 +36,17 @@ const inputClass =
 const readOnlyClass = "bg-gray-50 dark:bg-gray-900 cursor-not-allowed";
 
 export type ContractWorkUnitMonth = WorkUnitMonthInput;
+
+export type ContractAssignedProfile = {
+  id: string;
+  profileId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  category: string;
+  technology: string;
+  available: boolean;
+};
 
 export type ContractVariation = {
   id: string;
@@ -96,6 +108,7 @@ export type ContractFormValues = {
   comments: string;
   fileUrls: string[];
   variations: ContractVariation[];
+  profiles?: ContractAssignedProfile[];
   milestones?: ContractMilestone[];
   invoices?: ContractInvoice[];
 };
@@ -224,6 +237,13 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const [comments, setComments] = useState(defaults.comments ?? "");
   const [fileUrls, setFileUrls] = useState<string[]>(defaults.fileUrls ?? []);
   const [variations, setVariations] = useState<ContractVariation[]>(defaults.variations ?? []);
+  const [profiles, setProfiles] = useState<ContractAssignedProfile[]>(defaults.profiles ?? []);
+  const [showProfilePicker, setShowProfilePicker] = useState(false);
+  const [profileSearch, setProfileSearch] = useState("");
+  const [profileOptions, setProfileOptions] = useState<ContractAssignedProfile[]>([]);
+  const [loadingProfileOptions, setLoadingProfileOptions] = useState(false);
+  const [addingProfile, setAddingProfile] = useState(false);
+  const [deletingProfileId, setDeletingProfileId] = useState<string | null>(null);
   const [milestones, setMilestones] = useState<ContractMilestone[]>(defaults.milestones ?? []);
   const [invoices, setInvoices] = useState<ContractInvoice[]>(defaults.invoices ?? []);
   const [uploading, setUploading] = useState(false);
@@ -271,6 +291,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const contractValueReadOnly = type === "T_AND_M" || !isEditable;
   const contractValueRequired = type === "FIXED_PRICE";
   const numberOfUnitsReadOnly = true;
+  const canManageProfiles = Boolean(defaults.id) && isEditable;
   const canAddVariations = Boolean(defaults.id) && status === "ACTIVE";
   const canAddMilestones = Boolean(defaults.id) && status === "ACTIVE" && type !== "T_AND_M";
   const canAddInvoices = Boolean(defaults.id) && status === "ACTIVE";
@@ -396,6 +417,79 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       setContractValue(String(units * rateValue));
     }
   }, [type, workUnitMonths, rate]);
+
+  useEffect(() => {
+    if (!showProfilePicker || !defaults.id) return;
+    setLoadingProfileOptions(true);
+    const params = new URLSearchParams({ contractId: defaults.id });
+    if (profileSearch.trim()) params.set("search", profileSearch.trim());
+    void adminFetch(`/api/admin/contracts/profile-options?${params.toString()}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setProfileOptions(
+          (data.data ?? []).map((row: {
+            id: string;
+            firstName: string;
+            lastName: string;
+            email: string;
+            category: string;
+            technology: string;
+            available: boolean;
+          }) => ({
+            id: "",
+            profileId: row.id,
+            firstName: row.firstName,
+            lastName: row.lastName,
+            email: row.email,
+            category: row.category,
+            technology: row.technology,
+            available: row.available,
+          })),
+        );
+      })
+      .catch(console.error)
+      .finally(() => setLoadingProfileOptions(false));
+  }, [showProfilePicker, profileSearch, defaults.id]);
+
+  async function addProfile(profileId: string) {
+    if (!defaults.id || !canManageProfiles) return;
+    setAddingProfile(true);
+    try {
+      const res = await adminFetch(`/api/admin/contracts/${defaults.id}/profiles`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to add profile");
+      const saved = data.data as ContractAssignedProfile;
+      setProfiles((prev) => [...prev, saved]);
+      setShowProfilePicker(false);
+      setProfileSearch("");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to add profile");
+    } finally {
+      setAddingProfile(false);
+    }
+  }
+
+  async function deleteProfile(contractProfileId: string) {
+    if (!defaults.id || !canManageProfiles) return;
+    if (!window.confirm("Remove this profile from the contract?")) return;
+    setDeletingProfileId(contractProfileId);
+    try {
+      const res = await adminFetch(`/api/admin/contracts/${defaults.id}/profiles/${contractProfileId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to remove profile");
+      setProfiles((prev) => prev.filter((row) => row.id !== contractProfileId));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to remove profile");
+    } finally {
+      setDeletingProfileId(null);
+    }
+  }
 
   async function persistFileUrls(nextUrls: string[]) {
     if (!defaults.id || isEditable) {
@@ -1117,6 +1211,110 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
           </p>
         </div>
       </div>
+
+      {defaults.id ? (
+        <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100">Assigned profiles</h3>
+            {canManageProfiles ? (
+              <button
+                type="button"
+                onClick={() => setShowProfilePicker((open) => !open)}
+                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+              >
+                <Plus className="h-4 w-4" />
+                Add profile
+              </button>
+            ) : null}
+          </div>
+          {!canManageProfiles && status !== "DRAFT" ? (
+            <p className="text-sm text-gray-400">Profiles can only be added while the contract is in Draft.</p>
+          ) : null}
+          {showProfilePicker && canManageProfiles ? (
+            <div className="mb-4 space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/40">
+              <input
+                type="search"
+                value={profileSearch}
+                onChange={(e) => setProfileSearch(e.target.value)}
+                placeholder="Search profiles by name or email…"
+                className={inputClass}
+              />
+              {loadingProfileOptions ? (
+                <p className="text-sm text-gray-500">Loading profiles…</p>
+              ) : profileOptions.length ? (
+                <ul className="max-h-56 space-y-2 overflow-y-auto">
+                  {profileOptions.map((option) => (
+                    <li
+                      key={option.profileId}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {option.firstName} {option.lastName}
+                        </p>
+                        <p className="text-xs text-gray-500">{option.email}</p>
+                        <p className="text-xs text-gray-500">
+                          {option.category} · {option.technology} · Available: {option.available ? "Yes" : "No"}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={addingProfile}
+                        onClick={() => void addProfile(option.profileId)}
+                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                      >
+                        Add
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-gray-500">No matching profiles found.</p>
+              )}
+            </div>
+          ) : null}
+          {!profiles.length ? (
+            <p className="text-sm text-gray-400">No profiles assigned yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {profiles.map((profile) => (
+                <li
+                  key={profile.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-800"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {profile.firstName} {profile.lastName}
+                    </p>
+                    <p className="text-xs text-gray-500">{profile.email}</p>
+                    <p className="text-xs text-gray-500">
+                      {profile.category} · {profile.technology} · Available: {profile.available ? "Yes" : "No"}
+                    </p>
+                  </div>
+                  <div className="inline-flex items-center gap-2">
+                    <Link
+                      href={`/database/profiles/${profile.profileId}`}
+                      className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-black dark:hover:bg-gray-800 dark:hover:text-white"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Link>
+                    {canManageProfiles ? (
+                      <button
+                        type="button"
+                        onClick={() => void deleteProfile(profile.id)}
+                        disabled={deletingProfileId === profile.id}
+                        className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
 
       {defaults.id ? (
         <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">

@@ -1,4 +1,4 @@
-export const ADMIN_ROLES = ["admin", "recruiter", "sales", "website"] as const;
+export const ADMIN_ROLES = ["admin", "recruiter_admin", "recruiter", "sales", "website"] as const;
 
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
@@ -8,6 +8,7 @@ export type RolePermission = {
   id: string;
   label: string;
   admin: boolean;
+  recruiter_admin: boolean;
   recruiter: boolean;
   sales: boolean;
   website: boolean;
@@ -17,6 +18,10 @@ export const ROLE_META: Record<AdminRole, { label: string; description: string }
   admin: {
     label: "Administrator",
     description: "Full access to Recruitment, Website, Sales, and user management.",
+  },
+  recruiter_admin: {
+    label: "Recruiter admin",
+    description: "Full add/edit/delete/read access to the Recruitment module only.",
   },
   recruiter: {
     label: "Recruiter",
@@ -33,7 +38,7 @@ export const ROLE_META: Record<AdminRole, { label: string; description: string }
 };
 
 const MODULE_ROLE_MAP: Record<TbModule, readonly AdminRole[]> = {
-  recruitment: ["admin", "recruiter"],
+  recruitment: ["admin", "recruiter_admin", "recruiter"],
   website: ["admin", "website"],
   sales: ["admin", "sales"],
   users: ["admin"],
@@ -44,6 +49,7 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
     id: "recruitment",
     label: "Recruitment module (dashboard, profiles, job listings)",
     admin: true,
+    recruiter_admin: true,
     recruiter: true,
     sales: false,
     website: false,
@@ -52,6 +58,7 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
     id: "website",
     label: "Website module (pages, jobs, case studies, team, taxonomy)",
     admin: true,
+    recruiter_admin: false,
     recruiter: false,
     sales: false,
     website: true,
@@ -60,6 +67,7 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
     id: "sales",
     label: "Sales module (clients and contacts)",
     admin: true,
+    recruiter_admin: false,
     recruiter: false,
     sales: true,
     website: false,
@@ -68,6 +76,7 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
     id: "users",
     label: "Manage TBOS users and roles",
     admin: true,
+    recruiter_admin: false,
     recruiter: false,
     sales: false,
     website: false,
@@ -76,6 +85,7 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
     id: "security",
     label: "Configure own MFA (Security settings)",
     admin: true,
+    recruiter_admin: true,
     recruiter: true,
     sales: true,
     website: true,
@@ -108,7 +118,7 @@ export function canManageJobs(role: string): boolean {
 }
 
 export function canViewJobs(role: string): boolean {
-  return canManageJobs(role) || role === "recruiter";
+  return canManageJobs(role) || role === "recruiter" || role === "recruiter_admin";
 }
 
 export function canEditProfiles(role: string): boolean {
@@ -116,11 +126,11 @@ export function canEditProfiles(role: string): boolean {
 }
 
 export function canDeleteProfiles(role: string): boolean {
-  return role === "admin";
+  return role === "admin" || role === "recruiter_admin";
 }
 
 export function canManageProfileOwnership(role: string): boolean {
-  return role === "admin";
+  return role === "admin" || role === "recruiter_admin";
 }
 
 export function canAccessRecruitment(role: string): boolean {

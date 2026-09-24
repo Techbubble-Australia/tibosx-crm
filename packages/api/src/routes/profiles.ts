@@ -11,6 +11,7 @@ import { SALARY_CURRENCIES, SALARY_MODES, parseSalaryRateInput } from "../lib/ca
 import { linkProfileToJobIfRequested } from "../lib/profile-to-application";
 import { computeProfileDuplicateMeta } from "../lib/profile-duplicates";
 import { getJobLevelNames } from "../lib/job-levels";
+import { canDeleteProfiles, canManageProfileOwnership } from "../lib/admin-roles";
 
 const router: IRouter = Router();
 
@@ -233,7 +234,7 @@ function serializeProfile(row: {
 router.get("/meta/sourcers", async (_req, res) => {
   try {
     const rows = await prisma.adminUser.findMany({
-      where: { active: true, role: { in: ["admin", "recruiter"] } },
+      where: { active: true, role: { in: ["admin", "recruiter_admin", "recruiter"] } },
       select: { id: true, name: true, email: true, role: true },
       orderBy: [{ name: "asc" }, { email: "asc" }],
     });
@@ -332,7 +333,7 @@ router.post("/", async (req: AuthRequest, res) => {
     let sourcedById = data.sourcedById ?? null;
     if (req.user?.role === "recruiter") {
       sourcedById = req.user.id;
-    } else if (req.user?.role !== "admin") {
+    } else if (!canManageProfileOwnership(req.user?.role ?? "")) {
       sourcedById = req.user?.id ?? sourcedById;
     }
 
@@ -417,7 +418,7 @@ router.patch("/:id", async (req: AuthRequest, res) => {
     const data = patchSchema.parse(req.body);
 
     let sourcedById = data.sourcedById;
-    if (sourcedById !== undefined && req.user?.role !== "admin") {
+    if (sourcedById !== undefined && !canManageProfileOwnership(req.user?.role ?? "")) {
       return res.status(403).json({ error: "Only administrators can change profile ownership" });
     }
 
@@ -483,7 +484,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
     await assertValidProfileLevel(data.level);
 
     let sourcedById = data.sourcedById ?? null;
-    if (req.user?.role !== "admin") {
+    if (!canManageProfileOwnership(req.user?.role ?? "")) {
       sourcedById = existing.sourcedById;
     }
 
@@ -549,8 +550,8 @@ router.put("/:id", async (req: AuthRequest, res) => {
 
 router.delete("/:id", async (req: AuthRequest, res) => {
   try {
-    if (req.user?.role === "recruiter") {
-      return res.status(403).json({ error: "Recruiters cannot delete profiles" });
+    if (!canDeleteProfiles(req.user?.role ?? "")) {
+      return res.status(403).json({ error: "You do not have permission to delete profiles" });
     }
     await prisma.candidateProfile.delete({ where: { id: req.params.id } });
     res.json({ message: "Deleted" });

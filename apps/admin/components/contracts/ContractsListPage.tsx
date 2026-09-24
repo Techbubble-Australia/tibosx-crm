@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Edit, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
@@ -15,7 +15,10 @@ import {
   CONTRACT_STATUS_LABELS,
   type ContractStatus,
 } from "@/lib/contract-status";
-import { CONTRACT_TYPE_LABELS, type ContractType } from "@/lib/contract-types";
+import { CONTRACT_TYPES, CONTRACT_TYPE_LABELS, type ContractType } from "@/lib/contract-types";
+
+const filterInputClass =
+  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
 
 interface ContractRow {
   id: string;
@@ -80,11 +83,24 @@ function formatDate(value: string | null) {
 }
 
 export function ContractsListPage({ activeFilter }: Props) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const clientIdFilter = searchParams.get("clientId")?.trim() ?? "";
+  const typeFilter = searchParams.get("type")?.trim() ?? "";
+  const startDateFromFilter = searchParams.get("startDateFrom")?.trim() ?? "";
+  const startDateToFilter = searchParams.get("startDateTo")?.trim() ?? "";
+  const endDateFromFilter = searchParams.get("endDateFrom")?.trim() ?? "";
+  const endDateToFilter = searchParams.get("endDateTo")?.trim() ?? "";
   const expiringFilter = searchParams.get("expiring")?.trim() ?? "";
   const listTab = activeFilter ? "active" : "inactive";
   const [rows, setRows] = useState<ContractRow[]>([]);
+  const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
+  const [filterClientId, setFilterClientId] = useState(clientIdFilter);
+  const [filterType, setFilterType] = useState(typeFilter);
+  const [filterStartDateFrom, setFilterStartDateFrom] = useState(startDateFromFilter);
+  const [filterStartDateTo, setFilterStartDateTo] = useState(startDateToFilter);
+  const [filterEndDateFrom, setFilterEndDateFrom] = useState(endDateFromFilter);
+  const [filterEndDateTo, setFilterEndDateTo] = useState(endDateToFilter);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
@@ -171,8 +187,63 @@ export function ContractsListPage({ activeFilter }: Props) {
   }, [search, viewMode, activeFilter]);
 
   useEffect(() => {
+    void adminFetch("/api/admin/clients")
+      .then((res) => res.json())
+      .then((data) => setClients((data.data ?? []) as Array<{ id: string; name: string }>))
+      .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    setFilterClientId(clientIdFilter);
+    setFilterType(typeFilter);
+    setFilterStartDateFrom(startDateFromFilter);
+    setFilterStartDateTo(startDateToFilter);
+    setFilterEndDateFrom(endDateFromFilter);
+    setFilterEndDateTo(endDateToFilter);
+  }, [
+    clientIdFilter,
+    typeFilter,
+    startDateFromFilter,
+    startDateToFilter,
+    endDateFromFilter,
+    endDateToFilter,
+  ]);
+
+  useEffect(() => {
     void fetchRows();
-  }, [activeFilter, clientIdFilter, expiringFilter]);
+  }, [
+    activeFilter,
+    clientIdFilter,
+    typeFilter,
+    startDateFromFilter,
+    startDateToFilter,
+    endDateFromFilter,
+    endDateToFilter,
+    expiringFilter,
+  ]);
+
+  function applyFilters() {
+    const params = new URLSearchParams(searchParams.toString());
+    const setOrDelete = (key: string, value: string) => {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    };
+    setOrDelete("clientId", filterClientId);
+    setOrDelete("type", filterType);
+    setOrDelete("startDateFrom", filterStartDateFrom);
+    setOrDelete("startDateTo", filterStartDateTo);
+    setOrDelete("endDateFrom", filterEndDateFrom);
+    setOrDelete("endDateTo", filterEndDateTo);
+    router.push(`?${params.toString()}`);
+  }
+
+  function clearFilters() {
+    const params = new URLSearchParams(searchParams.toString());
+    ["clientId", "type", "startDateFrom", "startDateTo", "endDateFrom", "endDateTo"].forEach((key) =>
+      params.delete(key),
+    );
+    router.push(`?${params.toString()}`);
+  }
 
   async function fetchRows() {
     setIsLoading(true);
@@ -180,6 +251,11 @@ export function ContractsListPage({ activeFilter }: Props) {
       const params = new URLSearchParams();
       params.set("tab", listTab);
       if (clientIdFilter) params.set("clientId", clientIdFilter);
+      if (typeFilter) params.set("type", typeFilter);
+      if (startDateFromFilter) params.set("startDateFrom", startDateFromFilter);
+      if (startDateToFilter) params.set("startDateTo", startDateToFilter);
+      if (endDateFromFilter) params.set("endDateFrom", endDateFromFilter);
+      if (endDateToFilter) params.set("endDateTo", endDateToFilter);
       if (expiringFilter) params.set("expiring", expiringFilter);
       const res = await adminFetch(`/api/admin/contracts?${params.toString()}`);
       const data = await res.json();
@@ -274,6 +350,64 @@ export function ContractsListPage({ activeFilter }: Props) {
           </Link>
         </div>
       </div>
+
+      <section className="mb-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Filters</h3>
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="text-xs font-medium text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            Clear all
+          </button>
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Client</label>
+            <select value={filterClientId} onChange={(e) => setFilterClientId(e.target.value)} className={filterInputClass}>
+              <option value="">All clients</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>{client.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Type</label>
+            <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className={filterInputClass}>
+              <option value="">All types</option>
+              {CONTRACT_TYPES.map((type) => (
+                <option key={type} value={type}>{CONTRACT_TYPE_LABELS[type]}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Start date from</label>
+            <input type="date" value={filterStartDateFrom} onChange={(e) => setFilterStartDateFrom(e.target.value)} className={filterInputClass} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Start date to</label>
+            <input type="date" value={filterStartDateTo} onChange={(e) => setFilterStartDateTo(e.target.value)} className={filterInputClass} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">End date from</label>
+            <input type="date" value={filterEndDateFrom} onChange={(e) => setFilterEndDateFrom(e.target.value)} className={filterInputClass} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">End date to</label>
+            <input type="date" value={filterEndDateTo} onChange={(e) => setFilterEndDateTo(e.target.value)} className={filterInputClass} />
+          </div>
+        </div>
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={applyFilters}
+            className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
+          >
+            Apply filters
+          </button>
+        </div>
+      </section>
 
       <AdminSearchField
         id="contract-search"

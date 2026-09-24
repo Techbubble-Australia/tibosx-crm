@@ -1,6 +1,6 @@
 import { prisma } from "@techbubble/database";
 
-export const ADMIN_ROLES = ["admin", "recruiter", "sales", "website"] as const;
+export const ADMIN_ROLES = ["admin", "recruiter_admin", "recruiter", "sales", "website"] as const;
 
 export const ADMIN_ROLES_LIST = ADMIN_ROLES;
 
@@ -9,7 +9,7 @@ export type AdminRole = (typeof ADMIN_ROLES)[number];
 export type TbModule = "recruitment" | "website" | "sales" | "users";
 
 const MODULE_ROLE_MAP: Record<TbModule, readonly AdminRole[]> = {
-  recruitment: ["admin", "recruiter"],
+  recruitment: ["admin", "recruiter_admin", "recruiter"],
   website: ["admin", "website"],
   sales: ["admin", "sales"],
   users: ["admin"],
@@ -17,6 +17,18 @@ const MODULE_ROLE_MAP: Record<TbModule, readonly AdminRole[]> = {
 
 export function isAdminRole(value: string): value is AdminRole {
   return (ADMIN_ROLES as readonly string[]).includes(value);
+}
+
+export function isRecruitmentStaff(role: string): boolean {
+  return role === "recruiter" || role === "recruiter_admin";
+}
+
+export function canDeleteProfiles(role: string): boolean {
+  return role === "admin" || role === "recruiter_admin";
+}
+
+export function canManageProfileOwnership(role: string): boolean {
+  return role === "admin" || role === "recruiter_admin";
 }
 
 export function canAccessModule(role: string, module: TbModule): boolean {

@@ -230,6 +230,7 @@ model CandidateProfile {
   careerApplicationId String?            @unique
   careerApplication   CareerApplication? @relation("LegacyPrimaryApplication", fields: [careerApplicationId], references: [id], onDelete: SetNull)
   careerApplications  CareerApplication[] @relation("ProfileApplications")
+  contractProfiles    ContractProfile[]
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
@@ -392,6 +393,7 @@ model Contract {
   milestones      ContractMilestone[]
   invoices        ContractInvoice[]
   workUnitMonths  ContractWorkUnitMonth[]
+  contractProfiles ContractProfile[]
   activityLogs    ContractActivityLog[]
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
@@ -400,6 +402,19 @@ model Contract {
   @@index([status])
   @@index([type])
   @@index([ownerId])
+}
+
+model ContractProfile {
+  id         String           @id @default(cuid())
+  contractId String
+  contract   Contract         @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  profileId  String
+  profile    CandidateProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  createdAt  DateTime         @default(now())
+
+  @@unique([contractId, profileId])
+  @@index([contractId])
+  @@index([profileId])
 }
 
 model ContractActivityLog {

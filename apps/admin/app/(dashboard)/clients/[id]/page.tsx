@@ -7,7 +7,12 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { CountryFlagPicker } from "@/components/CountryFlagPicker";
 import { ClientContactsField, type ClientContactInput } from "@/components/clients/ClientContactsField";
-import { CLIENT_STATUSES, CLIENT_STATUS_LABELS, type ClientStatus } from "@/lib/client-status";
+import type { ClientStatus } from "@/lib/client-status";
+import {
+  ClientStatusFields,
+  clientListPathForStatus,
+  readClientStatusFromForm,
+} from "@/components/clients/ClientStatusFields";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
@@ -65,6 +70,7 @@ export default function EditClientPage() {
     e.preventDefault();
     setIsLoading(true);
     const formData = new FormData(e.currentTarget);
+    const status = readClientStatusFromForm(formData);
     try {
       const res = await adminFetch(`/api/admin/clients/${id}`, {
         method: "PUT",
@@ -74,7 +80,7 @@ export default function EditClientPage() {
           website: formData.get("website") ?? "",
           country: formData.get("country"),
           order: parseInt(formData.get("order") as string, 10) || 0,
-          status: formData.get("status"),
+          status,
           contacts,
         }),
       });
@@ -82,7 +88,7 @@ export default function EditClientPage() {
         const err = await res.json().catch(() => ({}));
         throw new Error((err as { error?: string }).error || "Failed");
       }
-      router.push("/clients/active");
+      router.push(clientListPathForStatus(status));
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to update client");
     } finally {
@@ -124,14 +130,11 @@ export default function EditClientPage() {
           selectClassName={inputClass}
           labelClassName="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100"
         />
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Status *</label>
-          <select name="status" required defaultValue={defaults.status} className={inputClass}>
-            {CLIENT_STATUSES.map((status) => (
-              <option key={status} value={status}>{CLIENT_STATUS_LABELS[status]}</option>
-            ))}
-          </select>
-        </div>
+        <ClientStatusFields
+          defaultProspect={defaults.status === "PROSPECT"}
+          defaultInactive={defaults.status === "INACTIVE"}
+          inputClass={inputClass}
+        />
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Order</label>
           <input name="order" type="number" defaultValue={defaults.order} className={inputClass} />
