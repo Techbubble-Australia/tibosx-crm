@@ -1,18 +1,27 @@
 import { prisma } from "@techbubble/database";
 
-export const ADMIN_ROLES = ["admin", "recruiter_admin", "recruiter", "sales", "website"] as const;
+export const ADMIN_ROLES = [
+  "admin",
+  "recruiter_admin",
+  "recruiter",
+  "sales",
+  "website",
+  "project_manager",
+  "project_member",
+] as const;
 
 export const ADMIN_ROLES_LIST = ADMIN_ROLES;
 
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
-export type TbModule = "recruitment" | "website" | "sales" | "users";
+export type TbModule = "recruitment" | "website" | "sales" | "users" | "project_management";
 
 const MODULE_ROLE_MAP: Record<TbModule, readonly AdminRole[]> = {
   recruitment: ["admin", "recruiter_admin", "recruiter"],
   website: ["admin", "website"],
   sales: ["admin", "sales"],
   users: ["admin"],
+  project_management: ["admin", "project_manager", "project_member"],
 };
 
 export function isAdminRole(value: string): value is AdminRole {

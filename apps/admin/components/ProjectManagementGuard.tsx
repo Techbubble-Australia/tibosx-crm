@@ -1,0 +1,39 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAdminSession } from "@/contexts/AdminSessionContext";
+
+type Props = {
+  children: React.ReactNode;
+  requireManageProjects?: boolean;
+};
+
+export function ProjectManagementGuard({ children, requireManageProjects = false }: Props) {
+  const { canAccessProjectManagement, canManageProjects, loading } = useAdminSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+    if (!canAccessProjectManagement) {
+      router.replace("/settings/security");
+      return;
+    }
+    if (requireManageProjects && !canManageProjects) {
+      router.replace("/timesheets");
+    }
+  }, [canAccessProjectManagement, canManageProjects, loading, requireManageProjects, router]);
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-black border-t-transparent dark:border-white" />
+      </div>
+    );
+  }
+
+  if (!canAccessProjectManagement) return null;
+  if (requireManageProjects && !canManageProjects) return null;
+
+  return children;
+}

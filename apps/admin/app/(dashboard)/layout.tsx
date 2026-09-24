@@ -29,6 +29,9 @@ import {
   ClipboardList,
   PanelLeftClose,
   PanelLeft,
+  FolderKanban,
+  FileCode,
+  ClipboardCheck,
 } from "lucide-react";
 import { AdminSessionProvider, useAdminSession } from "@/contexts/AdminSessionContext";
 import { MfaEnrollmentGuard } from "@/components/MfaEnrollmentGuard";
@@ -80,6 +83,16 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    id: "project_management",
+    label: "Project Management",
+    icon: FolderKanban,
+    roles: ["admin", "project_manager", "project_member"],
+    items: [
+      { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin", "project_manager"] },
+      { href: "/timesheets", label: "Timesheets", icon: ClipboardCheck, roles: ["admin", "project_manager", "project_member"] },
+    ],
+  },
+  {
     id: "website",
     label: "Website",
     icon: Globe,
@@ -103,7 +116,8 @@ const navGroups: NavGroup[] = [
       { href: "/settings/technologies", label: "Technology", icon: Cpu, roles: ["admin", "website"] },
       { href: "/settings/departments", label: "Department", icon: Building, roles: ["admin", "website"] },
       { href: "/settings/levels", label: "Level", icon: Target, roles: ["admin", "website"] },
-      { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin", "recruiter_admin", "recruiter", "sales", "website"] },
+      { href: "/settings/templates", label: "Templates", icon: FileCode, roles: ["admin"] },
+      { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin", "recruiter_admin", "recruiter", "sales", "website", "project_manager", "project_member"] },
       { href: "/users", label: "Users", icon: UserCircle, roles: ["admin"] },
     ],
   },

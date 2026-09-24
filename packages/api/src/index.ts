@@ -31,6 +31,9 @@ import { requireMfaEnrolled } from "./middleware/requireMfaEnrolled";
 import { requireRole, requireModule, requireAnyModule, blockModuleMutations } from "./middleware/requireRole";
 import { dashboardRoutes } from "./routes/dashboard";
 import { salesDashboardRoutes } from "./routes/sales-dashboard";
+import { credentialTemplateRoutes } from "./routes/credentialTemplates";
+import { projectRoutes } from "./routes/projects";
+import { timesheetRoutes } from "./routes/timesheets";
 import { invoiceRoutes } from "./routes/invoices";
 
 dotenv.config();
@@ -106,6 +109,27 @@ app.use("/api/admin/contracts", authMiddleware, requireMfaEnrolled, requireModul
 app.use("/api/admin/sales-dashboard", authMiddleware, requireMfaEnrolled, requireModule("sales"), salesDashboardRoutes);
 app.use("/api/admin/invoices", authMiddleware, requireMfaEnrolled, requireModule("sales"), invoiceRoutes);
 app.use("/api/admin/users", authMiddleware, requireMfaEnrolled, requireRole("admin"), adminUserRoutes);
+app.use(
+  "/api/admin/credential-templates",
+  authMiddleware,
+  requireMfaEnrolled,
+  requireRole("admin"),
+  credentialTemplateRoutes,
+);
+app.use(
+  "/api/admin/projects",
+  authMiddleware,
+  requireMfaEnrolled,
+  requireModule("project_management"),
+  projectRoutes,
+);
+app.use(
+  "/api/admin/timesheets",
+  authMiddleware,
+  requireMfaEnrolled,
+  requireModule("project_management"),
+  timesheetRoutes,
+);
 app.use("/api/upload", ...websiteWrite, uploadRoutes);
 
 // Error handler

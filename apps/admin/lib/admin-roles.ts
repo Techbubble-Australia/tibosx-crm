@@ -1,8 +1,16 @@
-export const ADMIN_ROLES = ["admin", "recruiter_admin", "recruiter", "sales", "website"] as const;
+export const ADMIN_ROLES = [
+  "admin",
+  "recruiter_admin",
+  "recruiter",
+  "sales",
+  "website",
+  "project_manager",
+  "project_member",
+] as const;
 
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
-export type TbModule = "recruitment" | "website" | "sales" | "users";
+export type TbModule = "recruitment" | "website" | "sales" | "users" | "project_management";
 
 export type RolePermission = {
   id: string;
@@ -12,12 +20,14 @@ export type RolePermission = {
   recruiter: boolean;
   sales: boolean;
   website: boolean;
+  project_manager: boolean;
+  project_member: boolean;
 };
 
 export const ROLE_META: Record<AdminRole, { label: string; description: string }> = {
   admin: {
     label: "Administrator",
-    description: "Full access to Recruitment, Website, Sales, and user management.",
+    description: "Full access to all modules and user management.",
   },
   recruiter_admin: {
     label: "Recruiter admin",
@@ -35,6 +45,14 @@ export const ROLE_META: Record<AdminRole, { label: string; description: string }
     label: "Website",
     description: "Access to the Website module (content, jobs, team members, taxonomy).",
   },
+  project_manager: {
+    label: "Project manager",
+    description: "Manage projects and approve timesheets for assigned projects.",
+  },
+  project_member: {
+    label: "Project member",
+    description: "Submit and manage own timesheets for assigned active projects.",
+  },
 };
 
 const MODULE_ROLE_MAP: Record<TbModule, readonly AdminRole[]> = {
@@ -42,6 +60,7 @@ const MODULE_ROLE_MAP: Record<TbModule, readonly AdminRole[]> = {
   website: ["admin", "website"],
   sales: ["admin", "sales"],
   users: ["admin"],
+  project_management: ["admin", "project_manager", "project_member"],
 };
 
 export const ROLE_PERMISSIONS: RolePermission[] = [
@@ -53,6 +72,8 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
     recruiter: true,
     sales: false,
     website: false,
+    project_manager: false,
+    project_member: false,
   },
   {
     id: "website",
@@ -62,6 +83,8 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
     recruiter: false,
     sales: false,
     website: true,
+    project_manager: false,
+    project_member: false,
   },
   {
     id: "sales",
@@ -71,6 +94,19 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
     recruiter: false,
     sales: true,
     website: false,
+    project_manager: false,
+    project_member: false,
+  },
+  {
+    id: "project_management",
+    label: "Project Management module (projects, timesheets)",
+    admin: true,
+    recruiter_admin: false,
+    recruiter: false,
+    sales: false,
+    website: false,
+    project_manager: true,
+    project_member: true,
   },
   {
     id: "users",
@@ -80,6 +116,8 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
     recruiter: false,
     sales: false,
     website: false,
+    project_manager: false,
+    project_member: false,
   },
   {
     id: "security",
@@ -89,6 +127,8 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
     recruiter: true,
     sales: true,
     website: true,
+    project_manager: true,
+    project_member: true,
   },
 ];
 
@@ -145,6 +185,18 @@ export function canAccessSales(role: string): boolean {
   return canAccessModule(role, "sales");
 }
 
+export function canAccessProjectManagement(role: string): boolean {
+  return canAccessModule(role, "project_management");
+}
+
+export function canManageProjects(role: string): boolean {
+  return role === "admin" || role === "project_manager";
+}
+
+export function isProjectMember(role: string): boolean {
+  return role === "project_member";
+}
+
 export function roleLabel(role: string): string {
   if (isAdminRole(role)) {
     return ROLE_META[role].label;
@@ -154,6 +206,9 @@ export function roleLabel(role: string): string {
 
 export function defaultLandingPath(role: string): string {
   if (canAccessRecruitment(role)) return "/database/dashboard";
+  if (canAccessProjectManagement(role)) {
+    return canManageProjects(role) ? "/projects" : "/timesheets";
+  }
   if (canAccessWebsite(role)) return "/pages";
   if (canAccessSales(role)) return "/clients/active";
   return "/settings/security";

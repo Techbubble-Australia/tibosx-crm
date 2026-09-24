@@ -4,9 +4,12 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { adminFetch } from "@/lib/admin-api";
 import {
   type AdminRole,
+  canAccessProjectManagement,
   canAccessRecruitment,
   canAccessSales,
   canAccessWebsite,
+  canManageProjects,
+  isProjectMember,
   canDeleteProfiles,
   canEditProfiles,
   canManageClients,
@@ -26,6 +29,9 @@ type AdminSession = {
   canAccessRecruitment: boolean;
   canAccessWebsite: boolean;
   canAccessSales: boolean;
+  canAccessProjectManagement: boolean;
+  canManageProjects: boolean;
+  isProjectMember: boolean;
   canManageUsers: boolean;
   canManageClients: boolean;
   canManageJobs: boolean;
@@ -81,6 +87,9 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       canAccessRecruitment: canAccessRecruitment(role),
       canAccessWebsite: canAccessWebsite(role),
       canAccessSales: canAccessSales(role),
+      canAccessProjectManagement: canAccessProjectManagement(role),
+      canManageProjects: canManageProjects(role),
+      isProjectMember: isProjectMember(role),
       canManageUsers: canManageUsers(role),
       canManageClients: canManageClients(role),
       canManageJobs: canManageJobs(role),
