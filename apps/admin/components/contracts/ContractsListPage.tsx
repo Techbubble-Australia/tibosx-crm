@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Edit, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
 import { TablePagination } from "@/components/ui/TablePagination";
@@ -24,6 +24,7 @@ interface ContractRow {
   id: string;
   contractNumber: string;
   title: string;
+  isIncomplete?: boolean;
   clientId: string;
   clientName: string;
   type: ContractType;
@@ -290,8 +291,19 @@ export function ContractsListPage({ activeFilter }: Props) {
     const colors = CONTRACT_STATUS_COLORS[row.status] ?? CONTRACT_STATUS_COLORS.DRAFT;
     return (
       <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-        <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{row.contractNumber}</td>
-        <td className="px-4 py-3 text-gray-900 dark:text-gray-100">{row.title}</td>
+        <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
+          <span className="inline-flex items-center gap-2">
+            {row.isIncomplete ? (
+              <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" title="Incomplete contract data" />
+            ) : null}
+            {row.contractNumber}
+          </span>
+        </td>
+        <td className="px-4 py-3 text-gray-900 dark:text-gray-100">
+          <Link href={`/contracts/${row.id}`} className="hover:text-blue-600 hover:underline dark:hover:text-blue-400">
+            {row.title}
+          </Link>
+        </td>
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.clientName}</td>
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.typeLabel}</td>
         <td className="px-4 py-3">
@@ -306,9 +318,6 @@ export function ContractsListPage({ activeFilter }: Props) {
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.consumed)}</td>
         <td className="px-4 py-3 text-right">
           <div className="inline-flex items-center gap-2">
-            <Link href={`/contracts/${row.id}`} className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-black dark:hover:bg-gray-800 dark:hover:text-white">
-              <Edit className="h-4 w-4" />
-            </Link>
             <button type="button" onClick={() => void deleteRow(row.id)} className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20">
               <Trash2 className="h-4 w-4" />
             </button>

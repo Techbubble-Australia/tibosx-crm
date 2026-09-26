@@ -14,6 +14,7 @@ import {
   parseSalaryRateInput,
 } from "../lib/careers-form";
 import { createProfileFromCareerApplication } from "../lib/profile-from-application";
+import { extractTextFromDocument } from "../lib/resume-text-extract";
 import { findDuplicateCareerApplication } from "../lib/career-application-dedup";
 import {
   buildJobClientByTitleLookup,
@@ -148,18 +149,24 @@ router.post(
         files.map(async (file) => {
           const filename = makeStoredFilename(file.fieldname, file.originalname);
           await persistUploadedFile(file, filename);
+          const extractedText = await extractTextFromDocument(file.buffer, file.originalname);
           return {
             url: `/uploads/${filename}`,
             filename,
             size: file.size,
             originalName: file.originalname,
+            extractedText,
           };
         }),
       );
+      const extractedText = uploaded
+        .map((file) => file.extractedText)
+        .filter(Boolean)
+        .join("\n\n");
 
       res.json({
         message: "Documents uploaded successfully",
-        data: { files: uploaded },
+        data: { files: uploaded, extractedText },
       });
     } catch (error) {
       console.error("Error uploading documents:", error);
@@ -365,8 +372,24 @@ type CareerApplicationWithJob = Prisma.CareerApplicationGetPayload<{
         client: { select: { name: true } };
       };
     };
+    contract: { select: { id: true; contractNumber: true } };
   };
 }>;
+
+const careerApplicationAdminInclude = {
+  jobListing: {
+    select: {
+      id: true,
+      title: true,
+      published: true,
+      country: true,
+      workMode: true,
+      clientId: true,
+      client: { select: { name: true } },
+    },
+  },
+  contract: { select: { id: true, contractNumber: true } },
+} as const;
 
 function serializeAdminApplication(
   row: CareerApplicationWithJob,
@@ -401,6 +424,8 @@ function serializeAdminApplication(
     chargeRate: row.chargeRate ?? "",
     relevantExperience: row.relevantExperience,
     profileId: profileId ?? row.profileId ?? null,
+    contractId: row.contractId ?? null,
+    contractNumber: row.contract?.contractNumber ?? null,
     createdAt: row.createdAt.toISOString(),
     jobTitle: row.jobListing?.title ?? null,
     jobPublished: row.jobListing?.published ?? null,
@@ -410,6 +435,34 @@ function serializeAdminApplication(
     clientId,
   };
 }
+
+// Admin: get single career application
+router.get("/admin/applications/:id", async (req, res) => {
+  try {
+    const row = await prisma.careerApplication.findUnique({
+      where: { id: req.params.id },
+      include: careerApplicationAdminInclude,
+    });
+    if (!row) {
+      return res.status(404).json({ error: "Not found" });
+    }
+    let profileId = row.profileId;
+    if (!profileId) {
+      const legacy = await prisma.candidateProfile.findUnique({
+        where: { careerApplicationId: row.id },
+        select: { id: true },
+      });
+      profileId = legacy?.id ?? null;
+    }
+    const jobClientByTitle = await buildJobClientByTitleLookup();
+    res.json({
+      data: serializeAdminApplication(row, profileId, jobClientByTitle),
+    });
+  } catch (error) {
+    console.error("Error fetching career application:", error);
+    res.status(500).json({ error: "Failed to fetch application" });
+  }
+});
 
 // Admin: list all career applications
 router.get("/admin/applications", async (req, res) => {
@@ -452,19 +505,7 @@ router.get("/admin/applications", async (req, res) => {
 
     const applications = await prisma.careerApplication.findMany({
       where,
-      include: {
-        jobListing: {
-          select: {
-            id: true,
-            title: true,
-            published: true,
-            country: true,
-            workMode: true,
-            clientId: true,
-            client: { select: { name: true } },
-          },
-        },
-      },
+      include: careerApplicationAdminInclude,
       orderBy: { createdAt: "desc" },
     });
 
@@ -563,19 +604,7 @@ router.patch("/admin/applications/:id", async (req, res) => {
         statusComments: nextComments,
         ...(body.chargeRate !== undefined ? { chargeRate: body.chargeRate.trim() } : {}),
       },
-      include: {
-        jobListing: {
-          select: {
-            id: true,
-            title: true,
-            published: true,
-            country: true,
-            workMode: true,
-            clientId: true,
-            client: { select: { name: true } },
-          },
-        },
-      },
+      include: careerApplicationAdminInclude,
     });
 
     if (isStatusChange && nextStatus === "SELECTED") {
@@ -644,19 +673,7 @@ router.post("/admin/applications/:id/move", async (req, res) => {
         jobListingId: job.id,
         position: job.title,
       },
-      include: {
-        jobListing: {
-          select: {
-            id: true,
-            title: true,
-            published: true,
-            country: true,
-            workMode: true,
-            clientId: true,
-            client: { select: { name: true } },
-          },
-        },
-      },
+      include: careerApplicationAdminInclude,
     });
 
     res.json({ data: serializeAdminApplication(updated) });

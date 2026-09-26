@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { readUploadImageUrlFromJson } from "@/lib/upload-response";
@@ -30,6 +31,7 @@ import {
   sumWorkUnits,
   type WorkUnitMonthInput,
 } from "@/lib/contract-work-units";
+import { validateContractDates, validateVariationDates } from "@/lib/contract-date-rules";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
@@ -43,6 +45,7 @@ export type ContractAssignedProfile = {
   firstName: string;
   lastName: string;
   email: string;
+  phone: string;
   category: string;
   technology: string;
   available: boolean;
@@ -111,6 +114,19 @@ export type ContractFormValues = {
   profiles?: ContractAssignedProfile[];
   milestones?: ContractMilestone[];
   invoices?: ContractInvoice[];
+  linkedProjects?: Array<{
+    id: string;
+    projectNumber: string;
+    contractVariationId: string | null;
+  }>;
+  careerApplication?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    position: string;
+    status: string;
+    jobTitle?: string | null;
+  } | null;
 };
 
 type UserOption = { id: string; name: string | null; email: string; active: boolean };
@@ -210,6 +226,7 @@ function WorkUnitMonthsEditor({
 }
 
 export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving }: Props) {
+  const router = useRouter();
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [title, setTitle] = useState(defaults.title ?? "");
@@ -237,6 +254,9 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const [comments, setComments] = useState(defaults.comments ?? "");
   const [fileUrls, setFileUrls] = useState<string[]>(defaults.fileUrls ?? []);
   const [variations, setVariations] = useState<ContractVariation[]>(defaults.variations ?? []);
+  const [creatingProjectFor, setCreatingProjectFor] = useState<string | null>(null);
+  const linkedProjects = defaults.linkedProjects ?? [];
+  const baseProject = linkedProjects.find((row) => !row.contractVariationId);
   const [profiles, setProfiles] = useState<ContractAssignedProfile[]>(defaults.profiles ?? []);
   const [showProfilePicker, setShowProfilePicker] = useState(false);
   const [profileSearch, setProfileSearch] = useState("");
@@ -432,6 +452,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
             firstName: string;
             lastName: string;
             email: string;
+            phone: string;
             category: string;
             technology: string;
             available: boolean;
@@ -441,6 +462,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
             firstName: row.firstName,
             lastName: row.lastName,
             email: row.email,
+            phone: row.phone ?? "",
             category: row.category,
             technology: row.technology,
             available: row.available,
@@ -644,6 +666,25 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
     }
   }
 
+  async function createProject(variationId?: string) {
+    if (!defaults.id) return;
+    setCreatingProjectFor(variationId ?? "base");
+    try {
+      const res = await adminFetch(`/api/admin/contracts/${defaults.id}/create-project`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ variationId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to create project");
+      router.push(`/projects/${(data.data as { id: string }).id}`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to create project");
+    } finally {
+      setCreatingProjectFor(null);
+    }
+  }
+
   function resetVariationForm() {
     setShowVariationForm(false);
     setEditingVariationId(null);
@@ -680,6 +721,23 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
     }
     if (type === "T_AND_M" && !variationEndDate) {
       alert("Variation end date is required for T&M contracts.");
+      return;
+    }
+    const variationDateError = validateVariationDates(
+      {
+        id: editingVariationId ?? undefined,
+        variationDate,
+        variationEndDate: variationEndDate || null,
+      },
+      endDate || null,
+      variations.map((row) => ({
+        id: row.id,
+        variationDate: row.variationDate,
+        variationEndDate: row.variationEndDate ?? null,
+      })),
+    );
+    if (variationDateError) {
+      alert(variationDateError);
       return;
     }
 
@@ -958,6 +1016,12 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       }
     }
 
+    const contractDateError = validateContractDates(startDate, endDate || null);
+    if (contractDateError) {
+      alert(contractDateError);
+      return;
+    }
+
     const payload: Record<string, unknown> = {
       title: title.trim(),
       clientId,
@@ -990,6 +1054,20 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Contract number</label>
           <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{defaults.contractNumber}</p>
+        </div>
+      ) : null}
+
+      {defaults.careerApplication ? (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm dark:border-gray-600 dark:bg-gray-800">
+          <span className="font-medium text-gray-700 dark:text-gray-300">Linked career application: </span>
+          <span className="text-gray-900 dark:text-gray-100">
+            {defaults.careerApplication.firstName} {defaults.careerApplication.lastName}
+            {" · "}
+            {defaults.careerApplication.jobTitle ?? defaults.careerApplication.position}
+          </span>
+          <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+            ({defaults.careerApplication.status.replace(/_/g, " ")})
+          </span>
         </div>
       ) : null}
 
@@ -1287,6 +1365,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                       {profile.firstName} {profile.lastName}
                     </p>
                     <p className="text-xs text-gray-500">{profile.email}</p>
+                    {profile.phone ? <p className="text-xs text-gray-500">{profile.phone}</p> : null}
                     <p className="text-xs text-gray-500">
                       {profile.category} · {profile.technology} · Available: {profile.available ? "Yes" : "No"}
                     </p>
@@ -1320,6 +1399,17 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
         <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h3 className="font-semibold text-gray-900 dark:text-gray-100">Variations</h3>
+            <div className="flex items-center gap-2">
+            {status === "ACTIVE" && !baseProject ? (
+              <button
+                type="button"
+                onClick={() => void createProject()}
+                disabled={creatingProjectFor === "base"}
+                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+              >
+                {creatingProjectFor === "base" ? "Creating…" : "Create Project"}
+              </button>
+            ) : null}
             {canAddVariations ? (
               <button
                 type="button"
@@ -1337,6 +1427,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                 Add variation
               </button>
             ) : null}
+            </div>
           </div>
           {!canAddVariations && status !== "ACTIVE" ? (
             <p className="text-sm text-gray-400">Variations can be added when the contract is active.</p>
@@ -1459,8 +1550,20 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                       <p className="text-gray-500 dark:text-gray-400">{variation.comments}</p>
                     ) : null}
                   </div>
+                  <div className="flex shrink-0 gap-1">
+                    {status === "ACTIVE" &&
+                    !linkedProjects.some((row) => row.contractVariationId === variation.id) ? (
+                      <button
+                        type="button"
+                        onClick={() => void createProject(variation.id)}
+                        disabled={creatingProjectFor === variation.id}
+                        className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium hover:bg-gray-50 dark:border-gray-600"
+                      >
+                        {creatingProjectFor === variation.id ? "Creating…" : "Create Project"}
+                      </button>
+                    ) : null}
                   {canAddVariations ? (
-                    <div className="flex shrink-0 gap-1">
+                    <>
                       <button
                         type="button"
                         onClick={() => startEditVariation(variation)}
@@ -1478,8 +1581,9 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
-                    </div>
+                    </>
                   ) : null}
+                  </div>
                 </li>
               ))}
             </ul>

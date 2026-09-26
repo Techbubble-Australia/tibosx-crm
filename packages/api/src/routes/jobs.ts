@@ -11,6 +11,7 @@ import {
 import { JOB_LISTING_TYPES } from "../lib/careers-form";
 import { DEFAULT_PROFILE_LEVEL } from "../lib/profile-levels";
 import { getJobLevelNames } from "../lib/job-levels";
+import { matchProfilesToJob } from "../lib/job-profile-matching";
 
 const router: IRouter = Router();
 
@@ -39,6 +40,7 @@ const jobSchema = z.object({
   positionsCount: z.coerce.number().int().min(1).default(1),
   publishedDate: z.coerce.date().optional().nullable(),
   opportunityId: z.string().optional().nullable(),
+  metaTags: z.array(z.string().min(1).max(80)).optional().default([]),
 });
 
 function prepareJobWriteData(body: z.infer<typeof jobSchema>): Record<string, unknown> {
@@ -269,6 +271,7 @@ function serializeAdminJob(
     level: job.level ?? "Developer",
     positionsCount: job.positionsCount ?? 1,
     publishedDate: job.publishedDate?.toISOString() ?? null,
+    metaTags: Array.isArray(job.metaTags) ? job.metaTags : [],
     applicationCount: applicationCount ?? 0,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
@@ -482,6 +485,36 @@ router.get("/admin/all", async (_req, res) => {
   } catch (error) {
     console.error("Error fetching jobs:", error);
     res.status(500).json({ error: "Failed to fetch jobs" });
+  }
+});
+
+router.get("/admin/:id/matching-profiles", async (req, res) => {
+  try {
+    const job = await prisma.jobListing.findUnique({ where: { id: req.params.id } });
+    if (!job) return res.status(404).json({ error: "Job not found" });
+    const metaTags = Array.isArray(job.metaTags) ? job.metaTags.filter((tag): tag is string => typeof tag === "string") : [];
+    const profiles = await prisma.candidateProfile.findMany({
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        country: true,
+        category: true,
+        technology: true,
+        level: true,
+        comments: true,
+        resumeText: true,
+      },
+    });
+    const matches = matchProfilesToJob(
+      { country: job.country, locations: job.locations, metaTags },
+      profiles,
+    );
+    res.json({ data: matches });
+  } catch (error) {
+    console.error("Error matching profiles to job:", error);
+    res.status(500).json({ error: "Failed to match profiles" });
   }
 });
 

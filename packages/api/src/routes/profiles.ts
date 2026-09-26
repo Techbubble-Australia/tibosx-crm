@@ -12,6 +12,7 @@ import { linkProfileToJobIfRequested } from "../lib/profile-to-application";
 import { computeProfileDuplicateMeta } from "../lib/profile-duplicates";
 import { getJobLevelNames } from "../lib/job-levels";
 import { canDeleteProfiles, canManageProfileOwnership } from "../lib/admin-roles";
+import { appendResumeText, extractTextFromDocument } from "../lib/resume-text-extract";
 
 const router: IRouter = Router();
 
@@ -30,6 +31,7 @@ const profileSchema = z.object({
   currency: z.enum(salaryCurrencyCodes),
   mode: z.enum(SALARY_MODES),
   documentUrls: z.array(z.string().min(1)).min(1, "At least one document is required"),
+  resumeText: z.string().max(500_000).optional().nullable(),
   previousSalary: z.coerce.number().int().positive().optional().nullable(),
   comments: z.string().max(5000).optional().nullable(),
   careerApplicationId: z.string().optional().nullable(),
@@ -159,6 +161,7 @@ function serializeProfile(row: {
   currency: string;
   mode: string;
   documentUrls: unknown;
+  resumeText?: string | null;
   previousSalary: number | null;
   comments: string | null;
   careerApplicationId: string | null;
@@ -174,7 +177,7 @@ function serializeProfile(row: {
   duplicateMatchReason?: string | null;
   createdAt: Date;
   updatedAt: Date;
-  careerApplications?: Array<{
+    careerApplications?: Array<{
     id: string;
     position: string;
     status: string;
@@ -183,6 +186,13 @@ function serializeProfile(row: {
     jobReferenceNumber: string | null;
     jobPublished: boolean | null;
     createdAt: Date;
+  }>;
+  contracts?: Array<{
+    id: string;
+    contractNumber: string;
+    title: string;
+    status: string;
+    clientName: string;
   }>;
 }) {
   const docs = Array.isArray(row.documentUrls)
@@ -203,6 +213,7 @@ function serializeProfile(row: {
     currency: row.currency,
     mode: row.mode,
     documentUrls: docs,
+    resumeText: row.resumeText ?? null,
     previousSalary: row.previousSalary,
     comments: row.comments,
     careerApplicationId: row.careerApplicationId,
@@ -218,6 +229,13 @@ function serializeProfile(row: {
     duplicateMatchReason: row.duplicateMatchReason ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    contracts: (row.contracts ?? []).map((contract) => ({
+      id: contract.id,
+      contractNumber: contract.contractNumber,
+      title: contract.title,
+      status: contract.status,
+      clientName: contract.clientName,
+    })),
     careerApplications: (row.careerApplications ?? []).map((app) => ({
       id: app.id,
       position: app.position,
@@ -289,6 +307,20 @@ router.get("/:id", async (req, res) => {
             jobListing: { select: { title: true, referenceNumber: true, published: true } },
           },
         },
+        contractProfiles: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            contract: {
+              select: {
+                id: true,
+                contractNumber: true,
+                title: true,
+                status: true,
+                client: { select: { name: true } },
+              },
+            },
+          },
+        },
       },
     });
     if (!row) {
@@ -299,6 +331,13 @@ router.get("/:id", async (req, res) => {
     });
     const meta = computeProfileDuplicateMeta(allRows).get(row.id);
     const careerApplications = await buildProfileCareerApplications(row);
+    const contracts = row.contractProfiles.map((entry) => ({
+      id: entry.contract.id,
+      contractNumber: entry.contract.contractNumber,
+      title: entry.contract.title,
+      status: entry.contract.status,
+      clientName: entry.contract.client?.name ?? "",
+    }));
     res.json({
       data: serializeProfile({
         ...row,
@@ -307,6 +346,7 @@ router.get("/:id", async (req, res) => {
         duplicateCount: meta?.duplicateCount ?? 0,
         duplicateMatchReason: meta?.duplicateMatchReason ?? null,
         careerApplications,
+        contracts,
       }),
     });
   } catch (error) {
@@ -351,6 +391,7 @@ router.post("/", async (req: AuthRequest, res) => {
         currency: data.currency,
         mode: data.mode,
         documentUrls: data.documentUrls,
+        resumeText: data.resumeText ?? null,
         previousSalary: data.previousSalary ?? null,
         comments: data.comments ?? null,
         careerApplicationId: data.careerApplicationId ?? null,
@@ -503,6 +544,10 @@ router.put("/:id", async (req: AuthRequest, res) => {
         currency: data.currency,
         mode: data.mode,
         documentUrls: data.documentUrls,
+        resumeText:
+          data.resumeText !== undefined && data.resumeText !== null
+            ? appendResumeText(existing.resumeText, data.resumeText)
+            : existing.resumeText,
         previousSalary: data.previousSalary ?? null,
         comments: data.comments ?? null,
         sourcedById,
@@ -579,18 +624,25 @@ router.post(
         files.map(async (file) => {
           const filename = makeStoredFilename(file.fieldname, file.originalname);
           await persistUploadedFile(file, filename);
+          const extractedText = await extractTextFromDocument(file.buffer, file.originalname);
           return {
             url: `/uploads/${filename}`,
             filename,
             size: file.size,
             originalName: file.originalname,
+            extractedText,
           };
         }),
       );
 
+      const extractedText = uploaded
+        .map((file) => file.extractedText)
+        .filter(Boolean)
+        .join("\n\n");
+
       res.json({
         message: "Documents uploaded successfully",
-        data: { files: uploaded },
+        data: { files: uploaded, extractedText },
       });
     } catch (error) {
       console.error("Error uploading profile documents:", error);

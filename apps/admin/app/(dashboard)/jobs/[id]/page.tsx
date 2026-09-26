@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, Copy, Loader2 } from "lucide-react";
 import { JobForm, type JobFormDefaults } from "@/components/jobs/JobForm";
 import { JobApplicationsPanel } from "@/components/jobs/JobApplicationsPanel";
+import { JobAiInsightsPanel } from "@/components/jobs/JobAiInsightsPanel";
 import { adminFetch } from "@/lib/admin-api";
 import { jobListHref, jobListingsTabFromPath } from "@/lib/job-routes";
 
@@ -143,7 +144,8 @@ function EditJobPageInner() {
         submitLabel="Save Changes"
       />
 
-      <div className="mt-8">
+      <div className="mt-8 space-y-8">
+        <JobAiInsightsPanel jobId={id} />
         <JobApplicationsPanel jobId={id} jobTitle={job.title ?? ""} jobCountry={job.country ?? ""} />
       </div>
     </div>

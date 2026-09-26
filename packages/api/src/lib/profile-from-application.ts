@@ -1,4 +1,5 @@
 import { prisma } from "@techbubble/database";
+import { extractTextFromUploadUrls } from "./resume-text-extract";
 
 function inferFromTitle(title: string): { category: string; technology: string } {
   const t = title.toLowerCase();
@@ -116,6 +117,8 @@ export async function createProfileFromCareerApplication(
     return;
   }
 
+  const resumeText = await extractTextFromUploadUrls(documentUrls);
+
   const profile = await prisma.candidateProfile.create({
     data: {
       firstName: application.firstName.trim(),
@@ -130,6 +133,7 @@ export async function createProfileFromCareerApplication(
       currency,
       mode,
       documentUrls,
+      resumeText: resumeText || null,
       comments: application.message?.trim() || null,
       isCitizen: application.isCitizen ?? true,
       visaStatus: application.isCitizen ? null : application.visaStatus?.trim() ?? null,

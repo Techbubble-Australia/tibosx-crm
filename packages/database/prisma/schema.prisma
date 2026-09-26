@@ -195,6 +195,8 @@ model CareerApplication {
   profileId         String?
   candidateProfile  CandidateProfile? @relation("ProfileApplications", fields: [profileId], references: [id], onDelete: SetNull)
   legacyProfile     CandidateProfile? @relation("LegacyPrimaryApplication")
+  contractId        String?           @unique
+  contract          Contract?         @relation(fields: [contractId], references: [id], onDelete: SetNull)
   createdAt         DateTime          @default(now())
 
   @@index([profileId])
@@ -214,6 +216,8 @@ model CandidateProfile {
   currency            String
   mode                String
   documentUrls        Json
+  /// Extracted plain text from uploaded resumes for search/matching.
+  resumeText          String?            @db.Text
   previousSalary      Int?
   comments            String?            @db.Text
   isCitizen           Boolean            @default(true)
@@ -397,6 +401,7 @@ model Contract {
   workUnitMonths  ContractWorkUnitMonth[]
   contractProfiles ContractProfile[]
   projects         Project[]
+  careerApplication CareerApplication?
   activityLogs    ContractActivityLog[]
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
@@ -454,6 +459,7 @@ model ContractVariation {
   rate             Decimal?  @db.Decimal(14, 2)
   /// Monetary value added to total variation
   variationValue   Decimal   @db.Decimal(14, 2)
+  project          Project?
   createdAt        DateTime  @default(now())
 
   @@index([contractId])
@@ -568,6 +574,8 @@ model JobListing {
   endClient       String?
   /// Admin budget notes (free text).
   budget          String    @default("")
+  /// Recruiter-defined tags for AI profile matching (e.g. AWS, Python).
+  metaTags        String[]  @default([])
   order           Int       @default(0)
   /// Admin user IDs assigned as recruiters for this role
   recruiterIds    Json?
@@ -681,9 +689,11 @@ model Project {
   status           String              @default("DRAFT")
   projectManagerId String
   projectManager   AdminUser           @relation("ProjectManager", fields: [projectManagerId], references: [id], onDelete: Restrict)
-  contractId       String?
-  contract         Contract?           @relation(fields: [contractId], references: [id], onDelete: SetNull)
-  startDate        DateTime
+  contractId           String?
+  contract             Contract?           @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  contractVariationId  String?             @unique
+  contractVariation    ContractVariation?  @relation(fields: [contractVariationId], references: [id], onDelete: SetNull)
+  startDate            DateTime
   endDate          DateTime
   fileUrls         Json?
   members          ProjectMember[]

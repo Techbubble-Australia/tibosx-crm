@@ -26,10 +26,10 @@ export const OPPORTUNITY_STATUS_COLORS: Record<
     darkText: "dark:text-amber-400",
   },
   IN_PROGRESS: {
-    bg: "bg-amber-900/20",
-    text: "text-amber-950",
-    darkBg: "dark:bg-amber-950/50",
-    darkText: "dark:text-amber-100",
+    bg: "bg-stone-100",
+    text: "text-stone-800",
+    darkBg: "dark:bg-stone-900/40",
+    darkText: "dark:text-stone-300",
   },
   ACCEPTED: {
     bg: "bg-green-50",

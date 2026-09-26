@@ -50,6 +50,15 @@ export type ProfileFormValues = {
   createdAt?: string;
   updatedAt?: string;
   careerApplications?: ProfileCareerApplication[];
+  contracts?: ProfileContract[];
+};
+
+export type ProfileContract = {
+  id: string;
+  contractNumber: string;
+  title: string;
+  status: string;
+  clientName: string;
 };
 
 export type ProfileCareerApplication = {
@@ -247,6 +256,7 @@ export function ProfileForm({
     setPhoneError("");
 
     let nextDocumentUrls = [...documentUrls];
+    let pendingResumeText: string | undefined;
 
     if (documentFiles.length > 0) {
       setUploading(true);
@@ -267,6 +277,10 @@ export function ProfileForm({
           throw new Error("Document upload failed");
         }
         nextDocumentUrls = [...nextDocumentUrls, ...urls];
+        const extractedText = uploadJson.data?.extractedText as string | undefined;
+        if (extractedText?.trim()) {
+          pendingResumeText = extractedText.trim();
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Document upload failed");
         setUploading(false);
@@ -327,6 +341,7 @@ export function ProfileForm({
         sourcedById: sourcedById || null,
         available,
         jobListingId: jobListingId || null,
+        ...(pendingResumeText ? { resumeText: pendingResumeText } : {}),
       });
       setSavedNotice(true);
       window.setTimeout(() => setSavedNotice(false), 4000);
@@ -636,6 +651,35 @@ export function ProfileForm({
                   >
                     View job applications
                   </Link>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {defaults.contracts && defaults.contracts.length > 0 ? (
+        <section className="space-y-3 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100">Contracts</h3>
+          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+            {defaults.contracts.map((contract) => (
+              <li key={contract.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-gray-100">
+                    <Link
+                      href={`/contracts/${contract.id}`}
+                      className="text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      {contract.title}
+                    </Link>
+                    <span className="ml-2 font-mono text-xs text-gray-500 dark:text-gray-400">
+                      {contract.contractNumber}
+                    </span>
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {contract.clientName ? `${contract.clientName} · ` : ""}
+                    Status: {contract.status.replace(/_/g, " ")}
+                  </p>
                 </div>
               </li>
             ))}

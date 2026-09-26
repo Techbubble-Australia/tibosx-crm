@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Plus, Edit, Trash2, Settings, Flame, ChevronDown, ChevronUp, Pencil, GripVertical } from "lucide-react";
+import { Plus, Trash2, Settings, Flame, ChevronDown, ChevronUp, Pencil, GripVertical } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { jobEditHref } from "@/lib/job-routes";
@@ -704,7 +704,12 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                               <GripVertical className="h-4 w-4" aria-hidden />
                             </button>
                           ) : null}
-                          <span>{job.title}</span>
+                          <Link
+                            href={jobEditHref(job.id, listTab)}
+                            className="hover:text-blue-600 hover:underline dark:hover:text-blue-400"
+                          >
+                            {job.title}
+                          </Link>
                         </div>
                       </td>
                     ) : null}
@@ -967,12 +972,6 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                     <td className="px-4 py-3 text-right">
                       {canManageJobs ? (
                         <div className="inline-flex items-center gap-2">
-                          <Link
-                            href={jobEditHref(job.id, listTab)}
-                            className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-black dark:hover:bg-gray-800 dark:hover:text-white"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Link>
                           <button
                             type="button"
                             onClick={() => void deleteJob(job.id)}
@@ -1031,7 +1030,12 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                     className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="min-w-0">
-                      <p className="font-medium text-gray-900 dark:text-gray-100">{job.title}</p>
+                      <Link
+                        href={jobEditHref(job.id, listTab)}
+                        className="font-medium text-gray-900 hover:text-blue-600 hover:underline dark:text-gray-100 dark:hover:text-blue-400"
+                      >
+                        {job.title}
+                      </Link>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
                         {job.referenceNumber} · {job.city || "—"} · {job.country} · {job.type || "—"} ·{" "}
                         {(job.applicationCount ?? 0) > 0 ? (

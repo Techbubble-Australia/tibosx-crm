@@ -33,6 +33,9 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
   const [html, setHtml] = useState(defaults.html);
   const [variables, setVariables] = useState<CredentialVariable[]>(defaults.variables);
   const [parsing, setParsing] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importedFileName, setImportedFileName] = useState("");
+  const [showSource, setShowSource] = useState(false);
 
   async function parseVariables() {
     setParsing(true);
@@ -89,6 +92,52 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
     );
   }
 
+  async function applyParsedHtml(nextHtml: string) {
+    setHtml(nextHtml);
+    const res = await adminFetch("/api/admin/credential-templates/parse-variables", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ html: nextHtml }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to parse variables");
+    const parsed = (data.data as CredentialVariable[]) ?? [];
+    const byKey = new Map(variables.map((row) => [row.key, row]));
+    setVariables(
+      parsed.map((row) => {
+        const prev = byKey.get(row.key);
+        return prev ? { ...row, ...prev, key: row.key } : row;
+      }),
+    );
+  }
+
+  async function importFile(file: File) {
+    setImporting(true);
+    try {
+      const ext = file.name.toLowerCase().split(".").pop() ?? "";
+      let nextHtml = "";
+      if (ext === "docx") {
+        const formData = new FormData();
+        formData.append("document", file);
+        const res = await adminFetch("/api/admin/credential-templates/import-document", {
+          method: "POST",
+          body: formData,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to import file");
+        nextHtml = (data.data as { html: string }).html;
+      } else {
+        nextHtml = await file.text();
+      }
+      setImportedFileName(file.name);
+      await applyParsedHtml(nextHtml);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to import file");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) {
@@ -121,27 +170,66 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
             <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
           <div>
-            <div className="mb-1 flex items-center justify-between">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">HTML</label>
-              <button
-                type="button"
-                onClick={() => void parseVariables()}
-                disabled={parsing}
-                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-              >
-                {parsing ? <Loader2 className="inline h-3.5 w-3.5 animate-spin" /> : "Parse variables"}
-              </button>
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Template content</label>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800">
+                  {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Import file"}
+                  <input
+                    type="file"
+                    accept=".docx,.html,.htm,.txt"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void importFile(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void parseVariables()}
+                  disabled={parsing}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  {parsing ? <Loader2 className="inline h-3.5 w-3.5 animate-spin" /> : "Parse variables"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSource((value) => !value)}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  {showSource ? "Hide source" : "Edit HTML source"}
+                </button>
+              </div>
             </div>
-            <textarea
-              className={`${inputClass} min-h-[240px] font-mono`}
-              value={html}
-              onChange={(e) => setHtml(e.target.value)}
-              onBlur={() => void parseVariables()}
-              placeholder="<p>Agreement for {Name} ({Email})</p>"
-              required
-            />
+            {importedFileName ? (
+              <p className="mb-2 text-xs text-gray-500">Imported: {importedFileName}</p>
+            ) : null}
+            {html.trim() ? (
+              <div className="mb-3 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700">
+                <iframe
+                  title="Template preview"
+                  className="h-[480px] w-full bg-white"
+                  srcDoc={html}
+                  sandbox=""
+                />
+              </div>
+            ) : (
+              <p className="mb-3 text-sm text-gray-400">Import a .docx, .html, or .txt file to preview the template.</p>
+            )}
+            {showSource ? (
+              <textarea
+                className={`${inputClass} min-h-[240px] font-mono`}
+                value={html}
+                onChange={(e) => setHtml(e.target.value)}
+                onBlur={() => void parseVariables()}
+                placeholder="<p>Agreement for {Name} ({Email})</p>"
+                required
+              />
+            ) : null}
             <p className="mt-1 text-xs text-gray-500">
-              Use placeholders like {"{Name}"}, {"{Email}"} in the HTML. Click Parse variables to configure each field.
+              Use placeholders like {"{Name}"}, {"{Email}"} in the HTML. Import from Word (.docx) or edit HTML source directly.
             </p>
           </div>
         </div>

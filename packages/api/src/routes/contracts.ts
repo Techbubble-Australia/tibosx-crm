@@ -28,6 +28,13 @@ import {
   sumWorkUnits,
   type WorkUnitMonthInput,
 } from "../lib/contract-work-units";
+import { validateContractDates, validateVariationDates } from "../lib/contract-date-rules";
+import {
+  contractIsIncomplete,
+  releaseProfilesForEndedContract,
+  syncProfileAvailableFlag,
+} from "../lib/contract-profiles";
+import { createProjectFromContract } from "../lib/create-project-from-contract";
 
 const router: IRouter = Router();
 
@@ -47,6 +54,10 @@ const workUnitMonthSchema = z.object({
   year: z.coerce.number().int(),
   month: z.coerce.number().int().min(0).max(11),
   workUnits: z.coerce.number().int().positive(),
+});
+
+const contractCreateSchema = z.object({
+  careerApplicationId: z.string().optional(),
 });
 
 const contractBaseSchema = z.object({
@@ -407,14 +418,6 @@ async function ensureDraftContract(contractId: string) {
   return contract;
 }
 
-async function syncProfileAvailableFlag(profileId: string, tx: Prisma.TransactionClient) {
-  const count = await tx.contractProfile.count({ where: { profileId } });
-  await tx.candidateProfile.update({
-    where: { id: profileId },
-    data: { available: count === 0 },
-  });
-}
-
 function serializeContractProfile(row: {
   id: string;
   profileId: string;
@@ -424,6 +427,7 @@ function serializeContractProfile(row: {
     firstName: string;
     lastName: string;
     email: string;
+    phone?: string;
     category: string;
     technology: string;
     available: boolean;
@@ -435,6 +439,7 @@ function serializeContractProfile(row: {
     firstName: row.profile.firstName,
     lastName: row.profile.lastName,
     email: row.profile.email,
+    phone: row.profile.phone ?? "",
     category: row.profile.category,
     technology: row.profile.technology,
     available: row.profile.available,
@@ -623,18 +628,27 @@ function serializeContract(row: {
   }>;
   contractProfiles?: Array<{
     id: string;
-    profileId: string;
-    createdAt: Date;
-    profile: {
+    profileId?: string;
+    createdAt?: Date;
+    profile?: {
       id: string;
       firstName: string;
       lastName: string;
       email: string;
+      phone?: string;
       category: string;
       technology: string;
       available: boolean;
     };
   }>;
+  careerApplication?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    position: string;
+    status: string;
+    jobListing?: { title: string | null } | null;
+  } | null;
 }) {
   const type = row.type as keyof typeof CONTRACT_TYPE_LABELS;
   const contractValue = toNumber(row.contractValue);
@@ -683,13 +697,56 @@ function serializeContract(row: {
     milestones: row.milestones?.map(serializeMilestone) ?? undefined,
     invoices: row.invoices?.map(serializeInvoice) ?? undefined,
     activityLogs: row.activityLogs?.map(serializeActivityLog) ?? undefined,
-    profiles: row.contractProfiles?.map(serializeContractProfile) ?? [],
+    profiles: (row.contractProfiles ?? [])
+      .filter(
+        (
+          entry,
+        ): entry is {
+          id: string;
+          profileId: string;
+          createdAt: Date;
+          profile: {
+            id: string;
+            firstName: string;
+            lastName: string;
+            email: string;
+            phone?: string;
+            category: string;
+            technology: string;
+            available: boolean;
+          };
+        } => Boolean(entry.profile),
+      )
+      .map(serializeContractProfile),
+    linkedProjects:
+      (row as { projects?: Array<{ id: string; projectNumber: string; contractVariationId: string | null }> })
+        .projects?.map((project) => ({
+          id: project.id,
+          projectNumber: project.projectNumber,
+          contractVariationId: project.contractVariationId,
+        })) ?? [],
+    isIncomplete: contractIsIncomplete(
+      row.type,
+      fileUrls,
+      row.contractProfiles?.length ?? 0,
+    ),
+    careerApplication: row.careerApplication
+      ? {
+          id: row.careerApplication.id,
+          firstName: row.careerApplication.firstName,
+          lastName: row.careerApplication.lastName,
+          position: row.careerApplication.position,
+          status: row.careerApplication.status,
+          jobTitle: row.careerApplication.jobListing?.title ?? null,
+        }
+      : null,
   };
 }
 
 const contractInclude = {
   client: { select: { id: true, name: true } },
   owner: { select: { id: true, name: true, email: true } },
+  contractProfiles: { select: { id: true } },
 };
 
 const activityInclude = {
@@ -708,6 +765,7 @@ const detailInclude = {
           firstName: true,
           lastName: true,
           email: true,
+          phone: true,
           category: true,
           technology: true,
           available: true,
@@ -721,6 +779,19 @@ const detailInclude = {
   activityLogs: {
     orderBy: { createdAt: "desc" as const },
     include: activityInclude,
+  },
+  projects: {
+    select: { id: true, projectNumber: true, contractVariationId: true },
+  },
+  careerApplication: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      position: true,
+      status: true,
+      jobListing: { select: { title: true } },
+    },
   },
 };
 
@@ -760,6 +831,7 @@ router.get("/profile-options", async (req, res) => {
         firstName: true,
         lastName: true,
         email: true,
+        phone: true,
         category: true,
         technology: true,
         available: true,
@@ -876,6 +948,7 @@ router.post("/:id/profiles", async (req, res) => {
               firstName: true,
               lastName: true,
               email: true,
+              phone: true,
               category: true,
               technology: true,
               available: true,
@@ -893,6 +966,7 @@ router.post("/:id/profiles", async (req, res) => {
               firstName: true,
               lastName: true,
               email: true,
+              phone: true,
               category: true,
               technology: true,
               available: true,
@@ -951,8 +1025,11 @@ router.delete("/:id/profiles/:contractProfileId", async (req, res) => {
 
 router.post("/", async (req: AuthRequest, res) => {
   try {
+    const createMeta = contractCreateSchema.parse(req.body);
     const data = contractBaseSchema.parse(req.body);
     const endDate = normalizeEndDate(data.endDate ?? null);
+    const dateError = validateContractDates(data.startDate, endDate);
+    if (dateError) return res.status(400).json({ error: dateError });
     const workUnitMonths =
       data.type === "T_AND_M" && data.unit
         ? resolveTmWorkUnitMonths(data.startDate, endDate, data.unit, data.workUnitMonths)
@@ -962,6 +1039,30 @@ router.post("/", async (req: AuthRequest, res) => {
     const ownerId = data.ownerId ?? req.user?.id ?? null;
     await ensureContractOwner(ownerId);
     const contractNumber = await allocateContractNumber();
+
+    let careerApplication:
+      | {
+          id: string;
+          profileId: string | null;
+          status: string;
+          contractId: string | null;
+        }
+      | null = null;
+    if (createMeta.careerApplicationId) {
+      careerApplication = await prisma.careerApplication.findUnique({
+        where: { id: createMeta.careerApplicationId },
+        select: { id: true, profileId: true, status: true, contractId: true },
+      });
+      if (!careerApplication) {
+        return res.status(400).json({ error: "Career application not found" });
+      }
+      if (careerApplication.status !== "SELECTED") {
+        return res.status(400).json({ error: "Contract can only be created from selected applications" });
+      }
+      if (careerApplication.contractId) {
+        return res.status(400).json({ error: "This application already has a linked contract" });
+      }
+    }
 
     const row = await prisma.$transaction(async (tx) => {
       const created = await tx.contract.create({
@@ -987,6 +1088,34 @@ router.post("/", async (req: AuthRequest, res) => {
       if (data.type === "T_AND_M" && workUnitMonths.length) {
         await replaceWorkUnitMonths(tx, created.id, "base", workUnitMonths);
       }
+      if (careerApplication) {
+        await tx.careerApplication.update({
+          where: { id: careerApplication.id },
+          data: { contractId: created.id },
+        });
+        let profileId = careerApplication.profileId;
+        if (!profileId) {
+          const legacy = await tx.candidateProfile.findUnique({
+            where: { careerApplicationId: careerApplication.id },
+            select: { id: true },
+          });
+          profileId = legacy?.id ?? null;
+        }
+        if (profileId) {
+          const existingProfile = await tx.contractProfile.findUnique({
+            where: { contractId_profileId: { contractId: created.id, profileId } },
+          });
+          if (!existingProfile) {
+            await tx.contractProfile.create({
+              data: { contractId: created.id, profileId },
+            });
+            await tx.candidateProfile.update({
+              where: { id: profileId },
+              data: { available: false },
+            });
+          }
+        }
+      }
       await tx.contractActivityLog.create({
         data: {
           contractId: created.id,
@@ -1003,7 +1132,11 @@ router.post("/", async (req: AuthRequest, res) => {
         where: { contractId: created.id },
         orderBy: [{ year: "asc" }, { month: "asc" }],
       });
-      return { ...created, workUnitMonths: workUnits, activityLogs: logs };
+      const detail = await tx.contract.findUnique({
+        where: { id: created.id },
+        include: detailInclude,
+      });
+      return detail ?? { ...created, workUnitMonths: workUnits, activityLogs: logs };
     });
 
     res.status(201).json({ data: serializeContract(row) });
@@ -1050,6 +1183,8 @@ router.put("/:id", async (req: AuthRequest, res) => {
         ? normalizeEndDate(data.endDate)
         : normalizeEndDate(existing.endDate);
     const mergedUnit = data.unit !== undefined ? data.unit : existing.unit;
+    const dateError = validateContractDates(mergedStartDate, mergedEndDate);
+    if (dateError) return res.status(400).json({ error: dateError });
     const workUnitMonths =
       nextType === "T_AND_M" && mergedUnit
         ? resolveTmWorkUnitMonths(
@@ -1222,6 +1357,42 @@ router.post("/:id/activate", async (req: AuthRequest, res) => {
   }
 });
 
+router.post("/:id/create-project", async (req: AuthRequest, res) => {
+  try {
+    const contractId = req.params.id;
+    if (!contractId) return res.status(400).json({ error: "Invalid id" });
+    const variationId =
+      typeof req.body?.variationId === "string" && req.body.variationId.trim()
+        ? req.body.variationId.trim()
+        : null;
+    const projectManagerId = req.user?.id;
+    if (!projectManagerId) return res.status(401).json({ error: "Unauthorized" });
+
+    const project = await createProjectFromContract(contractId, projectManagerId, variationId);
+    res.status(201).json({
+      data: {
+        id: project.id,
+        projectNumber: project.projectNumber,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === "NOT_FOUND") return res.status(404).json({ error: "Contract not found" });
+      if (error.message === "NOT_ACTIVE") {
+        return res.status(400).json({ error: "Projects can only be created from active contracts" });
+      }
+      if (error.message === "VARIATION_NOT_FOUND") {
+        return res.status(404).json({ error: "Variation not found" });
+      }
+      if (error.message === "PROJECT_EXISTS") {
+        return res.status(400).json({ error: "A project already exists for this contract or variation" });
+      }
+    }
+    console.error("Error creating project from contract:", error);
+    res.status(500).json({ error: "Failed to create project" });
+  }
+});
+
 router.post("/:id/terminate", async (req: AuthRequest, res) => {
   try {
     const existing = await prisma.contract.findUnique({ where: { id: req.params.id } });
@@ -1243,6 +1414,7 @@ router.post("/:id/terminate", async (req: AuthRequest, res) => {
         "CANCELED",
         req.user?.id,
       );
+      await releaseProfilesForEndedContract(existing.id, tx);
     });
 
     const row = await fetchContractDetail(existing.id);
@@ -1411,6 +1583,19 @@ router.post("/:id/variations", async (req, res) => {
   try {
     const input = variationSchema.parse(req.body);
     const contract = await ensureActiveContract(req.params.id);
+    const existingVariations = await prisma.contractVariation.findMany({
+      where: { contractId: contract.id },
+      select: { id: true, variationDate: true, variationEndDate: true },
+    });
+    const variationDateError = validateVariationDates(
+      {
+        variationDate: input.variationDate,
+        variationEndDate: input.variationEndDate,
+      },
+      contract.endDate,
+      existingVariations,
+    );
+    if (variationDateError) return res.status(400).json({ error: variationDateError });
     const payload = resolveVariationPayload(contract, input);
     const { workUnitMonths, ...variationData } = payload as typeof payload & {
       workUnitMonths?: WorkUnitMonthInput[];
@@ -1474,6 +1659,20 @@ router.patch("/:id/variations/:variationId", async (req, res) => {
     });
     if (!existing) return res.status(404).json({ error: "Variation not found" });
 
+    const existingVariations = await prisma.contractVariation.findMany({
+      where: { contractId: contract.id },
+      select: { id: true, variationDate: true, variationEndDate: true },
+    });
+    const variationDateError = validateVariationDates(
+      {
+        id: existing.id,
+        variationDate: input.variationDate,
+        variationEndDate: input.variationEndDate,
+      },
+      contract.endDate,
+      existingVariations,
+    );
+    if (variationDateError) return res.status(400).json({ error: variationDateError });
     const payload = resolveVariationPayload(contract, input);
     const { workUnitMonths, ...variationData } = payload as typeof payload & {
       workUnitMonths?: WorkUnitMonthInput[];

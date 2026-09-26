@@ -95,11 +95,11 @@ export default function NewClientPage() {
           selectClassName={inputClass}
           labelClassName="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100"
         />
-        <ClientStatusFields defaultProspect={defaultProspect} inputClass={inputClass} />
         <p className="text-xs text-gray-500 dark:text-gray-400">
           Display order: {nextOrder ?? "…"} (assigned automatically)
         </p>
         <ClientContactsField contacts={contacts} onChange={setContacts} inputClassName={inputClass} />
+        <ClientStatusFields defaultProspect={defaultProspect} defaultActive inputClass={inputClass} />
         <button
           type="submit"
           disabled={isLoading}

@@ -57,6 +57,8 @@ interface CareerApplication {
   clientName?: string | null;
   clientId?: string | null;
   profileId?: string | null;
+  contractId?: string | null;
+  contractNumber?: string | null;
 }
 
 function formatSalary(app: CareerApplication): string | null {
@@ -758,6 +760,7 @@ function CommentsFieldRow({
 function ApplicationCard({
   app,
   canEdit,
+  isAdmin = false,
   hidePosition = false,
   onStatusChange,
   onSaveFields,
@@ -767,6 +770,7 @@ function ApplicationCard({
 }: {
   app: CareerApplication;
   canEdit: boolean;
+  isAdmin?: boolean;
   hidePosition?: boolean;
   onStatusChange: (app: CareerApplication, status: CareerApplicationStatus) => void;
   onSaveFields: (
@@ -826,6 +830,17 @@ function ApplicationCard({
             {app.isCitizen !== false ? <span>Citizen: Yes</span> : null}
             {salary ? <span>Salary: {salary}</span> : null}
             {app.clientName ? <span>Client: {app.clientName}</span> : null}
+            {app.contractId && app.contractNumber ? (
+              <span>
+                Contract:{" "}
+                <Link
+                  href={`/contracts/${app.contractId}`}
+                  className="font-mono text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  {app.contractNumber}
+                </Link>
+              </span>
+            ) : null}
           </div>
           <ChargeRateField
             app={app}
@@ -877,6 +892,14 @@ function ApplicationCard({
               year: "numeric",
             })}
           </span>
+          {isAdmin && status === "SELECTED" && !app.contractId ? (
+            <Link
+              href={`/contracts/new?careerApplicationId=${encodeURIComponent(app.id)}`}
+              className="rounded-lg bg-black px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+            >
+              Create contract
+            </Link>
+          ) : null}
           {canEdit ? (
             <div className="flex items-center gap-1">
               <button
@@ -905,8 +928,9 @@ function ApplicationCard({
 }
 
 export function CareerApplicationsList({ jobPublished, jobListingId, initialStatusFilter }: Props) {
-  const { canAccessRecruitment } = useAdminSession();
+  const { canAccessRecruitment, role } = useAdminSession();
   const canEdit = canAccessRecruitment;
+  const isAdmin = role === "admin";
   const [applications, setApplications] = useState<CareerApplication[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("card");
@@ -1423,6 +1447,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
               key={app.id}
               app={app}
               canEdit={canEdit}
+              isAdmin={isAdmin}
               onStatusChange={(app, status) => requestStatusChange(app, status)}
               onSaveFields={(app, fields) => saveApplicationFields(app, fields)}
               onSaveChargeRate={(app, chargeRate) => saveChargeRate(app, chargeRate)}
@@ -1473,9 +1498,10 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
                         key={app.id}
                         app={app}
                         canEdit={canEdit}
+                        isAdmin={isAdmin}
                         hidePosition
                         onStatusChange={(app, status) => requestStatusChange(app, status)}
-              onSaveFields={(app, fields) => saveApplicationFields(app, fields)}
+                        onSaveFields={(app, fields) => saveApplicationFields(app, fields)}
                         onSaveChargeRate={(app, chargeRate) => saveChargeRate(app, chargeRate)}
                         onMove={(app) => setMoveTarget(app)}
                         onDelete={(id) => void deleteApplication(id)}

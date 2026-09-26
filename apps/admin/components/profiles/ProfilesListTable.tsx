@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Edit, Trash2, Info, FileText, Pencil } from "lucide-react";
+import { Trash2, Info, FileText, Pencil } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { resolveDocumentHref } from "@/lib/media-url";
 import { getSortedCountryOptions } from "@/lib/country-flags";
@@ -263,7 +263,12 @@ export function ProfilesListTable({
                         {tooltip || "No additional details"}
                       </span>
                     </span>
-                    <span>{row.firstName} {row.lastName}</span>
+                    <Link
+                      href={`/database/profiles/${row.id}`}
+                      className="hover:text-blue-600 hover:underline dark:hover:text-blue-400"
+                    >
+                      {row.firstName} {row.lastName}
+                    </Link>
                     {row.isDuplicate ? (
                       <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
                         Dup
@@ -500,12 +505,6 @@ export function ProfilesListTable({
                       <Pencil className="h-4 w-4" />
                     </button>
                   )}
-                  <Link
-                    href={`/database/profiles/${row.id}`}
-                    className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-black dark:hover:bg-gray-800 dark:hover:text-white"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Link>
                   {canDeleteProfiles ? (
                     <button
                       type="button"

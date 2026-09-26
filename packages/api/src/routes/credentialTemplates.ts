@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import multer from "multer";
 import { z } from "zod";
 import { prisma } from "@techbubble/database";
 import {
@@ -6,8 +7,14 @@ import {
   mergeVariablesFromHtml,
   type CredentialTemplateVariable,
 } from "../lib/credential-template-vars";
+import { importDocumentToHtml } from "../lib/document-html";
 
 const router: IRouter = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
 
 const variableSchema = z.object({
   key: z.string().min(1),
@@ -60,6 +67,19 @@ router.get("/:id", async (req, res) => {
   } catch (error) {
     console.error("Error fetching credential template:", error);
     res.status(500).json({ error: "Failed to fetch template" });
+  }
+});
+
+router.post("/import-document", upload.single("document"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const html = await importDocumentToHtml(req.file.buffer, req.file.originalname);
+    res.json({ data: { html } });
+  } catch (error) {
+    console.error("Error importing template document:", error);
+    res.status(400).json({
+      error: error instanceof Error ? error.message : "Failed to import document",
+    });
   }
 });
 

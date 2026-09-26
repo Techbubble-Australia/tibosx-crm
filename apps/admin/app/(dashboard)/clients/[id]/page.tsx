@@ -130,16 +130,16 @@ export default function EditClientPage() {
           selectClassName={inputClass}
           labelClassName="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100"
         />
-        <ClientStatusFields
-          defaultProspect={defaults.status === "PROSPECT"}
-          defaultInactive={defaults.status === "INACTIVE"}
-          inputClass={inputClass}
-        />
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Order</label>
           <input name="order" type="number" defaultValue={defaults.order} className={inputClass} />
         </div>
         <ClientContactsField contacts={contacts} onChange={setContacts} inputClassName={inputClass} />
+        <ClientStatusFields
+          defaultProspect={defaults.status === "PROSPECT"}
+          defaultActive={defaults.status !== "INACTIVE"}
+          inputClass={inputClass}
+        />
         <button
           type="submit"
           disabled={isLoading}

@@ -34,6 +34,7 @@ export type JobFormDefaults = {
   positionsCount?: number;
   publishedDate?: string | null;
   budget?: string;
+  metaTags?: string[];
   updatedAt?: string;
 };
 
@@ -88,6 +89,8 @@ export function JobForm({
   const [level, setLevel] = useState(defaults.level ?? DEFAULT_PROFILE_LEVEL);
   const [positionsCount, setPositionsCount] = useState(String(defaults.positionsCount ?? 1));
   const [budget, setBudget] = useState(defaults.budget ?? "");
+  const [metaTags, setMetaTags] = useState<string[]>(defaults.metaTags ?? []);
+  const [metaTagInput, setMetaTagInput] = useState("");
   const [publishedDate, setPublishedDate] = useState(() => {
     if (!defaults.publishedDate) return "";
     const d = new Date(defaults.publishedDate);
@@ -148,7 +151,21 @@ export function JobForm({
         setPublishedDate(d.toISOString().slice(0, 10));
       }
     }
-  }, [defaults.level, defaults.budget, defaults.publishedDate]);
+    if (defaults.metaTags) setMetaTags(defaults.metaTags);
+  }, [defaults.level, defaults.budget, defaults.publishedDate, defaults.metaTags]);
+
+  function addMetaTag(raw: string) {
+    const tag = raw.trim();
+    if (!tag) return;
+    const exists = metaTags.some((existing) => existing.toLowerCase() === tag.toLowerCase());
+    if (exists) return;
+    setMetaTags((prev) => [...prev, tag]);
+    setMetaTagInput("");
+  }
+
+  function removeMetaTag(tag: string) {
+    setMetaTags((prev) => prev.filter((existing) => existing !== tag));
+  }
 
   useEffect(() => {
     if (mode !== "create") return;
@@ -218,6 +235,7 @@ export function JobForm({
       level,
       positionsCount: Number.parseInt(positionsCount, 10) || 1,
       budget: budget.trim(),
+      metaTags,
       description,
       order: mode === "create" ? (nextOrder ?? 0) : parseInt(formData.get("order") as string, 10) || 0,
       published: formData.get("published") === "on",
@@ -315,6 +333,53 @@ export function JobForm({
               placeholder="Optional budget notes"
               maxLength={500}
             />
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelClass}>Meta tags</label>
+            <div className="flex flex-wrap gap-2">
+              {metaTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-800 dark:bg-gray-800 dark:text-gray-200"
+                >
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() => removeMetaTag(tag)}
+                    className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+                    aria-label={`Remove ${tag}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="mt-2 flex gap-2">
+              <input
+                type="text"
+                value={metaTagInput}
+                onChange={(e) => setMetaTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addMetaTag(metaTagInput);
+                  }
+                }}
+                className={inputClass}
+                placeholder="Add tag and press Enter"
+                maxLength={80}
+              />
+              <button
+                type="button"
+                onClick={() => addMetaTag(metaTagInput)}
+                className="shrink-0 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+              >
+                Add
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Used for AI Insights profile matching (skills, technologies, keywords).
+            </p>
           </div>
           {mode === "edit" ? (
             <div>

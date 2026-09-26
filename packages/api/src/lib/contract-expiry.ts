@@ -1,5 +1,6 @@
 import { prisma } from "@techbubble/database";
 import { logContractStatusChange } from "./contract-activity";
+import { releaseProfilesForEndedContract } from "./contract-profiles";
 import { resolveContractExpiryDate } from "./sales-forecast";
 
 function startOfUtcDay(date = new Date()): Date {
@@ -44,6 +45,7 @@ export async function expirePastDueContracts(): Promise<number> {
         data: { status: "EXPIRED" },
       });
       await logContractStatusChange(tx, row.id, "AUTO_EXPIRED", "ACTIVE", "EXPIRED", null);
+      await releaseProfilesForEndedContract(row.id, tx);
     }
   });
 
