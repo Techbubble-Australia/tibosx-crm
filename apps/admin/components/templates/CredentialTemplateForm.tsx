@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
+import { SIGNATURE_BLOCK_HTML, wrapTemplatePreviewHtml } from "@/lib/credential-template";
 
 export type CredentialVariable = {
   key: string;
@@ -36,6 +37,18 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
   const [importing, setImporting] = useState(false);
   const [importedFileName, setImportedFileName] = useState("");
   const [showSource, setShowSource] = useState(false);
+  const [dragOverPreview, setDragOverPreview] = useState(false);
+
+  const previewHtml = useMemo(() => wrapTemplatePreviewHtml(html), [html]);
+
+  function insertSignatureBlock() {
+    if (html.includes('data-signature-block="contractor"')) {
+      alert("A signature block is already in this template.");
+      return;
+    }
+    const nextHtml = `${html.trim()}\n${SIGNATURE_BLOCK_HTML}`;
+    void applyParsedHtml(nextHtml);
+  }
 
   async function parseVariables() {
     setParsing(true);
@@ -47,7 +60,10 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
       });
       const data = await res.json();
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to parse variables");
-      const parsed = (data.data as CredentialVariable[]) ?? [];
+      const payload = data.data as { variables?: CredentialVariable[]; normalizedHtml?: string } | CredentialVariable[];
+      const parsed = Array.isArray(payload) ? payload : payload.variables ?? [];
+      const normalizedHtml = Array.isArray(payload) ? undefined : payload.normalizedHtml;
+      if (normalizedHtml) setHtml(normalizedHtml);
       const byKey = new Map(variables.map((row) => [row.key, row]));
       setVariables(
         parsed.map((row) => {
@@ -101,7 +117,13 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
     });
     const data = await res.json();
     if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to parse variables");
-    const parsed = (data.data as CredentialVariable[]) ?? [];
+    const payload = data.data as { variables?: CredentialVariable[]; normalizedHtml?: string };
+    const parsed = payload.variables ?? [];
+    if (payload.normalizedHtml) {
+      setHtml(payload.normalizedHtml);
+    } else {
+      setHtml(nextHtml);
+    }
     const byKey = new Map(variables.map((row) => [row.key, row]));
     setVariables(
       parsed.map((row) => {
@@ -125,7 +147,14 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
         });
         const data = await res.json();
         if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to import file");
-        nextHtml = (data.data as { html: string }).html;
+        const imported = data.data as { html: string; variables?: CredentialVariable[] };
+        nextHtml = imported.html;
+        if (imported.variables?.length) {
+          setHtml(imported.html);
+          setVariables(imported.variables);
+          setImportedFileName(file.name);
+          return;
+        }
       } else {
         nextHtml = await file.text();
       }
@@ -203,15 +232,48 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
                 </button>
               </div>
             </div>
+            <div className="mb-3 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/40">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Template blocks</p>
+              <button
+                type="button"
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("text/plain", "signature-block");
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
+                onClick={insertSignatureBlock}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+              >
+                <GripVertical className="h-4 w-4 text-gray-400" />
+                Signature block
+              </button>
+              <p className="mt-2 text-xs text-gray-500">Drag onto the preview or click to insert at the end.</p>
+            </div>
             {importedFileName ? (
               <p className="mb-2 text-xs text-gray-500">Imported: {importedFileName}</p>
             ) : null}
             {html.trim() ? (
-              <div className="mb-3 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700">
+              <div
+                className={`mb-3 overflow-hidden rounded-lg border bg-white dark:border-gray-700 ${
+                  dragOverPreview ? "border-blue-400 ring-2 ring-blue-200" : "border-gray-200"
+                }`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOverPreview(true);
+                }}
+                onDragLeave={() => setDragOverPreview(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverPreview(false);
+                  if (e.dataTransfer.getData("text/plain") === "signature-block") {
+                    insertSignatureBlock();
+                  }
+                }}
+              >
                 <iframe
                   title="Template preview"
                   className="h-[480px] w-full bg-white"
-                  srcDoc={html}
+                  srcDoc={previewHtml}
                   sandbox=""
                 />
               </div>

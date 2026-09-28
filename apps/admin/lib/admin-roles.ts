@@ -207,7 +207,7 @@ export function roleLabel(role: string): string {
 export function defaultLandingPath(role: string): string {
   if (canAccessRecruitment(role)) return "/database/dashboard";
   if (canAccessProjectManagement(role)) {
-    return canManageProjects(role) ? "/projects" : "/timesheets";
+    return canManageProjects(role) ? "/projects" : "/agreement";
   }
   if (canAccessWebsite(role)) return "/pages";
   if (canAccessSales(role)) return "/clients/active";

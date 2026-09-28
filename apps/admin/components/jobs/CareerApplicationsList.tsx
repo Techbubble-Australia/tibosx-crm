@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Trash2, ChevronDown, Pencil, ArrowRightLeft, Download } from "lucide-react";
 import { exportCareerApplicationsAsExcel } from "@/lib/export-career-applications-excel";
 import { adminFetch } from "@/lib/admin-api";
@@ -144,6 +145,7 @@ const STATUSES_WITH_INTERVIEW_FIELD: CareerApplicationStatus[] = [
   "INTERNAL_REVIEW",
   "CLIENT_REVIEW",
   "INTERVIEW_SCHEDULED",
+  "AWAITING_FEEDBACK",
   "REJECTED",
   "CANCELLED",
 ];
@@ -152,6 +154,7 @@ const STATUSES_WITH_COMMENTS_FIELD: CareerApplicationStatus[] = [
   "INTERNAL_REVIEW",
   "CLIENT_REVIEW",
   "INTERVIEW_SCHEDULED",
+  "AWAITING_FEEDBACK",
   "REJECTED",
   "CANCELLED",
 ];
@@ -165,7 +168,7 @@ function showsCommentsField(status: CareerApplicationStatus): boolean {
 }
 
 function isInterviewEditable(status: CareerApplicationStatus): boolean {
-  return status === "INTERVIEW_SCHEDULED";
+  return status === "INTERVIEW_SCHEDULED" || status === "AWAITING_FEEDBACK";
 }
 
 function isCommentsMandatory(status: CareerApplicationStatus): boolean {
@@ -182,6 +185,8 @@ function statusSelectStyle(status: CareerApplicationStatus): React.CSSProperties
       return { backgroundColor: "#fef9c3", color: "#854d0e" };
     case "INTERVIEW_SCHEDULED":
       return { backgroundColor: "#fef3c7", color: "#92400e" };
+    case "AWAITING_FEEDBACK":
+      return { backgroundColor: "#dbeafe", color: "#1e40af" };
     case "SELECTED":
       return { backgroundColor: "#dcfce7", color: "#166534" };
     default:
@@ -928,6 +933,9 @@ function ApplicationCard({
 }
 
 export function CareerApplicationsList({ jobPublished, jobListingId, initialStatusFilter }: Props) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { canAccessRecruitment, role } = useAdminSession();
   const canEdit = canAccessRecruitment;
   const isAdmin = role === "admin";
@@ -1008,7 +1016,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
 
   useEffect(() => {
     void fetchApplications();
-  }, [jobPublished, jobListingId, initialStatusFilter]);
+  }, [jobPublished, jobListingId]);
 
   useEffect(() => {
     void adminFetch("/api/admin/jobs/admin/all")
@@ -1029,8 +1037,18 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
   }, [jobPublished]);
 
   useEffect(() => {
-    setFilterStatus(initialStatusFilter ?? "");
-  }, [initialStatusFilter]);
+    setFilterStatus(searchParams.get("status")?.trim() ?? initialStatusFilter ?? "");
+  }, [searchParams, initialStatusFilter]);
+
+  function updateStatusFilter(next: string) {
+    setFilterStatus(next);
+    setPage(1);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next) params.set("status", next);
+    else params.delete("status");
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname);
+  }
 
   async function fetchApplications() {
     setIsLoading(true);
@@ -1038,7 +1056,6 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
       const params = new URLSearchParams();
       params.set("published", jobPublished ? "true" : "false");
       if (jobListingId) params.set("jobListingId", jobListingId);
-      if (initialStatusFilter) params.set("status", initialStatusFilter);
       const res = await adminFetch(`/api/admin/career-applications/admin/applications?${params.toString()}`);
       const data = await res.json();
       const rows = (data.data || []) as CareerApplication[];
@@ -1402,10 +1419,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
         </select>
         <select
           value={filterStatus}
-          onChange={(e) => {
-            setFilterStatus(e.target.value);
-            setPage(1);
-          }}
+          onChange={(e) => updateStatusFilter(e.target.value)}
           className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
           aria-label="Filter by status"
         >

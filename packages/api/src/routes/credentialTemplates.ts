@@ -5,9 +5,10 @@ import { prisma } from "@techbubble/database";
 import {
   CREDENTIAL_VARIABLE_TYPES,
   mergeVariablesFromHtml,
+  normalizeTemplatePlaceholders,
   type CredentialTemplateVariable,
 } from "../lib/credential-template-vars";
-import { importDocumentToHtml } from "../lib/document-html";
+import { importDocumentToHtml, previewImportedHtml } from "../lib/document-html";
 
 const router: IRouter = Router();
 
@@ -74,7 +75,15 @@ router.post("/import-document", upload.single("document"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const html = await importDocumentToHtml(req.file.buffer, req.file.originalname);
-    res.json({ data: { html } });
+    const variables = mergeVariablesFromHtml(html);
+    const normalizedHtml = normalizeTemplatePlaceholders(html, variables);
+    res.json({
+      data: {
+        html: normalizedHtml,
+        previewHtml: previewImportedHtml(normalizedHtml),
+        variables,
+      },
+    });
   } catch (error) {
     console.error("Error importing template document:", error);
     res.status(400).json({
@@ -87,7 +96,8 @@ router.post("/parse-variables", async (req, res) => {
   try {
     const html = z.object({ html: z.string() }).parse(req.body).html;
     const variables = mergeVariablesFromHtml(html);
-    res.json({ data: variables });
+    const normalizedHtml = normalizeTemplatePlaceholders(html, variables);
+    res.json({ data: { variables, normalizedHtml } });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });

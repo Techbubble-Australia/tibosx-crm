@@ -2,6 +2,7 @@ export const CAREER_APPLICATION_STATUSES = [
   "INTERNAL_REVIEW",
   "CLIENT_REVIEW",
   "INTERVIEW_SCHEDULED",
+  "AWAITING_FEEDBACK",
   "SELECTED",
   "REJECTED",
   "CANCELLED",
@@ -13,6 +14,7 @@ export const CAREER_APPLICATION_STATUS_LABELS: Record<CareerApplicationStatus, s
   INTERNAL_REVIEW: "Internal Review",
   CLIENT_REVIEW: "Client Review",
   INTERVIEW_SCHEDULED: "Interview Scheduled",
+  AWAITING_FEEDBACK: "Awaiting feedback",
   SELECTED: "Selected",
   REJECTED: "Rejected",
   CANCELLED: "Cancelled",
@@ -39,6 +41,12 @@ export const CAREER_APPLICATION_STATUS_COLORS: Record<
     text: "text-amber-800",
     darkBg: "dark:bg-amber-900/40",
     darkText: "dark:text-amber-200",
+  },
+  AWAITING_FEEDBACK: {
+    bg: "bg-blue-100",
+    text: "text-blue-800",
+    darkBg: "dark:bg-blue-900/40",
+    darkText: "dark:text-blue-200",
   },
   SELECTED: {
     bg: "bg-green-100",

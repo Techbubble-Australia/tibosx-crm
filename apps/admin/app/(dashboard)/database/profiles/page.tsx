@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Plus, Edit, Trash2, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
@@ -125,6 +125,8 @@ export default function ProfilesPage() {
 }
 
 function ProfilesPageInner() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const { canDeleteProfiles, canManageProfileOwnership } = useAdminSession();
   const [rows, setRows] = useState<ProfileRow[]>([]);
@@ -213,11 +215,17 @@ function ProfilesPageInner() {
   }, []);
 
   useEffect(() => {
-    const technology = searchParams.get("technology")?.trim();
-    const country = searchParams.get("country")?.trim();
-    if (technology) setTechnologyFilter(technology);
-    if (country) setCountryFilter(country);
+    setTechnologyFilter(searchParams.get("technology")?.trim() ?? "");
+    setCountryFilter(searchParams.get("country")?.trim() ?? "");
   }, [searchParams]);
+
+  function updateQueryFilter(key: "country" | "technology", value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set(key, value);
+    else params.delete(key);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname);
+  }
 
   async function loadMeta() {
     try {
@@ -446,7 +454,7 @@ function ProfilesPageInner() {
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <select
             value={countryFilter}
-            onChange={(e) => setCountryFilter(e.target.value)}
+            onChange={(e) => updateQueryFilter("country", e.target.value)}
             className={filterSelectClass}
             aria-label="Filter by country"
           >
@@ -468,7 +476,7 @@ function ProfilesPageInner() {
           </select>
           <select
             value={technologyFilter}
-            onChange={(e) => setTechnologyFilter(e.target.value)}
+            onChange={(e) => updateQueryFilter("technology", e.target.value)}
             className={filterSelectClass}
             aria-label="Filter by technology"
           >
@@ -522,13 +530,12 @@ function ProfilesPageInner() {
             <button
               type="button"
               onClick={() => {
-                setCountryFilter("");
                 setCategoryFilter("");
-                setTechnologyFilter("");
                 setCitizenFilter("");
                 setLevelFilter("");
                 setExperienceMin("");
                 setExperienceMax("");
+                router.replace(pathname);
               }}
               className="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
             >

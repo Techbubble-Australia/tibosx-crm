@@ -721,6 +721,8 @@ model ProjectMember {
   credentialTemplateId String?
   credentialTemplate   CredentialTemplate? @relation(fields: [credentialTemplateId], references: [id], onDelete: SetNull)
   credentialData       Json?
+  signatureDataUrl     String?             @db.Text
+  agreementSignedAt    DateTime?
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
 

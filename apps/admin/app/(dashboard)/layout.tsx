@@ -90,6 +90,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin", "project_manager"] },
       { href: "/timesheets", label: "Timesheets", icon: ClipboardCheck, roles: ["admin", "project_manager", "project_member"] },
+      { href: "/agreement", label: "Agreement", icon: FileText, roles: ["project_member"] },
     ],
   },
   {

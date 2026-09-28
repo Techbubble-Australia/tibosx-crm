@@ -8,7 +8,8 @@ import {
   defaultCredentialValuesForProfile,
   type CredentialTemplateVariable,
 } from "../lib/credential-template-vars";
-import { canManageProjects, getActorId, isProjectManagerRole } from "../lib/project-access";
+import { renderTemplateHtml, wrapTemplateHtml } from "../lib/credential-template-render";
+import { canManageProjects, getActorId, isProjectManagerRole, isProjectMemberRole } from "../lib/project-access";
 import {
   generateProjectMonths,
   PROJECT_COST_TYPES,
@@ -118,6 +119,8 @@ function serializeMember(row: {
   adminUserId: string | null;
   credentialTemplateId: string | null;
   credentialData: unknown;
+  signatureDataUrl: string | null;
+  agreementSignedAt: Date | null;
   createdAt: Date;
   profile: {
     id: string;
@@ -141,7 +144,10 @@ function serializeMember(row: {
     adminUserEmail: row.adminUser?.email ?? null,
     credentialTemplateId: row.credentialTemplateId,
     credentialData: row.credentialData ?? null,
+    signatureDataUrl: row.signatureDataUrl ?? null,
+    agreementSignedAt: row.agreementSignedAt?.toISOString() ?? null,
     hasCredentials: Boolean(row.adminUserId),
+    agreementSigned: Boolean(row.agreementSignedAt),
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -386,6 +392,107 @@ router.get("/", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Error fetching projects:", error);
     res.status(500).json({ error: "Failed to fetch projects" });
+  }
+});
+
+router.get("/my-agreement", async (req: AuthRequest, res) => {
+  try {
+    const role = req.user?.role ?? "";
+    if (!isProjectMemberRole(role)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const userId = getActorId(req);
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const member = await prisma.projectMember.findFirst({
+      where: { adminUserId: userId },
+      include: {
+        project: { select: { id: true, title: true, projectNumber: true } },
+        credentialTemplate: true,
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (!member?.credentialTemplate) {
+      return res.status(404).json({ error: "No agreement assigned" });
+    }
+
+    const variables = Array.isArray(member.credentialTemplate.variables)
+      ? (member.credentialTemplate.variables as CredentialTemplateVariable[])
+      : [];
+    const values =
+      member.credentialData && typeof member.credentialData === "object"
+        ? (member.credentialData as Record<string, string>)
+        : {};
+    const rendered = renderTemplateHtml(
+      member.credentialTemplate.html,
+      values,
+      variables,
+      member.signatureDataUrl,
+    );
+
+    res.json({
+      data: {
+        memberId: member.id,
+        projectId: member.projectId,
+        projectTitle: member.project.title,
+        projectNumber: member.project.projectNumber,
+        templateName: member.credentialTemplate.name,
+        html: wrapTemplateHtml(rendered),
+        signed: Boolean(member.agreementSignedAt),
+        signedAt: member.agreementSignedAt?.toISOString() ?? null,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching agreement:", error);
+    res.status(500).json({ error: "Failed to fetch agreement" });
+  }
+});
+
+router.post("/my-agreement/sign", async (req: AuthRequest, res) => {
+  try {
+    const role = req.user?.role ?? "";
+    if (!isProjectMemberRole(role)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const userId = getActorId(req);
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const body = z
+      .object({
+        signatureDataUrl: z.string().min(1).max(500_000),
+      })
+      .parse(req.body);
+
+    if (!body.signatureDataUrl.startsWith("data:image/")) {
+      return res.status(400).json({ error: "Invalid signature image" });
+    }
+
+    const member = await prisma.projectMember.findFirst({
+      where: { adminUserId: userId, credentialTemplateId: { not: null } },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (!member) return res.status(404).json({ error: "No agreement assigned" });
+
+    const updated = await prisma.projectMember.update({
+      where: { id: member.id },
+      data: {
+        signatureDataUrl: body.signatureDataUrl,
+        agreementSignedAt: new Date(),
+      },
+    });
+
+    res.json({
+      data: {
+        signed: true,
+        signedAt: updated.agreementSignedAt?.toISOString() ?? null,
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error signing agreement:", error);
+    res.status(500).json({ error: "Failed to sign agreement" });
   }
 });
 
