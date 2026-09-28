@@ -154,7 +154,7 @@ export function canManageClients(role: string): boolean {
 }
 
 export function canManageJobs(role: string): boolean {
-  return role === "admin" || role === "website";
+  return role === "admin" || role === "website" || role === "recruiter_admin";
 }
 
 export function canViewJobs(role: string): boolean {

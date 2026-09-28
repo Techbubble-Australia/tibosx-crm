@@ -164,7 +164,7 @@ type JobsListPageProps = {
 };
 
 export function JobsListPage({ publishedFilter, heading, description }: JobsListPageProps) {
-  const { canManageJobs, canViewJobs } = useAdminSession();
+  const { canManageJobs, canViewJobs, canAccessWebsite } = useAdminSession();
   const searchParams = useSearchParams();
   const presetClientId = searchParams.get("clientId")?.trim() ?? "";
   const presetCountry = searchParams.get("country")?.trim() ?? "";
@@ -554,23 +554,23 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
               onToggle={toggleColumn}
             />
           ) : null}
+          {canAccessWebsite ? (
+            <Link
+              href="/settings/categories"
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-800"
+            >
+              <Settings className="h-4 w-4" />
+              Taxonomy settings
+            </Link>
+          ) : null}
           {canManageJobs ? (
-            <>
-              <Link
-                href="/settings/categories"
-                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-800"
-              >
-                <Settings className="h-4 w-4" />
-                Taxonomy settings
-              </Link>
-              <Link
-                href="/jobs/new"
-                className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
-              >
-                <Plus className="h-4 w-4" />
-                Add Job
-              </Link>
-            </>
+            <Link
+              href="/jobs/new"
+              className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+            >
+              <Plus className="h-4 w-4" />
+              Add Job
+            </Link>
           ) : null}
         </div>
       </div>
