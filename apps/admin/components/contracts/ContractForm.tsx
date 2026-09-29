@@ -302,8 +302,11 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const [addingMilestone, setAddingMilestone] = useState(false);
   const [deletingMilestoneId, setDeletingMilestoneId] = useState<string | null>(null);
   const [savingFiles, setSavingFiles] = useState(false);
+  const [endDateError, setEndDateError] = useState<string | null>(null);
+  const [savingEndDate, setSavingEndDate] = useState(false);
 
   const isEditable = status === "DRAFT";
+  const canEditEndDate = status === "DRAFT" || status === "ACTIVE";
   const canEditFiles = status !== "CANCELED";
   const showRate = type !== "FIXED_PRICE";
   const rateRequired = type === "T_AND_M";
@@ -314,7 +317,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const canManageProfiles = Boolean(defaults.id) && isEditable;
   const canAddVariations = Boolean(defaults.id) && status === "ACTIVE";
   const canAddMilestones = Boolean(defaults.id) && status === "ACTIVE" && type !== "T_AND_M";
-  const canAddInvoices = Boolean(defaults.id) && status === "ACTIVE";
+  const canAddInvoices = Boolean(defaults.id) && (status === "ACTIVE" || status === "EXPIRED");
   const showMilestones = type !== "T_AND_M";
 
   const invoicePreviewAmount = useMemo(() => {
@@ -349,7 +352,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const remaining = useMemo(() => {
     const value = Number.parseFloat(contractValue) || 0;
     const used = Number.parseFloat(consumed) || 0;
-    return value - totalVariation - used;
+    return value + totalVariation - used;
   }, [contractValue, consumed, totalVariation]);
 
   const ownerDisplayName =
@@ -666,6 +669,30 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
     }
   }
 
+  async function saveActiveEndDate(nextEndDate: string) {
+    if (!defaults.id || status !== "ACTIVE") return;
+    const dateError = validateContractDates(startDate, nextEndDate || null);
+    if (dateError) {
+      setEndDateError(dateError);
+      return;
+    }
+    setEndDateError(null);
+    setSavingEndDate(true);
+    try {
+      const res = await adminFetch(`/api/admin/contracts/${defaults.id}/end-date`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endDate: nextEndDate || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to update end date");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to update end date");
+    } finally {
+      setSavingEndDate(false);
+    }
+  }
+
   async function createProject(variationId?: string) {
     if (!defaults.id) return;
     setCreatingProjectFor(variationId ?? "base");
@@ -729,7 +756,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
         variationDate,
         variationEndDate: variationEndDate || null,
       },
-      endDate || null,
+      startDate || null,
       variations.map((row) => ({
         id: row.id,
         variationDate: row.variationDate,
@@ -1018,9 +1045,11 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
 
     const contractDateError = validateContractDates(startDate, endDate || null);
     if (contractDateError) {
+      setEndDateError(contractDateError);
       alert(contractDateError);
       return;
     }
+    setEndDateError(null);
 
     const payload: Record<string, unknown> = {
       title: title.trim(),
@@ -1051,9 +1080,21 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   return (
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-6">
       {defaults.contractNumber ? (
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Contract number</label>
-          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{defaults.contractNumber}</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Contract number</label>
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{defaults.contractNumber}</p>
+          </div>
+          {status === "ACTIVE" && !baseProject ? (
+            <button
+              type="button"
+              onClick={() => void createProject()}
+              disabled={creatingProjectFor === "base"}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+            >
+              {creatingProjectFor === "base" ? "Creating…" : "Create Project"}
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -1157,10 +1198,21 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
           <input
             type="date"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            readOnly={!isEditable}
-            className={fieldClass(isEditable)}
+            onChange={(e) => {
+              const next = e.target.value;
+              setEndDate(next);
+              if (isEditable) {
+                setEndDateError(validateContractDates(startDate, next || null));
+              }
+            }}
+            onBlur={() => {
+              if (status === "ACTIVE") void saveActiveEndDate(endDate);
+            }}
+            readOnly={!canEditEndDate}
+            className={fieldClass(canEditEndDate)}
           />
+          {endDateError ? <p className="mt-1 text-xs text-red-600">{endDateError}</p> : null}
+          {savingEndDate ? <p className="mt-1 text-xs text-gray-500">Saving end date…</p> : null}
         </div>
       </div>
 
@@ -1400,16 +1452,6 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
           <div className="mb-3 flex items-center justify-between gap-3">
             <h3 className="font-semibold text-gray-900 dark:text-gray-100">Variations</h3>
             <div className="flex items-center gap-2">
-            {status === "ACTIVE" && !baseProject ? (
-              <button
-                type="button"
-                onClick={() => void createProject()}
-                disabled={creatingProjectFor === "base"}
-                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
-              >
-                {creatingProjectFor === "base" ? "Creating…" : "Create Project"}
-              </button>
-            ) : null}
             {canAddVariations ? (
               <button
                 type="button"
@@ -1554,17 +1596,6 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                     ) : null}
                   </div>
                   <div className="flex shrink-0 gap-1">
-                    {status === "ACTIVE" &&
-                    !linkedProjects.some((row) => row.contractVariationId === variation.id) ? (
-                      <button
-                        type="button"
-                        onClick={() => void createProject(variation.id)}
-                        disabled={creatingProjectFor === variation.id}
-                        className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium hover:bg-gray-50 dark:border-gray-600"
-                      >
-                        {creatingProjectFor === variation.id ? "Creating…" : "Create Project"}
-                      </button>
-                    ) : null}
                   {canAddVariations ? (
                     <>
                       <button
@@ -1717,8 +1748,8 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
               </button>
             ) : null}
           </div>
-          {!canAddInvoices && status !== "ACTIVE" ? (
-            <p className="text-sm text-gray-400">Invoices can be added when the contract is active.</p>
+          {!canAddInvoices ? (
+            <p className="text-sm text-gray-400">Invoices can be added when the contract is active or expired.</p>
           ) : null}
           {showInvoiceForm ? (
             <div className="mb-4 space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/40">

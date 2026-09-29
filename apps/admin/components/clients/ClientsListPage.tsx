@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Edit, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
 import { TablePagination } from "@/components/ui/TablePagination";
@@ -227,7 +227,14 @@ export function ClientsListPage({ statusFilter, heading, description }: Props) {
                 const oppCount = row.opportunityCount ?? 0;
                 return (
                   <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{row.name}</td>
+                    <td className="px-4 py-3 font-medium">
+                      <Link
+                        href={`/clients/${row.id}`}
+                        className="text-blue-600 hover:underline dark:text-blue-400"
+                      >
+                        {row.name}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.country}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.contacts?.length ?? 0}</td>
                     <td className="px-4 py-3">
@@ -251,12 +258,6 @@ export function ClientsListPage({ statusFilter, heading, description }: Props) {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center gap-2">
-                        <Link
-                          href={`/clients/${row.id}`}
-                          className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-black dark:hover:bg-gray-800 dark:hover:text-white"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Link>
                         <button
                           type="button"
                           onClick={() => void deleteRow(row.id)}

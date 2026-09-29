@@ -1,5 +1,4 @@
 import { prisma, type Prisma } from "@techbubble/database";
-import { generateProjectMonths } from "./project-types";
 
 type WorkUnitRow = { year: number; month: number; workUnits: number };
 type MilestoneRow = { milestoneDate: Date; amount: Prisma.Decimal | number };
@@ -73,43 +72,6 @@ async function replaceEstimates(
       qty: row.qty,
       currency: row.currency,
       estimatedCost: row.estimatedCost,
-      costType: row.costType,
-    })),
-  });
-}
-
-function buildDefaultActuals(
-  startDate: Date,
-  endDate: Date,
-  contract: { type: string; unit: string | null; currency: string },
-) {
-  const months = generateProjectMonths(startDate, endDate, contract.type, contract.unit);
-  const currency = contract.currency;
-  return months.map((row) => ({
-    year: row.year,
-    month: row.month,
-    qty: row.qty,
-    currency,
-    actualCost: 0,
-    costType: "personnel" as const,
-  }));
-}
-
-async function replaceActuals(
-  tx: Prisma.TransactionClient,
-  projectId: string,
-  rows: ReturnType<typeof buildDefaultActuals>,
-) {
-  await tx.projectActual.deleteMany({ where: { projectId } });
-  if (!rows.length) return;
-  await tx.projectActual.createMany({
-    data: rows.map((row) => ({
-      projectId,
-      year: row.year,
-      month: row.month,
-      qty: row.qty,
-      currency: row.currency,
-      actualCost: row.actualCost,
       costType: row.costType,
     })),
   });
@@ -202,12 +164,6 @@ export async function createProjectFromContract(
     });
 
     await replaceEstimates(tx, created.id, estimates);
-    const actuals = buildDefaultActuals(startDate, endDate, {
-      type: contract.type,
-      unit: contract.unit,
-      currency: contract.currency,
-    });
-    await replaceActuals(tx, created.id, actuals);
 
     await tx.projectActivityLog.create({
       data: {

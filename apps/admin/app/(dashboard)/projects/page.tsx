@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Edit } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
 import { PROJECT_STATUS_LABELS, type ProjectStatus } from "@/lib/project-types";
@@ -25,6 +25,7 @@ function formatDate(value: string) {
 export default function ProjectsPage() {
   const [rows, setRows] = useState<ProjectRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     void adminFetch("/api/admin/projects")
@@ -32,6 +33,21 @@ export default function ProjectsPage() {
       .then((data) => setRows(data.data || []))
       .finally(() => setIsLoading(false));
   }, []);
+
+  async function deleteProject(id: string) {
+    if (!window.confirm("Delete this draft project? This cannot be undone.")) return;
+    setDeletingId(id);
+    try {
+      const res = await adminFetch(`/api/admin/projects/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to delete project");
+      setRows((prev) => prev.filter((row) => row.id !== id));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to delete project");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <ProjectManagementGuard requireManageProjects>
@@ -70,16 +86,32 @@ export default function ProjectsPage() {
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id} className="border-b border-gray-50 dark:border-gray-800">
-                    <td className="px-4 py-3 font-mono text-gray-900 dark:text-gray-100">{row.projectNumber}</td>
-                    <td className="px-4 py-3">{row.title}</td>
+                    <td className="px-4 py-3 font-mono">
+                      <Link href={`/projects/${row.id}`} className="text-blue-600 hover:underline dark:text-blue-400">
+                        {row.projectNumber}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Link href={`/projects/${row.id}`} className="font-medium text-blue-600 hover:underline dark:text-blue-400">
+                        {row.title}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3 text-gray-500">{row.clientName}</td>
                     <td className="px-4 py-3">{PROJECT_STATUS_LABELS[row.status]}</td>
                     <td className="px-4 py-3 text-gray-500">{row.projectManagerName}</td>
                     <td className="px-4 py-3 text-gray-500">{formatDate(row.startDate)} – {formatDate(row.endDate)}</td>
                     <td className="px-4 py-3 text-right">
-                      <Link href={`/projects/${row.id}`} className="inline-flex rounded-lg border border-gray-200 p-2 hover:bg-gray-50 dark:border-gray-600">
-                        <Edit className="h-4 w-4" />
-                      </Link>
+                      {row.status === "DRAFT" ? (
+                        <button
+                          type="button"
+                          onClick={() => void deleteProject(row.id)}
+                          disabled={deletingId === row.id}
+                          className="inline-flex rounded-lg border border-gray-200 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-red-950/30"
+                          aria-label="Delete project"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      ) : null}
                     </td>
                   </tr>
                 ))}

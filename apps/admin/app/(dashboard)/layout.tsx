@@ -71,6 +71,17 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    id: "project_management",
+    label: "Project Management",
+    icon: FolderKanban,
+    roles: ["admin", "project_manager", "project_member"],
+    items: [
+      { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin", "project_manager"] },
+      { href: "/timesheets", label: "Timesheets", icon: ClipboardCheck, roles: ["admin", "project_manager", "project_member"] },
+      { href: "/agreement", label: "Agreement", icon: FileText, roles: ["project_member"] },
+    ],
+  },
+  {
     id: "recruitment",
     label: "Recruitment",
     icon: Target,
@@ -80,17 +91,6 @@ const navGroups: NavGroup[] = [
       { href: "/jobs/active", label: "Job Listings", icon: Briefcase, roles: ["admin", "recruiter_admin", "recruiter", "website"] },
       { href: "/career-applications/active", label: "Career Applications", icon: ClipboardList, roles: ["admin", "recruiter_admin", "recruiter"] },
       { href: "/database/profiles", label: "Profiles", icon: UserCircle, roles: ["admin", "recruiter_admin", "recruiter"] },
-    ],
-  },
-  {
-    id: "project_management",
-    label: "Project Management",
-    icon: FolderKanban,
-    roles: ["admin", "project_manager", "project_member"],
-    items: [
-      { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin", "project_manager"] },
-      { href: "/timesheets", label: "Timesheets", icon: ClipboardCheck, roles: ["admin", "project_manager", "project_member"] },
-      { href: "/agreement", label: "Agreement", icon: FileText, roles: ["project_member"] },
     ],
   },
   {

@@ -9,6 +9,9 @@ export const CONTRACT_ACTIVITY_ACTIONS = [
   "TERMINATED",
   "MOVE_TO_DRAFT",
   "AUTO_EXPIRED",
+  "VARIATION_ADDED",
+  "VARIATION_UPDATED",
+  "VARIATION_DELETED",
 ] as const;
 
 export type ContractActivityAction = (typeof CONTRACT_ACTIVITY_ACTIONS)[number];
@@ -175,6 +178,25 @@ export async function logContractFieldChanges(
       },
     });
   }
+}
+
+export async function logContractVariationChange(
+  tx: Prisma.TransactionClient,
+  contractId: string,
+  action: "VARIATION_ADDED" | "VARIATION_UPDATED" | "VARIATION_DELETED",
+  summary: string,
+  performedById: string | null | undefined,
+): Promise<void> {
+  await tx.contractActivityLog.create({
+    data: {
+      contractId,
+      action,
+      fieldName: "variation",
+      oldValue: null,
+      newValue: summary,
+      performedById: performedById ?? null,
+    },
+  });
 }
 
 export async function logContractStatusChange(

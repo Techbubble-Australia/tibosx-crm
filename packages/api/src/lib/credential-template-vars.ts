@@ -9,7 +9,6 @@ export type CredentialTemplateVariable = {
   required: boolean;
 };
 
-const SIMPLE_KEY_PATTERN = /^[A-Za-z][A-Za-z0-9_]*$/;
 const BRACED_PLACEHOLDER = /\{([^{}]{1,500})\}/g;
 const MALFORMED_OPEN_BRACE = /\{([^{}]{1,500})\]/g;
 const MALFORMED_OPEN_BRACKET = /\[([^{\[\]]{1,500})\}/g;
@@ -58,7 +57,6 @@ export function cleanPlaceholdersInHtml(html: string): string {
 export function labelToVariableKey(label: string): string {
   const trimmed = label.trim();
   if (!trimmed) return "field";
-  if (SIMPLE_KEY_PATTERN.test(trimmed)) return trimmed;
   const slug = trimmed
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
@@ -130,25 +128,27 @@ export function extractVariableKeysFromHtml(html: string): string[] {
 
 export function extractVariablesFromHtml(html: string): CredentialTemplateVariable[] {
   const labels = collectPlaceholderLabelsFromHtml(cleanPlaceholdersInHtml(html));
-  const usedKeys = new Set<string>();
+  const byKey = new Map<string, CredentialTemplateVariable>();
 
-  return labels.map((label) => {
-    let key = labelToVariableKey(label);
-    const base = key;
-    let suffix = 2;
-    while (usedKeys.has(key.toLowerCase())) {
-      key = `${base}_${suffix}`;
-      suffix += 1;
+  for (const label of labels) {
+    const key = labelToVariableKey(label);
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, {
+        key,
+        label,
+        type: "text",
+        options: [],
+        required: true,
+      });
+      continue;
     }
-    usedKeys.add(key.toLowerCase());
-    return {
-      key,
-      label,
-      type: "text",
-      options: [],
-      required: true,
-    };
-  });
+    if (label.length > existing.label.length) {
+      existing.label = label;
+    }
+  }
+
+  return [...byKey.values()];
 }
 
 export function mergeVariablesFromHtml(
@@ -194,6 +194,10 @@ export function normalizeTemplatePlaceholders(
     }
   }
 
+  for (const variable of variables) {
+    next = next.replace(new RegExp(`\\{${escapeRegExp(variable.key)}\\}`, "gi"), `{${variable.key}}`);
+  }
+
   return next;
 }
 
@@ -207,14 +211,40 @@ export function defaultCredentialValuesForProfile(profile: {
   email: string;
   phone: string;
   currency: string;
+  city?: string | null;
+  country?: string | null;
+  expectedRate?: number | null;
+  mode?: string | null;
 }): Record<string, string> {
+  const fullName = `${profile.firstName} ${profile.lastName}`.trim();
+  const location = [profile.city, profile.country].filter(Boolean).join(", ");
+  const rate = profile.expectedRate != null ? String(profile.expectedRate) : "";
+  const today = new Date().toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
   return {
-    Name: `${profile.firstName} ${profile.lastName}`.trim(),
+    name: fullName,
+    email: profile.email,
+    phone: profile.phone,
+    currency: profile.currency,
+    address: location,
+    rate,
+    personnel_name: fullName,
+    nominated_personnel_full_name: fullName,
+    personnel_address: location,
+    nominated_personnel_address: location,
+    date: today,
+    frequency: profile.mode ?? "",
+    // Legacy keys for older templates
+    Name: fullName,
     Email: profile.email,
     Phone: profile.phone,
     Currency: profile.currency,
-    Address: "",
-    Frequency: "",
-    Rate: "",
+    Address: location,
+    Rate: rate,
+    Frequency: profile.mode ?? "",
   };
 }

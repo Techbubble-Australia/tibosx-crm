@@ -8,13 +8,50 @@ function toNumber(value: { toString(): string } | number): number {
   return typeof value === "number" ? value : Number(value.toString());
 }
 
+function startOfUtcDay(date = new Date()): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+function endOfUtcMonth(date = new Date()): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+}
+
+const SORT_FIELDS = ["dueDate", "issueDate", "invoiceNumber", "clientName", "totalAmount", "status"] as const;
+type SortField = (typeof SORT_FIELDS)[number];
+
 router.get("/", async (req, res) => {
   try {
     const status = typeof req.query.status === "string" ? req.query.status.trim() : "";
+    const clientId = typeof req.query.clientId === "string" ? req.query.clientId.trim() : "";
+    const dueFilter = typeof req.query.due === "string" ? req.query.due.trim() : "";
+    const sortByRaw = typeof req.query.sortBy === "string" ? req.query.sortBy.trim() : "dueDate";
+    const sortDir = req.query.sortDir === "asc" ? "asc" : "desc";
+    const sortBy: SortField = (SORT_FIELDS as readonly string[]).includes(sortByRaw)
+      ? (sortByRaw as SortField)
+      : "dueDate";
+
     const where: Prisma.ContractInvoiceWhereInput = {};
     if (status && (CONTRACT_INVOICE_STATUSES as readonly string[]).includes(status)) {
       where.status = status;
     }
+    if (clientId) {
+      where.contract = { clientId };
+    }
+
+    const today = startOfUtcDay();
+    if (dueFilter === "overdue") {
+      where.dueDate = { lt: today };
+      where.status = "AWAITING_PAYMENT";
+    } else if (dueFilter === "due_this_month") {
+      where.dueDate = { gte: today, lte: endOfUtcMonth(today) };
+    }
+
+    const orderBy: Prisma.ContractInvoiceOrderByWithRelationInput[] =
+      sortBy === "clientName"
+        ? [{ contract: { client: { name: sortDir } } }]
+        : sortBy === "invoiceNumber" || sortBy === "totalAmount" || sortBy === "status"
+          ? [{ [sortBy]: sortDir }]
+          : [{ [sortBy]: sortDir }];
 
     const rows = await prisma.contractInvoice.findMany({
       where,
@@ -29,7 +66,7 @@ router.get("/", async (req, res) => {
           },
         },
       },
-      orderBy: [{ dueDate: "desc" }],
+      orderBy,
     });
 
     res.json({

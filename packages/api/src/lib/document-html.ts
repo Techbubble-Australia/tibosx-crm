@@ -27,8 +27,14 @@ export async function convertDocxBufferToHtml(buffer: Buffer): Promise<string> {
   return enhanceImportedHtml(result.value.trim());
 }
 
+function fixCommonTemplateTypos(html: string): string {
+  return html.replace(/\bPostion\b/gi, "Position");
+}
+
 function enhanceImportedHtml(html: string): string {
-  let next = cleanPlaceholdersInHtml(html)
+  let next = fixCommonTemplateTypos(html);
+  next = cleanPlaceholdersInHtml(next);
+  next = next
     .replace(/<table(?![^>]*class=)/g, '<table class="docx-table"')
     .replace(/<table class="docx-table"(?![^>]*class=)/g, '<table class="docx-table"')
     .replace(/<td(?![^>]*valign=)/g, '<td valign="top"')
@@ -38,6 +44,7 @@ function enhanceImportedHtml(html: string): string {
     .replace(/<th([^>]*)><p>/g, "<th$1>")
     .replace(/<\/p><\/th>/g, "</th>");
 
+  next = fixCommonTemplateTypos(next);
   next = reconstructSectionTables(next);
   return next;
 }

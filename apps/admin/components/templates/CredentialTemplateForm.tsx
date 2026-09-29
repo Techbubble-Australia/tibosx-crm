@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { SIGNATURE_BLOCK_HTML, wrapTemplatePreviewHtml } from "@/lib/credential-template";
@@ -38,8 +38,23 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
   const [importedFileName, setImportedFileName] = useState("");
   const [showSource, setShowSource] = useState(false);
   const [dragOverPreview, setDragOverPreview] = useState(false);
+  const [showSignatureReminder, setShowSignatureReminder] = useState(false);
 
   const previewHtml = useMemo(() => wrapTemplatePreviewHtml(html), [html]);
+  const hasSignatureBlock = html.includes('data-signature-block="contractor"');
+  const looksLikeAgreementTemplate =
+    /contractor services agreement|deed poll|assignment schedule/i.test(`${name} ${html}`);
+
+  function updateSignatureReminder(nextHtml: string, nextName = name) {
+    const missingSignature =
+      !nextHtml.includes('data-signature-block="contractor"') &&
+      /contractor services agreement|deed poll|assignment schedule/i.test(`${nextName} ${nextHtml}`);
+    setShowSignatureReminder(missingSignature);
+  }
+
+  useEffect(() => {
+    updateSignatureReminder(html, name);
+  }, [html, name]);
 
   function insertSignatureBlock() {
     if (html.includes('data-signature-block="contractor"')) {
@@ -47,6 +62,7 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
       return;
     }
     const nextHtml = `${html.trim()}\n${SIGNATURE_BLOCK_HTML}`;
+    setShowSignatureReminder(false);
     void applyParsedHtml(nextHtml);
   }
 
@@ -110,6 +126,7 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
 
   async function applyParsedHtml(nextHtml: string) {
     setHtml(nextHtml);
+    updateSignatureReminder(nextHtml);
     const res = await adminFetch("/api/admin/credential-templates/parse-variables", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -153,6 +170,7 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
           setHtml(imported.html);
           setVariables(imported.variables);
           setImportedFileName(file.name);
+          updateSignatureReminder(imported.html);
           return;
         }
       } else {
@@ -232,6 +250,19 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
                 </button>
               </div>
             </div>
+            {showSignatureReminder && !hasSignatureBlock && looksLikeAgreementTemplate ? (
+              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+                This looks like a contractor agreement. Add a{" "}
+                <button
+                  type="button"
+                  onClick={insertSignatureBlock}
+                  className="font-medium underline hover:no-underline"
+                >
+                  signature block
+                </button>{" "}
+                so contractors can sign in the agreement portal.
+              </div>
+            ) : null}
             <div className="mb-3 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/40">
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Template blocks</p>
               <button
@@ -291,7 +322,7 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
               />
             ) : null}
             <p className="mt-1 text-xs text-gray-500">
-              Use placeholders like {"{Name}"}, {"{Email}"} in the HTML. Import from Word (.docx) or edit HTML source directly.
+              Use placeholders like {"{personnel_name}"} or {"{start_date}"} in the HTML. Import from Word (.docx) or edit HTML source directly.
             </p>
           </div>
         </div>

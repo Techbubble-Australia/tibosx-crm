@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { adminFetch } from "@/lib/admin-api";
 
@@ -19,18 +19,61 @@ type MatchRow = {
 
 type Props = {
   jobId: string;
+  metaTags?: string[];
 };
 
-export function JobAiInsightsPanel({ jobId }: Props) {
+export function JobAiInsightsPanel({ jobId, metaTags = [] }: Props) {
   const [rows, setRows] = useState<MatchRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [appliedProfileIds, setAppliedProfileIds] = useState<Set<string>>(new Set());
+  const [addingProfileId, setAddingProfileId] = useState<string | null>(null);
+
+  const metaTagsKey = useMemo(() => metaTags.join(","), [metaTags]);
+
+  const loadApplications = useCallback(async () => {
+    const res = await adminFetch(`/api/admin/jobs/admin/${jobId}/applications`);
+    const data = await res.json();
+    const profileIds = new Set<string>();
+    for (const row of (data.data ?? []) as Array<{ profileId?: string | null }>) {
+      if (row.profileId) profileIds.add(row.profileId);
+    }
+    setAppliedProfileIds(profileIds);
+  }, [jobId]);
 
   useEffect(() => {
-    void adminFetch(`/api/admin/jobs/admin/${jobId}/matching-profiles`)
-      .then((res) => res.json())
-      .then((data) => setRows((data.data as MatchRow[]) ?? []))
-      .finally(() => setLoading(false));
-  }, [jobId]);
+    void loadApplications();
+  }, [loadApplications]);
+
+  useEffect(() => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (metaTags.length) params.set("metaTags", metaTags.join(","));
+    const timer = window.setTimeout(() => {
+      void adminFetch(`/api/admin/jobs/admin/${jobId}/matching-profiles?${params.toString()}`)
+        .then((res) => res.json())
+        .then((data) => setRows((data.data as MatchRow[]) ?? []))
+        .finally(() => setLoading(false));
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [jobId, metaTagsKey]);
+
+  async function addProfile(profileId: string) {
+    setAddingProfileId(profileId);
+    try {
+      const res = await adminFetch(`/api/admin/jobs/admin/${jobId}/applications/from-profile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to add profile");
+      setAppliedProfileIds((prev) => new Set(prev).add(profileId));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to add profile");
+    } finally {
+      setAddingProfileId(null);
+    }
+  }
 
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
@@ -51,34 +94,48 @@ export function JobAiInsightsPanel({ jobId }: Props) {
                 <th className="py-2 pr-3">Country</th>
                 <th className="py-2 pr-3">Category / Tech</th>
                 <th className="py-2 pr-3">Matched tags</th>
-                <th className="py-2">Score</th>
+                <th className="py-2 pr-3">Score</th>
+                <th className="py-2">Add</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={row.profileId} className="border-b border-gray-50 dark:border-gray-800">
-                  <td className="py-2 pr-3">
-                    <Link
-                      href={`/database/profiles/${row.profileId}`}
-                      className="font-medium text-blue-600 hover:underline dark:text-blue-400"
-                    >
-                      {row.firstName} {row.lastName}
-                    </Link>
-                    <p className="text-xs text-gray-500">{row.email}</p>
-                  </td>
-                  <td className="py-2 pr-3 text-gray-600 dark:text-gray-400">
-                    {row.country}
-                    {row.countryMatch ? " ✓" : ""}
-                  </td>
-                  <td className="py-2 pr-3 text-gray-600 dark:text-gray-400">
-                    {row.category} · {row.technology}
-                  </td>
-                  <td className="py-2 pr-3 text-gray-600 dark:text-gray-400">
-                    {row.matchedTags.length ? row.matchedTags.join(", ") : "—"}
-                  </td>
-                  <td className="py-2">{row.matchCount}</td>
-                </tr>
-              ))}
+              {rows.map((row) => {
+                const alreadyApplied = appliedProfileIds.has(row.profileId);
+                return (
+                  <tr key={row.profileId} className="border-b border-gray-50 dark:border-gray-800">
+                    <td className="py-2 pr-3">
+                      <Link
+                        href={`/database/profiles/${row.profileId}`}
+                        className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                      >
+                        {row.firstName} {row.lastName}
+                      </Link>
+                      <p className="text-xs text-gray-500">{row.email}</p>
+                    </td>
+                    <td className="py-2 pr-3 text-gray-600 dark:text-gray-400">
+                      {row.country}
+                      {row.countryMatch ? " ✓" : ""}
+                    </td>
+                    <td className="py-2 pr-3 text-gray-600 dark:text-gray-400">
+                      {row.category} · {row.technology}
+                    </td>
+                    <td className="py-2 pr-3 text-gray-600 dark:text-gray-400">
+                      {row.matchedTags.length ? row.matchedTags.join(", ") : "—"}
+                    </td>
+                    <td className="py-2 pr-3">{row.matchCount}</td>
+                    <td className="py-2">
+                      <button
+                        type="button"
+                        onClick={() => void addProfile(row.profileId)}
+                        disabled={alreadyApplied || addingProfileId === row.profileId}
+                        className="rounded-lg border border-gray-200 px-3 py-1 text-xs font-medium hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                      >
+                        {alreadyApplied ? "Added" : addingProfileId === row.profileId ? "Adding…" : "Add"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

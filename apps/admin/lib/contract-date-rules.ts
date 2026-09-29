@@ -24,7 +24,7 @@ export function validateContractDates(startDate: string, endDate: string | null 
 
 export function validateVariationDates(
   variation: VariationDateInput,
-  contractEndDate: string | null | undefined,
+  contractStartDate: string | null | undefined,
   existingVariations: VariationDateInput[] = [],
 ): string | null {
   const start = toDate(variation.variationDate);
@@ -32,7 +32,11 @@ export function validateVariationDates(
   if (!start) return "Variation start date is required";
   if (end && end <= start) return "Variation end date must be after start date";
 
-  const contractEnd = toDate(contractEndDate);
+  const contractStart = toDate(contractStartDate);
+  if (contractStart && start < startOfDay(contractStart)) {
+    return "Variation start date cannot be earlier than the contract start date";
+  }
+
   const others = existingVariations
     .filter((row) => row.id !== variation.id)
     .map((row) => ({
@@ -42,12 +46,7 @@ export function validateVariationDates(
     .filter((row) => row.start)
     .sort((a, b) => startOfDay(a.start!).getTime() - startOfDay(b.start!).getTime());
 
-  if (others.length === 0) {
-    if (contractEnd && start <= contractEnd) {
-      return "Variation start date must be after the contract end date";
-    }
-    return null;
-  }
+  if (others.length === 0) return null;
 
   const previous = others[others.length - 1];
   if (!previous) return null;

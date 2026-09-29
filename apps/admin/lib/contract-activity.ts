@@ -25,6 +25,9 @@ export const CONTRACT_ACTIVITY_ACTION_LABELS: Record<string, string> = {
   TERMINATED: "Contract terminated",
   MOVE_TO_DRAFT: "Moved to Draft",
   AUTO_EXPIRED: "Auto-expired",
+  VARIATION_ADDED: "Variation added",
+  VARIATION_UPDATED: "Variation updated",
+  VARIATION_DELETED: "Variation deleted",
 };
 
 export type ContractActivityLogEntry = {
@@ -50,6 +53,13 @@ export function formatActivitySummary(log: ContractActivityLogEntry): string {
   }
   if (log.action === "FIELD_UPDATED" && log.fieldLabel) {
     return `${log.fieldLabel} changed from ${log.oldValue ?? "—"} to ${log.newValue ?? "—"}`;
+  }
+  if (
+    log.action === "VARIATION_ADDED" ||
+    log.action === "VARIATION_UPDATED" ||
+    log.action === "VARIATION_DELETED"
+  ) {
+    return log.newValue ?? CONTRACT_ACTIVITY_ACTION_LABELS[log.action] ?? log.action;
   }
   return CONTRACT_ACTIVITY_ACTION_LABELS[log.action] ?? log.action;
 }

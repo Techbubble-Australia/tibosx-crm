@@ -12,6 +12,8 @@ import { JOB_LISTING_TYPES } from "../lib/careers-form";
 import { DEFAULT_PROFILE_LEVEL } from "../lib/profile-levels";
 import { getJobLevelNames } from "../lib/job-levels";
 import { matchProfilesToJob } from "../lib/job-profile-matching";
+import type { AuthRequest } from "../middleware/auth";
+import { createCareerApplicationForProfile } from "../lib/profile-to-application";
 
 const router: IRouter = Router();
 
@@ -492,7 +494,13 @@ router.get("/admin/:id/matching-profiles", async (req, res) => {
   try {
     const job = await prisma.jobListing.findUnique({ where: { id: req.params.id } });
     if (!job) return res.status(404).json({ error: "Job not found" });
-    const metaTags = Array.isArray(job.metaTags) ? job.metaTags.filter((tag): tag is string => typeof tag === "string") : [];
+    const queryMetaTags =
+      typeof req.query.metaTags === "string" ? req.query.metaTags.trim() : "";
+    const metaTags = queryMetaTags
+      ? queryMetaTags.split(",").map((tag) => tag.trim()).filter(Boolean)
+      : Array.isArray(job.metaTags)
+        ? job.metaTags.filter((tag): tag is string => typeof tag === "string")
+        : [];
     const profiles = await prisma.candidateProfile.findMany({
       select: {
         id: true,
@@ -518,6 +526,44 @@ router.get("/admin/:id/matching-profiles", async (req, res) => {
   }
 });
 
+router.post("/admin/:id/applications/from-profile", async (req: AuthRequest, res) => {
+  try {
+    const { profileId } = z.object({ profileId: z.string().min(1) }).parse(req.body);
+    const job = await prisma.jobListing.findUnique({ where: { id: req.params.id } });
+    if (!job) return res.status(404).json({ error: "Job not found" });
+
+    const profile = await prisma.candidateProfile.findUnique({ where: { id: profileId } });
+    if (!profile) return res.status(404).json({ error: "Profile not found" });
+
+    const applicationId = await createCareerApplicationForProfile(profileId, job.id, {
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      email: profile.email,
+      phone: profile.phone,
+      country: profile.country,
+      city: profile.city,
+      expectedRate: profile.expectedRate,
+      currency: profile.currency,
+      mode: profile.mode,
+      documentUrls: profile.documentUrls,
+      isCitizen: profile.isCitizen,
+      visaStatus: profile.visaStatus,
+      relevantExperience: profile.relevantExperience,
+    });
+
+    res.status(201).json({ data: { id: applicationId } });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    if (error instanceof Error && error.message.includes("already linked")) {
+      return res.status(409).json({ error: error.message });
+    }
+    console.error("Error creating application from profile:", error);
+    res.status(500).json({ error: "Failed to create application" });
+  }
+});
+
 router.get("/admin/:id/applications", async (req, res) => {
   try {
     const job = await prisma.jobListing.findUnique({ where: { id: req.params.id } });
@@ -529,8 +575,24 @@ router.get("/admin/:id/applications", async (req, res) => {
         OR: [{ jobListingId: job.id }, { jobListingId: null, position: job.title }],
       },
       orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        country: true,
+        city: true,
+        createdAt: true,
+        profileId: true,
+      },
     });
-    res.json({ data: applications });
+    res.json({
+      data: applications.map((row) => ({
+        ...row,
+        createdAt: row.createdAt.toISOString(),
+      })),
+    });
   } catch (error) {
     console.error("Error fetching job applications:", error);
     res.status(500).json({ error: "Failed to fetch applications" });

@@ -7,6 +7,7 @@ import { ArrowLeft, Copy, Loader2 } from "lucide-react";
 import { JobForm, type JobFormDefaults } from "@/components/jobs/JobForm";
 import { JobApplicationsPanel } from "@/components/jobs/JobApplicationsPanel";
 import { JobAiInsightsPanel } from "@/components/jobs/JobAiInsightsPanel";
+import { JobMetaTagsSection } from "@/components/jobs/JobMetaTagsSection";
 import { adminFetch } from "@/lib/admin-api";
 import { jobListHref, jobListingsTabFromPath } from "@/lib/job-routes";
 
@@ -21,6 +22,7 @@ function EditJobPageInner() {
   const [isCopying, setIsCopying] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [job, setJob] = useState<(JobFormDefaults & { opportunityId?: string | null; opportunityName?: string }) | null>(null);
+  const [metaTags, setMetaTags] = useState<string[]>([]);
 
   const listHref = useMemo(() => {
     const tabParam = searchParams.get("tab");
@@ -40,6 +42,7 @@ function EditJobPageInner() {
         const data = await res.json();
         const found = (data.data || []).find((j: { id: string }) => j.id === id);
         setJob(found || null);
+        if (found?.metaTags) setMetaTags(found.metaTags);
       } catch (error) {
         console.error("Error loading job:", error);
       } finally {
@@ -138,6 +141,9 @@ function EditJobPageInner() {
         key={`${id}-${job.updatedAt ?? ""}-${job.level ?? ""}`}
         mode="edit"
         defaults={job}
+        metaTags={metaTags}
+        onMetaTagsChange={setMetaTags}
+        hideMetaTags
         onSubmit={onSubmit}
         isLoading={isLoading}
         cancelHref={listHref}
@@ -145,7 +151,8 @@ function EditJobPageInner() {
       />
 
       <div className="mt-8 space-y-8">
-        <JobAiInsightsPanel jobId={id} />
+        <JobMetaTagsSection metaTags={metaTags} onChange={setMetaTags} />
+        <JobAiInsightsPanel jobId={id} metaTags={metaTags} />
         <JobApplicationsPanel jobId={id} jobTitle={job.title ?? ""} jobCountry={job.country ?? ""} />
       </div>
     </div>

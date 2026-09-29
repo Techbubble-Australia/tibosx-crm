@@ -331,18 +331,6 @@ function buildDefaultEstimates(
   }));
 }
 
-function buildDefaultActuals(
-  startDate: Date,
-  endDate: Date,
-  contract: { type: string; unit: string | null; currency: string } | null,
-  costType: ProjectCostType = "personnel",
-) {
-  return buildDefaultFinancialRows(startDate, endDate, contract, costType).map((row) => ({
-    ...row,
-    actualCost: 0,
-  }));
-}
-
 function mapDetail(row: NonNullable<Awaited<ReturnType<typeof fetchProject>>>) {
   return serializeProject({
     ...row,
@@ -526,10 +514,7 @@ router.post("/", async (req: AuthRequest, res) => {
       data.estimates?.length
         ? data.estimates
         : buildDefaultEstimates(data.startDate, data.endDate, contract);
-    const actuals =
-      data.actuals?.length
-        ? data.actuals
-        : buildDefaultActuals(data.startDate, data.endDate, contract);
+    const actuals = data.actuals ?? [];
 
     const row = await prisma.$transaction(async (tx) => {
       const created = await tx.project.create({
@@ -607,10 +592,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
         data.estimates?.length
           ? data.estimates
           : buildDefaultEstimates(data.startDate, data.endDate, contract);
-      const actuals =
-        data.actuals?.length
-          ? data.actuals
-          : buildDefaultActuals(data.startDate, data.endDate, contract);
+      const actuals = data.actuals ?? [];
       await replaceEstimates(tx, projectId, estimates);
       await replaceActuals(tx, projectId, actuals);
       await tx.projectActivityLog.create({
@@ -631,6 +613,30 @@ router.put("/:id", async (req: AuthRequest, res) => {
     }
     console.error("Error updating project:", error);
     res.status(500).json({ error: "Failed to update project" });
+  }
+});
+
+router.delete("/:id", async (req: AuthRequest, res) => {
+  try {
+    const projectId = req.params.id;
+    if (!projectId) return res.status(400).json({ error: "Invalid id" });
+    if (!canManageProjects(req.user?.role ?? "")) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const existing = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!existing) return res.status(404).json({ error: "Not found" });
+    if (existing.status !== "DRAFT") {
+      return res.status(400).json({ error: "Only draft projects can be deleted" });
+    }
+    const timesheetCount = await prisma.timesheet.count({ where: { projectId } });
+    if (timesheetCount > 0) {
+      return res.status(400).json({ error: "Cannot delete a project that has timesheets" });
+    }
+    await prisma.project.delete({ where: { id: projectId } });
+    res.json({ message: "Deleted" });
+  } catch (error) {
+    console.error("Error deleting project:", error);
+    res.status(500).json({ error: "Failed to delete project" });
   }
 });
 
@@ -675,8 +681,12 @@ router.post("/:id/members/:memberId/generate-credentials", async (req: AuthReque
 
     const defaults = defaultCredentialValuesForProfile(member.profile);
     const mergedValues = { ...defaults, ...input.values };
-    const email = mergedValues.Email?.trim() || member.profile.email;
-    const name = mergedValues.Name?.trim() || `${member.profile.firstName} ${member.profile.lastName}`.trim();
+    const email =
+      mergedValues.email?.trim() || mergedValues.Email?.trim() || member.profile.email;
+    const name =
+      mergedValues.name?.trim() ||
+      mergedValues.Name?.trim() ||
+      `${member.profile.firstName} ${member.profile.lastName}`.trim();
 
     const existingUser = await prisma.adminUser.findUnique({ where: { email } });
     if (existingUser && existingUser.id !== member.adminUserId) {
