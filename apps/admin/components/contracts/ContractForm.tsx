@@ -1434,6 +1434,33 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
           ) : null}
           {showVariationForm ? (
             <div className="mb-4 space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/40">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Start date *</label>
+                  <input
+                    type="date"
+                    value={variationDate}
+                    onChange={(e) => setVariationDate(e.target.value)}
+                    required
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                    End date{type === "T_AND_M" ? " *" : ""}
+                  </label>
+                  <input
+                    type="date"
+                    value={variationEndDate}
+                    onChange={(e) => setVariationEndDate(e.target.value)}
+                    required={type === "T_AND_M"}
+                    className={inputClass}
+                  />
+                  {type === "T_AND_M" ? (
+                    <p className="mt-1 text-xs text-gray-500">Set start and end dates to generate monthly work units.</p>
+                  ) : null}
+                </div>
+              </div>
               {type === "T_AND_M" ? (
                 <>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -1489,30 +1516,6 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                   />
                 </div>
               )}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Start date *</label>
-                  <input
-                    type="date"
-                    value={variationDate}
-                    onChange={(e) => setVariationDate(e.target.value)}
-                    required
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                    End date{type === "T_AND_M" ? " *" : ""}
-                  </label>
-                  <input
-                    type="date"
-                    value={variationEndDate}
-                    onChange={(e) => setVariationEndDate(e.target.value)}
-                    required={type === "T_AND_M"}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
               <textarea
                 value={variationComments}
                 onChange={(e) => setVariationComments(e.target.value)}

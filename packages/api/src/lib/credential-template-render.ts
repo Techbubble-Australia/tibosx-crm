@@ -10,9 +10,10 @@ export const SIGNATURE_BLOCK_HTML = `<div ${SIGNATURE_BLOCK_MARKER}="contractor"
 
 const TEMPLATE_PREVIEW_STYLES = `
 body { font-family: Georgia, "Times New Roman", serif; font-size: 12pt; line-height: 1.5; color: #111; margin: 0; padding: 24px; }
-table { width: 100%; border-collapse: collapse; margin: 16px 0; table-layout: fixed; }
+table, table.docx-table { width: 100%; border-collapse: collapse; margin: 16px 0; table-layout: fixed; border: 1px solid #374151; }
 td, th { border: 1px solid #374151; padding: 8px 10px; vertical-align: top; word-wrap: break-word; }
 th { background: #f3f4f6; font-weight: 600; }
+table td p, table th p { margin: 0; }
 h1, h2, h3 { margin-top: 1.25em; margin-bottom: 0.5em; }
 ul, ol { margin: 0.5em 0 0.5em 1.25em; }
 .signature-block { border: 2px dashed #6b7280; padding: 16px; margin: 24px 0; background: #fafafa; }
@@ -45,11 +46,15 @@ export function renderTemplateHtml(
     const patterns = [variable.key, variable.label].filter(Boolean);
     for (const pattern of patterns) {
       rendered = rendered.replace(new RegExp(`\\{${escapeRegExp(pattern)}\\}`, "gi"), value);
+      rendered = rendered.replace(new RegExp(`\\{${escapeRegExp(pattern)}\\]`, "gi"), value);
+      rendered = rendered.replace(new RegExp(`\\[${escapeRegExp(pattern)}\\}`, "gi"), value);
     }
   }
 
   for (const [key, value] of Object.entries(values)) {
     rendered = rendered.replace(new RegExp(`\\{${escapeRegExp(key)}\\}`, "gi"), value);
+    rendered = rendered.replace(new RegExp(`\\{${escapeRegExp(key)}\\]`, "gi"), value);
+    rendered = rendered.replace(new RegExp(`\\[${escapeRegExp(key)}\\}`, "gi"), value);
   }
 
   if (signatureDataUrl) {

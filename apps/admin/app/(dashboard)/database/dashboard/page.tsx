@@ -8,6 +8,7 @@ type DashboardStats = {
   totalProfiles: number;
   activeApplications: number;
   interviewScheduled: number;
+  awaitingFeedback: number;
   activeRoles: number;
   countries: string[];
   clients: Array<{ id: string; name: string }>;
@@ -110,6 +111,11 @@ const STAT_CARDS = [
     label: "Interview Scheduled",
     href: "/career-applications/active?status=INTERVIEW_SCHEDULED",
   },
+  {
+    key: "awaitingFeedback",
+    label: "Awaiting feedback",
+    href: "/career-applications/active?status=AWAITING_FEEDBACK",
+  },
   { key: "totalProfiles", label: "Total profiles", href: "/database/profiles" },
 ] as const;
 
@@ -143,6 +149,7 @@ export default function DatabaseDashboardPage() {
           activeRoles: raw.activeRoles ?? raw.openRoles ?? 0,
           activeApplications: raw.activeApplications ?? raw.applications30d ?? 0,
           interviewScheduled: raw.interviewScheduled ?? 0,
+          awaitingFeedback: raw.awaitingFeedback ?? 0,
           countries: raw.countries ?? [],
           clients: raw.clients ?? [],
           profilesByTechnology: raw.profilesByTechnology ?? [],
@@ -181,7 +188,7 @@ export default function DatabaseDashboardPage() {
         Overview of profiles, applications, and hiring pipeline metrics.
       </p>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {STAT_CARDS.map((card) => (
           <Link
             key={card.key}

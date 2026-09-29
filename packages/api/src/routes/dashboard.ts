@@ -12,7 +12,7 @@ router.get("/stats", async (req, res) => {
     const countryFilter = typeof req.query.country === "string" ? req.query.country.trim() : "";
     const clientFilter = typeof req.query.clientId === "string" ? req.query.clientId.trim() : "";
 
-    const [profiles, activeApplications, interviewScheduled, activeRoles, activeJobs, clientsWithActiveJobs] =
+    const [profiles, activeApplications, interviewScheduled, awaitingFeedback, activeRoles, activeJobs, clientsWithActiveJobs] =
       await Promise.all([
         prisma.candidateProfile.findMany({
           select: { technology: true, country: true },
@@ -21,6 +21,11 @@ router.get("/stats", async (req, res) => {
         prisma.careerApplication.count({
           where: {
             AND: [{ status: "INTERVIEW_SCHEDULED" }, activeApplicationWhere],
+          },
+        }),
+        prisma.careerApplication.count({
+          where: {
+            AND: [{ status: "AWAITING_FEEDBACK" }, activeApplicationWhere],
           },
         }),
         prisma.jobListing.count({ where: { published: true } }),
@@ -79,6 +84,7 @@ router.get("/stats", async (req, res) => {
         totalProfiles: profiles.length,
         activeApplications,
         interviewScheduled,
+        awaitingFeedback,
         activeRoles,
         countries,
         clients: clientsWithActiveJobs,

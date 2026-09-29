@@ -134,9 +134,9 @@ function ProfilesPageInner() {
   const [technologies, setTechnologies] = useState<Array<{ id: string; name: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [countryFilter, setCountryFilter] = useState("");
+  const countryFilter = searchParams.get("country")?.trim() ?? "";
+  const technologyFilter = searchParams.get("technology")?.trim() ?? "";
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [technologyFilter, setTechnologyFilter] = useState("");
   const [citizenFilter, setCitizenFilter] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
   const [experienceMin, setExperienceMin] = useState("");
@@ -213,11 +213,6 @@ function ProfilesPageInner() {
     void fetchRows();
     void loadMeta();
   }, []);
-
-  useEffect(() => {
-    setTechnologyFilter(searchParams.get("technology")?.trim() ?? "");
-    setCountryFilter(searchParams.get("country")?.trim() ?? "");
-  }, [searchParams]);
 
   function updateQueryFilter(key: "country" | "technology", value: string) {
     const params = new URLSearchParams(searchParams.toString());

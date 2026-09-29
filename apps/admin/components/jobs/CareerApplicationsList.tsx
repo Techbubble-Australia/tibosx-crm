@@ -138,7 +138,6 @@ function careerApplicationsEmptyMessage(options: {
 type Props = {
   jobPublished: boolean;
   jobListingId?: string;
-  initialStatusFilter?: string;
 };
 
 const STATUSES_WITH_INTERVIEW_FIELD: CareerApplicationStatus[] = [
@@ -932,10 +931,11 @@ function ApplicationCard({
   );
 }
 
-export function CareerApplicationsList({ jobPublished, jobListingId, initialStatusFilter }: Props) {
+export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const filterStatus = searchParams.get("status")?.trim() ?? "";
   const { canAccessRecruitment, role } = useAdminSession();
   const canEdit = canAccessRecruitment;
   const isAdmin = role === "admin";
@@ -947,7 +947,6 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
   const [filterCountry, setFilterCountry] = useState("");
   const [filterWorkMode, setFilterWorkMode] = useState("");
   const [filterClient, setFilterClient] = useState("");
-  const [filterStatus, setFilterStatus] = useState(initialStatusFilter ?? "");
   const [jobClientOptions, setJobClientOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [tabJobs, setTabJobs] = useState<TabJob[]>([]);
   const [statusChange, setStatusChange] = useState<{
@@ -1036,12 +1035,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId, initialStat
       .catch(console.error);
   }, [jobPublished]);
 
-  useEffect(() => {
-    setFilterStatus(searchParams.get("status")?.trim() ?? initialStatusFilter ?? "");
-  }, [searchParams, initialStatusFilter]);
-
   function updateStatusFilter(next: string) {
-    setFilterStatus(next);
     setPage(1);
     const params = new URLSearchParams(searchParams.toString());
     if (next) params.set("status", next);
