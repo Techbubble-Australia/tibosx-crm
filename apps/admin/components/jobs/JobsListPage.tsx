@@ -226,7 +226,11 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
       .then((res) => res.json())
       .then((data) => {
         const rows = (data.data ?? []) as Array<{ id: string; name: string; status: string }>;
-        setClients(rows.filter((c) => c.status === "ACTIVE").map((c) => ({ id: c.id, name: c.name })));
+        setClients(
+          rows
+            .filter((c) => c.status === "ACTIVE" || c.status === "PROSPECT")
+            .map((c) => ({ id: c.id, name: c.name })),
+        );
       })
       .catch(console.error);
     void adminFetch("/api/admin/job-technologies")

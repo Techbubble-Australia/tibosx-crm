@@ -139,7 +139,12 @@ export function JobForm({
         setCategories(catData.data ?? []);
         setTechnologies(techData.data ?? []);
         setDepartments(deptData.data ?? []);
-        setClients((clientData.data ?? []).filter((c: ClientItem) => c.status === "ACTIVE"));
+        setClients(
+          (clientData.data ?? []).filter(
+            (c: ClientItem) =>
+              c.status === "ACTIVE" || c.status === "PROSPECT" || c.id === defaults.clientId,
+          ),
+        );
       } catch (e) {
         console.error(e);
       } finally {
@@ -147,7 +152,7 @@ export function JobForm({
       }
     }
     void loadTaxonomy();
-  }, []);
+  }, [defaults.clientId]);
 
   useEffect(() => {
     if (defaults.level) setLevel(defaults.level);

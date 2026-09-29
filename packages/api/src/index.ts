@@ -103,7 +103,14 @@ app.use("/api/admin/site-content", ...websiteWrite, siteContentAdminRoutes);
 app.use("/api/admin/career-applications", authMiddleware, requireMfaEnrolled, requireModule("recruitment"), careerRoutes);
 app.use("/api/admin/profiles", authMiddleware, requireMfaEnrolled, requireModule("recruitment"), profileRoutes);
 app.use("/api/admin/contact-submissions", authMiddleware, requireMfaEnrolled, requireModule("website"), contactRoutes);
-app.use("/api/admin/clients", authMiddleware, requireMfaEnrolled, requireModule("sales"), clientRoutes);
+app.use(
+  "/api/admin/clients",
+  authMiddleware,
+  requireMfaEnrolled,
+  requireAnyModule("sales", "recruitment"),
+  blockModuleMutations("sales"),
+  clientRoutes,
+);
 app.use("/api/admin/opportunities", authMiddleware, requireMfaEnrolled, requireModule("sales"), opportunityRoutes);
 app.use("/api/admin/contracts", authMiddleware, requireMfaEnrolled, requireModule("sales"), contractRoutes);
 app.use("/api/admin/sales-dashboard", authMiddleware, requireMfaEnrolled, requireModule("sales"), salesDashboardRoutes);
