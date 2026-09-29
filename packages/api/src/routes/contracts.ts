@@ -1624,8 +1624,10 @@ router.delete("/:id/milestones/:milestoneId", async (req, res) => {
 
 router.post("/:id/variations", async (req: AuthRequest, res) => {
   try {
+    const contractId = req.params.id;
+    if (!contractId) return res.status(400).json({ error: "Invalid id" });
     const input = variationSchema.parse(req.body);
-    const contract = await ensureActiveContract(req.params.id);
+    const contract = await ensureActiveContract(contractId);
     const existingVariations = await prisma.contractVariation.findMany({
       where: { contractId: contract.id },
       select: { id: true, variationDate: true, variationEndDate: true },
@@ -1705,8 +1707,10 @@ router.post("/:id/variations", async (req: AuthRequest, res) => {
 
 router.patch("/:id/variations/:variationId", async (req: AuthRequest, res) => {
   try {
+    const contractId = req.params.id;
+    if (!contractId) return res.status(400).json({ error: "Invalid id" });
     const input = variationSchema.parse(req.body);
-    const contract = await ensureActiveContract(req.params.id);
+    const contract = await ensureActiveContract(contractId);
     const existing = await prisma.contractVariation.findFirst({
       where: { id: req.params.variationId, contractId: contract.id },
     });
@@ -1789,16 +1793,18 @@ router.patch("/:id/variations/:variationId", async (req: AuthRequest, res) => {
 
 router.delete("/:id/variations/:variationId", async (req: AuthRequest, res) => {
   try {
-    await ensureActiveContract(req.params.id);
+    const contractId = req.params.id;
+    if (!contractId) return res.status(400).json({ error: "Invalid id" });
+    await ensureActiveContract(contractId);
     const existing = await prisma.contractVariation.findFirst({
-      where: { id: req.params.variationId, contractId: req.params.id },
+      where: { id: req.params.variationId, contractId },
     });
     if (!existing) return res.status(404).json({ error: "Variation not found" });
 
     await prisma.$transaction(async (tx) => {
       await logContractVariationChange(
         tx,
-        req.params.id,
+        contractId,
         "VARIATION_DELETED",
         `Variation deleted: ${existing.variationValue.toString()} from ${existing.variationDate.toISOString().slice(0, 10)}${
           existing.variationEndDate ? ` to ${existing.variationEndDate.toISOString().slice(0, 10)}` : ""
@@ -1806,7 +1812,7 @@ router.delete("/:id/variations/:variationId", async (req: AuthRequest, res) => {
         req.user?.id,
       );
       await tx.contractVariation.delete({ where: { id: existing.id } });
-      await syncContractTotalVariation(tx, req.params.id);
+      await syncContractTotalVariation(tx, contractId);
     });
 
     res.json({ message: "Deleted" });
