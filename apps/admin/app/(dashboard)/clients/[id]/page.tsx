@@ -53,6 +53,7 @@ export default function EditClientPage() {
           (row.contacts ?? []).map((contact) => ({
             name: contact.name,
             email: contact.email,
+            position: contact.position ?? "",
             phoneCountryCode: contact.phoneCountryCode,
             phoneNumber: contact.phoneNumber,
           })),

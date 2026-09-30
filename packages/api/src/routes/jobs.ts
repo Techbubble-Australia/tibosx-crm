@@ -108,6 +108,28 @@ router.patch("/admin/:id/published-date", async (req, res) => {
   }
 });
 
+router.patch("/admin/:id/published", async (req, res) => {
+  try {
+    const body = z.object({ published: z.boolean() }).parse(req.body);
+    const jobId = req.params.id;
+    if (!jobId) return res.status(400).json({ error: "Invalid id" });
+    const existing = await prisma.jobListing.findUnique({ where: { id: jobId } });
+    if (!existing) return res.status(404).json({ error: "Job not found" });
+    const job = await prisma.jobListing.update({
+      where: { id: jobId },
+      data: { published: body.published },
+      include: { client: { select: { name: true } } },
+    });
+    res.json({ data: serializeAdminJob(job) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error updating job published state:", error);
+    res.status(500).json({ error: "Failed to update job" });
+  }
+});
+
 router.patch("/admin/:id/hot", async (req, res) => {
   try {
     const body = z.object({ isHot: z.boolean() }).parse(req.body);
@@ -295,12 +317,9 @@ function mergeJobUpdate(
 }
 
 async function allocateNextJobOrder(): Promise<number> {
-  const [agg, count] = await Promise.all([
-    prisma.jobListing.aggregate({ _max: { order: true } }),
-    prisma.jobListing.count(),
-  ]);
-  const maxOrder = agg._max.order ?? 0;
-  return Math.max(maxOrder, count) + 1;
+  const agg = await prisma.jobListing.aggregate({ _min: { order: true } });
+  const minOrder = agg._min.order ?? 1;
+  return minOrder - 1;
 }
 
 async function allocateDuplicateSlug(sourceSlug: string): Promise<string> {

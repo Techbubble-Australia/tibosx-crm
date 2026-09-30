@@ -266,6 +266,28 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
     }
   }
 
+  async function togglePublished(job: JobListing) {
+    if (!canManageJobs) return;
+    const nextPublished = !job.published;
+    try {
+      const res = await adminFetch(`/api/admin/jobs/admin/${job.id}/published`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ published: nextPublished }),
+      });
+      if (res.ok) {
+        setJobs((prev) => {
+          if (nextPublished !== publishedFilter) {
+            return prev.filter((j) => j.id !== job.id);
+          }
+          return prev.map((j) => (j.id === job.id ? { ...j, published: nextPublished } : j));
+        });
+      }
+    } catch (error) {
+      console.error("Error toggling job active state:", error);
+    }
+  }
+
   async function toggleHot(job: JobListing) {
     if (!canManageJobs) return;
     const nextIsHot = !job.isHot;
@@ -969,13 +991,21 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                               : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
                           }`}
                         >
-                          {job.published ? "Published" : "Unpublished"}
+                          {job.published ? "Active" : "Inactive"}
                         </span>
                       </td>
                     ) : null}
                     <td className="px-4 py-3 text-right">
                       {canManageJobs ? (
                         <div className="inline-flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void togglePublished(job)}
+                            className="rounded px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                            title={publishedFilter ? "Mark inactive" : "Mark active"}
+                          >
+                            {publishedFilter ? "Deactivate" : "Activate"}
+                          </button>
                           <button
                             type="button"
                             onClick={() => void deleteJob(job.id)}
@@ -1079,6 +1109,13 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
                       ) : null}
                       {canManageJobs ? (
                         <>
+                          <button
+                            type="button"
+                            onClick={() => void togglePublished(job)}
+                            className="rounded px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                          >
+                            {publishedFilter ? "Deactivate" : "Activate"}
+                          </button>
                           <Link
                             href={jobEditHref(job.id, listTab)}
                             className="inline-flex rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"

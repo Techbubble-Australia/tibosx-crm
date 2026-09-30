@@ -24,7 +24,7 @@ export default function NewClientPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [nextOrder, setNextOrder] = useState<number | null>(null);
   const [contacts, setContacts] = useState<ClientContactInput[]>([
-    { name: "", email: "", phoneCountryCode: "+61", phoneNumber: "" },
+    { name: "", email: "", position: "", phoneCountryCode: "+61", phoneNumber: "" },
   ]);
 
   useEffect(() => {

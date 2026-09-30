@@ -154,6 +154,7 @@ const STATUSES_WITH_COMMENTS_FIELD: CareerApplicationStatus[] = [
   "CLIENT_REVIEW",
   "INTERVIEW_SCHEDULED",
   "AWAITING_FEEDBACK",
+  "SELECTED",
   "REJECTED",
   "CANCELLED",
 ];
@@ -171,7 +172,7 @@ function isInterviewEditable(status: CareerApplicationStatus): boolean {
 }
 
 function isCommentsMandatory(status: CareerApplicationStatus): boolean {
-  return status === "REJECTED" || status === "CANCELLED";
+  return status === "SELECTED" || status === "REJECTED" || status === "CANCELLED";
 }
 
 function statusSelectStyle(status: CareerApplicationStatus): React.CSSProperties | undefined {
@@ -1261,6 +1262,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
             items: appsByJobId.get(job.id) ?? [],
           },
         }))
+        .filter(({ group }) => group.items.length > 0)
         .filter(({ group }) => {
           if (!q) return true;
           const haystack = buildSearchHaystack([
@@ -1269,7 +1271,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
             group.workMode,
             group.clientName,
           ]);
-          return matchesSearch(haystack, q) || group.items.length > 0;
+          return matchesSearch(haystack, q);
         })
         .sort((a, b) => a.group.label.localeCompare(b.group.label));
     }

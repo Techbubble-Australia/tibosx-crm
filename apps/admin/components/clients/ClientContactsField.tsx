@@ -6,6 +6,7 @@ import { PHONE_COUNTRY_CODES } from "@/lib/phone-country-codes";
 export type ClientContactInput = {
   name: string;
   email: string;
+  position: string;
   phoneCountryCode: string;
   phoneNumber: string;
 };
@@ -20,6 +21,7 @@ type ClientContactsFieldProps = {
 const emptyContact = (): ClientContactInput => ({
   name: "",
   email: "",
+  position: "",
   phoneCountryCode: "+61",
   phoneNumber: "",
 });
@@ -104,6 +106,16 @@ export function ClientContactsField({
                     onChange={(e) => updateContact(index, { email: e.target.value })}
                     className={inputClassName}
                     placeholder="jane@company.com"
+                  />
+                </div>
+                <div>
+                  <label className={labelClassName}>Contact position</label>
+                  <input
+                    value={contact.position}
+                    onChange={(e) => updateContact(index, { position: e.target.value })}
+                    className={inputClassName}
+                    placeholder="e.g. Hiring manager"
+                    maxLength={200}
                   />
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,140px)_1fr]">

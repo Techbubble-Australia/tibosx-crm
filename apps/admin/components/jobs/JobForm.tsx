@@ -610,7 +610,7 @@ export function JobForm({
               className="h-4 w-4 rounded"
             />
             <label htmlFor="published" className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              Published
+              Active
             </label>
           </div>
         </div>

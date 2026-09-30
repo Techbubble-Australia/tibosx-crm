@@ -6,6 +6,7 @@ import { Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { adminFetch } from "@/lib/admin-api";
 import { ClientsOnlyGuard } from "@/components/ClientsOnlyGuard";
+import { ViewModeToggle, type ViewMode } from "@/components/ui/ViewModeToggle";
 import {
   CONTRACT_INVOICE_STATUSES,
   CONTRACT_INVOICE_STATUS_COLORS,
@@ -85,6 +86,7 @@ export default function InvoicesPageInner() {
   const [sortKey, setSortKey] = useState<SortKey>("dueDate");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>("card");
 
   useEffect(() => {
     setStatusFilter(initialStatus);
@@ -114,6 +116,16 @@ export default function InvoicesPageInner() {
 
   const filteredRows = useMemo(() => rows, [rows]);
 
+  const groupedByClient = useMemo(() => {
+    const map = new Map<string, InvoiceRow[]>();
+    for (const row of filteredRows) {
+      const list = map.get(row.clientName) ?? [];
+      list.push(row);
+      map.set(row.clientName, list);
+    }
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [filteredRows]);
+
   function handleSort(key: SortKey) {
     if (sortKey === key) {
       setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -131,13 +143,16 @@ export default function InvoicesPageInner() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Invoices</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">All contract invoices across clients.</p>
           </div>
-          <Link
-            href="/invoices/new"
-            className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
-          >
-            <Plus className="h-4 w-4" />
-            Add invoice
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+            <Link
+              href="/invoices/new"
+              className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
+            >
+              <Plus className="h-4 w-4" />
+              Add invoice
+            </Link>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -176,6 +191,73 @@ export default function InvoicesPageInner() {
           <div className="flex h-48 items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-black border-t-transparent dark:border-white" />
           </div>
+        ) : viewMode === "card" ? (
+          filteredRows.length === 0 ? (
+            <p className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:bg-gray-900">
+              No invoices found.
+            </p>
+          ) : (
+            <div className="space-y-6">
+              {groupedByClient.map(([clientName, clientRows]) => (
+                <section
+                  key={clientName}
+                  className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900"
+                >
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">{clientName}</h3>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      {clientRows.length} invoice{clientRows.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {clientRows.map((row) => {
+                      const colors =
+                        CONTRACT_INVOICE_STATUS_COLORS[row.status] ?? CONTRACT_INVOICE_STATUS_COLORS.DRAFT;
+                      return (
+                        <article
+                          key={row.id}
+                          className="rounded-lg border border-gray-100 p-4 dark:border-gray-800"
+                        >
+                          <div className="mb-2 flex items-start justify-between gap-2">
+                            <p className="font-semibold text-gray-900 dark:text-gray-100">{row.invoiceNumber}</p>
+                            <span
+                              className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`}
+                            >
+                              {CONTRACT_INVOICE_STATUS_LABELS[row.status]}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Due {formatDate(row.dueDate)}
+                          </p>
+                          <p className="mt-1 text-sm">
+                            <Link
+                              href={`/contracts/${row.contractId}`}
+                              className="text-blue-600 hover:underline dark:text-blue-400"
+                            >
+                              {row.contractNumber} — {row.contractTitle}
+                            </Link>
+                          </p>
+                          {row.description ? (
+                            <p className="mt-2 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">
+                              {row.description}
+                            </p>
+                          ) : null}
+                          <div className="mt-3 flex items-end justify-between gap-2 text-sm">
+                            <span className="text-gray-500 dark:text-gray-400">
+                              {formatMoney(row.currency, row.amount)}
+                            </span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100">
+                              {formatMoney(row.currency, row.totalAmount)}
+                            </span>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )
         ) : (
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
             <table className="w-full min-w-[1100px] text-sm">

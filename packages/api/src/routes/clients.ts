@@ -8,6 +8,7 @@ const router: IRouter = Router();
 const contactSchema = z.object({
   name: z.string().min(1).max(200),
   email: z.string().email(),
+  position: z.string().max(200).optional().default(""),
   phoneCountryCode: z.string().min(1).max(8),
   phoneNumber: z.string().min(4).max(20),
   order: z.number().int().default(0),
@@ -163,6 +164,7 @@ router.post("/", async (req, res) => {
           create: data.contacts.map((contact, index) => ({
             name: contact.name,
             email: contact.email,
+            position: contact.position?.trim() || null,
             phoneCountryCode: contact.phoneCountryCode,
             phoneNumber: contact.phoneNumber,
             order: contact.order ?? index,
@@ -211,6 +213,7 @@ router.put("/:id", async (req, res) => {
               clientId: req.params.id,
               name: contact.name,
               email: contact.email,
+              position: contact.position?.trim() || null,
               phoneCountryCode: contact.phoneCountryCode,
               phoneNumber: contact.phoneNumber,
               order: contact.order ?? index,

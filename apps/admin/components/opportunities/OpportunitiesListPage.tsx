@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Plus, Edit, Trash2, ChevronDown, ChevronUp, Pencil } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronUp, Pencil } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
 import { TablePagination } from "@/components/ui/TablePagination";
@@ -504,28 +504,13 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
     const contacts = contactsByClient[row.clientId] ?? [];
     return (
       <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-        <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
-          <InlineEditableCell
-            label={`Edit name for ${row.name}`}
-            editing={editingNameId === row.id}
-            onEdit={() => startEditName(row)}
-            editControl={
-              <input
-                value={nameDrafts[row.id] ?? ""}
-                onChange={(e) => setNameDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))}
-                onBlur={() => void saveName(row)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur();
-                  if (e.key === "Escape") cancelEditName(row.id);
-                }}
-                autoFocus
-                className={inlineInputClass}
-                aria-label={`Edit name for ${row.name}`}
-              />
-            }
+        <td className="px-4 py-3 font-medium">
+          <Link
+            href={`/opportunities/${row.id}`}
+            className="text-blue-600 hover:underline dark:text-blue-400"
           >
-            <span>{row.name}</span>
-          </InlineEditableCell>
+            {row.name}
+          </Link>
         </td>
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
           <Link href={clientFilterHref(row.clientId)} className="hover:underline">
@@ -679,9 +664,6 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
             >
               {activeFilter ? "Deactivate" : "Activate"}
             </button>
-            <Link href={`/opportunities/${row.id}`} className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-black dark:hover:bg-gray-800 dark:hover:text-white">
-              <Edit className="h-4 w-4" />
-            </Link>
             <button type="button" onClick={() => void deleteRow(row.id)} className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20">
               <Trash2 className="h-4 w-4" />
             </button>

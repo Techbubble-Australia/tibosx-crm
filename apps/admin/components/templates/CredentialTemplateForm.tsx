@@ -38,6 +38,7 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
   const [importedFileName, setImportedFileName] = useState("");
   const [showSource, setShowSource] = useState(false);
   const [dragOverPreview, setDragOverPreview] = useState(false);
+  const [signatureDragActive, setSignatureDragActive] = useState(false);
   const [showSignatureReminder, setShowSignatureReminder] = useState(false);
 
   const previewHtml = useMemo(() => wrapTemplatePreviewHtml(html), [html]);
@@ -56,12 +57,32 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
     updateSignatureReminder(html, name);
   }, [html, name]);
 
+  function buildHtmlWithSignatureBlock(sourceHtml: string): string {
+    if (sourceHtml.includes('data-signature-block="contractor"')) {
+      return sourceHtml;
+    }
+    const markers = [
+      /\{contractor_signature\}/i,
+      /(<p[^>]*>[\s\S]*?Contractor[\s\S]*?signature[\s\S]*?<\/p>)/i,
+      /(Signed for and on behalf of the Contractor)/i,
+      /(THE CONTRACTOR)/i,
+    ];
+    for (const marker of markers) {
+      const match = sourceHtml.match(marker);
+      if (match?.index !== undefined) {
+        const insertAt = match.index + match[0].length;
+        return `${sourceHtml.slice(0, insertAt)}\n${SIGNATURE_BLOCK_HTML}\n${sourceHtml.slice(insertAt)}`;
+      }
+    }
+    return `${sourceHtml.trim()}\n${SIGNATURE_BLOCK_HTML}`;
+  }
+
   function insertSignatureBlock() {
     if (html.includes('data-signature-block="contractor"')) {
       alert("A signature block is already in this template.");
       return;
     }
-    const nextHtml = `${html.trim()}\n${SIGNATURE_BLOCK_HTML}`;
+    const nextHtml = buildHtmlWithSignatureBlock(html);
     setShowSignatureReminder(false);
     void applyParsedHtml(nextHtml);
   }
@@ -271,7 +292,9 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
                 onDragStart={(e) => {
                   e.dataTransfer.setData("text/plain", "signature-block");
                   e.dataTransfer.effectAllowed = "copy";
+                  setSignatureDragActive(true);
                 }}
+                onDragEnd={() => setSignatureDragActive(false)}
                 onClick={insertSignatureBlock}
                 className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
               >
@@ -285,17 +308,19 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
             ) : null}
             {html.trim() ? (
               <div
-                className={`mb-3 overflow-hidden rounded-lg border bg-white dark:border-gray-700 ${
+                className={`relative mb-3 overflow-hidden rounded-lg border bg-white dark:border-gray-700 ${
                   dragOverPreview ? "border-blue-400 ring-2 ring-blue-200" : "border-gray-200"
                 }`}
                 onDragOver={(e) => {
                   e.preventDefault();
+                  e.dataTransfer.dropEffect = "copy";
                   setDragOverPreview(true);
                 }}
                 onDragLeave={() => setDragOverPreview(false)}
                 onDrop={(e) => {
                   e.preventDefault();
                   setDragOverPreview(false);
+                  setSignatureDragActive(false);
                   if (e.dataTransfer.getData("text/plain") === "signature-block") {
                     insertSignatureBlock();
                   }
@@ -304,9 +329,28 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
                 <iframe
                   title="Template preview"
                   className="h-[480px] w-full bg-white"
+                  style={{ pointerEvents: signatureDragActive ? "none" : "auto" }}
                   srcDoc={previewHtml}
                   sandbox=""
                 />
+                {signatureDragActive ? (
+                  <div
+                    className="absolute inset-0 z-10 bg-blue-50/20"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "copy";
+                      setDragOverPreview(true);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOverPreview(false);
+                      setSignatureDragActive(false);
+                      if (e.dataTransfer.getData("text/plain") === "signature-block") {
+                        insertSignatureBlock();
+                      }
+                    }}
+                  />
+                ) : null}
               </div>
             ) : (
               <p className="mb-3 text-sm text-gray-400">Import a .docx, .html, or .txt file to preview the template.</p>
