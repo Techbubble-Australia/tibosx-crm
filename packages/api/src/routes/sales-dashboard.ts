@@ -201,6 +201,7 @@ router.get("/stats", async (req, res) => {
     const forecastInvoices: ForecastInvoice[] = invoices.map((row) => ({
       amount: toNumber(row.amount),
       totalAmount: toNumber(row.totalAmount),
+      issueDate: row.issueDate,
       dueDate: row.dueDate,
       status: row.status,
       clientId: row.contract.clientId,
@@ -226,7 +227,7 @@ router.get("/stats", async (req, res) => {
 
     const actualByClientMap = new Map<string, { clientId: string; clientName: string; actual: number }>();
     for (const invoice of forecastInvoices) {
-      if (invoice.status === "CANCELED" || invoice.dueDate.getUTCFullYear() !== year) continue;
+      if (invoice.status === "CANCELED" || invoice.issueDate.getUTCFullYear() !== year) continue;
       const value = toBase(invoice.amount, invoice.currency, baseCurrency, rates);
       const existing = actualByClientMap.get(invoice.clientId);
       if (existing) {
@@ -260,7 +261,7 @@ router.get("/stats", async (req, res) => {
     );
 
     const actualRevenueThisYear = forecastInvoices
-      .filter((row) => row.status !== "CANCELED" && row.dueDate.getUTCFullYear() === year)
+      .filter((row) => row.status !== "CANCELED" && row.issueDate.getUTCFullYear() === year)
       .reduce((sum, row) => sum + toBase(row.amount, row.currency, baseCurrency, rates), 0);
 
     const forecastByMonth = MONTH_LABELS.map((label, month) => ({
@@ -274,8 +275,8 @@ router.get("/stats", async (req, res) => {
         .filter(
           (row) =>
             row.status !== "CANCELED" &&
-            row.dueDate.getUTCFullYear() === year &&
-            row.dueDate.getUTCMonth() === month,
+            row.issueDate.getUTCFullYear() === year &&
+            row.issueDate.getUTCMonth() === month,
         )
         .reduce((sum, row) => sum + toBase(row.amount, row.currency, baseCurrency, rates), 0),
     }));

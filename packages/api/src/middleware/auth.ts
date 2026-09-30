@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { ADMIN_SESSION_MAX_AGE_SEC } from "../lib/session.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
 
@@ -72,7 +73,7 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
 };
 
 export const generateToken = (payload: AuthUser) => {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: ADMIN_SESSION_MAX_AGE_SEC });
 };
 
 export const generateMfaPendingToken = (payload: AuthUser) => {

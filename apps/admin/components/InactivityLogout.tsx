@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-
-const INACTIVITY_MS = 60 * 60 * 1000;
+import { ADMIN_INACTIVITY_MS } from "@/lib/session";
 
 export function InactivityLogout() {
   useEffect(() => {
@@ -10,7 +9,7 @@ export function InactivityLogout() {
       void fetch("/api/auth/logout", { method: "POST", credentials: "include" }).finally(() => {
         window.location.href = "/login";
       });
-    }, INACTIVITY_MS);
+    }, ADMIN_INACTIVITY_MS);
 
     function resetTimer() {
       window.clearTimeout(timer);
@@ -18,7 +17,7 @@ export function InactivityLogout() {
         void fetch("/api/auth/logout", { method: "POST", credentials: "include" }).finally(() => {
           window.location.href = "/login";
         });
-      }, INACTIVITY_MS);
+      }, ADMIN_INACTIVITY_MS);
     }
 
     const events: Array<keyof WindowEventMap> = ["mousemove", "mousedown", "keydown", "scroll", "touchstart"];

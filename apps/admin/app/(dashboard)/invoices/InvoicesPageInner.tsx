@@ -49,6 +49,18 @@ function formatDate(value: string) {
   return new Date(value).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
 }
 
+function toDateInputValue(value: string) {
+  const date = new Date(value);
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function invoiceDetailHref(row: InvoiceRow) {
+  return `/contracts/${row.contractId}#contract-invoice-${row.id}`;
+}
+
 function SortHeader({
   label,
   sortKey,
@@ -87,6 +99,44 @@ export default function InvoicesPageInner() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("card");
+  const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
+
+  async function patchInvoice(
+    row: InvoiceRow,
+    body: { status?: ContractInvoiceStatus; dueDate?: string },
+  ) {
+    setUpdatingInvoiceId(row.id);
+    try {
+      const res = await adminFetch(`/api/admin/contracts/${row.contractId}/invoices/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...body,
+          ...(body.dueDate ? { dueDate: body.dueDate } : {}),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Failed to update invoice");
+      }
+      const updated = data.data as InvoiceRow;
+      setRows((prev) =>
+        prev.map((item) =>
+          item.id === row.id
+            ? {
+                ...item,
+                status: updated.status ?? item.status,
+                dueDate: updated.dueDate ?? item.dueDate,
+              }
+            : item,
+        ),
+      );
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to update invoice");
+    } finally {
+      setUpdatingInvoiceId(null);
+    }
+  }
 
   useEffect(() => {
     setStatusFilter(initialStatus);
@@ -219,7 +269,12 @@ export default function InvoicesPageInner() {
                           className="rounded-lg border border-gray-100 p-4 dark:border-gray-800"
                         >
                           <div className="mb-2 flex items-start justify-between gap-2">
-                            <p className="font-semibold text-gray-900 dark:text-gray-100">{row.invoiceNumber}</p>
+                            <Link
+                              href={invoiceDetailHref(row)}
+                              className="whitespace-nowrap font-semibold text-blue-600 hover:underline dark:text-blue-400"
+                            >
+                              {row.invoiceNumber}
+                            </Link>
                             <span
                               className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`}
                             >
@@ -229,13 +284,8 @@ export default function InvoicesPageInner() {
                           <p className="text-sm text-gray-600 dark:text-gray-400">
                             Due {formatDate(row.dueDate)}
                           </p>
-                          <p className="mt-1 text-sm">
-                            <Link
-                              href={`/contracts/${row.contractId}`}
-                              className="text-blue-600 hover:underline dark:text-blue-400"
-                            >
-                              {row.contractNumber} — {row.contractTitle}
-                            </Link>
+                          <p className="mt-1 truncate text-sm text-gray-600 dark:text-gray-400" title={`${row.contractNumber} — ${row.contractTitle}`}>
+                            {row.contractNumber} — {row.contractTitle}
                           </p>
                           {row.description ? (
                             <p className="mt-2 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">
@@ -260,17 +310,18 @@ export default function InvoicesPageInner() {
           )
         ) : (
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-            <table className="w-full min-w-[1100px] text-sm">
+            <table className="w-full min-w-[1200px] text-sm">
               <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
                 <tr>
-                  <th className="px-4 py-3 text-left">
+                  <th className="whitespace-nowrap px-4 py-3 text-left">
                     <SortHeader label="Invoice" sortKey="invoiceNumber" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                   </th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Contract</th>
+                  <th className="max-w-[200px] px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Contract</th>
+                  <th className="max-w-[240px] px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Description</th>
                   <th className="px-4 py-3 text-left">
                     <SortHeader label="Client" sortKey="clientName" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                   </th>
-                  <th className="px-4 py-3 text-left">
+                  <th className="whitespace-nowrap px-4 py-3 text-left">
                     <SortHeader label="Due" sortKey="dueDate" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                   </th>
                   <th className="px-4 py-3 text-left">
@@ -285,25 +336,62 @@ export default function InvoicesPageInner() {
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {filteredRows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-gray-400">No invoices found.</td>
+                    <td colSpan={8} className="px-4 py-8 text-center text-gray-400">No invoices found.</td>
                   </tr>
                 ) : (
                   filteredRows.map((row) => {
                     const colors = CONTRACT_INVOICE_STATUS_COLORS[row.status] ?? CONTRACT_INVOICE_STATUS_COLORS.DRAFT;
                     return (
                       <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                        <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{row.invoiceNumber}</td>
-                        <td className="px-4 py-3">
-                          <Link href={`/contracts/${row.contractId}`} className="text-blue-600 hover:underline dark:text-blue-400">
-                            {row.contractNumber} — {row.contractTitle}
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <Link
+                            href={invoiceDetailHref(row)}
+                            className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                          >
+                            {row.invoiceNumber}
                           </Link>
                         </td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.clientName}</td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatDate(row.dueDate)}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`}>
-                            {CONTRACT_INVOICE_STATUS_LABELS[row.status]}
+                        <td className="max-w-[200px] px-4 py-3 text-gray-600 dark:text-gray-400">
+                          <span className="block truncate" title={`${row.contractNumber} — ${row.contractTitle}`}>
+                            {row.contractNumber} — {row.contractTitle}
                           </span>
+                        </td>
+                        <td className="max-w-[240px] px-4 py-3 text-gray-600 dark:text-gray-400">
+                          {row.description ? (
+                            <Link
+                              href={invoiceDetailHref(row)}
+                              className="line-clamp-2 text-blue-600 hover:underline dark:text-blue-400"
+                              title={row.description}
+                            >
+                              {row.description}
+                            </Link>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.clientName}</td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <input
+                            type="date"
+                            value={toDateInputValue(row.dueDate)}
+                            disabled={updatingInvoiceId === row.id}
+                            onChange={(e) => void patchInvoice(row, { dueDate: e.target.value })}
+                            className="rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={row.status}
+                            disabled={updatingInvoiceId === row.id}
+                            onChange={(e) =>
+                              void patchInvoice(row, { status: e.target.value as ContractInvoiceStatus })
+                            }
+                            className={`rounded-full border-0 px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`}
+                          >
+                            {CONTRACT_INVOICE_STATUSES.map((value) => (
+                              <option key={value} value={value}>{CONTRACT_INVOICE_STATUS_LABELS[value]}</option>
+                            ))}
+                          </select>
                         </td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.amount)}</td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.totalAmount)}</td>

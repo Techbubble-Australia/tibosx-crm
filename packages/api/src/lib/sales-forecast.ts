@@ -41,6 +41,7 @@ export type ForecastContract = {
 export type ForecastInvoice = {
   amount: number;
   totalAmount: number;
+  issueDate: Date;
   dueDate: Date;
   status: string;
   clientId: string;

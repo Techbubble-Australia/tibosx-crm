@@ -854,7 +854,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   }
 
   function syncConsumedFromInvoices(nextInvoices: ContractInvoice[]) {
-    setConsumed(String(nextInvoices.reduce((sum, row) => sum + row.totalAmount, 0)));
+    setConsumed(String(nextInvoices.reduce((sum, row) => sum + row.amount, 0)));
   }
 
   function resetInvoiceForm() {
@@ -1759,22 +1759,28 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                 </p>
               ) : null}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <input
-                  value={invoiceReference}
-                  onChange={(e) => setInvoiceReference(e.target.value)}
-                  placeholder="Reference"
-                  readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
-                  className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
-                />
-                <select
-                  value={invoiceStatus}
-                  onChange={(e) => setInvoiceStatus(e.target.value as ContractInvoiceStatus)}
-                  className={inputClass}
-                >
-                  {CONTRACT_INVOICE_STATUSES.map((value) => (
-                    <option key={value} value={value}>{CONTRACT_INVOICE_STATUS_LABELS[value]}</option>
-                  ))}
-                </select>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Reference</label>
+                  <input
+                    value={invoiceReference}
+                    onChange={(e) => setInvoiceReference(e.target.value)}
+                    placeholder="Reference"
+                    readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
+                    className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Status</label>
+                  <select
+                    value={invoiceStatus}
+                    onChange={(e) => setInvoiceStatus(e.target.value as ContractInvoiceStatus)}
+                    className={inputClass}
+                  >
+                    {CONTRACT_INVOICE_STATUSES.map((value) => (
+                      <option key={value} value={value}>{CONTRACT_INVOICE_STATUS_LABELS[value]}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
@@ -1800,66 +1806,90 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                   />
                 </div>
               </div>
-              <textarea
-                value={invoiceDescription}
-                onChange={(e) => setInvoiceDescription(e.target.value)}
-                rows={3}
-                placeholder="Description *"
-                readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
-                className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
-              />
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Description *</label>
+                <textarea
+                  value={invoiceDescription}
+                  onChange={(e) => setInvoiceDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Description"
+                  readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
+                  className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                />
+              </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                <select
-                  value={invoiceCurrency}
-                  onChange={(e) => setInvoiceCurrency(e.target.value)}
-                  disabled={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
-                  className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
-                >
-                  {SALES_CURRENCIES.map((c) => (
-                    <option key={c.code} value={c.code}>{c.label}</option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={invoiceQty}
-                  onChange={(e) => setInvoiceQty(e.target.value)}
-                  placeholder="Qty *"
-                  readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
-                  className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
-                />
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={invoiceRate}
-                  onChange={(e) => setInvoiceRate(e.target.value)}
-                  placeholder="Rate *"
-                  readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
-                  className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
-                />
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={invoiceTaxRate}
-                  onChange={(e) => setInvoiceTaxRate(e.target.value)}
-                  placeholder="Tax rate % *"
-                  readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
-                  className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
-                />
-                <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
-                  Amount: {formatMoney(invoiceCurrency, invoicePreviewAmount)}
-                </p>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Currency</label>
+                  <select
+                    value={invoiceCurrency}
+                    onChange={(e) => setInvoiceCurrency(e.target.value)}
+                    disabled={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
+                    className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                  >
+                    {SALES_CURRENCIES.map((c) => (
+                      <option key={c.code} value={c.code}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Qty *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={invoiceQty}
+                    onChange={(e) => setInvoiceQty(e.target.value)}
+                    placeholder="Qty"
+                    readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
+                    className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Rate *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={invoiceRate}
+                    onChange={(e) => setInvoiceRate(e.target.value)}
+                    placeholder="Rate"
+                    readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
+                    className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Tax rate % *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={invoiceTaxRate}
+                    onChange={(e) => setInvoiceTaxRate(e.target.value)}
+                    placeholder="Tax rate"
+                    readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
+                    className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Amount</label>
+                  <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
+                    {formatMoney(invoiceCurrency, invoicePreviewAmount)}
+                  </p>
+                </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
-                  Tax amount: {formatMoney(invoiceCurrency, invoicePreviewTaxAmount)}
-                </p>
-                <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
-                  Total amount: {formatMoney(invoiceCurrency, invoicePreviewTotal)}
-                </p>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Tax amount</label>
+                  <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
+                    {formatMoney(invoiceCurrency, invoicePreviewTaxAmount)}
+                  </p>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Total amount</label>
+                  <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
+                    {formatMoney(invoiceCurrency, invoicePreviewTotal)}
+                  </p>
+                </div>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Invoice file</label>
@@ -1892,7 +1922,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                 const colors = CONTRACT_INVOICE_STATUS_COLORS[invoice.status] ?? CONTRACT_INVOICE_STATUS_COLORS.DRAFT;
                 const readOnly = invoice.status !== "DRAFT";
                 return (
-                  <li key={invoice.id} className="space-y-2 py-4 text-sm">
+                  <li key={invoice.id} id={`contract-invoice-${invoice.id}`} className="scroll-mt-24 space-y-2 py-4 text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="font-medium text-gray-900 dark:text-gray-100">{invoice.invoiceNumber}</p>
                       <div className="flex items-center gap-2">

@@ -295,9 +295,9 @@ async function syncContractTotalVariation(tx: Prisma.TransactionClient, contract
 async function syncContractConsumed(tx: Prisma.TransactionClient, contractId: string) {
   const agg = await tx.contractInvoice.aggregate({
     where: { contractId },
-    _sum: { totalAmount: true },
+    _sum: { amount: true },
   });
-  const total = agg._sum.totalAmount == null ? 0 : toNumber(agg._sum.totalAmount);
+  const total = agg._sum.amount == null ? 0 : toNumber(agg._sum.amount);
   await tx.contract.update({
     where: { id: contractId },
     data: { consumed: total },
@@ -1916,11 +1916,7 @@ router.post("/:id/invoices", async (req, res) => {
           fileUrl: input.fileUrl ?? null,
         },
       });
-      const nextConsumed = toNumber(contract.consumed) + totalAmount;
-      await tx.contract.update({
-        where: { id: contract.id },
-        data: { consumed: nextConsumed },
-      });
+      await syncContractConsumed(tx, contract.id);
       return created;
     });
 
@@ -1943,20 +1939,24 @@ router.patch("/:id/invoices/:invoiceId", async (req, res) => {
     if (!invoice) return res.status(404).json({ error: "Invoice not found" });
 
     const body = invoiceUpdateSchema.parse(req.body);
-    const onlyStatus =
-      body.status !== undefined &&
-      Object.keys(body).every((key) => key === "status" || body[key as keyof typeof body] === undefined);
+    const nonDraftAllowedKeys = new Set(["status", "dueDate"]);
+    const onlyNonDraftFields = Object.entries(body).every(
+      ([key, value]) => value === undefined || nonDraftAllowedKeys.has(key),
+    );
 
-    if (invoice.status !== "DRAFT" && !onlyStatus) {
+    if (invoice.status !== "DRAFT" && !onlyNonDraftFields) {
       return res.status(400).json({
-        error: "Only status can be updated when invoice is not in Draft status",
+        error: "Only status and due date can be updated when invoice is not in Draft status",
       });
     }
 
     if (invoice.status !== "DRAFT") {
       const row = await prisma.contractInvoice.update({
         where: { id: invoice.id },
-        data: { status: body.status! },
+        data: {
+          ...(body.status !== undefined ? { status: body.status } : {}),
+          ...(body.dueDate !== undefined ? { dueDate: body.dueDate } : {}),
+        },
       });
       return res.json({ data: serializeInvoice(row) });
     }

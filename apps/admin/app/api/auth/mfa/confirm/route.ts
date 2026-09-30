@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ADMIN_SESSION_COOKIE } from "@/lib/auth-cookie";
+import { adminSessionCookieOptions } from "@/lib/session";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -37,12 +38,6 @@ export async function POST(req: Request) {
     user: data.data.user,
     mfaEnabled: data.data.mfaEnabled,
   });
-  response.cookies.set(ADMIN_SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24,
-  });
+  response.cookies.set(ADMIN_SESSION_COOKIE, token, adminSessionCookieOptions());
   return response;
 }
