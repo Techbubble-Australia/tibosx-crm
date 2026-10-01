@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
-import { SIGNATURE_BLOCK_HTML, wrapTemplatePreviewHtml } from "@/lib/credential-template";
+import {
+  buildHtmlWithSignatureBlock,
+  isContractorSignatureInTable,
+  insertSignatureBlockIntoContractorTable,
+  wrapTemplatePreviewHtml,
+} from "@/lib/credential-template";
 
 export type CredentialVariable = {
   key: string;
@@ -42,13 +47,13 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
   const [showSignatureReminder, setShowSignatureReminder] = useState(false);
 
   const previewHtml = useMemo(() => wrapTemplatePreviewHtml(html), [html]);
-  const hasSignatureBlock = html.includes('data-signature-block="contractor"');
+  const signatureInTable = isContractorSignatureInTable(html);
   const looksLikeAgreementTemplate =
     /contractor services agreement|deed poll|assignment schedule/i.test(`${name} ${html}`);
 
   function updateSignatureReminder(nextHtml: string, nextName = name) {
     const missingSignature =
-      !nextHtml.includes('data-signature-block="contractor"') &&
+      !isContractorSignatureInTable(nextHtml) &&
       /contractor services agreement|deed poll|assignment schedule/i.test(`${nextName} ${nextHtml}`);
     setShowSignatureReminder(missingSignature);
   }
@@ -57,32 +62,19 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
     updateSignatureReminder(html, name);
   }, [html, name]);
 
-  function buildHtmlWithSignatureBlock(sourceHtml: string): string {
-    if (sourceHtml.includes('data-signature-block="contractor"')) {
-      return sourceHtml;
-    }
-    const markers = [
-      /\{contractor_signature\}/i,
-      /(<p[^>]*>[\s\S]*?Contractor[\s\S]*?signature[\s\S]*?<\/p>)/i,
-      /(Signed for and on behalf of the Contractor)/i,
-      /(THE CONTRACTOR)/i,
-    ];
-    for (const marker of markers) {
-      const match = sourceHtml.match(marker);
-      if (match?.index !== undefined) {
-        const insertAt = match.index + match[0].length;
-        return `${sourceHtml.slice(0, insertAt)}\n${SIGNATURE_BLOCK_HTML}\n${sourceHtml.slice(insertAt)}`;
-      }
-    }
-    return `${sourceHtml.trim()}\n${SIGNATURE_BLOCK_HTML}`;
-  }
-
   function insertSignatureBlock() {
-    if (html.includes('data-signature-block="contractor"')) {
-      alert("A signature block is already in this template.");
+    if (isContractorSignatureInTable(html)) {
+      alert("A signature block is already in the contractor signature table cell.");
       return;
     }
-    const nextHtml = buildHtmlWithSignatureBlock(html);
+    const relocated = insertSignatureBlockIntoContractorTable(html);
+    const nextHtml = relocated ?? buildHtmlWithSignatureBlock(html);
+    if (nextHtml === html && html.includes('data-signature-block="contractor"')) {
+      alert(
+        "Could not find a signing table with a Signature row and “For the Contractor” column. Add the block manually in HTML source.",
+      );
+      return;
+    }
     setShowSignatureReminder(false);
     void applyParsedHtml(nextHtml);
   }
@@ -271,15 +263,19 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
                 </button>
               </div>
             </div>
-            {showSignatureReminder && !hasSignatureBlock && looksLikeAgreementTemplate ? (
+            {showSignatureReminder && !signatureInTable && looksLikeAgreementTemplate ? (
               <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
-                This looks like a contractor agreement. Add a{" "}
+                This looks like a contractor agreement.{" "}
+                {html.includes('data-signature-block="contractor"')
+                  ? "Move the signature block into the contractor signature table cell"
+                  : "Add a signature block in the contractor signature table cell"}
+                {" "}
                 <button
                   type="button"
                   onClick={insertSignatureBlock}
                   className="font-medium underline hover:no-underline"
                 >
-                  signature block
+                  {html.includes('data-signature-block="contractor"') ? "Move signature block" : "Insert signature block"}
                 </button>{" "}
                 so contractors can sign in the agreement portal.
               </div>
@@ -301,7 +297,9 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
                 <GripVertical className="h-4 w-4 text-gray-400" />
                 Signature block
               </button>
-              <p className="mt-2 text-xs text-gray-500">Drag onto the preview or click to insert at the end.</p>
+              <p className="mt-2 text-xs text-gray-500">
+                Drag onto the preview or click to insert into the contractor signature cell in the signing table.
+              </p>
             </div>
             {importedFileName ? (
               <p className="mb-2 text-xs text-gray-500">Imported: {importedFileName}</p>
