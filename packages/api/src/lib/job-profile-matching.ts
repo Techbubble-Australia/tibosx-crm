@@ -92,7 +92,12 @@ export function matchProfilesToJob(
   });
 
   return scored
-    .filter((row) => row.matchCount > 0)
+    .filter((row) => {
+      if (tags.length > 0) {
+        return row.matchedTags.length > 0;
+      }
+      return row.matchCount > 0;
+    })
     .sort((a, b) => b.matchCount - a.matchCount || b.matchedTags.length - a.matchedTags.length)
     .slice(0, limit);
 }
