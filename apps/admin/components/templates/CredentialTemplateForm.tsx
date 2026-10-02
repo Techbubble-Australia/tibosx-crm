@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import {
   buildHtmlWithSignatureBlock,
-  isContractorSignatureInTable,
-  insertSignatureBlockIntoContractorTable,
-  wrapTemplatePreviewHtml,
+  hasContractorSignatureBlock,
 } from "@/lib/credential-template";
+import { TemplateSignatureEditor } from "@/components/templates/TemplateSignatureEditor";
 
 export type CredentialVariable = {
   key: string;
@@ -46,14 +45,12 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
   const [signatureDragActive, setSignatureDragActive] = useState(false);
   const [showSignatureReminder, setShowSignatureReminder] = useState(false);
 
-  const previewHtml = useMemo(() => wrapTemplatePreviewHtml(html), [html]);
-  const signatureInTable = isContractorSignatureInTable(html);
   const looksLikeAgreementTemplate =
     /contractor services agreement|deed poll|assignment schedule/i.test(`${name} ${html}`);
 
   function updateSignatureReminder(nextHtml: string, nextName = name) {
     const missingSignature =
-      !isContractorSignatureInTable(nextHtml) &&
+      !hasContractorSignatureBlock(nextHtml) &&
       /contractor services agreement|deed poll|assignment schedule/i.test(`${nextName} ${nextHtml}`);
     setShowSignatureReminder(missingSignature);
   }
@@ -63,20 +60,9 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
   }, [html, name]);
 
   function insertSignatureBlock() {
-    if (isContractorSignatureInTable(html)) {
-      alert("A signature block is already in the contractor signature table cell.");
-      return;
-    }
-    const relocated = insertSignatureBlockIntoContractorTable(html);
-    const nextHtml = relocated ?? buildHtmlWithSignatureBlock(html);
-    if (nextHtml === html && html.includes('data-signature-block="contractor"')) {
-      alert(
-        "Could not find a signing table with a Signature row and “For the Contractor” column. Add the block manually in HTML source.",
-      );
-      return;
-    }
+    if (hasContractorSignatureBlock(html)) return;
     setShowSignatureReminder(false);
-    void applyParsedHtml(nextHtml);
+    void applyParsedHtml(buildHtmlWithSignatureBlock(html));
   }
 
   async function parseVariables() {
@@ -263,21 +249,17 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
                 </button>
               </div>
             </div>
-            {showSignatureReminder && !signatureInTable && looksLikeAgreementTemplate ? (
+            {showSignatureReminder && !hasContractorSignatureBlock(html) && looksLikeAgreementTemplate ? (
               <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
-                This looks like a contractor agreement.{" "}
-                {html.includes('data-signature-block="contractor"')
-                  ? "Move the signature block into the contractor signature table cell"
-                  : "Add a signature block in the contractor signature table cell"}
-                {" "}
+                This looks like a contractor agreement. Drag the{" "}
                 <button
                   type="button"
                   onClick={insertSignatureBlock}
                   className="font-medium underline hover:no-underline"
                 >
-                  {html.includes('data-signature-block="contractor"') ? "Move signature block" : "Insert signature block"}
+                  signature block
                 </button>{" "}
-                so contractors can sign in the agreement portal.
+                onto the template where the contractor should sign.
               </div>
             ) : null}
             <div className="mb-3 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/40">
@@ -298,57 +280,26 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
                 Signature block
               </button>
               <p className="mt-2 text-xs text-gray-500">
-                Drag onto the preview or click to insert into the contractor signature cell in the signing table.
+                Drag onto the template to place it, then move or resize it anywhere (including over tables). Use the corner
+                handle to resize.
               </p>
             </div>
             {importedFileName ? (
               <p className="mb-2 text-xs text-gray-500">Imported: {importedFileName}</p>
             ) : null}
             {html.trim() ? (
-              <div
-                className={`relative mb-3 overflow-hidden rounded-lg border bg-white dark:border-gray-700 ${
-                  dragOverPreview ? "border-blue-400 ring-2 ring-blue-200" : "border-gray-200"
-                }`}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = "copy";
-                  setDragOverPreview(true);
-                }}
-                onDragLeave={() => setDragOverPreview(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragOverPreview(false);
-                  setSignatureDragActive(false);
-                  if (e.dataTransfer.getData("text/plain") === "signature-block") {
-                    insertSignatureBlock();
-                  }
-                }}
-              >
-                <iframe
-                  title="Template preview"
-                  className="h-[480px] w-full bg-white"
-                  style={{ pointerEvents: signatureDragActive ? "none" : "auto" }}
-                  srcDoc={previewHtml}
-                  sandbox=""
+              <div className="mb-3">
+                <TemplateSignatureEditor
+                  html={html}
+                  onHtmlChange={(next) => {
+                    setHtml(next);
+                    updateSignatureReminder(next);
+                  }}
+                  dragOver={dragOverPreview}
+                  onDragOverChange={setDragOverPreview}
+                  signaturePaletteActive={signatureDragActive}
+                  onPaletteActiveChange={setSignatureDragActive}
                 />
-                {signatureDragActive ? (
-                  <div
-                    className="absolute inset-0 z-10 bg-blue-50/20"
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      e.dataTransfer.dropEffect = "copy";
-                      setDragOverPreview(true);
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setDragOverPreview(false);
-                      setSignatureDragActive(false);
-                      if (e.dataTransfer.getData("text/plain") === "signature-block") {
-                        insertSignatureBlock();
-                      }
-                    }}
-                  />
-                ) : null}
               </div>
             ) : (
               <p className="mb-3 text-sm text-gray-400">Import a .docx, .html, or .txt file to preview the template.</p>

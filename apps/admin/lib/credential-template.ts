@@ -1,10 +1,34 @@
-export const SIGNATURE_BLOCK_HTML = `<div data-signature-block="contractor" class="signature-block" contenteditable="false">
+export const SIGNATURE_BLOCK_SELECTOR = '[data-signature-block="contractor"]';
+
+export const DEFAULT_SIGNATURE_WIDTH_PX = 260;
+export const DEFAULT_SIGNATURE_HEIGHT_PX = 120;
+
+export const SIGNATURE_BLOCK_HTML = createSignatureBlockHtml({
+  left: 48,
+  top: 48,
+  width: DEFAULT_SIGNATURE_WIDTH_PX,
+  height: DEFAULT_SIGNATURE_HEIGHT_PX,
+});
+
+export function createSignatureBlockHtml(options: {
+  left: number;
+  top: number;
+  width?: number;
+  height?: number;
+}): string {
+  const width = options.width ?? DEFAULT_SIGNATURE_WIDTH_PX;
+  const height = options.height ?? DEFAULT_SIGNATURE_HEIGHT_PX;
+  return `<div data-signature-block="contractor" data-signature-layout="free" class="signature-block signature-block--free" contenteditable="false" style="position:absolute;left:${Math.round(options.left)}px;top:${Math.round(options.top)}px;width:${Math.round(width)}px;min-height:${Math.round(height)}px;z-index:30;box-sizing:border-box;">
+<button type="button" data-signature-drag-handle class="signature-drag-handle" aria-label="Move signature block">Move</button>
 <p><strong>Contractor signature</strong></p>
 <div data-signature-capture="contractor" class="signature-capture-area"></div>
 <p class="signature-hint">The contractor will sign here in the agreement portal.</p>
+<span data-signature-resize-handle class="signature-resize-handle" aria-hidden="true"></span>
 </div>`;
+}
 
-const TEMPLATE_PREVIEW_STYLES = `
+export const TEMPLATE_DOCUMENT_STYLES = `
+.template-canvas { position: relative; min-height: 720px; }
 body { font-family: Georgia, "Times New Roman", serif; font-size: 12pt; line-height: 1.5; color: #111; margin: 0; padding: 24px; }
 table, table.docx-table { width: 100%; border-collapse: collapse; margin: 16px 0; table-layout: fixed; border: 1px solid #374151; }
 td, th { border: 1px solid #374151; padding: 8px 10px; vertical-align: top; word-wrap: break-word; }
@@ -12,11 +36,13 @@ th { background: #f3f4f6; font-weight: 600; }
 table td p, table th p { margin: 0; }
 h1, h2, h3 { margin-top: 1.25em; margin-bottom: 0.5em; }
 ul, ol { margin: 0.5em 0 0.5em 1.25em; }
-.signature-block { border: 2px dashed #6b7280; padding: 16px; margin: 24px 0; background: #fafafa; }
-table .signature-block { margin: 0; padding: 8px 6px; }
-table .signature-capture-area { min-height: 64px; margin-top: 8px; }
-.signature-capture-area { min-height: 80px; border-bottom: 1px solid #374151; margin-top: 16px; }
-.signature-hint { margin-top: 8px; font-size: 11px; color: #6b7280; }
+.signature-block { border: 2px dashed #6b7280; padding: 12px 12px 20px; background: #fafafa; }
+.signature-block--free { margin: 0; }
+.signature-capture-area { min-height: 56px; border-bottom: 1px solid #374151; margin-top: 8px; }
+.signature-hint { margin-top: 6px; font-size: 11px; color: #6b7280; }
+.signature-drag-handle { position: absolute; top: 4px; right: 4px; z-index: 2; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; padding: 2px 8px; font-size: 10px; font-family: system-ui, sans-serif; cursor: grab; color: #374151; }
+.signature-drag-handle:active { cursor: grabbing; }
+.signature-resize-handle { position: absolute; right: 2px; bottom: 2px; width: 12px; height: 12px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, #6b7280 50%); }
 img { max-width: 100%; height: auto; }
 `;
 
@@ -24,105 +50,133 @@ export function wrapTemplatePreviewHtml(body: string): string {
   const content = body.trim();
   if (!content) return "";
   if (content.toLowerCase().includes("<html")) return content;
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${TEMPLATE_PREVIEW_STYLES}</style></head><body>${content}</body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${TEMPLATE_DOCUMENT_STYLES}</style></head><body>${content}</body></html>`;
 }
 
-function cellText(cell: Element): string {
-  return (cell.textContent ?? "").replace(/\s+/g, " ").trim();
+export function hasContractorSignatureBlock(html: string): boolean {
+  return html.includes('data-signature-block="contractor"');
 }
 
-function findContractorColumnIndex(table: HTMLTableElement): number {
-  const rows = Array.from(table.querySelectorAll("tr"));
-  for (const row of rows.slice(0, 4)) {
-    const cells = Array.from(row.querySelectorAll("td, th"));
-    const idx = cells.findIndex((cell) => /for\s+the\s+contractor/i.test(cellText(cell)));
-    if (idx >= 0) return idx;
-  }
-  const tableText = table.textContent ?? "";
-  if (/for\s+the\s+contractor/i.test(tableText)) {
-    const firstRow = rows[0];
-    if (firstRow) {
-      const count = firstRow.querySelectorAll("td, th").length;
-      if (count >= 2) return count - 1;
-    }
-  }
-  return -1;
+function parseTemplateDoc(html: string): Document {
+  return new DOMParser().parseFromString(html, "text/html");
 }
 
-function findSignatureRow(table: HTMLTableElement): HTMLTableRowElement | null {
-  for (const row of Array.from(table.querySelectorAll("tr"))) {
-    const cells = Array.from(row.querySelectorAll("td, th"));
-    const label = cellText(cells[0] ?? row);
-    if (/^signature$/i.test(label) || /^signature\s*:/i.test(label)) {
-      return row;
-    }
-  }
-  return null;
-}
-
-/** True when the contractor signature block sits in the signature row of a signing table. */
-export function isContractorSignatureInTable(html: string): boolean {
-  if (typeof DOMParser === "undefined") return false;
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  const block = doc.querySelector('[data-signature-block="contractor"]');
-  if (!block) return false;
-  const table = block.closest("table");
-  if (!table) return false;
-  const row = block.closest("tr");
-  if (!row || row !== findSignatureRow(table as HTMLTableElement)) return false;
-  const contractorCol = findContractorColumnIndex(table as HTMLTableElement);
-  if (contractorCol < 0) return false;
-  const cells = Array.from(row.querySelectorAll("td, th"));
-  return cells[contractorCol]?.contains(block) ?? false;
-}
-
-/**
- * Places the contractor signature block in the "For the Contractor" signature table cell.
- * Removes a duplicate block outside the table when relocating.
- */
-export function insertSignatureBlockIntoContractorTable(html: string): string | null {
-  if (typeof DOMParser === "undefined") return null;
-
-  const doc = new DOMParser().parseFromString(html, "text/html");
+function ensureTemplateCanvasOnDocument(doc: Document): HTMLElement {
   const body = doc.body;
+  let canvas = body.querySelector("[data-template-canvas]") as HTMLElement | null;
+  if (!canvas) {
+    canvas = doc.createElement("div");
+    canvas.setAttribute("data-template-canvas", "true");
+    canvas.className = "template-canvas";
+    while (body.firstChild) {
+      canvas.appendChild(body.firstChild);
+    }
+    body.appendChild(canvas);
+  }
+  return canvas;
+}
 
-  let existing = body.querySelector('[data-signature-block="contractor"]');
-  const blockMarkup = existing ? existing.outerHTML : SIGNATURE_BLOCK_HTML;
+export function prepareTemplateCanvasHtml(html: string): string {
+  const doc = parseTemplateDoc(html);
+  ensureTemplateCanvasOnDocument(doc);
+  return doc.body.innerHTML;
+}
 
-  for (const table of Array.from(body.querySelectorAll("table"))) {
-    const contractorCol = findContractorColumnIndex(table);
-    if (contractorCol < 0) continue;
+/** Normalize legacy flow/table blocks to free-positioned overlay on the canvas. */
+export function normalizeSignatureBlockLayout(canvas: HTMLElement): void {
+  const block = canvas.querySelector(SIGNATURE_BLOCK_SELECTOR);
+  if (!(block instanceof HTMLElement)) return;
 
-    const signatureRow = findSignatureRow(table);
-    if (!signatureRow) continue;
+  const layout = block.getAttribute("data-signature-layout");
+  const hasPosition = block.style.position === "absolute" && block.style.left && block.style.top;
+  if (layout === "free" && hasPosition) return;
 
-    const cells = Array.from(signatureRow.querySelectorAll("td, th"));
-    const target = cells[contractorCol];
-    if (!target) continue;
+  const canvasRect = canvas.getBoundingClientRect();
+  const blockRect = block.getBoundingClientRect();
+  const left = Math.max(0, blockRect.left - canvasRect.left + canvas.scrollLeft);
+  const top = Math.max(0, blockRect.top - canvasRect.top + canvas.scrollTop);
+  const width = blockRect.width || DEFAULT_SIGNATURE_WIDTH_PX;
+  const height = blockRect.height || DEFAULT_SIGNATURE_HEIGHT_PX;
 
-    if (existing) existing.remove();
-    target.innerHTML = blockMarkup;
-    return body.innerHTML;
+  if (block.parentElement && block.parentElement !== canvas) {
+    block.remove();
+    canvas.appendChild(block);
   }
 
-  return null;
+  block.setAttribute("data-signature-layout", "free");
+  block.classList.add("signature-block--free");
+  block.style.position = "absolute";
+  block.style.left = `${Math.round(left)}px`;
+  block.style.top = `${Math.round(top)}px`;
+  block.style.width = `${Math.round(width)}px`;
+  block.style.minHeight = `${Math.round(height)}px`;
+  block.style.zIndex = "30";
+  block.style.boxSizing = "border-box";
+  block.style.margin = "0";
+
+  ensureEditorChrome(block);
+}
+
+function ensureEditorChrome(block: HTMLElement): void {
+  if (!block.querySelector("[data-signature-drag-handle]")) {
+    const handle = document.createElement("button");
+    handle.type = "button";
+    handle.setAttribute("data-signature-drag-handle", "");
+    handle.className = "signature-drag-handle";
+    handle.setAttribute("aria-label", "Move signature block");
+    handle.textContent = "Move";
+    block.insertBefore(handle, block.firstChild);
+  }
+  if (!block.querySelector("[data-signature-resize-handle]")) {
+    const resize = document.createElement("span");
+    resize.setAttribute("data-signature-resize-handle", "");
+    resize.className = "signature-resize-handle";
+    resize.setAttribute("aria-hidden", "true");
+    block.appendChild(resize);
+  }
+}
+
+export function placeSignatureBlockAt(html: string, left: number, top: number): string {
+  const doc = parseTemplateDoc(html);
+  const canvas = ensureTemplateCanvasOnDocument(doc);
+
+  let block = canvas.querySelector(SIGNATURE_BLOCK_SELECTOR) as HTMLElement | null;
+  if (!block) {
+    canvas.insertAdjacentHTML("beforeend", createSignatureBlockHtml({ left, top }));
+    block = canvas.querySelector(SIGNATURE_BLOCK_SELECTOR) as HTMLElement;
+  }
+  if (block) {
+    if (block.parentElement !== canvas) {
+      block.remove();
+      canvas.appendChild(block);
+    }
+    block.setAttribute("data-signature-layout", "free");
+    block.classList.add("signature-block--free");
+    block.style.position = "absolute";
+    block.style.left = `${Math.round(left)}px`;
+    block.style.top = `${Math.round(top)}px`;
+    block.style.zIndex = "30";
+    block.style.boxSizing = "border-box";
+    block.style.margin = "0";
+    if (!block.style.width) block.style.width = `${DEFAULT_SIGNATURE_WIDTH_PX}px`;
+    if (!block.style.minHeight) block.style.minHeight = `${DEFAULT_SIGNATURE_HEIGHT_PX}px`;
+    ensureEditorChrome(block);
+  }
+
+  return doc.body.innerHTML;
+}
+
+export function serializeTemplateHtmlFromCanvas(canvas: HTMLElement): string {
+  const root = canvas.closest("[data-template-canvas]") as HTMLElement | null;
+  return root?.outerHTML ?? canvas.outerHTML;
 }
 
 export function buildHtmlWithSignatureBlock(sourceHtml: string): string {
-  if (isContractorSignatureInTable(sourceHtml)) {
+  if (hasContractorSignatureBlock(sourceHtml)) {
     return sourceHtml;
   }
-
-  const inTable = insertSignatureBlockIntoContractorTable(sourceHtml);
-  if (inTable) return inTable;
-
-  if (sourceHtml.includes('data-signature-block="contractor"')) {
-    return sourceHtml;
-  }
-
   if (/\{contractor_signature\}/i.test(sourceHtml)) {
     return sourceHtml.replace(/\{contractor_signature\}/i, SIGNATURE_BLOCK_HTML);
   }
-
-  return `${sourceHtml.trim()}\n${SIGNATURE_BLOCK_HTML}`;
+  return placeSignatureBlockAt(sourceHtml, 48, 48);
 }
