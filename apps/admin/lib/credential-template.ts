@@ -16,13 +16,16 @@ export function createFlowSignatureBlockHtml(): string {
 export const SIGNATURE_BLOCK_HTML = createFlowSignatureBlockHtml();
 
 export const TEMPLATE_DOCUMENT_STYLES = `
-.template-canvas { position: relative; min-height: 480px; }
+.template-canvas { position: relative; min-height: 480px; outline: none; }
+.template-canvas-editable:focus { box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.35); }
 body { font-family: Georgia, "Times New Roman", serif; font-size: 12pt; line-height: 1.5; color: #111; margin: 0; padding: 24px; }
-table, table.docx-table { width: 100%; border-collapse: collapse; margin: 16px 0; table-layout: fixed; border: 1px solid #374151; }
-.template-editable-table { position: relative; }
+table, table.docx-table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 16px 0; table-layout: auto; border: 1px solid #374151; }
+.template-table-host { position: relative; max-width: 100%; margin: 16px 0; }
+.template-table-host > table { margin: 0; }
 td, th { border: 1px solid #374151; padding: 8px 10px; vertical-align: top; word-wrap: break-word; }
 th { background: #f3f4f6; font-weight: 600; }
-table td p, table th p { margin: 0; }
+table td p, table th p { margin: 0 0 0.35em 0; }
+table td p:last-child, table th p:last-child { margin-bottom: 0; }
 h1, h2, h3 { margin-top: 1.25em; margin-bottom: 0.5em; }
 ul, ol { margin: 0.5em 0 0.5em 1.25em; }
 .signature-block { border: 2px dashed #6b7280; padding: 12px 12px 20px; background: #fafafa; position: relative; }
@@ -34,10 +37,53 @@ td .signature-block--flow, th .signature-block--flow { margin: 6px 0; max-width:
 .signature-drag-handle:active { cursor: grabbing; }
 .signature-resize-handle { position: absolute; right: 2px; bottom: 2px; width: 12px; height: 12px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, #6b7280 50%); }
 .template-drop-target { outline: 2px dashed #3b82f6; outline-offset: 2px; background: rgba(59, 130, 246, 0.06); }
-.table-width-resize-grip { position: absolute; right: 2px; bottom: 2px; width: 14px; height: 14px; cursor: nwse-resize; z-index: 4; background: linear-gradient(135deg, transparent 55%, #9ca3af 55%); }
-.table-col-resize-grip { position: absolute; top: 0; right: -4px; width: 8px; height: 100%; cursor: col-resize; z-index: 4; }
+.table-width-resize-grip { position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; cursor: nwse-resize; z-index: 4; background: linear-gradient(135deg, transparent 55%, #9ca3af 55%); }
+.template-format-toolbar button { border: 1px solid #d1d5db; background: #fff; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
+.template-format-toolbar button:hover { background: #f3f4f6; }
 img { max-width: 100%; height: auto; }
 `;
+
+export function getTableColumnCount(table: HTMLTableElement): number {
+  let max = 0;
+  for (const row of table.querySelectorAll("tr")) {
+    let count = 0;
+    for (const cell of row.querySelectorAll("td, th")) {
+      count += Number.parseInt(cell.getAttribute("colspan") || "1", 10) || 1;
+    }
+    max = Math.max(max, count);
+  }
+  return Math.max(max, 1);
+}
+
+/** Fix invalid editor markup and colgroups that collapse Word tables to one column. */
+export function repairImportedTables(root: ParentNode): void {
+  root.querySelectorAll(".table-width-resize-grip, .table-col-resize-grip").forEach((node) => node.remove());
+
+  for (const table of Array.from(root.querySelectorAll("table"))) {
+    if (!(table instanceof HTMLTableElement)) continue;
+
+    for (const child of Array.from(table.children)) {
+      if (child.tagName !== "CAPTION" && child.tagName !== "COLGROUP" && child.tagName !== "THEAD" && child.tagName !== "TBODY" && child.tagName !== "TFOOT" && child.tagName !== "TR") {
+        child.remove();
+      }
+    }
+
+    const colgroup = table.querySelector("colgroup");
+    if (colgroup && !colgroup.hasAttribute("data-user-resized")) {
+      const cols = colgroup.querySelectorAll("col").length;
+      if (cols !== getTableColumnCount(table)) {
+        colgroup.remove();
+      }
+    }
+  }
+}
+
+export function stripEditorArtifacts(html: string): string {
+  const doc = parseTemplateDoc(html);
+  repairImportedTables(doc.body);
+  doc.querySelectorAll(".table-width-resize-grip, .table-col-resize-grip").forEach((node) => node.remove());
+  return doc.body.innerHTML;
+}
 
 export function wrapTemplatePreviewHtml(body: string): string {
   const content = body.trim();
@@ -164,10 +210,17 @@ export function normalizeSignatureBlockToFlow(canvas: HTMLElement): void {
     parent instanceof HTMLParagraphElement ||
     (parent instanceof HTMLDivElement && !parent.hasAttribute("data-template-canvas"));
 
-  if (layout === "flow" && inFlowParent) {
+  const isOverlay =
+    layout === "free" ||
+    block.style.position === "absolute" ||
+    parent?.hasAttribute("data-template-canvas");
+
+  if (!isOverlay && inFlowParent) {
     if (parent instanceof HTMLTableCellElement) prepareCellForSignature(parent);
     return;
   }
+
+  if (!isOverlay) return;
 
   const contractorCell = findContractorSignatureCell(canvas);
   if (contractorCell) {
@@ -218,7 +271,8 @@ export function insertSignatureInContractorCell(html: string): string {
 
 export function serializeTemplateHtmlFromCanvas(canvas: HTMLElement): string {
   const root = canvas.closest("[data-template-canvas]") as HTMLElement | null;
-  return root?.outerHTML ?? canvas.outerHTML;
+  const raw = root?.outerHTML ?? canvas.outerHTML;
+  return stripEditorArtifacts(raw);
 }
 
 export function buildHtmlWithSignatureBlock(sourceHtml: string): string {

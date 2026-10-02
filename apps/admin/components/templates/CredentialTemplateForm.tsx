@@ -280,8 +280,8 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
                 Signature block
               </button>
               <p className="mt-2 text-xs text-gray-500">
-                Drag into a table cell or paragraph — the layout reflows around it. Move the block by dragging; resize with
-                the corner handle. Drag table column edges or the table corner to resize tables.
+                Edit the document directly (text and tables). Drag the signature block into place; resize tables from the
+                bottom-right corner grip.
               </p>
             </div>
             {importedFileName ? (

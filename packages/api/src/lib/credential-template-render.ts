@@ -11,7 +11,9 @@ export const SIGNATURE_BLOCK_HTML = `<div ${SIGNATURE_BLOCK_MARKER}="contractor"
 const TEMPLATE_PREVIEW_STYLES = `
 .template-canvas { position: relative; min-height: 720px; }
 body { font-family: Georgia, "Times New Roman", serif; font-size: 12pt; line-height: 1.5; color: #111; margin: 0; padding: 24px; }
-table, table.docx-table { width: 100%; border-collapse: collapse; margin: 16px 0; table-layout: fixed; border: 1px solid #374151; }
+.template-table-host { position: relative; max-width: 100%; margin: 16px 0; }
+.template-table-host > table { margin: 0; }
+table, table.docx-table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 16px 0; table-layout: auto; border: 1px solid #374151; }
 td, th { border: 1px solid #374151; padding: 8px 10px; vertical-align: top; word-wrap: break-word; }
 th { background: #f3f4f6; font-weight: 600; }
 table td p, table th p { margin: 0; }

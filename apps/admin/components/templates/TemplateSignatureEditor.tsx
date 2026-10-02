@@ -9,6 +9,7 @@ import {
   normalizeSignatureBlockToFlow,
   prepareCellForSignature,
   prepareTemplateCanvasHtml,
+  repairImportedTables,
   serializeTemplateHtmlFromCanvas,
   SIGNATURE_BLOCK_SELECTOR,
   TEMPLATE_DOCUMENT_STYLES,
@@ -60,7 +61,9 @@ export function TemplateSignatureEditor({
     if (!mounted) return;
     canvasRef.current = mounted;
 
+    repairImportedTables(mounted);
     normalizeSignatureBlockToFlow(mounted);
+    attachContentEditable(mounted, syncHtmlFromCanvas);
     attachEditorInteractions(mounted, syncHtmlFromCanvas, dropHighlightRef);
     syncingRef.current = false;
   }, [html, syncHtmlFromCanvas]);
@@ -87,6 +90,14 @@ export function TemplateSignatureEditor({
     }
 
     clearDropHighlight(dropHighlightRef);
+    syncHtmlFromCanvas();
+  }
+
+  function runFormat(command: string) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.focus();
+    document.execCommand(command, false);
     syncHtmlFromCanvas();
   }
 
@@ -118,6 +129,24 @@ export function TemplateSignatureEditor({
       }}
     >
       <style>{TEMPLATE_DOCUMENT_STYLES}</style>
+      <div className="template-format-toolbar flex flex-wrap gap-2 border-b border-gray-100 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-900/50">
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => runFormat("bold")}>
+          Bold
+        </button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => runFormat("italic")}>
+          Italic
+        </button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => runFormat("underline")}>
+          Underline
+        </button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => runFormat("insertUnorderedList")}>
+          Bullets
+        </button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => runFormat("insertOrderedList")}>
+          Numbered list
+        </button>
+        <span className="self-center text-xs text-gray-500">Click in the document to edit text, tables, and cells like Word.</span>
+      </div>
       <div
         ref={hostRef}
         className={`template-editor-host h-[520px] overflow-auto bg-white p-0 ${
@@ -128,13 +157,32 @@ export function TemplateSignatureEditor({
   );
 }
 
+function attachContentEditable(canvas: HTMLElement, onChange: () => void) {
+  canvas.setAttribute("contenteditable", "true");
+  canvas.setAttribute("spellcheck", "true");
+  canvas.classList.add("template-canvas-editable");
+
+  let inputTimer: number | undefined;
+  canvas.addEventListener("input", () => {
+    window.clearTimeout(inputTimer);
+    inputTimer = window.setTimeout(() => onChange(), 200);
+  });
+
+  canvas.addEventListener("paste", (event) => {
+    event.preventDefault();
+    const text = event.clipboardData?.getData("text/plain") ?? "";
+    document.execCommand("insertText", false, text);
+    onChange();
+  });
+}
+
 function attachEditorInteractions(
   canvas: HTMLElement,
   onChange: () => void,
   dropHighlightRef: React.MutableRefObject<HTMLElement | null>,
 ) {
   attachSignatureInteractions(canvas, onChange, dropHighlightRef);
-  attachTableResizeInteractions(canvas, onChange);
+  attachTableWidthResize(canvas, onChange);
 }
 
 function attachSignatureInteractions(
@@ -164,10 +212,6 @@ function attachSignatureInteractions(
         applyFlowSignatureStyles(block);
         container.appendChild(block);
         if (container instanceof HTMLTableCellElement) prepareCellForSignature(container);
-        const oldParent = block.parentElement;
-        if (oldParent instanceof HTMLTableCellElement && !oldParent.textContent?.trim()) {
-          oldParent.style.minHeight = "";
-        }
       }
       clearDropHighlight(dropHighlightRef);
       onChange();
@@ -181,11 +225,6 @@ function attachSignatureInteractions(
   if (dragHandle instanceof HTMLElement) {
     dragHandle.onmousedown = startMove;
   }
-  block.onmousedown = (event) => {
-    const target = event.target as HTMLElement;
-    if (target.closest("[data-signature-drag-handle], [data-signature-resize-handle]")) return;
-    startMove(event);
-  };
 
   const resizeHandle = block.querySelector("[data-signature-resize-handle]");
   if (resizeHandle instanceof HTMLElement) {
@@ -219,101 +258,47 @@ function attachSignatureInteractions(
   }
 }
 
-function attachTableResizeInteractions(canvas: HTMLElement, onChange: () => void) {
+function attachTableWidthResize(canvas: HTMLElement, onChange: () => void) {
   for (const table of Array.from(canvas.querySelectorAll("table"))) {
     if (!(table instanceof HTMLTableElement)) continue;
-    table.classList.add("template-editable-table");
-    ensureTableColgroup(table);
 
-    if (!table.querySelector(".table-width-resize-grip")) {
-      const widthGrip = document.createElement("span");
-      widthGrip.className = "table-width-resize-grip";
-      widthGrip.setAttribute("aria-hidden", "true");
-      widthGrip.onmousedown = (event) => {
-        event.preventDefault();
-        const startX = event.clientX;
-        const startWidth = table.getBoundingClientRect().width;
-
-        const onMove = (moveEvent: MouseEvent) => {
-          const next = Math.max(240, startWidth + moveEvent.clientX - startX);
-          table.style.width = `${Math.round(next)}px`;
-          table.style.maxWidth = "100%";
-        };
-
-        const onUp = () => {
-          window.removeEventListener("mousemove", onMove);
-          window.removeEventListener("mouseup", onUp);
-          onChange();
-        };
-
-        window.addEventListener("mousemove", onMove);
-        window.addEventListener("mouseup", onUp);
-      };
-      table.appendChild(widthGrip);
+    let host = table.parentElement;
+    if (!host?.classList.contains("template-table-host")) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "template-table-host";
+      table.parentNode?.insertBefore(wrapper, table);
+      wrapper.appendChild(table);
+      host = wrapper;
     }
+    if (!host) continue;
 
-    const headerRow = table.querySelector("tr");
-    if (!headerRow) continue;
-    const cells = Array.from(headerRow.querySelectorAll("td, th")).filter(
-      (cell): cell is HTMLTableCellElement => cell instanceof HTMLTableCellElement,
-    );
+    if (host.querySelector(".table-width-resize-grip")) continue;
 
-    cells.forEach((cell, index) => {
-      if (index >= cells.length - 1) return;
-      if (cell.querySelector(".table-col-resize-grip")) return;
-      cell.style.position = "relative";
+    const widthGrip = document.createElement("span");
+    widthGrip.className = "table-width-resize-grip";
+    widthGrip.setAttribute("aria-hidden", "true");
+    widthGrip.onmousedown = (event) => {
+      event.preventDefault();
+      const startX = event.clientX;
+      const startWidth = table.getBoundingClientRect().width;
 
-      const grip = document.createElement("span");
-      grip.className = "table-col-resize-grip";
-      grip.setAttribute("aria-hidden", "true");
-      grip.onmousedown = (event) => {
-        event.preventDefault();
-        const col = table.querySelectorAll("col")[index] as HTMLTableColElement | undefined;
-        const nextCol = table.querySelectorAll("col")[index + 1] as HTMLTableColElement | undefined;
-        if (!col || !nextCol) return;
-
-        const startX = event.clientX;
-        const nextCell = cells[index + 1];
-        if (!nextCell) return;
-        const startW = cell.offsetWidth;
-        const startNextW = nextCell.offsetWidth;
-
-        const onMove = (moveEvent: MouseEvent) => {
-          const delta = moveEvent.clientX - startX;
-          const w1 = Math.max(48, startW + delta);
-          const w2 = Math.max(48, startNextW - delta);
-          col.style.width = `${w1}px`;
-          nextCol.style.width = `${w2}px`;
-        };
-
-        const onUp = () => {
-          window.removeEventListener("mousemove", onMove);
-          window.removeEventListener("mouseup", onUp);
-          onChange();
-        };
-
-        window.addEventListener("mousemove", onMove);
-        window.addEventListener("mouseup", onUp);
+      const onMove = (moveEvent: MouseEvent) => {
+        const next = Math.max(240, startWidth + moveEvent.clientX - startX);
+        table.style.width = `${Math.round(next)}px`;
+        table.style.maxWidth = "100%";
       };
-      cell.appendChild(grip);
-    });
-  }
-}
 
-function ensureTableColgroup(table: HTMLTableElement) {
-  if (table.querySelector("colgroup")) return;
-  const firstRow = table.querySelector("tr");
-  const count = firstRow?.querySelectorAll("td, th").length ?? 0;
-  if (count === 0) return;
-  const colgroup = document.createElement("colgroup");
-  const tableWidth = table.getBoundingClientRect().width || 600;
-  const colWidth = Math.round(tableWidth / count);
-  for (let i = 0; i < count; i++) {
-    const col = document.createElement("col");
-    col.style.width = `${colWidth}px`;
-    colgroup.appendChild(col);
+      const onUp = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        onChange();
+      };
+
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    };
+    host.appendChild(widthGrip);
   }
-  table.insertBefore(colgroup, table.firstChild);
 }
 
 function highlightDropTarget(
