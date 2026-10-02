@@ -280,8 +280,8 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
                 Signature block
               </button>
               <p className="mt-2 text-xs text-gray-500">
-                Drag onto the template to place it, then move or resize it anywhere (including over tables). Use the corner
-                handle to resize.
+                Drag into a table cell or paragraph — the layout reflows around it. Move the block by dragging; resize with
+                the corner handle. Drag table column edges or the table corner to resize tables.
               </p>
             </div>
             {importedFileName ? (
