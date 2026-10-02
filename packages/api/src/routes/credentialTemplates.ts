@@ -8,7 +8,7 @@ import {
   normalizeTemplatePlaceholders,
   type CredentialTemplateVariable,
 } from "../lib/credential-template-vars";
-import { importDocumentToHtml, previewImportedHtml } from "../lib/document-html";
+import { importDocumentToHtml, polishTemplateHtml, previewImportedHtml } from "../lib/document-html";
 
 const router: IRouter = Router();
 
@@ -95,8 +95,9 @@ router.post("/import-document", upload.single("document"), async (req, res) => {
 router.post("/parse-variables", async (req, res) => {
   try {
     const html = z.object({ html: z.string() }).parse(req.body).html;
-    const variables = mergeVariablesFromHtml(html);
-    const normalizedHtml = normalizeTemplatePlaceholders(html, variables);
+    const polishedHtml = polishTemplateHtml(html);
+    const variables = mergeVariablesFromHtml(polishedHtml);
+    const normalizedHtml = normalizeTemplatePlaceholders(polishedHtml, variables);
     res.json({ data: { variables, normalizedHtml } });
   } catch (error) {
     if (error instanceof z.ZodError) {

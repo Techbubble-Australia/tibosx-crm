@@ -3,9 +3,11 @@ import { cleanPlaceholdersInHtml } from "./credential-template-vars";
 import { wrapTemplateHtml } from "./credential-template-render";
 
 const MAMMOTH_STYLE_MAP = [
+  "p[style-name='Title'] => h1.docx-agreement-title:fresh",
+  "p[style-name='Subtitle'] => p.docx-subtitle:fresh",
   "p[style-name='Heading 1'] => h1:fresh",
-  "p[style-name='Heading 2'] => h2:fresh",
-  "p[style-name='Heading 3'] => h3:fresh",
+  "p[style-name='Heading 2'] => h2.docx-section-title:fresh",
+  "p[style-name='Heading 3'] => h3.docx-subsection-title:fresh",
   "p[style-name='Heading 4'] => h4:fresh",
   "p[style-name='List Paragraph'] => p:fresh",
   "r[style-name='Strong'] => strong",
@@ -16,14 +18,30 @@ const MAMMOTH_STYLE_MAP = [
 ];
 
 export async function convertDocxBufferToHtml(buffer: Buffer): Promise<string> {
+  const imageCounter = { value: 0 };
   const result = await mammoth.convertToHtml(
     { buffer },
     {
       styleMap: MAMMOTH_STYLE_MAP,
       includeDefaultStyleMap: true,
       ignoreEmptyParagraphs: false,
+      convertImage: mammoth.images.imgElement((image) =>
+        image.read("base64").then((imageBuffer) => {
+          imageCounter.value += 1;
+          return {
+            src: `data:${image.contentType};base64,${imageBuffer}`,
+            class: imageCounter.value === 1 ? "docx-logo" : "docx-inline-image",
+          };
+        }),
+      ),
     },
   );
+  if (result.messages.length > 0) {
+    console.info(
+      "DOCX import notes:",
+      result.messages.map((message) => message.message).join("; "),
+    );
+  }
   return enhanceImportedHtml(result.value.trim());
 }
 
@@ -36,7 +54,6 @@ function enhanceImportedHtml(html: string): string {
   next = cleanPlaceholdersInHtml(next);
   next = next
     .replace(/<table(?![^>]*class=)/g, '<table class="docx-table"')
-    .replace(/<table class="docx-table"(?![^>]*class=)/g, '<table class="docx-table"')
     .replace(/<td(?![^>]*valign=)/g, '<td valign="top"')
     .replace(/<th(?![^>]*valign=)/g, '<th valign="top"')
     .replace(/<td([^>]*)><p>/g, "<td$1>")
@@ -44,9 +61,65 @@ function enhanceImportedHtml(html: string): string {
     .replace(/<th([^>]*)><p>/g, "<th$1>")
     .replace(/<\/p><\/th>/g, "</th>");
 
+  next = promoteAgreementTitle(next);
+  next = promoteSectionTitles(next);
+  next = promoteSubsectionTitles(next);
+  next = styleItemDetailsTables(next);
   next = fixCommonTemplateTypos(next);
   next = reconstructSectionTables(next);
   return next;
+}
+
+function promoteAgreementTitle(html: string): string {
+  return html
+    .replace(
+      /<p[^>]*>(?:<strong>)?(TECHBUBBLE PTY LTD\s*[—–-]\s*Contractor Services Agreement)(?:<\/strong>)?<\/p>/i,
+      '<h1 class="docx-agreement-title">$1</h1>',
+    )
+    .replace(
+      /<h1(?![^>]*class=)[^>]*>(TECHBUBBLE PTY LTD\s*[—–-]\s*Contractor Services Agreement)<\/h1>/i,
+      '<h1 class="docx-agreement-title">$1</h1>',
+    );
+}
+
+function promoteSectionTitles(html: string): string {
+  return html.replace(
+    /<p[^>]*>\s*<strong>\s*(Part\s+[A-C]\s*[—–-]\s*[^<]+?)<\/strong>\s*<\/p>/gi,
+    '<h2 class="docx-section-title">$1</h2>',
+  );
+}
+
+function promoteSubsectionTitles(html: string): string {
+  return html.replace(
+    /<p[^>]*>\s*<strong>\s*(Contractor details|Assignment details)\s*<\/strong>\s*<\/p>/gi,
+    '<h3 class="docx-subsection-title">$1</h3>',
+  );
+}
+
+function styleItemDetailsTables(html: string): string {
+  return html.replace(/<table class="docx-table([^"]*)">([\s\S]*?)<\/table>/gi, (full, extraClass, inner) => {
+    if (!/\bItem\b/i.test(inner) || !/\bDetails\b/i.test(inner)) {
+      return full;
+    }
+
+    let body = inner.trim();
+    const headerRow =
+      /<tr>\s*<t([dh])([^>]*)>\s*Item\s*<\/t\1>\s*<t([dh])([^>]*)>\s*Details\s*<\/t\3>\s*<\/tr>/i;
+    if (headerRow.test(body) && !/<thead/i.test(body)) {
+      body = body.replace(
+        headerRow,
+        "<thead><tr><th$2>Item</th><th$4>Details</th></tr></thead><tbody>",
+      );
+      if (!body.includes("</tbody>")) {
+        body = `${body}</tbody>`;
+      }
+    } else if (!/<thead/i.test(body)) {
+      body = `<thead><tr><th valign="top">Item</th><th valign="top">Details</th></tr></thead><tbody>${body}</tbody>`;
+    }
+
+    const className = `docx-table docx-details-table${extraClass ?? ""}`.trim();
+    return `<table class="${className}">${body}</table>`;
+  });
 }
 
 function reconstructSectionTables(html: string): string {
@@ -55,7 +128,7 @@ function reconstructSectionTables(html: string): string {
 
   for (const title of sectionTitles) {
     const sectionPattern = new RegExp(
-      `(<h[1-6][^>]*>\\s*${escapeRegExp(title)}\\s*<\\/h[1-6]>|<p[^>]*>\\s*<strong>\\s*${escapeRegExp(title)}\\s*<\\/strong>\\s*<\\/p>|<p[^>]*>\\s*${escapeRegExp(title)}\\s*<\\/p>)`,
+      `(<h3[^>]*class="docx-subsection-title"[^>]*>\\s*${escapeRegExp(title)}\\s*<\\/h3>|<h[1-6][^>]*>\\s*${escapeRegExp(title)}\\s*<\\/h[1-6]>|<p[^>]*>\\s*<strong>\\s*${escapeRegExp(title)}\\s*<\\/strong>\\s*<\\/p>|<p[^>]*>\\s*${escapeRegExp(title)}\\s*<\\/p>)`,
       "i",
     );
     const match = sectionPattern.exec(output);
@@ -87,7 +160,7 @@ function buildItemDetailsTable(sectionHtml: string): string | null {
     )
     .join("");
 
-  return `<table class="docx-table"><thead><tr><th valign="top">Item</th><th valign="top">Details</th></tr></thead><tbody>${body}</tbody></table>`;
+  return `<table class="docx-table docx-details-table"><thead><tr><th valign="top">Item</th><th valign="top">Details</th></tr></thead><tbody>${body}</tbody></table>`;
 }
 
 function extractItemDetailRows(sectionHtml: string): Array<[string, string]> {
@@ -148,9 +221,13 @@ export async function importDocumentToHtml(buffer: Buffer, filename: string): Pr
   }
   if (ext === "html" || ext === "htm" || ext === "txt") {
     const raw = readTextOrHtmlBuffer(buffer, filename);
-    return ext === "txt" ? `<pre>${raw}</pre>` : raw;
+    return ext === "txt" ? `<pre>${raw}</pre>` : enhanceImportedHtml(raw);
   }
   throw new Error("Unsupported file type. Use .docx, .html, .htm, or .txt");
+}
+
+export function polishTemplateHtml(html: string): string {
+  return enhanceImportedHtml(html);
 }
 
 export function previewImportedHtml(html: string): string {
