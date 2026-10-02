@@ -1,7 +1,6 @@
 /** Keep in sync with packages/api/src/lib/document-template-styles.ts */
 export const DOCUMENT_TEMPLATE_STYLES = `
-.template-canvas,
-.ProseMirror.template-canvas { position: relative; min-height: 480px; outline: none; padding: 32px 48px; box-sizing: border-box; }
+.template-canvas { position: relative; min-height: 480px; outline: none; padding: 32px 48px; box-sizing: border-box; }
 .template-canvas-editable:focus { box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.35); }
 body { margin: 0; padding: 24px; color: #111; }
 .template-canvas,

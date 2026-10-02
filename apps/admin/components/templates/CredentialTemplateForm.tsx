@@ -7,7 +7,7 @@ import {
   buildHtmlWithSignatureBlock,
   hasContractorSignatureBlock,
 } from "@/lib/credential-template";
-import { TemplateWysiwygEditor } from "@/components/templates/TemplateWysiwygEditor";
+import { TemplateSignatureEditor } from "@/components/templates/TemplateSignatureEditor";
 
 export type CredentialVariable = {
   key: string;
@@ -289,7 +289,7 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
             ) : null}
             {html.trim() ? (
               <div className="mb-3">
-                <TemplateWysiwygEditor
+                <TemplateSignatureEditor
                   html={html}
                   onHtmlChange={(next) => {
                     setHtml(next);
