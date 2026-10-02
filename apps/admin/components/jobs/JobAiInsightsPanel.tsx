@@ -47,11 +47,19 @@ export function JobAiInsightsPanel({ jobId, metaTags = [] }: Props) {
   useEffect(() => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (metaTags.length) params.set("metaTags", metaTags.join(","));
+    params.set("metaTags", metaTags.join(","));
+    const tagsForFilter = metaTags.map((t) => t.trim().toLowerCase()).filter(Boolean);
     const timer = window.setTimeout(() => {
       void adminFetch(`/api/admin/jobs/admin/${jobId}/matching-profiles?${params.toString()}`)
         .then((res) => res.json())
-        .then((data) => setRows((data.data as MatchRow[]) ?? []))
+        .then((data) => {
+          const rows = (data.data as MatchRow[]) ?? [];
+          setRows(
+            tagsForFilter.length > 0
+              ? rows.filter((row) => row.matchedTags.length > 0)
+              : rows,
+          );
+        })
         .finally(() => setLoading(false));
     }, 300);
     return () => window.clearTimeout(timer);
@@ -79,7 +87,7 @@ export function JobAiInsightsPanel({ jobId, metaTags = [] }: Props) {
     <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
       <h3 className="mb-1 font-semibold text-gray-900 dark:text-gray-100">AI Insights</h3>
       <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-        Matching profiles based on country and meta tags (including resume text).
+        When meta tags are set, only profiles with at least one matching tag are shown (resume, skills, and comments are searched). Without meta tags, matches use job country.
       </p>
       {loading ? (
         <p className="text-sm text-gray-400">Loading matches…</p>

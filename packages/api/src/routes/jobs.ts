@@ -11,7 +11,7 @@ import {
 import { JOB_LISTING_TYPES } from "../lib/careers-form";
 import { DEFAULT_PROFILE_LEVEL } from "../lib/profile-levels";
 import { getJobLevelNames } from "../lib/job-levels";
-import { matchProfilesToJob } from "../lib/job-profile-matching";
+import { matchProfilesToJob, resolveJobMetaTagsForMatch } from "../lib/job-profile-matching";
 import type { AuthRequest } from "../middleware/auth";
 import { createCareerApplicationForProfile } from "../lib/profile-to-application";
 
@@ -513,13 +513,13 @@ router.get("/admin/:id/matching-profiles", async (req, res) => {
   try {
     const job = await prisma.jobListing.findUnique({ where: { id: req.params.id } });
     if (!job) return res.status(404).json({ error: "Job not found" });
-    const queryMetaTags =
-      typeof req.query.metaTags === "string" ? req.query.metaTags.trim() : "";
-    const metaTags = queryMetaTags
-      ? queryMetaTags.split(",").map((tag) => tag.trim()).filter(Boolean)
-      : Array.isArray(job.metaTags)
-        ? job.metaTags.filter((tag): tag is string => typeof tag === "string")
-        : [];
+    const savedMetaTags = Array.isArray(job.metaTags)
+      ? job.metaTags.filter((tag): tag is string => typeof tag === "string")
+      : [];
+    const metaTags = resolveJobMetaTagsForMatch(
+      req.query as Record<string, unknown>,
+      savedMetaTags,
+    );
     const profiles = await prisma.candidateProfile.findMany({
       select: {
         id: true,

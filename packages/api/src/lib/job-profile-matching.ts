@@ -34,6 +34,29 @@ function normalizeTag(value: string): string {
   return value.trim().toLowerCase();
 }
 
+/** When `metaTags` is present on the query (even empty), use it; otherwise use saved job tags. */
+export function resolveJobMetaTagsForMatch(
+  query: Record<string, unknown>,
+  jobMetaTags: string[],
+): string[] {
+  if (!Object.prototype.hasOwnProperty.call(query, "metaTags")) {
+    return jobMetaTags.map((tag) => tag.trim()).filter(Boolean);
+  }
+  const raw = query.metaTags;
+  if (raw === undefined || raw === null) return [];
+  if (typeof raw === "string") {
+    if (!raw.trim()) return [];
+    return raw.split(",").map((tag) => tag.trim()).filter(Boolean);
+  }
+  if (Array.isArray(raw)) {
+    return raw
+      .flatMap((part) => String(part).split(","))
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 function jobCountries(job: JobForMatch): Set<string> {
   const countries = new Set<string>();
   if (job.country.trim()) countries.add(normalizeTag(job.country));
@@ -76,7 +99,10 @@ export function matchProfilesToJob(
       (profile.country.trim() && jobCountrySet.has(normalizeTag(profile.country)));
     const haystack = profileSearchText(profile);
     const matchedTags = tags.filter((tag) => haystack.includes(tag));
-    const matchCount = matchedTags.length + (countryMatch ? 1 : 0);
+    const matchCount =
+      tags.length > 0
+        ? matchedTags.length
+        : matchedTags.length + (countryMatch ? 1 : 0);
     return {
       profileId: profile.id,
       firstName: profile.firstName,
