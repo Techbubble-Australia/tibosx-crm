@@ -16,7 +16,7 @@ export function createFlowSignatureBlockHtml(): string {
 export const SIGNATURE_BLOCK_HTML = createFlowSignatureBlockHtml();
 
 export const TEMPLATE_DOCUMENT_STYLES = `
-.template-canvas { position: relative; min-height: 480px; outline: none; }
+.template-canvas { position: relative; min-height: 480px; outline: none; padding: 32px 48px; box-sizing: border-box; }
 .template-canvas-editable:focus { box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.35); }
 body { font-family: Georgia, "Times New Roman", serif; font-size: 12pt; line-height: 1.5; color: #111; margin: 0; padding: 24px; }
 table, table.docx-table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 16px 0; table-layout: auto; border: 1px solid #374151; }
@@ -34,7 +34,7 @@ td.signature-host-cell, th.signature-host-cell { padding: 14px 16px !important; 
 td .signature-block--flow, th .signature-block--flow { margin: 0; width: auto; max-width: 100%; min-width: 120px; }
 .signature-capture-area { min-height: 56px; border-bottom: 1px solid #374151; margin-top: 8px; }
 .signature-hint { margin-top: 6px; font-size: 11px; color: #6b7280; }
-.signature-drag-handle { position: absolute; top: 4px; right: 4px; z-index: 2; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; padding: 2px 8px; font-size: 10px; font-family: system-ui, sans-serif; cursor: grab; color: #374151; }
+.signature-drag-handle { position: absolute; top: 4px; right: 4px; z-index: 12; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; padding: 2px 8px; font-size: 10px; font-family: system-ui, sans-serif; cursor: grab; color: #374151; pointer-events: auto; }
 .signature-drag-handle:active { cursor: grabbing; }
 .signature-resize-handle { position: absolute; right: 4px; bottom: 4px; width: 20px; height: 20px; cursor: nwse-resize; z-index: 10; pointer-events: auto; touch-action: none; background: linear-gradient(135deg, transparent 52%, #6b7280 52%); }
 .template-drop-target { outline: 2px dashed #3b82f6; outline-offset: 2px; background: rgba(59, 130, 246, 0.06); }

@@ -9,7 +9,7 @@ export const SIGNATURE_BLOCK_HTML = `<div ${SIGNATURE_BLOCK_MARKER}="contractor"
 </div>`;
 
 const TEMPLATE_PREVIEW_STYLES = `
-.template-canvas { position: relative; min-height: 720px; }
+.template-canvas { position: relative; min-height: 720px; padding: 32px 48px; box-sizing: border-box; }
 body { font-family: Georgia, "Times New Roman", serif; font-size: 12pt; line-height: 1.5; color: #111; margin: 0; padding: 24px; }
 .template-table-host { position: relative; max-width: 100%; margin: 16px 0; }
 .template-table-host > table { margin: 0; }
