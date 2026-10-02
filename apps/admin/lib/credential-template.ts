@@ -4,7 +4,7 @@ export const DEFAULT_SIGNATURE_WIDTH_PX = 260;
 export const DEFAULT_SIGNATURE_MIN_HEIGHT_PX = 100;
 
 export function createFlowSignatureBlockHtml(): string {
-  return `<div data-signature-block="contractor" data-signature-layout="flow" class="signature-block signature-block--flow" contenteditable="false" style="width:100%;max-width:${DEFAULT_SIGNATURE_WIDTH_PX}px;min-height:${DEFAULT_SIGNATURE_MIN_HEIGHT_PX}px;box-sizing:border-box;">
+  return `<div data-signature-block="contractor" data-signature-layout="flow" class="signature-block signature-block--flow" contenteditable="false" style="width:auto;max-width:100%;min-width:140px;min-height:${DEFAULT_SIGNATURE_MIN_HEIGHT_PX}px;box-sizing:border-box;">
 <button type="button" data-signature-drag-handle class="signature-drag-handle" aria-label="Move signature block">Move</button>
 <p><strong>Contractor signature</strong></p>
 <div data-signature-capture="contractor" class="signature-capture-area"></div>
@@ -28,14 +28,15 @@ table td p, table th p { margin: 0 0 0.35em 0; }
 table td p:last-child, table th p:last-child { margin-bottom: 0; }
 h1, h2, h3 { margin-top: 1.25em; margin-bottom: 0.5em; }
 ul, ol { margin: 0.5em 0 0.5em 1.25em; }
-.signature-block { border: 2px dashed #6b7280; padding: 12px 12px 20px; background: #fafafa; position: relative; }
+.signature-block { border: 2px dashed #6b7280; padding: 14px 16px 28px; background: #fafafa; position: relative; }
 .signature-block--flow { margin: 8px 0; z-index: auto; }
-td .signature-block--flow, th .signature-block--flow { margin: 6px 0; max-width: 100%; }
+td.signature-host-cell, th.signature-host-cell { padding: 14px 16px !important; overflow: visible; vertical-align: top; }
+td .signature-block--flow, th .signature-block--flow { margin: 0; width: auto; max-width: 100%; min-width: 120px; }
 .signature-capture-area { min-height: 56px; border-bottom: 1px solid #374151; margin-top: 8px; }
 .signature-hint { margin-top: 6px; font-size: 11px; color: #6b7280; }
 .signature-drag-handle { position: absolute; top: 4px; right: 4px; z-index: 2; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; padding: 2px 8px; font-size: 10px; font-family: system-ui, sans-serif; cursor: grab; color: #374151; }
 .signature-drag-handle:active { cursor: grabbing; }
-.signature-resize-handle { position: absolute; right: 2px; bottom: 2px; width: 12px; height: 12px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, #6b7280 50%); }
+.signature-resize-handle { position: absolute; right: 4px; bottom: 4px; width: 20px; height: 20px; cursor: nwse-resize; z-index: 10; pointer-events: auto; touch-action: none; background: linear-gradient(135deg, transparent 52%, #6b7280 52%); }
 .template-drop-target { outline: 2px dashed #3b82f6; outline-offset: 2px; background: rgba(59, 130, 246, 0.06); }
 .table-width-resize-grip { position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; cursor: nwse-resize; z-index: 4; background: linear-gradient(135deg, transparent 55%, #9ca3af 55%); }
 .template-format-toolbar button { border: 1px solid #d1d5db; background: #fff; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
@@ -163,8 +164,15 @@ export function applyFlowSignatureStyles(block: HTMLElement): void {
   block.style.left = "";
   block.style.top = "";
   block.style.zIndex = "";
-  if (!block.style.width) block.style.width = "100%";
-  if (!block.style.maxWidth) block.style.maxWidth = `${DEFAULT_SIGNATURE_WIDTH_PX}px`;
+  const inTableCell = block.parentElement instanceof HTMLTableCellElement;
+  if (inTableCell) {
+    block.style.width = block.style.width && block.style.width !== "100%" ? block.style.width : "auto";
+    block.style.maxWidth = "100%";
+    block.style.minWidth = "120px";
+  } else {
+    if (!block.style.width || block.style.width === "100%") block.style.width = `${DEFAULT_SIGNATURE_WIDTH_PX}px`;
+    if (!block.style.maxWidth) block.style.maxWidth = `${DEFAULT_SIGNATURE_WIDTH_PX}px`;
+  }
   if (!block.style.minHeight) block.style.minHeight = `${DEFAULT_SIGNATURE_MIN_HEIGHT_PX}px`;
   block.style.boxSizing = "border-box";
 }
@@ -189,9 +197,12 @@ export function ensureEditorChrome(block: HTMLElement): void {
 }
 
 export function prepareCellForSignature(cell: HTMLTableCellElement): void {
+  cell.classList.add("signature-host-cell");
   cell.style.verticalAlign = "top";
+  cell.style.overflow = "visible";
   const block = cell.querySelector(SIGNATURE_BLOCK_SELECTOR);
-  const minH = block instanceof HTMLElement ? Math.max(DEFAULT_SIGNATURE_MIN_HEIGHT_PX, block.offsetHeight + 16) : DEFAULT_SIGNATURE_MIN_HEIGHT_PX;
+  const blockHeight = block instanceof HTMLElement ? block.offsetHeight : DEFAULT_SIGNATURE_MIN_HEIGHT_PX;
+  const minH = Math.max(DEFAULT_SIGNATURE_MIN_HEIGHT_PX + 28, blockHeight + 28);
   cell.style.minHeight = `${minH}px`;
 }
 

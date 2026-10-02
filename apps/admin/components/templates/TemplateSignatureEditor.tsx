@@ -174,6 +174,17 @@ function attachContentEditable(canvas: HTMLElement, onChange: () => void) {
     document.execCommand("insertText", false, text);
     onChange();
   });
+
+  canvas.addEventListener(
+    "mousedown",
+    (event) => {
+      const target = event.target as HTMLElement;
+      if (target.closest("[data-signature-resize-handle], [data-signature-drag-handle], [data-signature-block]")) {
+        event.stopPropagation();
+      }
+    },
+    true,
+  );
 }
 
 function attachEditorInteractions(
@@ -228,22 +239,29 @@ function attachSignatureInteractions(
 
   const resizeHandle = block.querySelector("[data-signature-resize-handle]");
   if (resizeHandle instanceof HTMLElement) {
-    resizeHandle.onmousedown = (event) => {
+    const startResize = (event: MouseEvent) => {
       event.preventDefault();
       event.stopPropagation();
+      event.stopImmediatePropagation();
+
+      const parentCell = block.parentElement instanceof HTMLTableCellElement ? block.parentElement : null;
+      const maxWidth = parentCell ? Math.max(120, parentCell.clientWidth - 8) : 640;
+
       const startX = event.clientX;
       const startY = event.clientY;
       const startW = block.offsetWidth;
       const startH = block.offsetHeight;
 
       const onMove = (moveEvent: MouseEvent) => {
-        const w = Math.max(140, startW + moveEvent.clientX - startX);
+        moveEvent.preventDefault();
+        const w = Math.min(maxWidth, Math.max(120, startW + moveEvent.clientX - startX));
         const h = Math.max(72, startH + moveEvent.clientY - startY);
         block.style.width = `${w}px`;
         block.style.maxWidth = "100%";
+        block.style.minWidth = "120px";
+        block.style.height = `${h}px`;
         block.style.minHeight = `${h}px`;
-        const parent = block.parentElement;
-        if (parent instanceof HTMLTableCellElement) prepareCellForSignature(parent);
+        if (parentCell) prepareCellForSignature(parentCell);
       };
 
       const onUp = () => {
@@ -255,6 +273,8 @@ function attachSignatureInteractions(
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
     };
+
+    resizeHandle.onmousedown = startResize;
   }
 }
 

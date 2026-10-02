@@ -19,9 +19,10 @@ th { background: #f3f4f6; font-weight: 600; }
 table td p, table th p { margin: 0; }
 h1, h2, h3 { margin-top: 1.25em; margin-bottom: 0.5em; }
 ul, ol { margin: 0.5em 0 0.5em 1.25em; }
-.signature-block { border: 2px dashed #6b7280; padding: 12px; background: #fafafa; position: relative; }
+.signature-block { border: 2px dashed #6b7280; padding: 14px 16px 20px; background: #fafafa; position: relative; }
 .signature-block--flow { margin: 8px 0; }
-td .signature-block--flow, th .signature-block--flow { margin: 6px 0; max-width: 100%; }
+td.signature-host-cell, th.signature-host-cell { padding: 14px 16px; vertical-align: top; }
+td .signature-block--flow, th .signature-block--flow { margin: 0; max-width: 100%; width: auto; }
 .signature-capture-area { min-height: 56px; border-bottom: 1px solid #374151; margin-top: 8px; }
 .signature-hint { margin-top: 6px; font-size: 11px; color: #6b7280; }
 .signature-drag-handle, .signature-resize-handle, .table-width-resize-grip, .table-col-resize-grip { display: none !important; }
