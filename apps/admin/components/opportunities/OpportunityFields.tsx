@@ -57,9 +57,11 @@ export function OpportunityFields({ defaults = {}, presetClientId = "", defaultO
     void adminFetch("/api/admin/clients")
       .then((res) => res.json())
       .then((data) => {
-        const list = ((data.data ?? []) as ClientOption[]).filter(
-          (c) => c.status === "ACTIVE" || c.status === "PROSPECT" || c.id === defaults.clientId,
-        );
+        const list = ((data.data ?? []) as ClientOption[])
+          .filter(
+            (c) => c.status === "ACTIVE" || c.status === "PROSPECT" || c.id === defaults.clientId,
+          )
+          .sort((a, b) => a.name.localeCompare(b.name));
         setClients(list);
       })
       .catch(console.error);

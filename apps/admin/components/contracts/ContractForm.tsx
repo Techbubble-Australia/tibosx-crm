@@ -332,6 +332,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   }, [invoicePreviewAmount, invoiceTaxRate]);
 
   const invoicePreviewTotal = invoicePreviewAmount + invoicePreviewTaxAmount;
+  const invoiceFieldsEditable = !editingInvoiceId || invoiceStatus === "DRAFT";
 
   const variationQtyTotal = useMemo(() => {
     if (type !== "T_AND_M") return Number.parseInt(variationQty, 10) || 0;
@@ -936,7 +937,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
           method: isEdit ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
-            editingInvoice && editingInvoice.status !== "DRAFT"
+            editingInvoice && editingInvoice.status !== "DRAFT" && invoiceStatus !== "DRAFT"
               ? { status: invoiceStatus }
               : payload,
           ),
@@ -1753,9 +1754,9 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
           ) : null}
           {showInvoiceForm ? (
             <div className="mb-4 space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/40">
-              {editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT" ? (
+              {editingInvoiceId && !invoiceFieldsEditable ? (
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Only status can be changed for non-draft invoices. Use the status dropdown in the list or below.
+                  Set status to <strong>Draft</strong> to edit all invoice fields, then save.
                 </p>
               ) : null}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1765,8 +1766,8 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                     value={invoiceReference}
                     onChange={(e) => setInvoiceReference(e.target.value)}
                     placeholder="Reference"
-                    readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
-                    className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                    readOnly={!invoiceFieldsEditable}
+                    className={fieldClass(invoiceFieldsEditable)}
                   />
                 </div>
                 <div>
@@ -1790,8 +1791,8 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                     value={invoiceIssueDate}
                     onChange={(e) => setInvoiceIssueDate(e.target.value)}
                     required
-                    readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
-                    className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                    readOnly={!invoiceFieldsEditable}
+                    className={fieldClass(invoiceFieldsEditable)}
                   />
                 </div>
                 <div>
@@ -1801,8 +1802,8 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                     value={invoiceDueDate}
                     onChange={(e) => setInvoiceDueDate(e.target.value)}
                     required
-                    readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
-                    className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                    readOnly={!invoiceFieldsEditable}
+                    className={fieldClass(invoiceFieldsEditable)}
                   />
                 </div>
               </div>
@@ -1813,8 +1814,8 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                   onChange={(e) => setInvoiceDescription(e.target.value)}
                   rows={3}
                   placeholder="Description"
-                  readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
-                  className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                  readOnly={!invoiceFieldsEditable}
+                  className={fieldClass(invoiceFieldsEditable)}
                 />
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -1823,8 +1824,8 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                   <select
                     value={invoiceCurrency}
                     onChange={(e) => setInvoiceCurrency(e.target.value)}
-                    disabled={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
-                    className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                    disabled={!invoiceFieldsEditable}
+                    className={fieldClass(invoiceFieldsEditable)}
                   >
                     {SALES_CURRENCIES.map((c) => (
                       <option key={c.code} value={c.code}>{c.label}</option>
@@ -1840,8 +1841,8 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                     value={invoiceQty}
                     onChange={(e) => setInvoiceQty(e.target.value)}
                     placeholder="Qty"
-                    readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
-                    className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                    readOnly={!invoiceFieldsEditable}
+                    className={fieldClass(invoiceFieldsEditable)}
                   />
                 </div>
                 <div>
@@ -1853,8 +1854,8 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                     value={invoiceRate}
                     onChange={(e) => setInvoiceRate(e.target.value)}
                     placeholder="Rate"
-                    readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
-                    className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                    readOnly={!invoiceFieldsEditable}
+                    className={fieldClass(invoiceFieldsEditable)}
                   />
                 </div>
                 <div>
@@ -1866,8 +1867,8 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                     value={invoiceTaxRate}
                     onChange={(e) => setInvoiceTaxRate(e.target.value)}
                     placeholder="Tax rate"
-                    readOnly={Boolean(editingInvoiceId && invoices.find((row) => row.id === editingInvoiceId)?.status !== "DRAFT")}
-                    className={fieldClass(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT")}
+                    readOnly={!invoiceFieldsEditable}
+                    className={fieldClass(invoiceFieldsEditable)}
                   />
                 </div>
                 <div>
@@ -1893,7 +1894,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Invoice file</label>
-                {(!editingInvoiceId || invoices.find((row) => row.id === editingInvoiceId)?.status === "DRAFT") ? (
+                {invoiceFieldsEditable ? (
                   <input type="file" onChange={(e) => void uploadInvoiceFile(e.target.files)} className="block w-full text-sm" />
                 ) : null}
                 {invoiceUploading ? <p className="mt-1 text-xs text-gray-500">Uploading…</p> : null}

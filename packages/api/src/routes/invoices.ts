@@ -19,6 +19,20 @@ function endOfUtcMonth(date = new Date()): Date {
 const SORT_FIELDS = ["dueDate", "issueDate", "invoiceNumber", "clientName", "totalAmount", "status"] as const;
 type SortField = (typeof SORT_FIELDS)[number];
 
+router.get("/clients", async (_req, res) => {
+  try {
+    const clients = await prisma.client.findMany({
+      where: { contracts: { some: { invoices: { some: {} } } } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+    res.json({ data: clients });
+  } catch (error) {
+    console.error("Error fetching invoice client filter options:", error);
+    res.status(500).json({ error: "Failed to fetch clients" });
+  }
+});
+
 router.get("/", async (req, res) => {
   try {
     const status = typeof req.query.status === "string" ? req.query.status.trim() : "";

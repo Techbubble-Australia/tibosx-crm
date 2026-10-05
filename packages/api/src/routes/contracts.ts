@@ -1939,18 +1939,19 @@ router.patch("/:id/invoices/:invoiceId", async (req, res) => {
     if (!invoice) return res.status(404).json({ error: "Invoice not found" });
 
     const body = invoiceUpdateSchema.parse(req.body);
+    const revertingToDraft = body.status === "DRAFT" && invoice.status !== "DRAFT";
     const nonDraftAllowedKeys = new Set(["status", "dueDate"]);
     const onlyNonDraftFields = Object.entries(body).every(
       ([key, value]) => value === undefined || nonDraftAllowedKeys.has(key),
     );
 
-    if (invoice.status !== "DRAFT" && !onlyNonDraftFields) {
+    if (invoice.status !== "DRAFT" && !revertingToDraft && !onlyNonDraftFields) {
       return res.status(400).json({
         error: "Only status and due date can be updated when invoice is not in Draft status",
       });
     }
 
-    if (invoice.status !== "DRAFT") {
+    if (invoice.status !== "DRAFT" && !revertingToDraft) {
       const row = await prisma.contractInvoice.update({
         where: { id: invoice.id },
         data: {

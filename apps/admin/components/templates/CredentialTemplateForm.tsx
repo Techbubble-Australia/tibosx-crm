@@ -212,8 +212,15 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
         <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Template details</h3>
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Name</label>
-            <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} required />
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Name *</label>
+            <input
+              className={inputClass}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              aria-required="true"
+              placeholder="Template name"
+            />
           </div>
           <div>
             <div className="mb-1 flex flex-wrap items-center justify-between gap-2">

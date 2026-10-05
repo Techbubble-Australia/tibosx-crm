@@ -140,10 +140,12 @@ export function JobForm({
         setTechnologies(techData.data ?? []);
         setDepartments(deptData.data ?? []);
         setClients(
-          (clientData.data ?? []).filter(
-            (c: ClientItem) =>
-              c.status === "ACTIVE" || c.status === "PROSPECT" || c.id === defaults.clientId,
-          ),
+          (clientData.data ?? [])
+            .filter(
+              (c: ClientItem) =>
+                c.status === "ACTIVE" || c.status === "PROSPECT" || c.id === defaults.clientId,
+            )
+            .sort((a: ClientItem, b: ClientItem) => a.name.localeCompare(b.name)),
         );
       } catch (e) {
         console.error(e);

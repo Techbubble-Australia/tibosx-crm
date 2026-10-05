@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, ChevronDown, ChevronUp, Pencil } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { adminFetch } from "@/lib/admin-api";
 import { ClientsOnlyGuard } from "@/components/ClientsOnlyGuard";
@@ -100,6 +100,7 @@ export default function InvoicesPageInner() {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("card");
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
+  const [editingDueId, setEditingDueId] = useState<string | null>(null);
 
   async function patchInvoice(
     row: InvoiceRow,
@@ -143,7 +144,7 @@ export default function InvoicesPageInner() {
   }, [initialStatus]);
 
   useEffect(() => {
-    void adminFetch("/api/admin/clients")
+    void adminFetch("/api/admin/invoices/clients")
       .then((res) => res.json())
       .then((data) => setClients((data.data ?? []) as ClientOption[]))
       .catch(console.error);
@@ -371,13 +372,29 @@ export default function InvoicesPageInner() {
                         </td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.clientName}</td>
                         <td className="whitespace-nowrap px-4 py-3">
-                          <input
-                            type="date"
-                            value={toDateInputValue(row.dueDate)}
-                            disabled={updatingInvoiceId === row.id}
-                            onChange={(e) => void patchInvoice(row, { dueDate: e.target.value })}
-                            className="rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-                          />
+                          {editingDueId === row.id ? (
+                            <input
+                              type="date"
+                              value={toDateInputValue(row.dueDate)}
+                              disabled={updatingInvoiceId === row.id}
+                              autoFocus
+                              onChange={(e) => void patchInvoice(row, { dueDate: e.target.value })}
+                              onBlur={() => setEditingDueId(null)}
+                              className="rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                            />
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                              {formatDate(row.dueDate)}
+                              <button
+                                type="button"
+                                onClick={() => setEditingDueId(row.id)}
+                                className="rounded p-0.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                                aria-label={`Edit due date for ${row.invoiceNumber}`}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <select
