@@ -9,6 +9,7 @@ type Me = {
   email: string;
   role: string;
   tbosRole?: string | null;
+  canApproveTimesheets?: boolean;
   organization?: { name: string } | null;
 };
 

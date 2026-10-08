@@ -89,6 +89,14 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
   const editable = !readOnly && status === "DRAFT";
 
   useEffect(() => {
+    if (defaults.approverKind === "CLIENT_CONTACT" && defaults.projectClientContactId) {
+      setSelectedApprover(`CLIENT_CONTACT:${defaults.projectClientContactId}`);
+    } else if (defaults.approverKind === "PM") {
+      setSelectedApprover("PM:PM");
+    }
+  }, [defaults.approverKind, defaults.projectClientContactId]);
+
+  useEffect(() => {
     void adminFetch("/api/admin/timesheets/active-targets")
       .then((r) => r.json())
       .then((data) => {
@@ -226,14 +234,13 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Project manager / owner</label>
             <input className={`${inputClass} ${readOnlyClass}`} value={managerName || "—"} readOnly />
           </div>
-          {approvers.length > 0 ? (
+          {approvers.length > 0 && editable ? (
             <div className="sm:col-span-2">
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Timesheet approver</label>
               <select
-                className={`${inputClass} ${editable ? "" : readOnlyClass}`}
+                className={inputClass}
                 value={selectedApprover}
                 onChange={(e) => setSelectedApprover(e.target.value)}
-                disabled={!editable}
               >
                 {approvers.map((row) => (
                   <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
@@ -241,6 +248,15 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
                   </option>
                 ))}
               </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Client approvers act in the support portal, not TBOS.
+              </p>
+            </div>
+          ) : null}
+          {!editable && defaults.approverLabel ? (
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Approver</label>
+              <input className={`${inputClass} ${readOnlyClass}`} value={defaults.approverLabel} readOnly />
             </div>
           ) : null}
           <div>

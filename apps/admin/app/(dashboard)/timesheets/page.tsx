@@ -17,6 +17,8 @@ type TimesheetRow = {
   startDate: string;
   endDate: string;
   status: TimesheetStatus;
+  approverKind?: string | null;
+  approverLabel?: string;
 };
 
 function formatDate(value: string) {
@@ -178,7 +180,14 @@ export default function TimesheetsPage() {
                     <td className="px-4 py-3 text-gray-500">
                       {formatDate(row.startDate)} – {formatDate(row.endDate)}
                     </td>
-                    <td className="px-4 py-3">{TIMESHEET_STATUS_LABELS[row.status]}</td>
+                    <td className="px-4 py-3">
+                      {TIMESHEET_STATUS_LABELS[row.status]}
+                      {row.status === "SUBMITTED" && row.approverKind === "CLIENT_CONTACT" ? (
+                        <span className="mt-0.5 block text-xs text-sky-600 dark:text-sky-400">
+                          Awaiting client{row.approverLabel ? `: ${row.approverLabel}` : ""}
+                        </span>
+                      ) : null}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex gap-2">
                         <Link href={`/timesheets/${row.id}`} className="rounded-lg border border-gray-200 p-2 hover:bg-gray-50 dark:border-gray-600">

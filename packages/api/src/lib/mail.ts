@@ -65,6 +65,30 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+export async function sendTimesheetApprovalRequestEmail(input: {
+  to: string;
+  memberName: string;
+  targetLabel: string;
+  portalUrl: string;
+}): Promise<void> {
+  const resend = getResendClient();
+  const subject = `Timesheet awaiting your approval — ${input.memberName}`;
+  const body = `${input.memberName} submitted a timesheet for ${input.targetLabel || "a support project"}.\n\nSign in to the client support portal to approve or reject:\n${input.portalUrl}/timesheets\n`;
+  if (!resend) {
+    console.info("[timesheet-approval-email] RESEND not configured; would send to", input.to, subject);
+    return;
+  }
+  const { error } = await resend.emails.send({
+    from: getMailFrom(),
+    to: [input.to],
+    subject,
+    text: body,
+  });
+  if (error) {
+    throw new Error(error.message || "Failed to send timesheet approval email");
+  }
+}
+
 export async function sendSupportTicketNotificationEmail(input: {
   to: string;
   subject: string;

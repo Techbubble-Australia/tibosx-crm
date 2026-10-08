@@ -2,21 +2,28 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, LifeBuoy, LogOut, Plus, Ticket, Users } from "lucide-react";
+import { ClipboardCheck, LayoutDashboard, LifeBuoy, LogOut, Plus, Ticket, Users } from "lucide-react";
 
 type User = {
   name: string;
   email: string;
   role: string;
   tbosRole?: string | null;
+  canApproveTimesheets?: boolean;
   organization?: { name: string } | null;
 };
 
-const clientNav = [
+const clientNavBase = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tickets", label: "My tickets", icon: Ticket },
   { href: "/tickets/new", label: "New ticket", icon: Plus },
 ];
+
+const clientApproverNavItem = {
+  href: "/timesheets",
+  label: "Timesheet approvals",
+  icon: ClipboardCheck,
+};
 
 const consultantNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -45,7 +52,11 @@ export function PortalShell({
   const router = useRouter();
   const isConsultant = user.role === "CONSULTANT";
   const isTbosAdmin = (user.tbosRole || "").toLowerCase() === "admin";
-  const nav = isConsultant ? consultantNav : clientNav;
+  const nav = isConsultant
+    ? consultantNav
+    : user.canApproveTimesheets
+      ? [...clientNavBase, clientApproverNavItem]
+      : clientNavBase;
 
   async function logout() {
     await fetch("/api/auth/session", { method: "DELETE" });

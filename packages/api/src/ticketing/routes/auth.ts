@@ -164,7 +164,19 @@ router.get("/me", authMiddleware, async (req: TicketingRequest, res) => {
     include: { organization: true },
   });
   if (!user || !user.active) return res.status(401).json({ error: "User not found" });
-  res.json({ data: serializeUser(user) });
+  const approverLink =
+    user.role === "CLIENT"
+      ? await prisma.projectClientContact.findFirst({
+          where: { ticketingUserId: user.id, canApproveTimesheets: true },
+          select: { id: true },
+        })
+      : null;
+  res.json({
+    data: {
+      ...serializeUser(user),
+      canApproveTimesheets: Boolean(approverLink),
+    },
+  });
 });
 
 export { router as authRoutes };

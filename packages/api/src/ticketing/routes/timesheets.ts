@@ -13,17 +13,18 @@ router.get("/pending-approval", async (req: TicketingRequest, res) => {
     return res.status(403).json({ error: "Forbidden" });
   }
 
-  const link = await prisma.projectClientContact.findFirst({
+  const links = await prisma.projectClientContact.findMany({
     where: { ticketingUserId: user.id, canApproveTimesheets: true },
     select: { id: true },
   });
-  if (!link) return res.json({ data: [] });
+  const linkIds = links.map((l) => l.id);
+  if (!linkIds.length) return res.json({ data: [] });
 
   const rows = await prisma.timesheet.findMany({
     where: {
       status: "SUBMITTED",
       approverKind: "CLIENT_CONTACT",
-      projectClientContactId: link.id,
+      projectClientContactId: { in: linkIds },
     },
     include: {
       memberUser: { select: { name: true, email: true } },
@@ -56,20 +57,19 @@ router.post("/:id/approve", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
   if (user.role !== "CLIENT") return res.status(403).json({ error: "Forbidden" });
 
-  const link = await prisma.projectClientContact.findFirst({
-    where: { ticketingUserId: user.id, canApproveTimesheets: true },
-  });
-  if (!link) return res.status(403).json({ error: "Forbidden" });
-
   const timesheet = await prisma.timesheet.findUnique({ where: { id: req.params.id } });
-  if (
-    !timesheet ||
-    timesheet.status !== "SUBMITTED" ||
-    timesheet.approverKind !== "CLIENT_CONTACT" ||
-    timesheet.projectClientContactId !== link.id
-  ) {
+  if (!timesheet || timesheet.status !== "SUBMITTED" || timesheet.approverKind !== "CLIENT_CONTACT") {
     return res.status(404).json({ error: "Timesheet not found" });
   }
+
+  const link = await prisma.projectClientContact.findFirst({
+    where: {
+      id: timesheet.projectClientContactId ?? "",
+      ticketingUserId: user.id,
+      canApproveTimesheets: true,
+    },
+  });
+  if (!link) return res.status(403).json({ error: "Forbidden" });
 
   await prisma.$transaction(async (tx) => {
     await tx.timesheet.update({
@@ -94,20 +94,19 @@ router.post("/:id/reject", async (req: TicketingRequest, res) => {
   const parsed = decisionSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
 
-  const link = await prisma.projectClientContact.findFirst({
-    where: { ticketingUserId: user.id, canApproveTimesheets: true },
-  });
-  if (!link) return res.status(403).json({ error: "Forbidden" });
-
   const timesheet = await prisma.timesheet.findUnique({ where: { id: req.params.id } });
-  if (
-    !timesheet ||
-    timesheet.status !== "SUBMITTED" ||
-    timesheet.approverKind !== "CLIENT_CONTACT" ||
-    timesheet.projectClientContactId !== link.id
-  ) {
+  if (!timesheet || timesheet.status !== "SUBMITTED" || timesheet.approverKind !== "CLIENT_CONTACT") {
     return res.status(404).json({ error: "Timesheet not found" });
   }
+
+  const link = await prisma.projectClientContact.findFirst({
+    where: {
+      id: timesheet.projectClientContactId ?? "",
+      ticketingUserId: user.id,
+      canApproveTimesheets: true,
+    },
+  });
+  if (!link) return res.status(403).json({ error: "Forbidden" });
 
   const reason = parsed.data.reason?.trim() || "Rejected by client contact";
 

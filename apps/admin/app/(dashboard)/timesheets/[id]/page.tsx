@@ -98,7 +98,17 @@ export default function TimesheetDetailPage() {
       const res = await adminFetch("/api/admin/timesheets/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: [id] }),
+        body: JSON.stringify({
+          items: [
+            {
+              id,
+              approverKind: timesheet?.approverKind ?? "PM",
+              ...(timesheet?.approverKind === "CLIENT_CONTACT" && timesheet.projectClientContactId
+                ? { projectClientContactId: timesheet.projectClientContactId }
+                : {}),
+            },
+          ],
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to submit");
@@ -145,6 +155,9 @@ export default function TimesheetDetailPage() {
   }
 
   const status = timesheet?.status ?? "DRAFT";
+  const awaitingClient =
+    status === "SUBMITTED" && timesheet?.approverKind === "CLIENT_CONTACT";
+  const pmCanAct = canManageProjects && status === "SUBMITTED" && !awaitingClient;
 
   return (
     <ProjectManagementGuard>
@@ -166,7 +179,7 @@ export default function TimesheetDetailPage() {
                 <Send className="h-4 w-4" /> Submit for approval
               </button>
             ) : null}
-            {canManageProjects && status === "SUBMITTED" ? (
+            {pmCanAct ? (
               <>
                 <button
                   type="button"
@@ -188,6 +201,14 @@ export default function TimesheetDetailPage() {
             ) : null}
           </div>
         </div>
+
+        {awaitingClient ? (
+          <div className="mb-6 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">
+            Waiting for client approval
+            {timesheet.approverLabel ? ` (${timesheet.approverLabel})` : ""} in the{" "}
+            <strong>client support portal</strong> (Timesheet approvals). PM approve/reject is disabled for this submission.
+          </div>
+        ) : null}
 
         {isLoading || !timesheet ? (
           <p className="text-sm text-gray-400">Loading…</p>

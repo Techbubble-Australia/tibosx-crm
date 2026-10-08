@@ -14,6 +14,7 @@ Support product: **Next.js portal** (`apps/ticketing`) and **TBOS API** (`packag
 - **Audit log** — consultant-visible history on each ticket.
 - **RBAC** — `CLIENT` (org-scoped) vs verified `CONSULTANT` (all orgs).
 - **TBOS SSO** — header **Support portal** link for `admin` / `sales` (configurable) opens the portal with a ticketing session.
+- **Client timesheet approvals** — client contacts flagged as approvers on a support project use **Timesheet approvals** in the portal (`/timesheets`) to approve or reject submitted timesheets (PMs still approve in TBOS).
 
 ## Local setup
 

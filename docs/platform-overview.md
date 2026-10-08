@@ -78,7 +78,7 @@ flowchart LR
 ### Project management module
 
 - **Projects** — Linked to contracts/clients; estimates vs actuals; members.
-- **Timesheets** — Entry and approval workflows (by role).
+- **Timesheets** — Entry and approval workflows (by role). Support-project timesheets assigned to a **client contact** are approved in the **client support portal**, not in TBOS.
 - **Agreement** (project members) — Sign agreements (e.g. contractor templates with signature capture).
 
 ### Recruitment module

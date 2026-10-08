@@ -9,6 +9,7 @@ import {
   isProjectMemberRole,
 } from "../lib/project-access";
 import { getMemberOnboardingStatus } from "../lib/member-onboarding";
+import { notifyClientApproverOfSubmittedTimesheet } from "../lib/timesheet-client-approval";
 import { mondayOfWeek, sundayOfWeek, TIMESHEET_STATUSES, TIMESHEET_STATUS_LABELS } from "../lib/project-types";
 
 const router: IRouter = Router();
@@ -573,12 +574,13 @@ router.post("/submit", async (req: AuthRequest, res) => {
         } else {
           const chosenKind = item?.approverKind ?? row.approverKind ?? "PM";
           if (chosenKind === "CLIENT_CONTACT") {
-            if (!item?.projectClientContactId) {
+            const contactId = item?.projectClientContactId ?? row.projectClientContactId;
+            if (!contactId) {
               throw new Error("APPROVER_REQUIRED");
             }
             const link = await tx.projectClientContact.findFirst({
               where: {
-                id: item.projectClientContactId,
+                id: contactId,
                 projectId: supportProjectId,
                 canApproveTimesheets: true,
               },
@@ -600,6 +602,18 @@ router.post("/submit", async (req: AuthRequest, res) => {
         });
       }
     });
+
+    const submittedClient = await prisma.timesheet.findMany({
+      where: {
+        id: { in: rows.map((r) => r.id) },
+        status: "SUBMITTED",
+        approverKind: "CLIENT_CONTACT",
+      },
+      select: { id: true },
+    });
+    for (const row of submittedClient) {
+      void notifyClientApproverOfSubmittedTimesheet(row.id);
+    }
 
     res.json({ data: { submitted: rows.length } });
   } catch (error) {

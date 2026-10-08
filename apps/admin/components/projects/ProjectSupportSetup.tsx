@@ -111,7 +111,8 @@ export function ProjectSupportSetup({ projectId, project, onUpdated }: Props) {
       <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Client contacts (portal)</h3>
         <p className="mt-1 text-sm text-gray-500">
-          Select client contacts for this project. Portal access creates client logins; approvers can sign off timesheets in the support portal.
+          Select client contacts for this project. Portal access creates client logins on the{" "}
+          <strong>client support portal</strong> (not TBOS). Approvers review timesheets there under Timesheet approvals.
         </p>
         {available.length === 0 ? (
           <p className="mt-3 text-sm text-gray-400">No contacts on this client — add them under Sales → Clients.</p>
