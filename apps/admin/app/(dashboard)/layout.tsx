@@ -37,6 +37,7 @@ import { AdminSessionProvider, useAdminSession } from "@/contexts/AdminSessionCo
 import { MfaEnrollmentGuard } from "@/components/MfaEnrollmentGuard";
 import { TechBubbleLogo } from "@/components/TechBubbleLogo";
 import { InactivityLogout } from "@/components/InactivityLogout";
+import { TicketPortalLink } from "@/components/TicketPortalLink";
 import { roleLabel } from "@/lib/admin-roles";
 import { isCareerApplicationsPath, isJobListingsPath } from "@/lib/job-routes";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
@@ -354,8 +355,9 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="min-w-0 flex-1 bg-gray-50 dark:bg-gray-950">
-        <header className="border-b border-gray-200 bg-white px-6 py-4 dark:border-gray-700 dark:bg-gray-900 lg:px-8">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-6 py-4 dark:border-gray-700 dark:bg-gray-900 lg:px-8">
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{headerTitle(pathname)}</h1>
+          <TicketPortalLink />
         </header>
         <div className="p-8">{children}</div>
       </main>

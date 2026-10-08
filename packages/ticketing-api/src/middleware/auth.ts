@@ -1,0 +1,79 @@
+import type { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
+import { TICKETING_SESSION_COOKIE } from "../lib/session.js";
+
+const JWT_SECRET = process.env.TICKETING_JWT_SECRET || process.env.JWT_SECRET || "ticketing-dev-secret";
+
+export type TicketingAuthUser = {
+  id: string;
+  email: string;
+  role: "CLIENT" | "CONSULTANT";
+  organizationId: string | null;
+  consultantVerified: boolean;
+};
+
+export interface TicketingRequest extends Request {
+  ticketingUser?: TicketingAuthUser;
+}
+
+function getCookie(req: Request, name: string): string | undefined {
+  const raw = req.headers.cookie;
+  if (!raw) return undefined;
+  const prefix = `${name}=`;
+  for (const part of raw.split(";").map((c) => c.trim())) {
+    if (part.startsWith(prefix)) return decodeURIComponent(part.slice(prefix.length));
+  }
+  return undefined;
+}
+
+function extractToken(req: Request): string | undefined {
+  const auth = req.headers.authorization;
+  if (auth?.startsWith("Bearer ")) return auth.slice(7);
+  return getCookie(req, TICKETING_SESSION_COOKIE);
+}
+
+export function authMiddleware(req: TicketingRequest, res: Response, next: NextFunction) {
+  const token = extractToken(req);
+  if (!token) {
+    return res.status(401).json({ error: "Unauthorized: No token provided" });
+  }
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as TicketingAuthUser & { purpose?: string };
+    if (decoded.purpose === "tbos_exchange") {
+      return res.status(401).json({ error: "Exchange token not valid for API access" });
+    }
+    req.ticketingUser = {
+      id: decoded.id,
+      email: decoded.email,
+      role: decoded.role,
+      organizationId: decoded.organizationId ?? null,
+      consultantVerified: Boolean(decoded.consultantVerified),
+    };
+    next();
+  } catch {
+    return res.status(401).json({ error: "Unauthorized: Invalid token" });
+  }
+}
+
+export function requireConsultant(req: TicketingRequest, res: Response, next: NextFunction) {
+  const user = req.ticketingUser;
+  if (!user || user.role !== "CONSULTANT" || !user.consultantVerified) {
+    return res.status(403).json({ error: "Consultant access required" });
+  }
+  next();
+}
+
+export function signTicketingToken(payload: TicketingAuthUser): string {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: "8h" });
+}
+
+export function verifyTbosAdminToken(token: string): { id: string; email: string; role: string } | null {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { id?: string; email?: string; role?: string; purpose?: string };
+    if (!decoded.id || !decoded.email) return null;
+    if (decoded.purpose === "mfa_pending") return null;
+    return { id: decoded.id, email: decoded.email, role: decoded.role || "" };
+  } catch {
+    return null;
+  }
+}

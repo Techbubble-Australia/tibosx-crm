@@ -1,0 +1,140 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../generated/client"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("TICKETING_DATABASE_URL")
+}
+
+enum TicketingUserRole {
+  CLIENT
+  CONSULTANT
+}
+
+enum TicketType {
+  TECHNICAL
+  FINANCIAL_LOAN
+  SERVICE_INTERNAL
+  SERVICE_EXTERNAL
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  PENDING_CLIENT
+  RESOLVED
+  CLOSED
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users   TicketingUser[]
+  tickets Ticket[]
+}
+
+model TicketingUser {
+  id                 String            @id @default(cuid())
+  email              String            @unique
+  passwordHash       String
+  name               String
+  role               TicketingUserRole
+  organizationId     String?
+  organization       Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  consultantVerified Boolean           @default(false)
+  tbosAdminUserId    String?           @unique
+  active             Boolean           @default(true)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  createdTickets  Ticket[]        @relation("TicketCreatedBy")
+  assignedTickets Ticket[]        @relation("TicketAssignedTo")
+  messages        TicketMessage[]
+  auditLogs       TicketAuditLog[] @relation("AuditActor")
+
+  @@index([organizationId])
+  @@index([role])
+}
+
+model Ticket {
+  id             String         @id @default(cuid())
+  ticketNumber   String         @unique
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  type           TicketType
+  priority       TicketPriority @default(MEDIUM)
+  status         TicketStatus   @default(OPEN)
+  subject        String
+  description    String         @db.Text
+  createdById    String
+  createdBy      TicketingUser  @relation("TicketCreatedBy", fields: [createdById], references: [id])
+  assignedToId   String?
+  assignedTo     TicketingUser? @relation("TicketAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  closedAt       DateTime?
+
+  messages    TicketMessage[]
+  attachments TicketAttachment[]
+  auditLogs   TicketAuditLog[]
+
+  @@index([organizationId, status])
+  @@index([createdAt])
+}
+
+model TicketMessage {
+  id          String        @id @default(cuid())
+  ticketId    String
+  ticket      Ticket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      TicketingUser @relation(fields: [authorId], references: [id])
+  body        String        @db.Text
+  isInternal  Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+model TicketAttachment {
+  id           String   @id @default(cuid())
+  ticketId     String
+  ticket       Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  fileName     String
+  fileUrl      String
+  fileSize     Int?
+  uploadedById String
+  createdAt    DateTime @default(now())
+
+  @@index([ticketId])
+}
+
+model TicketAuditLog {
+  id         String        @id @default(cuid())
+  ticketId   String
+  ticket     Ticket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actorId    String?
+  actor      TicketingUser? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  field      String?
+  oldValue   String?       @db.Text
+  newValue   String?       @db.Text
+  metadata   Json?
+  createdAt  DateTime      @default(now())
+
+  @@index([ticketId, createdAt])
+}
