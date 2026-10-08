@@ -133,6 +133,25 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
           <p className="mt-1 text-sm text-gray-500">
             {member.firstName} {member.lastName} ({member.email})
           </p>
+          {!tempPassword && !loading ? (
+            <div className="mt-4">
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Select template <span className="text-red-500">*</span>
+              </label>
+              <select
+                className={inputClass}
+                value={templateId}
+                onChange={(e) => setTemplateId(e.target.value)}
+                required
+                form="credential-vars-form"
+              >
+                <option value="">Select template…</option>
+                {templates.map((row) => (
+                  <option key={row.id} value={row.id}>{row.name}</option>
+                ))}
+              </select>
+            </div>
+          ) : null}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
@@ -154,23 +173,6 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
             </div>
           ) : (
             <form id="credential-vars-form" onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
-              <div className="sticky top-0 z-10 -mx-1 rounded-lg border border-gray-100 bg-white/95 px-1 pb-3 pt-1 backdrop-blur dark:border-gray-800 dark:bg-gray-900/95">
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Select template <span className="text-red-500">*</span>
-                </label>
-                <select
-                  className={inputClass}
-                  value={templateId}
-                  onChange={(e) => setTemplateId(e.target.value)}
-                  required
-                >
-                  <option value="">Select template…</option>
-                  {templates.map((row) => (
-                    <option key={row.id} value={row.id}>{row.name}</option>
-                  ))}
-                </select>
-              </div>
-
               {selectedTemplate?.addStartDate ? (
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
