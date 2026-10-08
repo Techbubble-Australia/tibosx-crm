@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { ADMIN_SESSION_COOKIE } from "@/lib/auth-cookie";
+import { parseTicketingApiErrorBody } from "@/lib/ticketing-api-error";
 import { normalizeTicketingPortalUrl } from "@/lib/ticketing-portal-url";
 
 function ticketingApiBase(): string | null {
@@ -33,6 +34,31 @@ export async function GET() {
     return NextResponse.redirect(new URL("/login", process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3002"));
   }
 
+  try {
+    const healthRes = await fetch(`${ticketingApi}/health`, { method: "GET" });
+    const healthJson = await healthRes.json().catch(() => null);
+    if (
+      !healthRes.ok ||
+      !healthJson ||
+      typeof healthJson !== "object" ||
+      (healthJson as { service?: string }).service !== "ticketing-api"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            `TICKETING_API_URL (${ticketingApi}) is not the ticketing-api service. Open ${ticketingApi}/health — expect {"service":"ticketing-api",...}.`,
+        },
+        { status: 502 },
+      );
+    }
+  } catch (err) {
+    console.error("ticketing launch: health check failed", err);
+    return NextResponse.json(
+      { error: `Cannot reach ticketing API at ${ticketingApi}/health.` },
+      { status: 502 },
+    );
+  }
+
   let ssoRes: Response;
   try {
     ssoRes = await fetch(`${ticketingApi}/api/auth/tbos-sso`, {
@@ -53,13 +79,19 @@ export async function GET() {
     );
   }
 
-  const data = await ssoRes.json().catch(() => ({}));
+  const rawText = await ssoRes.text();
+  let data: unknown = {};
+  try {
+    data = rawText ? JSON.parse(rawText) : {};
+  } catch {
+    data = {};
+  }
   if (!ssoRes.ok) {
-    const message = typeof data.error === "string" ? data.error : "Support portal SSO failed";
+    const message = parseTicketingApiErrorBody(ssoRes.status, rawText, data);
     return NextResponse.json({ error: message }, { status: ssoRes.status });
   }
 
-  const token = data?.data?.token;
+  const token = (data as { data?: { token?: unknown } })?.data?.token;
   if (typeof token !== "string") {
     return NextResponse.json({ error: "Invalid SSO response" }, { status: 502 });
   }

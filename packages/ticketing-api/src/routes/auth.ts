@@ -13,7 +13,10 @@ import { randomUUID } from "crypto";
 const router: IRouter = Router();
 
 const TBOS_CONSULTANT_ROLES = new Set(
-  (process.env.TICKETING_TBOS_CONSULTANT_ROLES || "admin,sales").split(",").map((r) => r.trim()),
+  (process.env.TICKETING_TBOS_CONSULTANT_ROLES || "admin,sales")
+    .split(",")
+    .map((r) => r.trim().toLowerCase())
+    .filter(Boolean),
 );
 
 function serializeUser(user: {
@@ -72,6 +75,7 @@ router.post("/login", async (req, res) => {
 });
 
 router.post("/tbos-sso", async (req, res) => {
+  try {
   const tbosToken =
     typeof req.body?.tbosToken === "string"
       ? req.body.tbosToken
@@ -81,8 +85,14 @@ router.post("/tbos-sso", async (req, res) => {
   if (!tbosToken) return res.status(400).json({ error: "TBOS token required" });
 
   const tbosUser = verifyTbosAdminToken(tbosToken);
-  if (!tbosUser) return res.status(401).json({ error: "Invalid TBOS session" });
-  if (!TBOS_CONSULTANT_ROLES.has(tbosUser.role)) {
+  if (!tbosUser) {
+    return res.status(401).json({
+      error:
+        "Invalid TBOS session. JWT_SECRET on ticketing-api must match the main TBOS API that issued your login cookie.",
+    });
+  }
+  const tbosRole = tbosUser.role.trim().toLowerCase();
+  if (!TBOS_CONSULTANT_ROLES.has(tbosRole)) {
     return res.status(403).json({ error: "Your TBOS role is not authorized for the support portal" });
   }
 
@@ -124,6 +134,14 @@ router.post("/tbos-sso", async (req, res) => {
   });
 
   res.json({ data: { token, user: serializeUser(consultant) } });
+  } catch (err) {
+    console.error("tbos-sso failed", err);
+    const message = err instanceof Error ? err.message : "SSO failed";
+    if (message.includes("connect") || message.includes("DATABASE")) {
+      return res.status(503).json({ error: "Ticketing database unavailable. Check TICKETING_DATABASE_URL." });
+    }
+    return res.status(500).json({ error: "Support portal SSO failed on server" });
+  }
 });
 
 router.get("/me", authMiddleware, async (req: TicketingRequest, res) => {
