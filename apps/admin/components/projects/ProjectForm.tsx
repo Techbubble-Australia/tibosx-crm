@@ -10,10 +10,13 @@ import { SALES_CURRENCIES } from "@/lib/opportunity-status";
 import {
   PROJECT_COST_TYPES,
   PROJECT_COST_TYPE_LABELS,
+  PROJECT_KINDS,
+  PROJECT_KIND_LABELS,
   PROJECT_STATUSES,
   PROJECT_STATUS_LABELS,
   formatProjectMonth,
   type ProjectCostType,
+  type ProjectKind,
   type ProjectStatus,
 } from "@/lib/project-types";
 import { GenerateCredentialsModal } from "@/components/projects/GenerateCredentialsModal";
@@ -59,6 +62,7 @@ export type ProjectFormValues = {
   title: string;
   description: string;
   clientId: string;
+  kind?: ProjectKind;
   status: ProjectStatus;
   projectManagerId: string;
   contractId: string | null;
@@ -82,6 +86,22 @@ export type ProjectFormValues = {
   supportOrganizationId?: string | null;
   supportOrganizationName?: string | null;
   supportOrganizationSlug?: string | null;
+  clientContacts?: Array<{
+    id: string;
+    contactId: string;
+    name: string;
+    email: string;
+    portalAccess: boolean;
+    canApproveTimesheets: boolean;
+    portalProvisioned: boolean;
+  }>;
+  supportGroupMembers?: Array<{
+    id: string;
+    projectMemberId: string | null;
+    name: string;
+    email: string;
+    credentialsReady: boolean;
+  }>;
 };
 
 type ClientOption = { id: string; name: string };
@@ -107,6 +127,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
   const [title, setTitle] = useState(defaults.title ?? "");
   const [description, setDescription] = useState(defaults.description ?? "");
   const [clientId, setClientId] = useState(defaults.clientId ?? "");
+  const [kind, setKind] = useState<ProjectKind>(defaults.kind ?? "DELIVERY");
   const [status, setStatus] = useState<ProjectStatus>(defaults.status ?? "DRAFT");
   const [projectManagerId, setProjectManagerId] = useState(
     defaults.projectManagerId ?? defaultProjectManagerId ?? "",
@@ -181,6 +202,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
       title: title.trim(),
       description: description.trim(),
       clientId,
+      kind,
       status,
       projectManagerId,
       contractId: contractId || null,
@@ -218,6 +240,14 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                 <option value="">Select client…</option>
                 {clients.map((row) => (
                   <option key={row.id} value={row.id}>{row.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Project type *</label>
+              <select className={inputClass} value={kind} onChange={(e) => setKind(e.target.value as ProjectKind)}>
+                {PROJECT_KINDS.map((value) => (
+                  <option key={value} value={value}>{PROJECT_KIND_LABELS[value]}</option>
                 ))}
               </select>
             </div>

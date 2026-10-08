@@ -16,6 +16,10 @@ export type TimesheetFormValues = {
   id?: string;
   projectId?: string | null;
   opportunityId?: string | null;
+  ticketId?: string | null;
+  approverKind?: string | null;
+  projectClientContactId?: string | null;
+  approverLabel?: string;
   memberName?: string;
   startDate: string;
   endDate: string;
@@ -31,7 +35,8 @@ export type TimesheetFormValues = {
   }>;
 };
 
-type TargetOption = { kind: "project" | "opportunity"; id: string; label: string };
+type TargetOption = { kind: "project" | "opportunity" | "ticket"; id: string; label: string };
+type ApproverOption = { kind: "PM" | "CLIENT_CONTACT"; id: string; label: string };
 
 type Props = {
   defaults: Partial<TimesheetFormValues>;
@@ -57,18 +62,24 @@ function formatActivityDate(value: string) {
   });
 }
 
-function targetKey(kind: "project" | "opportunity", id: string) {
+function targetKey(kind: TargetOption["kind"], id: string) {
   return `${kind}:${id}`;
 }
 
 export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }: Props) {
   const { userName, email } = useAdminSession();
-  const initialKind: "project" | "opportunity" = defaults.opportunityId ? "opportunity" : "project";
-  const initialId = defaults.opportunityId ?? defaults.projectId ?? "";
+  const initialKind: "project" | "opportunity" | "ticket" = defaults.ticketId
+    ? "ticket"
+    : defaults.opportunityId
+      ? "opportunity"
+      : "project";
+  const initialId = defaults.ticketId ?? defaults.opportunityId ?? defaults.projectId ?? "";
   const [selectedTarget, setSelectedTarget] = useState(
     initialId ? targetKey(initialKind, initialId) : "",
   );
   const [managerName, setManagerName] = useState("");
+  const [approvers, setApprovers] = useState<ApproverOption[]>([]);
+  const [selectedApprover, setSelectedApprover] = useState("");
   const [startDate, setStartDate] = useState(toDateInput(defaults.startDate));
   const [endDate, setEndDate] = useState(toDateInput(defaults.endDate));
   const [fileUrls, setFileUrls] = useState<string[]>(defaults.fileUrls ?? []);
@@ -111,14 +122,23 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
     const query =
       kind === "project"
         ? `projectId=${encodeURIComponent(id)}`
-        : `opportunityId=${encodeURIComponent(id)}`;
+        : kind === "ticket"
+          ? `ticketId=${encodeURIComponent(id)}`
+          : `opportunityId=${encodeURIComponent(id)}`;
     void adminFetch(`/api/admin/timesheets/target-meta?${query}`)
       .then((r) => r.json())
       .then((data) => {
-        const row = data.data as { managerName?: string };
+        const row = data.data as { managerName?: string; approvers?: ApproverOption[] };
         setManagerName(row.managerName ?? "");
+        const list = row.approvers ?? [];
+        setApprovers(list);
+        setSelectedApprover(list[0] ? `${list[0].kind}:${list[0].id}` : "");
       })
-      .catch(() => setManagerName(""));
+      .catch(() => {
+        setManagerName("");
+        setApprovers([]);
+        setSelectedApprover("");
+      });
   }, [selectedTarget]);
 
   async function uploadFiles(files: FileList | null) {
@@ -155,7 +175,13 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
     const [kind, id] = selectedTarget.split(":");
     const payload: Record<string, unknown> = { startDate, endDate, fileUrls };
     if (kind === "project") payload.projectId = id;
+    else if (kind === "ticket") payload.ticketId = id;
     else payload.opportunityId = id;
+    if (approvers.length && selectedApprover) {
+      const [approverKind, approverId] = selectedApprover.split(":");
+      payload.approverKind = approverKind;
+      if (approverKind === "CLIENT_CONTACT") payload.projectClientContactId = approverId;
+    }
     await onSubmit(payload);
   }
 
@@ -187,7 +213,11 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
               <option value="">Select project or case…</option>
               {targets.map((row) => (
                 <option key={targetKey(row.kind, row.id)} value={targetKey(row.kind, row.id)}>
-                  {row.kind === "opportunity" ? `Case: ${row.label}` : row.label}
+                  {row.kind === "opportunity"
+                    ? `Sales case: ${row.label}`
+                    : row.kind === "ticket"
+                      ? `Support case: ${row.label}`
+                      : row.label}
                 </option>
               ))}
             </select>
@@ -196,6 +226,23 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Project manager / owner</label>
             <input className={`${inputClass} ${readOnlyClass}`} value={managerName || "—"} readOnly />
           </div>
+          {approvers.length > 0 ? (
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Timesheet approver</label>
+              <select
+                className={`${inputClass} ${editable ? "" : readOnlyClass}`}
+                value={selectedApprover}
+                onChange={(e) => setSelectedApprover(e.target.value)}
+                disabled={!editable}
+              >
+                {approvers.map((row) => (
+                  <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
+                    {row.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Start date *</label>
             <input

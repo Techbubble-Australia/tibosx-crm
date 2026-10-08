@@ -533,6 +533,7 @@ model ClientContact {
   phoneNumber      String
   order            Int           @default(0)
   opportunities    Opportunity[]
+  projectLinks     ProjectClientContact[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -691,6 +692,8 @@ model Project {
   description      String              @db.Text
   clientId         String
   client           Client              @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  /// DELIVERY | SUPPORT
+  kind             String              @default("DELIVERY")
   /// DRAFT | ACTIVE | ON_HOLD | COMPLETED | CANCELLED
   status           String              @default("DRAFT")
   projectManagerId String
@@ -708,13 +711,62 @@ model Project {
   timesheets       Timesheet[]
   activityLogs        ProjectActivityLog[]
   supportOrganization Organization?
+  clientContacts      ProjectClientContact[]
+  supportGroup        ProjectSupportGroup?
+  tickets             Ticket[]
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
 
   @@index([clientId])
   @@index([status])
+  @@index([kind])
   @@index([projectManagerId])
   @@index([contractId])
+}
+
+model ProjectClientContact {
+  id                   String        @id @default(cuid())
+  projectId            String
+  project              Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contactId            String
+  contact              ClientContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  portalAccess         Boolean       @default(true)
+  canApproveTimesheets Boolean       @default(false)
+  ticketingUserId      String?       @unique
+  ticketingUser        TicketingUser? @relation("ProjectClientPortalUser", fields: [ticketingUserId], references: [id], onDelete: SetNull)
+  timesheetApprovals   Timesheet[]   @relation("TimesheetClientApprover")
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@unique([projectId, contactId])
+  @@index([projectId])
+  @@index([contactId])
+}
+
+model ProjectSupportGroup {
+  id        String                    @id @default(cuid())
+  projectId String                    @unique
+  project   Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String                    @default("Support team")
+  members   ProjectSupportGroupMember[]
+  createdAt DateTime                  @default(now())
+  updatedAt DateTime                  @updatedAt
+}
+
+model ProjectSupportGroupMember {
+  id              String             @id @default(cuid())
+  groupId         String
+  group           ProjectSupportGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  projectMemberId String?            @unique
+  projectMember   ProjectMember?     @relation(fields: [projectMemberId], references: [id], onDelete: SetNull)
+  adminUserId     String?
+  adminUser       AdminUser?         @relation("SupportGroupMember", fields: [adminUserId], references: [id], onDelete: SetNull)
+  ticketingUserId String?            @unique
+  ticketingUser   TicketingUser?     @relation("SupportGroupConsultant", fields: [ticketingUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime           @default(now())
+
+  @@index([groupId])
+  @@index([adminUserId])
 }
 
 model ProjectMember {
@@ -730,6 +782,7 @@ model ProjectMember {
   credentialData       Json?
   signatureDataUrl     String?             @db.Text
   agreementSignedAt    DateTime?
+  supportGroupMember   ProjectSupportGroupMember?
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
 
@@ -789,27 +842,35 @@ model ProjectActivityLog {
 }
 
 model Timesheet {
-  id            String               @id @default(cuid())
-  projectId     String?
-  project       Project?             @relation(fields: [projectId], references: [id], onDelete: Restrict)
-  opportunityId String?
-  opportunity   Opportunity?         @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
-  memberUserId  String
-  memberUser    AdminUser            @relation("TimesheetMember", fields: [memberUserId], references: [id], onDelete: Restrict)
-  startDate     DateTime
-  endDate       DateTime
+  id                     String                @id @default(cuid())
+  projectId              String?
+  project                Project?              @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  opportunityId          String?
+  opportunity            Opportunity?          @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  ticketId               String?
+  ticket                 Ticket?               @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  memberUserId           String
+  memberUser             AdminUser             @relation("TimesheetMember", fields: [memberUserId], references: [id], onDelete: Restrict)
+  startDate              DateTime
+  endDate                DateTime
   /// DRAFT | SUBMITTED | APPROVED
-  status        String               @default("DRAFT")
-  fileUrls      Json?
-  rejectReason  String?              @db.Text
-  activityLogs  TimesheetActivityLog[]
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  status                 String                @default("DRAFT")
+  /// PM | CLIENT_CONTACT
+  approverKind           String?
+  projectClientContactId String?
+  projectClientContact   ProjectClientContact? @relation("TimesheetClientApprover", fields: [projectClientContactId], references: [id], onDelete: SetNull)
+  fileUrls               Json?
+  rejectReason           String?               @db.Text
+  activityLogs           TimesheetActivityLog[]
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
 
   @@index([projectId])
   @@index([opportunityId])
+  @@index([ticketId])
   @@index([memberUserId])
   @@index([status])
+  @@index([projectClientContactId])
 }
 
 model TimesheetActivityLog {
@@ -860,6 +921,7 @@ model AdminUser {
   activityLogs        AdminUserActivityLog[] @relation("AdminUserActivitySubject")
   performedUserLogs   AdminUserActivityLog[] @relation("AdminUserActivityPerformer")
   ticketingUser       TicketingUser?         @relation("TicketingTbosUser")
+  supportGroupMemberships ProjectSupportGroupMember[] @relation("SupportGroupMember")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -946,6 +1008,8 @@ model TicketingUser {
   messages                TicketMessage[]
   auditLogs               TicketAuditLog[]         @relation("AuditActor")
   consultantOrganizations ConsultantOrganization[]
+  projectClientLink       ProjectClientContact?    @relation("ProjectClientPortalUser")
+  supportGroupMember      ProjectSupportGroupMember? @relation("SupportGroupConsultant")
 
   @@index([organizationId])
   @@index([role])
@@ -969,6 +1033,8 @@ model Ticket {
   ticketNumber   String         @unique
   organizationId String
   organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projectId      String?
+  project        Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
   type           TicketType
   priority       TicketPriority @default(MEDIUM)
   status         TicketStatus   @default(OPEN)
@@ -985,8 +1051,10 @@ model Ticket {
   messages    TicketMessage[]
   attachments TicketAttachment[]
   auditLogs   TicketAuditLog[]
+  timesheets  Timesheet[]
 
   @@index([organizationId, status])
+  @@index([projectId])
   @@index([createdAt])
 }
 

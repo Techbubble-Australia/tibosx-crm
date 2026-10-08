@@ -17,15 +17,18 @@ const timesheetSchema = z
   .object({
     projectId: z.string().min(1).optional(),
     opportunityId: z.string().min(1).optional(),
+    ticketId: z.string().min(1).optional(),
+    approverKind: z.enum(["PM", "CLIENT_CONTACT"]).optional(),
+    projectClientContactId: z.string().min(1).optional(),
     startDate: z.coerce.date(),
     endDate: z.coerce.date(),
     fileUrls: z.array(z.string().min(1)).min(1, "At least one file is required"),
   })
-  .refine((data) => Boolean(data.projectId || data.opportunityId), {
-    message: "Select a project or case",
+  .refine((data) => Boolean(data.projectId || data.opportunityId || data.ticketId), {
+    message: "Select a project, sales case, or support case",
   })
-  .refine((data) => !(data.projectId && data.opportunityId), {
-    message: "Select either a project or a case, not both",
+  .refine((data) => [data.projectId, data.opportunityId, data.ticketId].filter(Boolean).length === 1, {
+    message: "Select only one target",
   });
 
 function serializeActivity(row: {
@@ -48,6 +51,9 @@ function serializeTimesheet(row: {
   id: string;
   projectId: string | null;
   opportunityId: string | null;
+  ticketId: string | null;
+  approverKind: string | null;
+  projectClientContactId: string | null;
   memberUserId: string;
   startDate: Date;
   endDate: Date;
@@ -58,6 +64,8 @@ function serializeTimesheet(row: {
   updatedAt: Date;
   project?: { id: string; title: string; projectNumber: string; projectManagerId: string } | null;
   opportunity?: { id: string; name: string } | null;
+  ticket?: { id: string; ticketNumber: string; subject: string; projectId: string | null } | null;
+  projectClientContact?: { id: string; contact: { name: string; email: string } } | null;
   memberUser?: { id: string; name: string | null; email: string };
   activityLogs?: ReturnType<typeof serializeActivity>[];
 }) {
@@ -69,12 +77,23 @@ function serializeTimesheet(row: {
     id: row.id,
     projectId: row.projectId,
     opportunityId: row.opportunityId,
+    ticketId: row.ticketId,
+    approverKind: row.approverKind,
+    projectClientContactId: row.projectClientContactId,
+    approverLabel:
+      row.approverKind === "CLIENT_CONTACT"
+        ? row.projectClientContact?.contact.name || row.projectClientContact?.contact.email || "Client contact"
+        : row.approverKind === "PM"
+          ? "Project manager"
+          : "",
     projectTitle: row.project?.title ?? "",
     projectNumber: row.project?.projectNumber ?? "",
     opportunityName: row.opportunity?.name ?? "",
-    targetLabel: row.project
-      ? `${row.project.projectNumber} — ${row.project.title}`
-      : row.opportunity?.name ?? "",
+    targetLabel: row.ticket
+      ? `${row.ticket.ticketNumber} — ${row.ticket.subject}`
+      : row.project
+        ? `${row.project.projectNumber} — ${row.project.title}`
+        : row.opportunity?.name ?? "",
     memberUserId: row.memberUserId,
     memberName: row.memberUser?.name || row.memberUser?.email || "",
     startDate: row.startDate.toISOString(),
@@ -92,6 +111,8 @@ function serializeTimesheet(row: {
 const detailInclude = {
   project: { select: { id: true, title: true, projectNumber: true, projectManagerId: true } },
   opportunity: { select: { id: true, name: true, ownerId: true } },
+  ticket: { select: { id: true, ticketNumber: true, subject: true, projectId: true } },
+  projectClientContact: { include: { contact: { select: { name: true, email: true } } } },
   memberUser: { select: { id: true, name: true, email: true } },
   activityLogs: {
     orderBy: { createdAt: "desc" as const },
@@ -201,7 +222,30 @@ router.get("/active-targets", async (req: AuthRequest, res) => {
       label: row.name,
     }));
 
-    res.json({ data: [...projects, ...cases] });
+    const groupMemberships = await prisma.projectSupportGroupMember.findMany({
+      where: { adminUserId: actorId, group: { project: { status: "ACTIVE", kind: "SUPPORT" } } },
+      select: { group: { select: { projectId: true } } },
+    });
+    const supportProjectIds = groupMemberships.map((m) => m.group.projectId);
+    const supportTickets =
+      supportProjectIds.length > 0
+        ? await prisma.ticket.findMany({
+            where: {
+              projectId: { in: supportProjectIds },
+              status: { in: ["OPEN", "IN_PROGRESS", "PENDING_CLIENT"] },
+            },
+            select: { id: true, ticketNumber: true, subject: true },
+            orderBy: { updatedAt: "desc" },
+            take: 100,
+          })
+        : [];
+    const ticketTargets = supportTickets.map((row) => ({
+      kind: "ticket" as const,
+      id: row.id,
+      label: `${row.ticketNumber} — ${row.subject}`,
+    }));
+
+    res.json({ data: [...projects, ...cases, ...ticketTargets] });
   } catch (error) {
     console.error("Error fetching active targets for timesheets:", error);
     res.status(500).json({ error: "Failed to fetch targets" });
@@ -212,6 +256,25 @@ router.get("/target-meta", async (req: AuthRequest, res) => {
   try {
     const projectId = typeof req.query.projectId === "string" ? req.query.projectId : "";
     const opportunityId = typeof req.query.opportunityId === "string" ? req.query.opportunityId : "";
+    const ticketId = typeof req.query.ticketId === "string" ? req.query.ticketId : "";
+
+    if (ticketId) {
+      const ticket = await prisma.ticket.findUnique({
+        where: { id: ticketId },
+        include: {
+          project: { include: { projectManager: { select: { name: true, email: true } } } },
+        },
+      });
+      if (!ticket) return res.status(404).json({ error: "Support case not found" });
+      const approvers = await buildProjectApprovers(ticket.projectId);
+      return res.json({
+        data: {
+          kind: "ticket",
+          managerName: ticket.project?.projectManager?.name || ticket.project?.projectManager?.email || "",
+          approvers,
+        },
+      });
+    }
 
     if (projectId) {
       const project = await prisma.project.findUnique({
@@ -219,10 +282,12 @@ router.get("/target-meta", async (req: AuthRequest, res) => {
         include: { projectManager: { select: { name: true, email: true } } },
       });
       if (!project) return res.status(404).json({ error: "Project not found" });
+      const approvers = project.kind === "SUPPORT" ? await buildProjectApprovers(projectId) : [];
       return res.json({
         data: {
           kind: "project",
           managerName: project.projectManager?.name || project.projectManager?.email || "",
+          approvers,
         },
       });
     }
@@ -241,12 +306,37 @@ router.get("/target-meta", async (req: AuthRequest, res) => {
       });
     }
 
-    return res.status(400).json({ error: "projectId or opportunityId is required" });
+    return res.status(400).json({ error: "projectId, opportunityId, or ticketId is required" });
   } catch (error) {
     console.error("Error fetching timesheet target meta:", error);
     res.status(500).json({ error: "Failed to fetch target details" });
   }
 });
+
+async function buildProjectApprovers(projectId: string | null | undefined) {
+  if (!projectId) return [];
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: {
+      projectManager: { select: { name: true, email: true } },
+      clientContacts: {
+        where: { canApproveTimesheets: true },
+        include: { contact: { select: { name: true, email: true } } },
+      },
+    },
+  });
+  if (!project) return [];
+  const pmName = project.projectManager?.name || project.projectManager?.email || "Project manager";
+  const rows = [
+    { kind: "PM" as const, id: "PM", label: pmName },
+    ...project.clientContacts.map((row) => ({
+      kind: "CLIENT_CONTACT" as const,
+      id: row.id,
+      label: `${row.contact.name} (client)`,
+    })),
+  ];
+  return rows;
+}
 
 router.get("/defaults", async (_req, res) => {
   res.json({
@@ -320,6 +410,15 @@ router.post("/", async (req: AuthRequest, res) => {
       if (isProjectManagerRole(role) && role === "project_manager" && opportunity.ownerId !== actorId) {
         return res.status(400).json({ error: "You can only log time on cases you own" });
       }
+    } else if (data.ticketId) {
+      const ticket = await prisma.ticket.findUnique({ where: { id: data.ticketId } });
+      if (!ticket?.projectId) return res.status(400).json({ error: "Invalid support case" });
+      const inGroup = await prisma.projectSupportGroupMember.findFirst({
+        where: { adminUserId: actorId, group: { projectId: ticket.projectId } },
+      });
+      if (!inGroup && !isProjectManagerRole(role)) {
+        return res.status(400).json({ error: "You are not on the support team for this case" });
+      }
     }
 
     const row = await prisma.$transaction(async (tx) => {
@@ -327,6 +426,10 @@ router.post("/", async (req: AuthRequest, res) => {
         data: {
           projectId: data.projectId ?? null,
           opportunityId: data.opportunityId ?? null,
+          ticketId: data.ticketId ?? null,
+          approverKind: data.approverKind ?? null,
+          projectClientContactId:
+            data.approverKind === "CLIENT_CONTACT" ? data.projectClientContactId ?? null : null,
           memberUserId: actorId,
           startDate: data.startDate,
           endDate: data.endDate,
@@ -380,6 +483,10 @@ router.put("/:id", async (req: AuthRequest, res) => {
         data: {
           projectId: data.projectId ?? null,
           opportunityId: data.opportunityId ?? null,
+          ticketId: data.ticketId ?? null,
+          approverKind: data.approverKind ?? null,
+          projectClientContactId:
+            data.approverKind === "CLIENT_CONTACT" ? data.projectClientContactId ?? null : null,
           startDate: data.startDate,
           endDate: data.endDate,
           fileUrls: data.fileUrls,
@@ -409,23 +516,85 @@ router.put("/:id", async (req: AuthRequest, res) => {
 });
 
 const submitSchema = z.object({
-  ids: z.array(z.string().min(1)).min(1),
+  items: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        approverKind: z.enum(["PM", "CLIENT_CONTACT"]).optional(),
+        projectClientContactId: z.string().min(1).optional(),
+      }),
+    )
+    .min(1),
 });
 
 router.post("/submit", async (req: AuthRequest, res) => {
   try {
-    const { ids } = submitSchema.parse(req.body);
+    const raw = req.body as { items?: unknown; ids?: string[] };
+    const items =
+      Array.isArray(raw.items) && raw.items.length
+        ? submitSchema.parse({ items: raw.items }).items
+        : Array.isArray(raw.ids) && raw.ids.length
+          ? raw.ids.map((id) => ({ id }))
+          : null;
+    if (!items) return res.status(400).json({ error: "No timesheets to submit" });
     const actorId = getActorId(req);
     const role = req.user?.role ?? "";
     await assertMemberCanSubmitTimesheets(actorId, role);
+    const ids = items.map((i) => i.id);
     const rows = await prisma.timesheet.findMany({
       where: { id: { in: ids }, memberUserId: actorId, status: "DRAFT" },
+      include: {
+        project: { select: { kind: true } },
+        ticket: { select: { projectId: true } },
+      },
     });
     if (!rows.length) return res.status(400).json({ error: "No draft timesheets found" });
 
+    const itemMap = new Map(items.map((i) => [i.id, i]));
+
     await prisma.$transaction(async (tx) => {
       for (const row of rows) {
-        await tx.timesheet.update({ where: { id: row.id }, data: { status: "SUBMITTED" } });
+        const item = itemMap.get(row.id);
+        let supportProjectId: string | null = null;
+        if (row.project?.kind === "SUPPORT" && row.projectId) {
+          supportProjectId = row.projectId;
+        } else if (row.ticket?.projectId) {
+          const project = await tx.project.findUnique({
+            where: { id: row.ticket.projectId },
+            select: { kind: true },
+          });
+          if (project?.kind === "SUPPORT") supportProjectId = row.ticket.projectId;
+        }
+        let approverKind: string | null = row.approverKind;
+        let projectClientContactId: string | null = row.projectClientContactId;
+        if (!supportProjectId) {
+          approverKind = null;
+          projectClientContactId = null;
+        } else {
+          const chosenKind = item?.approverKind ?? row.approverKind ?? "PM";
+          if (chosenKind === "CLIENT_CONTACT") {
+            if (!item?.projectClientContactId) {
+              throw new Error("APPROVER_REQUIRED");
+            }
+            const link = await tx.projectClientContact.findFirst({
+              where: {
+                id: item.projectClientContactId,
+                projectId: supportProjectId,
+                canApproveTimesheets: true,
+              },
+            });
+            if (!link) throw new Error("INVALID_APPROVER");
+            approverKind = "CLIENT_CONTACT";
+            projectClientContactId = link.id;
+          } else {
+            approverKind = "PM";
+            projectClientContactId = null;
+          }
+        }
+        await tx.timesheet.update({
+          where: { id: row.id },
+          data: { status: "SUBMITTED", approverKind, projectClientContactId },
+        });
         await tx.timesheetActivityLog.create({
           data: { timesheetId: row.id, action: "SUBMITTED", performedById: actorId },
         });
@@ -434,6 +603,12 @@ router.post("/submit", async (req: AuthRequest, res) => {
 
     res.json({ data: { submitted: rows.length } });
   } catch (error) {
+    if (error instanceof Error && error.message === "APPROVER_REQUIRED") {
+      return res.status(400).json({ error: "Select an approver for this support timesheet" });
+    }
+    if (error instanceof Error && error.message === "INVALID_APPROVER") {
+      return res.status(400).json({ error: "Invalid timesheet approver" });
+    }
     if (error instanceof Error && error.message === "AGREEMENT_REQUIRED") {
       return res.status(403).json({ error: "Sign your agreement before submitting timesheets" });
     }
@@ -473,6 +648,9 @@ router.post("/:id/approve", async (req: AuthRequest, res) => {
     }
     if (existing.status !== "SUBMITTED") {
       return res.status(400).json({ error: "Only submitted timesheets can be approved" });
+    }
+    if (existing.approverKind === "CLIENT_CONTACT") {
+      return res.status(400).json({ error: "This timesheet must be approved by the selected client contact in the support portal" });
     }
 
     await prisma.$transaction(async (tx) => {
@@ -520,6 +698,9 @@ router.post("/:id/reject", async (req: AuthRequest, res) => {
     }
     if (existing.status !== "SUBMITTED") {
       return res.status(400).json({ error: "Only submitted timesheets can be rejected" });
+    }
+    if (existing.approverKind === "CLIENT_CONTACT") {
+      return res.status(400).json({ error: "This timesheet must be rejected by the selected client contact in the support portal" });
     }
 
     await prisma.$transaction(async (tx) => {

@@ -22,6 +22,13 @@ import {
   ensureSupportOrganizationForProject,
   syncConsultantAccessForOrganization,
 } from "../lib/support-organization";
+import {
+  activateSupportProject,
+  PROJECT_KINDS,
+  provisionSupportMemberConsultant,
+  setProjectSupportGroupMembers,
+  syncProjectClientContacts,
+} from "../lib/support-project";
 
 const router: IRouter = Router();
 
@@ -49,6 +56,7 @@ const projectSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().min(1).max(20000),
   clientId: z.string().min(1),
+  kind: z.enum(PROJECT_KINDS).optional(),
   status: z.enum(PROJECT_STATUSES).optional(),
   projectManagerId: z.string().min(1),
   contractId: z.string().optional().nullable(),
@@ -187,6 +195,7 @@ function serializeProject(row: {
   title: string;
   description: string;
   clientId: string;
+  kind: string;
   status: string;
   projectManagerId: string;
   contractId: string | null;
@@ -203,6 +212,8 @@ function serializeProject(row: {
   actuals?: unknown;
   activityLogs?: unknown;
   supportOrganization?: { id: string; name: string; slug: string } | null;
+  clientContacts?: unknown;
+  supportGroup?: unknown;
 }) {
   const fileUrls = Array.isArray(row.fileUrls)
     ? row.fileUrls.filter((url): url is string => typeof url === "string")
@@ -215,6 +226,7 @@ function serializeProject(row: {
     description: row.description,
     clientId: row.clientId,
     clientName: row.client?.name ?? "",
+    kind: row.kind,
     status: row.status,
     statusLabel: PROJECT_STATUS_LABELS[status] ?? row.status,
     projectManagerId: row.projectManagerId,
@@ -234,6 +246,8 @@ function serializeProject(row: {
     supportOrganizationId: row.supportOrganization?.id ?? null,
     supportOrganizationName: row.supportOrganization?.name ?? null,
     supportOrganizationSlug: row.supportOrganization?.slug ?? null,
+    clientContacts: Array.isArray(row.clientContacts) ? row.clientContacts : [],
+    supportGroupMembers: Array.isArray(row.supportGroup?.members) ? row.supportGroup.members : [],
   };
 }
 
@@ -257,6 +271,28 @@ const detailInclude = {
     include: { performedBy: { select: { name: true, email: true } } },
   },
   supportOrganization: { select: { id: true, name: true, slug: true } },
+  clientContacts: {
+    orderBy: { createdAt: "asc" as const },
+    include: {
+      contact: { select: { id: true, name: true, email: true, position: true } },
+      ticketingUser: { select: { id: true, email: true } },
+    },
+  },
+  supportGroup: {
+    include: {
+      members: {
+        include: {
+          projectMember: {
+            include: {
+              profile: { select: { id: true, firstName: true, lastName: true, email: true } },
+            },
+          },
+          adminUser: { select: { id: true, email: true, name: true } },
+          ticketingUser: { select: { id: true, email: true } },
+        },
+      },
+    },
+  },
 };
 
 async function syncMembersFromContract(projectId: string, contractId: string | null | undefined) {
@@ -343,6 +379,50 @@ function buildDefaultEstimates(
   }));
 }
 
+function serializeProjectClientContact(row: {
+  id: string;
+  portalAccess: boolean;
+  canApproveTimesheets: boolean;
+  ticketingUserId: string | null;
+  contact: { id: string; name: string; email: string; position: string | null };
+}) {
+  return {
+    id: row.id,
+    contactId: row.contact.id,
+    name: row.contact.name,
+    email: row.contact.email,
+    position: row.contact.position,
+    portalAccess: row.portalAccess,
+    canApproveTimesheets: row.canApproveTimesheets,
+    portalProvisioned: Boolean(row.ticketingUserId),
+  };
+}
+
+function serializeSupportGroupMember(row: {
+  id: string;
+  projectMemberId: string | null;
+  adminUserId: string | null;
+  ticketingUserId: string | null;
+  projectMember?: {
+    id: string;
+    profile: { firstName: string; lastName: string; email: string };
+  } | null;
+  adminUser?: { id: string; email: string; name: string | null } | null;
+}) {
+  const profile = row.projectMember?.profile;
+  const name = profile ? `${profile.firstName} ${profile.lastName}`.trim() : row.adminUser?.name || "";
+  const email = profile?.email || row.adminUser?.email || "";
+  return {
+    id: row.id,
+    projectMemberId: row.projectMemberId,
+    adminUserId: row.adminUserId,
+    ticketingUserId: row.ticketingUserId,
+    name,
+    email,
+    credentialsReady: Boolean(row.adminUserId && row.ticketingUserId),
+  };
+}
+
 function mapDetail(row: NonNullable<Awaited<ReturnType<typeof fetchProject>>>) {
   return serializeProject({
     ...row,
@@ -350,6 +430,10 @@ function mapDetail(row: NonNullable<Awaited<ReturnType<typeof fetchProject>>>) {
     estimates: row.estimates.map(serializeEstimate),
     actuals: row.actuals.map(serializeActual),
     activityLogs: row.activityLogs.map(serializeActivity),
+    clientContacts: row.clientContacts.map(serializeProjectClientContact),
+    supportGroup: row.supportGroup
+      ? { members: row.supportGroup.members.map(serializeSupportGroupMember) }
+      : null,
   });
 }
 
@@ -573,6 +657,7 @@ router.post("/", async (req: AuthRequest, res) => {
           title: data.title.trim(),
           description: data.description.trim(),
           clientId: data.clientId,
+          kind: data.kind ?? "DELIVERY",
           status: data.status ?? "DRAFT",
           projectManagerId: data.projectManagerId,
           contractId: data.contractId ?? null,
@@ -594,6 +679,9 @@ router.post("/", async (req: AuthRequest, res) => {
     });
 
     await syncMembersFromContract(row.id, data.contractId);
+    if ((data.kind ?? "DELIVERY") === "SUPPORT" && (data.status ?? "DRAFT") === "ACTIVE") {
+      await activateSupportProject(row.id);
+    }
     const detail = await fetchProject(row.id);
     res.status(201).json({ data: detail ? mapDetail(detail) : null });
   } catch (error) {
@@ -630,6 +718,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
           title: data.title.trim(),
           description: data.description.trim(),
           clientId: data.clientId,
+          kind: data.kind ?? existing.kind,
           status: data.status ?? existing.status,
           projectManagerId: data.projectManagerId,
           contractId: data.contractId ?? null,
@@ -653,6 +742,12 @@ router.put("/:id", async (req: AuthRequest, res) => {
         },
       });
     });
+
+    const nextStatus = data.status ?? existing.status;
+    const nextKind = data.kind ?? existing.kind;
+    if (nextKind === "SUPPORT" && nextStatus === "ACTIVE") {
+      await activateSupportProject(projectId);
+    }
 
     await syncMembersFromContract(projectId, data.contractId);
     const linkedOrg = await prisma.organization.findFirst({ where: { projectId } });
@@ -845,6 +940,12 @@ router.post("/:id/members/:memberId/generate-credentials", async (req: AuthReque
       return user;
     });
 
+    try {
+      await provisionSupportMemberConsultant(projectId, adminUser.id, member.id);
+    } catch (error) {
+      console.error("Support consultant provisioning failed:", error);
+    }
+
     const detail = await fetchProject(projectId);
     res.json({
       data: {
@@ -861,6 +962,87 @@ router.post("/:id/members/:memberId/generate-credentials", async (req: AuthReque
     }
     console.error("Error generating credentials:", error);
     res.status(500).json({ error: "Failed to generate credentials" });
+  }
+});
+
+const supportClientContactsSchema = z.object({
+  contacts: z.array(
+    z.object({
+      contactId: z.string().min(1),
+      portalAccess: z.boolean(),
+      canApproveTimesheets: z.boolean(),
+    }),
+  ),
+});
+
+router.put("/:id/support/client-contacts", async (req: AuthRequest, res) => {
+  try {
+    const projectId = req.params.id;
+    if (!projectId) return res.status(400).json({ error: "Invalid id" });
+    if (!isProjectManagerRole(req.user?.role ?? "") && !canManageProjects(req.user?.role ?? "")) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const body = supportClientContactsSchema.parse(req.body);
+    await syncProjectClientContacts(projectId, body.contacts);
+    const detail = await fetchProject(projectId);
+    res.json({ data: detail ? mapDetail(detail) : null });
+  } catch (error) {
+    if (error instanceof Error && error.message === "NOT_SUPPORT_PROJECT") {
+      return res.status(400).json({ error: "Only support projects can have client contacts" });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error saving support client contacts:", error);
+    res.status(500).json({ error: "Failed to save client contacts" });
+  }
+});
+
+const supportGroupSchema = z.object({
+  projectMemberIds: z.array(z.string().min(1)),
+});
+
+router.put("/:id/support/group-members", async (req: AuthRequest, res) => {
+  try {
+    const projectId = req.params.id;
+    if (!projectId) return res.status(400).json({ error: "Invalid id" });
+    if (!isProjectManagerRole(req.user?.role ?? "") && !canManageProjects(req.user?.role ?? "")) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const body = supportGroupSchema.parse(req.body);
+    await setProjectSupportGroupMembers(projectId, body.projectMemberIds);
+    const detail = await fetchProject(projectId);
+    res.json({ data: detail ? mapDetail(detail) : null });
+  } catch (error) {
+    if (error instanceof Error && error.message === "NOT_SUPPORT_PROJECT") {
+      return res.status(400).json({ error: "Only support projects can have a support group" });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error saving support group:", error);
+    res.status(500).json({ error: "Failed to save support group" });
+  }
+});
+
+router.get("/:id/support/available-contacts", async (req: AuthRequest, res) => {
+  try {
+    const projectId = req.params.id;
+    if (!projectId) return res.status(400).json({ error: "Invalid id" });
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { clientId: true },
+    });
+    if (!project) return res.status(404).json({ error: "Not found" });
+    const contacts = await prisma.clientContact.findMany({
+      where: { clientId: project.clientId },
+      orderBy: { order: "asc" },
+      select: { id: true, name: true, email: true, position: true },
+    });
+    res.json({ data: contacts });
+  } catch (error) {
+    console.error("Error fetching client contacts:", error);
+    res.status(500).json({ error: "Failed to fetch contacts" });
   }
 });
 

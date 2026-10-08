@@ -38,6 +38,7 @@ import { invoiceRoutes } from "./routes/invoices";
 import { authRoutes as ticketingPortalAuthRoutes } from "./ticketing/routes/auth";
 import { ticketRoutes as ticketingTicketRoutes } from "./ticketing/routes/tickets";
 import { organizationRoutes as ticketingOrgRoutes } from "./ticketing/routes/organizations";
+import { ticketingTimesheetRoutes } from "./ticketing/routes/timesheets";
 import { tbosRoutes as ticketingAdminRoutes } from "./ticketing/routes/tbos";
 import { createTicketUploadsMiddleware } from "./ticketing/middleware/serve-ticket-uploads";
 import { uploadDir as ticketUploadDir } from "./ticketing/lib/upload-storage";
@@ -158,6 +159,7 @@ app.use(
 app.use("/api/ticketing/auth", ticketingPortalAuthRoutes);
 app.use("/api/ticketing/tickets", ticketingTicketRoutes);
 app.use("/api/ticketing/organizations", ticketingOrgRoutes);
+app.use("/api/ticketing/timesheets", ticketingTimesheetRoutes);
 app.use("/api/upload", ...websiteWrite, uploadRoutes);
 
 // Error handler

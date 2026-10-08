@@ -1,0 +1,131 @@
+import { Router, type IRouter } from "express";
+import { z } from "zod";
+import { prisma } from "@techbubble/database";
+import { authMiddleware, type TicketingRequest } from "../middleware/auth.js";
+
+const router: IRouter = Router();
+
+router.use(authMiddleware);
+
+router.get("/pending-approval", async (req: TicketingRequest, res) => {
+  const user = req.ticketingUser!;
+  if (user.role !== "CLIENT" || !user.organizationId) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const link = await prisma.projectClientContact.findFirst({
+    where: { ticketingUserId: user.id, canApproveTimesheets: true },
+    select: { id: true },
+  });
+  if (!link) return res.json({ data: [] });
+
+  const rows = await prisma.timesheet.findMany({
+    where: {
+      status: "SUBMITTED",
+      approverKind: "CLIENT_CONTACT",
+      projectClientContactId: link.id,
+    },
+    include: {
+      memberUser: { select: { name: true, email: true } },
+      project: { select: { projectNumber: true, title: true } },
+      ticket: { select: { ticketNumber: true, subject: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  res.json({
+    data: rows.map((row) => ({
+      id: row.id,
+      memberName: row.memberUser?.name || row.memberUser?.email || "",
+      startDate: row.startDate.toISOString(),
+      endDate: row.endDate.toISOString(),
+      targetLabel: row.ticket
+        ? `${row.ticket.ticketNumber} — ${row.ticket.subject}`
+        : row.project
+          ? `${row.project.projectNumber} — ${row.project.title}`
+          : "",
+    })),
+  });
+});
+
+const decisionSchema = z.object({
+  reason: z.string().max(5000).optional(),
+});
+
+router.post("/:id/approve", async (req: TicketingRequest, res) => {
+  const user = req.ticketingUser!;
+  if (user.role !== "CLIENT") return res.status(403).json({ error: "Forbidden" });
+
+  const link = await prisma.projectClientContact.findFirst({
+    where: { ticketingUserId: user.id, canApproveTimesheets: true },
+  });
+  if (!link) return res.status(403).json({ error: "Forbidden" });
+
+  const timesheet = await prisma.timesheet.findUnique({ where: { id: req.params.id } });
+  if (
+    !timesheet ||
+    timesheet.status !== "SUBMITTED" ||
+    timesheet.approverKind !== "CLIENT_CONTACT" ||
+    timesheet.projectClientContactId !== link.id
+  ) {
+    return res.status(404).json({ error: "Timesheet not found" });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.timesheet.update({
+      where: { id: timesheet.id },
+      data: { status: "APPROVED", rejectReason: null },
+    });
+    await tx.timesheetActivityLog.create({
+      data: {
+        timesheetId: timesheet.id,
+        action: "APPROVED",
+        reason: `Approved by client contact ${user.email}`,
+      },
+    });
+  });
+
+  res.json({ data: { id: timesheet.id, status: "APPROVED" } });
+});
+
+router.post("/:id/reject", async (req: TicketingRequest, res) => {
+  const user = req.ticketingUser!;
+  if (user.role !== "CLIENT") return res.status(403).json({ error: "Forbidden" });
+  const parsed = decisionSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  const link = await prisma.projectClientContact.findFirst({
+    where: { ticketingUserId: user.id, canApproveTimesheets: true },
+  });
+  if (!link) return res.status(403).json({ error: "Forbidden" });
+
+  const timesheet = await prisma.timesheet.findUnique({ where: { id: req.params.id } });
+  if (
+    !timesheet ||
+    timesheet.status !== "SUBMITTED" ||
+    timesheet.approverKind !== "CLIENT_CONTACT" ||
+    timesheet.projectClientContactId !== link.id
+  ) {
+    return res.status(404).json({ error: "Timesheet not found" });
+  }
+
+  const reason = parsed.data.reason?.trim() || "Rejected by client contact";
+
+  await prisma.$transaction(async (tx) => {
+    await tx.timesheet.update({
+      where: { id: timesheet.id },
+      data: { status: "DRAFT", rejectReason: reason },
+    });
+    await tx.timesheetActivityLog.create({
+      data: {
+        timesheetId: timesheet.id,
+        action: "REJECTED",
+        reason,
+      },
+    });
+  });
+
+  res.json({ data: { id: timesheet.id, status: "DRAFT" } });
+});
+
+export { router as ticketingTimesheetRoutes };

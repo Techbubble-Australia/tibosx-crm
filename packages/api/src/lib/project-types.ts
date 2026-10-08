@@ -1,3 +1,11 @@
+export const PROJECT_KINDS = ["DELIVERY", "SUPPORT"] as const;
+export type ProjectKind = (typeof PROJECT_KINDS)[number];
+
+export const PROJECT_KIND_LABELS: Record<ProjectKind, string> = {
+  DELIVERY: "Delivery",
+  SUPPORT: "Support",
+};
+
 export const PROJECT_STATUSES = ["DRAFT", "ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED"] as const;
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 

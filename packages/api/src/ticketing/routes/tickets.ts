@@ -144,14 +144,17 @@ router.post("/", async (req: TicketingRequest, res) => {
 
   const org = await prisma.organization.findFirst({
     where: { id: organizationId, active: true },
+    select: { id: true, projectId: true },
   });
   if (!org) return res.status(400).json({ error: "Invalid organization" });
 
   const ticketNumber = await nextTicketNumber();
+  const projectId = org.projectId ?? null;
   const ticket = await prisma.ticket.create({
     data: {
       ticketNumber,
       organizationId: org.id,
+      projectId,
       type: parsed.data.type,
       priority: parsed.data.priority ?? TicketPriority.MEDIUM,
       status: TicketStatus.OPEN,
@@ -169,6 +172,25 @@ router.post("/", async (req: TicketingRequest, res) => {
   await logTicketAudit(ticket.id, user.id, "CREATED", {
     metadata: { type: ticket.type, priority: ticket.priority },
   });
+
+  if (projectId) {
+    const { assignTicketToSupportGroup, notifySupportGroupOfTicket } = await import(
+      "../../lib/support-project.js"
+    );
+    await assignTicketToSupportGroup(ticket.id, projectId);
+    void notifySupportGroupOfTicket(ticket.id);
+    const refreshed = await prisma.ticket.findUnique({
+      where: { id: ticket.id },
+      include: {
+        organization: { select: { id: true, name: true, slug: true } },
+        createdBy: { select: { id: true, name: true, email: true } },
+        assignedTo: { select: { id: true, name: true, email: true } },
+      },
+    });
+    if (refreshed) {
+      return res.status(201).json({ data: serializeTicket(refreshed) });
+    }
+  }
 
   res.status(201).json({ data: serializeTicket(ticket) });
 });

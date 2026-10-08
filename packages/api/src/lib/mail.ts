@@ -65,6 +65,29 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+export async function sendSupportTicketNotificationEmail(input: {
+  to: string;
+  subject: string;
+  body: string;
+}): Promise<void> {
+  const resend = getResendClient();
+  if (!resend) {
+    console.info("[support-ticket-email] RESEND not configured; would send to", input.to, input.subject);
+    return;
+  }
+
+  const { error } = await resend.emails.send({
+    from: getMailFrom(),
+    to: [input.to],
+    subject: input.subject,
+    text: input.body,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Failed to send support ticket email");
+  }
+}
+
 export async function sendCareerApplicationEmail(data: CareerApplicationEmailData): Promise<void> {
   const resend = getResendClient();
   if (!resend) {
