@@ -107,7 +107,8 @@ pnpm --filter @techbubble/ticketing-database db:seed
 
 | Symptom | Check |
 |--------|--------|
-| Build fails with `npm ci` / missing `package-lock.json` | Railway is using the **root** `Dockerfile`. Set **Settings → Config file** to `railway.ticketing.toml` or `railway.ticketing-api.toml` and redeploy. Root directory must be the **repo root**. |
+| Wrong app / API image on deploy | **API / admin / web / ticketing-api** must set **Config file** to the matching `railway.*.toml`. The root `Dockerfile` builds the **ticketing portal** only (for services without a config file). |
+| Build fails with `npm ci` / missing `package-lock.json` | Old root Dockerfile; pull latest. Portal builds use **pnpm** via root `Dockerfile` or `Dockerfile.ticketing`. |
 | Portal 404 / nothing deployed | Separate **`ticketing`** service with `Dockerfile.ticketing`, not admin/web |
 | Login fails | `TICKETING_API_URL` on portal service; API healthy at `/health` |
 | SSO from TBOS fails | `JWT_SECRET` aligned; `TICKETING_ALLOWED_ORIGINS` includes admin URL |
