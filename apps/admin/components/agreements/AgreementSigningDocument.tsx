@@ -52,9 +52,11 @@ export function AgreementSigningDocument({
     if (!host) return;
 
     function onClick(event: MouseEvent) {
+      const node = hostRef.current;
+      if (!node) return;
       const target = event.target as HTMLElement;
       const capture = target.closest("[data-signature-capture]") as HTMLElement | null;
-      if (!capture || !host.contains(capture)) return;
+      if (!capture || !node.contains(capture)) return;
       const id = capture.getAttribute("data-signature-capture");
       if (!id || !captureIds.includes(id)) return;
       event.preventDefault();
