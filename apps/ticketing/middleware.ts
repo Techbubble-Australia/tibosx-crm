@@ -12,7 +12,7 @@ function secretKey() {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith("/login") || pathname.startsWith("/auth/")) {
+  if (pathname === "/health" || pathname.startsWith("/login") || pathname.startsWith("/auth/")) {
     return NextResponse.next();
   }
 

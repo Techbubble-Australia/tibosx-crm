@@ -123,6 +123,7 @@ pnpm --filter @techbubble/ticketing-database db:seed
 
 | Symptom | Check |
 |--------|--------|
+| `/health` shows **Client Support Portal** login | That domain runs the **portal** (Next.js), not ticketing-api. API must use `Dockerfile.ticketing-api` on its own service; `/health` must return `"service":"ticketing-api"`. Portal `/health` returns `"service":"ticketing-portal"`. |
 | Deploy stuck / no build when selecting `ticketing-api` folder | Set **Root Directory** back to **`/`**. Use **Config file** `railway.ticketing-api.toml` + **Dockerfile** `Dockerfile.ticketing-api` from repo root. |
 | Wrong app / API image on deploy | **API / admin / web / ticketing-api** must set **Config file** to the matching `railway.*.toml`. The root `Dockerfile` builds the **ticketing portal** only (for services without a config file). |
 | Build fails with `npm ci` / missing `package-lock.json` | Old root Dockerfile; pull latest. Portal builds use **pnpm** via root `Dockerfile` or `Dockerfile.ticketing`. |
