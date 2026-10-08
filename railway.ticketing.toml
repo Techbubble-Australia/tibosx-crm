@@ -1,4 +1,4 @@
-# Build from repository ROOT (/). Do not set Root Directory to apps/ticketing only.
+# Build from repository ROOT (/). Required for portal — root Dockerfile is the API, not the portal.
 
 [build]
 builder = "DOCKERFILE"

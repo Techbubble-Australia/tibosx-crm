@@ -77,7 +77,9 @@ For **every** ticketing service (API + portal):
 | **Config file** | `railway.ticketing-api.toml` or `railway.ticketing.toml` |
 | **Service name** | `ticketing-api` / `ticketing` (name only; not the root path) |
 
-**If both services build the portal** (backend `/health` shows `"service":"ticketing-portal"`), the API service is still using the root `Dockerfile`. Fix **on the API service only** (either approach):
+The repo **root `Dockerfile` builds ticketing-api** by default (for `ticketing_portal_backend`). The **portal** service must set `RAILWAY_DOCKERFILE_PATH=Dockerfile.ticketing` or `railway.ticketing.toml`.
+
+**If backend `/health` still shows `"service":"ticketing-portal"`**, redeploy after pulling latest, or fix **on the API service** (either approach):
 
 1. **Config file path:** `/railway.ticketing-api.toml` (absolute from repo root), or  
 2. **Service variable:** `RAILWAY_DOCKERFILE_PATH` = `Dockerfile.ticketing-api`  
@@ -136,7 +138,7 @@ pnpm --filter @techbubble/ticketing-database db:seed
 |--------|--------|
 | `/health` shows **Client Support Portal** login | That domain runs the **portal** (Next.js), not ticketing-api. API must use `Dockerfile.ticketing-api` on its own service; `/health` must return `"service":"ticketing-api"`. Portal `/health` returns `"service":"ticketing-portal"`. |
 | Deploy stuck / no build when selecting `ticketing-api` folder | Set **Root Directory** back to **`/`**. Use **Config file** `railway.ticketing-api.toml` + **Dockerfile** `Dockerfile.ticketing-api` from repo root. |
-| Wrong app / API image on deploy | **API / admin / web / ticketing-api** must set **Config file** to the matching `railway.*.toml`. The root `Dockerfile` builds the **ticketing portal** only (for services without a config file). |
+| Wrong app / API image on deploy | Root `Dockerfile` = **ticketing-api**. Portal service needs `Dockerfile.ticketing`. TBOS api/web/admin need their `railway.*.toml`. |
 | Build fails with `npm ci` / missing `package-lock.json` | Old root Dockerfile; pull latest. Portal builds use **pnpm** via root `Dockerfile` or `Dockerfile.ticketing`. |
 | Portal 404 / nothing deployed | Separate **`ticketing`** service with `Dockerfile.ticketing`, not admin/web |
 | Login fails | `TICKETING_API_URL` on portal service; API healthy at `/health` |
