@@ -10,6 +10,7 @@ import {
   TICKET_STATUS_LABELS,
   TICKET_TYPE_LABELS,
 } from "@/lib/ticket-labels";
+import { TicketAttachmentList } from "@/components/TicketAttachmentList";
 
 type Message = {
   id: string;
@@ -29,7 +30,7 @@ type TicketDetail = {
   status: string;
   organization?: { name: string };
   messages: Message[];
-  attachments: { id: string; fileName: string; fileUrl: string }[];
+  attachments: { id: string; fileName: string; fileUrl: string; fileSize?: number | null }[];
   auditLogs?: { id: string; action: string; createdAt: string; actor?: { name: string } }[];
 };
 
@@ -168,19 +169,7 @@ export default function TicketDetailPage() {
             <input type="file" className="hidden" onChange={onUploadFile} disabled={uploading} />
           </label>
         </div>
-        {ticket.attachments.length === 0 ? (
-          <p className="text-sm text-slate-500">No files attached.</p>
-        ) : (
-          <ul className="space-y-1 text-sm text-sky-600">
-            {ticket.attachments.map((a) => (
-              <li key={a.id}>
-                <a href={a.fileUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                  {a.fileName}
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
+        <TicketAttachmentList attachments={ticket.attachments} />
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-4">

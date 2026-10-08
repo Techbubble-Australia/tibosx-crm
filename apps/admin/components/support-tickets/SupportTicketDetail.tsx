@@ -11,6 +11,7 @@ import {
   TICKET_TYPE_LABELS,
   TICKET_TYPES,
 } from "@/lib/support-ticket-labels";
+import { TicketAttachmentList } from "@/components/support-tickets/TicketAttachmentList";
 
 type Assignee = { id: string; name: string; email: string };
 
@@ -227,20 +228,7 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
             <input type="file" className="hidden" onChange={onUpload} disabled={uploading} />
           </label>
         </div>
-        {ticket.attachments.length === 0 ? (
-          <p className="text-sm text-gray-500">No attachments.</p>
-        ) : (
-          <ul className="space-y-1 text-sm">
-            {ticket.attachments.map((a) => (
-              <li key={a.id}>
-                <a href={a.fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline dark:text-blue-400">
-                  {a.fileName}
-                </a>
-                {a.fileSize ? <span className="text-gray-400"> ({Math.round(a.fileSize / 1024)} KB)</span> : null}
-              </li>
-            ))}
-          </ul>
-        )}
+        <TicketAttachmentList attachments={ticket.attachments} />
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
