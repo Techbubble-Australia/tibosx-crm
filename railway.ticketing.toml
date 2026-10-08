@@ -1,3 +1,5 @@
+# Build from repository ROOT (/). Do not set Root Directory to apps/ticketing only.
+
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.ticketing"

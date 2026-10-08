@@ -1,3 +1,6 @@
+# Build from repository ROOT (/). Do not set Railway "Root Directory" to packages/ticketing-api
+# or the UI folder "ticketing-api" — Docker needs pnpm-workspace + packages/* at repo root.
+
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.ticketing-api"

@@ -63,11 +63,25 @@ The monorepo did **not** ship ticketing until `railway.ticketing.toml` and `rail
 - Add a **new** PostgreSQL service (or database) in the same Railway project.
 - Copy its `DATABASE_URL` into the variable **`TICKETING_DATABASE_URL`** on the **ticketing-api** service (not `DATABASE_URL` for the main TBOS API).
 
+### Railway “Root Directory” (important)
+
+Ticketing code lives under **`packages/ticketing-api`** and **`apps/ticketing`**, but Railway must still use **Root Directory = `/`** (repository root).
+
+The UI list item **`ticketing-api /`** is a **service label**, not a folder to deploy from. If you set Root Directory to `ticketing-api` or `packages/ticketing-api`, the build will not find `Dockerfile.ticketing-api`, `pnpm-lock.yaml`, or workspace packages — deploys fail or never start.
+
+For **every** ticketing service (API + portal):
+
+| Setting | Value |
+|--------|--------|
+| **Root Directory** | `/` (empty or repo root) |
+| **Config file** | `railway.ticketing-api.toml` or `railway.ticketing.toml` |
+| **Service name** | `ticketing-api` / `ticketing` (name only; not the root path) |
+
 ### 2. Service: `ticketing-api`
 
 - Create a service named **`ticketing-api`** (name must match `scripts/railway-deploy-all.sh`).
 - **Settings → Config file:** `railway.ticketing-api.toml` (or set Dockerfile path to `Dockerfile.ticketing-api`).
-- **Root directory:** repo root (not `apps/ticketing`).
+- **Root directory:** **`/`** — do **not** pick `ticketing-api` from the Root Directory dropdown.
 - **Variables:**
   - `TICKETING_DATABASE_URL` — from ticketing Postgres
   - `JWT_SECRET` — **same value as TBOS API** (for SSO)
@@ -109,6 +123,7 @@ pnpm --filter @techbubble/ticketing-database db:seed
 
 | Symptom | Check |
 |--------|--------|
+| Deploy stuck / no build when selecting `ticketing-api` folder | Set **Root Directory** back to **`/`**. Use **Config file** `railway.ticketing-api.toml` + **Dockerfile** `Dockerfile.ticketing-api` from repo root. |
 | Wrong app / API image on deploy | **API / admin / web / ticketing-api** must set **Config file** to the matching `railway.*.toml`. The root `Dockerfile` builds the **ticketing portal** only (for services without a config file). |
 | Build fails with `npm ci` / missing `package-lock.json` | Old root Dockerfile; pull latest. Portal builds use **pnpm** via root `Dockerfile` or `Dockerfile.ticketing`. |
 | Portal 404 / nothing deployed | Separate **`ticketing`** service with `Dockerfile.ticketing`, not admin/web |
