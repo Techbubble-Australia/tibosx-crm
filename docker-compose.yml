@@ -23,8 +23,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile
-      target: runner
+      dockerfile: Dockerfile.api
     container_name: techbubble-api
     environment:
       - NODE_ENV=production
