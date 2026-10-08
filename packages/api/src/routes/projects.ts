@@ -213,7 +213,7 @@ function serializeProject(row: {
   activityLogs?: unknown;
   supportOrganization?: { id: string; name: string; slug: string } | null;
   clientContacts?: unknown;
-  supportGroup?: unknown;
+  supportGroup?: { members?: unknown } | null;
 }) {
   const fileUrls = Array.isArray(row.fileUrls)
     ? row.fileUrls.filter((url): url is string => typeof url === "string")

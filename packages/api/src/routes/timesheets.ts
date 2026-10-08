@@ -528,10 +528,16 @@ const submitSchema = z.object({
     .min(1),
 });
 
+type SubmitTimesheetItem = {
+  id: string;
+  approverKind?: "PM" | "CLIENT_CONTACT";
+  projectClientContactId?: string;
+};
+
 router.post("/submit", async (req: AuthRequest, res) => {
   try {
     const raw = req.body as { items?: unknown; ids?: string[] };
-    const items =
+    const items: SubmitTimesheetItem[] | null =
       Array.isArray(raw.items) && raw.items.length
         ? submitSchema.parse({ items: raw.items }).items
         : Array.isArray(raw.ids) && raw.ids.length
