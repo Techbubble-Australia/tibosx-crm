@@ -1,24 +1,17 @@
-const UPLOAD_PATH = "/uploads/tickets/";
+const MOJIBAKE_NARROW_NBSP = "â€¯";
 
-export function resolveTicketAttachmentUrl(fileUrl: string): string {
-  const raw = fileUrl.trim();
-  if (!raw) return raw;
+export function formatDisplayFileName(fileName: string): string {
+  return fileName
+    .normalize("NFC")
+    .replace(/\u202f/g, " ")
+    .replace(/\u00a0/g, " ")
+    .replace(new RegExp(MOJIBAKE_NARROW_NBSP, "g"), " ");
+}
 
-  if (raw.startsWith(UPLOAD_PATH)) {
-    return raw;
-  }
+export function ticketAttachmentContentUrl(ticketId: string, attachmentId: string): string {
+  return `/api/admin/ticketing/tickets/${ticketId}/attachments/${attachmentId}/file`;
+}
 
-  try {
-    const u = new URL(raw);
-    if (u.pathname.startsWith(UPLOAD_PATH)) {
-      return `${u.pathname}${u.search}`;
-    }
-  } catch {
-    const idx = raw.indexOf(UPLOAD_PATH);
-    if (idx >= 0) {
-      return raw.slice(idx);
-    }
-  }
-
-  return raw;
+export function ticketAttachmentDownloadUrl(ticketId: string, attachmentId: string): string {
+  return `${ticketAttachmentContentUrl(ticketId, attachmentId)}?download=1`;
 }

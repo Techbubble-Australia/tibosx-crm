@@ -169,7 +169,7 @@ export default function TicketDetailPage() {
             <input type="file" className="hidden" onChange={onUploadFile} disabled={uploading} />
           </label>
         </div>
-        <TicketAttachmentList attachments={ticket.attachments} />
+        <TicketAttachmentList ticketId={ticket.id} attachments={ticket.attachments} />
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-4">

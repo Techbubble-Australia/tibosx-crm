@@ -183,6 +183,7 @@ exports.Prisma.TicketAttachmentScalarFieldEnum = {
   ticketId: 'ticketId',
   fileName: 'fileName',
   fileUrl: 'fileUrl',
+  storageKey: 'storageKey',
   fileSize: 'fileSize',
   uploadedById: 'uploadedById',
   createdAt: 'createdAt'

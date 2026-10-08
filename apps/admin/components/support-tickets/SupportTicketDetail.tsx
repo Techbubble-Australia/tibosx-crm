@@ -228,7 +228,7 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
             <input type="file" className="hidden" onChange={onUpload} disabled={uploading} />
           </label>
         </div>
-        <TicketAttachmentList attachments={ticket.attachments} />
+        <TicketAttachmentList ticketId={ticket.id} attachments={ticket.attachments} />
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">

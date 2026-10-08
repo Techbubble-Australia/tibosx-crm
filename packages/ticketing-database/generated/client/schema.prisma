@@ -133,6 +133,7 @@ model TicketAttachment {
   ticket       Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   fileName     String
   fileUrl      String
+  storageKey   String?
   fileSize     Int?
   uploadedById String
   createdAt    DateTime @default(now())

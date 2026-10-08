@@ -6778,6 +6778,7 @@ export namespace Prisma {
     ticketId: string | null
     fileName: string | null
     fileUrl: string | null
+    storageKey: string | null
     fileSize: number | null
     uploadedById: string | null
     createdAt: Date | null
@@ -6788,6 +6789,7 @@ export namespace Prisma {
     ticketId: string | null
     fileName: string | null
     fileUrl: string | null
+    storageKey: string | null
     fileSize: number | null
     uploadedById: string | null
     createdAt: Date | null
@@ -6798,6 +6800,7 @@ export namespace Prisma {
     ticketId: number
     fileName: number
     fileUrl: number
+    storageKey: number
     fileSize: number
     uploadedById: number
     createdAt: number
@@ -6818,6 +6821,7 @@ export namespace Prisma {
     ticketId?: true
     fileName?: true
     fileUrl?: true
+    storageKey?: true
     fileSize?: true
     uploadedById?: true
     createdAt?: true
@@ -6828,6 +6832,7 @@ export namespace Prisma {
     ticketId?: true
     fileName?: true
     fileUrl?: true
+    storageKey?: true
     fileSize?: true
     uploadedById?: true
     createdAt?: true
@@ -6838,6 +6843,7 @@ export namespace Prisma {
     ticketId?: true
     fileName?: true
     fileUrl?: true
+    storageKey?: true
     fileSize?: true
     uploadedById?: true
     createdAt?: true
@@ -6935,6 +6941,7 @@ export namespace Prisma {
     ticketId: string
     fileName: string
     fileUrl: string
+    storageKey: string | null
     fileSize: number | null
     uploadedById: string
     createdAt: Date
@@ -6964,6 +6971,7 @@ export namespace Prisma {
     ticketId?: boolean
     fileName?: boolean
     fileUrl?: boolean
+    storageKey?: boolean
     fileSize?: boolean
     uploadedById?: boolean
     createdAt?: boolean
@@ -6975,6 +6983,7 @@ export namespace Prisma {
     ticketId?: boolean
     fileName?: boolean
     fileUrl?: boolean
+    storageKey?: boolean
     fileSize?: boolean
     uploadedById?: boolean
     createdAt?: boolean
@@ -6986,6 +6995,7 @@ export namespace Prisma {
     ticketId?: boolean
     fileName?: boolean
     fileUrl?: boolean
+    storageKey?: boolean
     fileSize?: boolean
     uploadedById?: boolean
     createdAt?: boolean
@@ -7008,6 +7018,7 @@ export namespace Prisma {
       ticketId: string
       fileName: string
       fileUrl: string
+      storageKey: string | null
       fileSize: number | null
       uploadedById: string
       createdAt: Date
@@ -7409,6 +7420,7 @@ export namespace Prisma {
     readonly ticketId: FieldRef<"TicketAttachment", 'String'>
     readonly fileName: FieldRef<"TicketAttachment", 'String'>
     readonly fileUrl: FieldRef<"TicketAttachment", 'String'>
+    readonly storageKey: FieldRef<"TicketAttachment", 'String'>
     readonly fileSize: FieldRef<"TicketAttachment", 'Int'>
     readonly uploadedById: FieldRef<"TicketAttachment", 'String'>
     readonly createdAt: FieldRef<"TicketAttachment", 'DateTime'>
@@ -8832,6 +8844,7 @@ export namespace Prisma {
     ticketId: 'ticketId',
     fileName: 'fileName',
     fileUrl: 'fileUrl',
+    storageKey: 'storageKey',
     fileSize: 'fileSize',
     uploadedById: 'uploadedById',
     createdAt: 'createdAt'
@@ -9436,6 +9449,7 @@ export namespace Prisma {
     ticketId?: StringFilter<"TicketAttachment"> | string
     fileName?: StringFilter<"TicketAttachment"> | string
     fileUrl?: StringFilter<"TicketAttachment"> | string
+    storageKey?: StringNullableFilter<"TicketAttachment"> | string | null
     fileSize?: IntNullableFilter<"TicketAttachment"> | number | null
     uploadedById?: StringFilter<"TicketAttachment"> | string
     createdAt?: DateTimeFilter<"TicketAttachment"> | Date | string
@@ -9447,6 +9461,7 @@ export namespace Prisma {
     ticketId?: SortOrder
     fileName?: SortOrder
     fileUrl?: SortOrder
+    storageKey?: SortOrderInput | SortOrder
     fileSize?: SortOrderInput | SortOrder
     uploadedById?: SortOrder
     createdAt?: SortOrder
@@ -9461,6 +9476,7 @@ export namespace Prisma {
     ticketId?: StringFilter<"TicketAttachment"> | string
     fileName?: StringFilter<"TicketAttachment"> | string
     fileUrl?: StringFilter<"TicketAttachment"> | string
+    storageKey?: StringNullableFilter<"TicketAttachment"> | string | null
     fileSize?: IntNullableFilter<"TicketAttachment"> | number | null
     uploadedById?: StringFilter<"TicketAttachment"> | string
     createdAt?: DateTimeFilter<"TicketAttachment"> | Date | string
@@ -9472,6 +9488,7 @@ export namespace Prisma {
     ticketId?: SortOrder
     fileName?: SortOrder
     fileUrl?: SortOrder
+    storageKey?: SortOrderInput | SortOrder
     fileSize?: SortOrderInput | SortOrder
     uploadedById?: SortOrder
     createdAt?: SortOrder
@@ -9490,6 +9507,7 @@ export namespace Prisma {
     ticketId?: StringWithAggregatesFilter<"TicketAttachment"> | string
     fileName?: StringWithAggregatesFilter<"TicketAttachment"> | string
     fileUrl?: StringWithAggregatesFilter<"TicketAttachment"> | string
+    storageKey?: StringNullableWithAggregatesFilter<"TicketAttachment"> | string | null
     fileSize?: IntNullableWithAggregatesFilter<"TicketAttachment"> | number | null
     uploadedById?: StringWithAggregatesFilter<"TicketAttachment"> | string
     createdAt?: DateTimeWithAggregatesFilter<"TicketAttachment"> | Date | string
@@ -10005,6 +10023,7 @@ export namespace Prisma {
     id?: string
     fileName: string
     fileUrl: string
+    storageKey?: string | null
     fileSize?: number | null
     uploadedById: string
     createdAt?: Date | string
@@ -10016,6 +10035,7 @@ export namespace Prisma {
     ticketId: string
     fileName: string
     fileUrl: string
+    storageKey?: string | null
     fileSize?: number | null
     uploadedById: string
     createdAt?: Date | string
@@ -10025,6 +10045,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     fileName?: StringFieldUpdateOperationsInput | string
     fileUrl?: StringFieldUpdateOperationsInput | string
+    storageKey?: NullableStringFieldUpdateOperationsInput | string | null
     fileSize?: NullableIntFieldUpdateOperationsInput | number | null
     uploadedById?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -10036,6 +10057,7 @@ export namespace Prisma {
     ticketId?: StringFieldUpdateOperationsInput | string
     fileName?: StringFieldUpdateOperationsInput | string
     fileUrl?: StringFieldUpdateOperationsInput | string
+    storageKey?: NullableStringFieldUpdateOperationsInput | string | null
     fileSize?: NullableIntFieldUpdateOperationsInput | number | null
     uploadedById?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -10046,6 +10068,7 @@ export namespace Prisma {
     ticketId: string
     fileName: string
     fileUrl: string
+    storageKey?: string | null
     fileSize?: number | null
     uploadedById: string
     createdAt?: Date | string
@@ -10055,6 +10078,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     fileName?: StringFieldUpdateOperationsInput | string
     fileUrl?: StringFieldUpdateOperationsInput | string
+    storageKey?: NullableStringFieldUpdateOperationsInput | string | null
     fileSize?: NullableIntFieldUpdateOperationsInput | number | null
     uploadedById?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -10065,6 +10089,7 @@ export namespace Prisma {
     ticketId?: StringFieldUpdateOperationsInput | string
     fileName?: StringFieldUpdateOperationsInput | string
     fileUrl?: StringFieldUpdateOperationsInput | string
+    storageKey?: NullableStringFieldUpdateOperationsInput | string | null
     fileSize?: NullableIntFieldUpdateOperationsInput | number | null
     uploadedById?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -10628,6 +10653,7 @@ export namespace Prisma {
     ticketId?: SortOrder
     fileName?: SortOrder
     fileUrl?: SortOrder
+    storageKey?: SortOrder
     fileSize?: SortOrder
     uploadedById?: SortOrder
     createdAt?: SortOrder
@@ -10642,6 +10668,7 @@ export namespace Prisma {
     ticketId?: SortOrder
     fileName?: SortOrder
     fileUrl?: SortOrder
+    storageKey?: SortOrder
     fileSize?: SortOrder
     uploadedById?: SortOrder
     createdAt?: SortOrder
@@ -10652,6 +10679,7 @@ export namespace Prisma {
     ticketId?: SortOrder
     fileName?: SortOrder
     fileUrl?: SortOrder
+    storageKey?: SortOrder
     fileSize?: SortOrder
     uploadedById?: SortOrder
     createdAt?: SortOrder
@@ -12533,6 +12561,7 @@ export namespace Prisma {
     id?: string
     fileName: string
     fileUrl: string
+    storageKey?: string | null
     fileSize?: number | null
     uploadedById: string
     createdAt?: Date | string
@@ -12542,6 +12571,7 @@ export namespace Prisma {
     id?: string
     fileName: string
     fileUrl: string
+    storageKey?: string | null
     fileSize?: number | null
     uploadedById: string
     createdAt?: Date | string
@@ -12760,6 +12790,7 @@ export namespace Prisma {
     ticketId?: StringFilter<"TicketAttachment"> | string
     fileName?: StringFilter<"TicketAttachment"> | string
     fileUrl?: StringFilter<"TicketAttachment"> | string
+    storageKey?: StringNullableFilter<"TicketAttachment"> | string | null
     fileSize?: IntNullableFilter<"TicketAttachment"> | number | null
     uploadedById?: StringFilter<"TicketAttachment"> | string
     createdAt?: DateTimeFilter<"TicketAttachment"> | Date | string
@@ -13629,6 +13660,7 @@ export namespace Prisma {
     id?: string
     fileName: string
     fileUrl: string
+    storageKey?: string | null
     fileSize?: number | null
     uploadedById: string
     createdAt?: Date | string
@@ -13673,6 +13705,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     fileName?: StringFieldUpdateOperationsInput | string
     fileUrl?: StringFieldUpdateOperationsInput | string
+    storageKey?: NullableStringFieldUpdateOperationsInput | string | null
     fileSize?: NullableIntFieldUpdateOperationsInput | number | null
     uploadedById?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -13682,6 +13715,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     fileName?: StringFieldUpdateOperationsInput | string
     fileUrl?: StringFieldUpdateOperationsInput | string
+    storageKey?: NullableStringFieldUpdateOperationsInput | string | null
     fileSize?: NullableIntFieldUpdateOperationsInput | number | null
     uploadedById?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -13691,6 +13725,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     fileName?: StringFieldUpdateOperationsInput | string
     fileUrl?: StringFieldUpdateOperationsInput | string
+    storageKey?: NullableStringFieldUpdateOperationsInput | string | null
     fileSize?: NullableIntFieldUpdateOperationsInput | number | null
     uploadedById?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string

@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Download, X } from "lucide-react";
-import { resolveTicketAttachmentUrl } from "@/lib/ticket-attachment-url";
+import {
+  formatDisplayFileName,
+  ticketAttachmentContentUrl,
+  ticketAttachmentDownloadUrl,
+} from "@/lib/ticket-attachment-url";
 
 export type TicketAttachmentItem = {
   id: string;
@@ -14,7 +18,7 @@ export type TicketAttachmentItem = {
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg)$/i;
 
 export function isImageAttachment(fileName: string): boolean {
-  return IMAGE_EXT.test(fileName.trim());
+  return IMAGE_EXT.test(formatDisplayFileName(fileName).trim());
 }
 
 function formatFileSize(bytes?: number | null): string | null {
@@ -24,7 +28,13 @@ function formatFileSize(bytes?: number | null): string | null {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function TicketAttachmentList({ attachments }: { attachments: TicketAttachmentItem[] }) {
+export function TicketAttachmentList({
+  ticketId,
+  attachments,
+}: {
+  ticketId: string;
+  attachments: TicketAttachmentItem[];
+}) {
   const [lightbox, setLightbox] = useState<TicketAttachmentItem | null>(null);
 
   const closeLightbox = useCallback(() => setLightbox(null), []);
@@ -51,7 +61,9 @@ export function TicketAttachmentList({ attachments }: { attachments: TicketAttac
     <>
       <ul className="space-y-3">
         {attachments.map((a) => {
-          const href = resolveTicketAttachmentUrl(a.fileUrl);
+          const displayName = formatDisplayFileName(a.fileName);
+          const previewUrl = ticketAttachmentContentUrl(ticketId, a.id);
+          const downloadUrl = ticketAttachmentDownloadUrl(ticketId, a.id);
           const sizeLabel = formatFileSize(a.fileSize);
           const image = isImageAttachment(a.fileName);
 
@@ -62,12 +74,12 @@ export function TicketAttachmentList({ attachments }: { attachments: TicketAttac
                   type="button"
                   onClick={() => setLightbox(a)}
                   className="group shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-sm transition hover:border-sky-300 hover:ring-2 hover:ring-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                  aria-label={`Preview ${a.fileName}`}
+                  aria-label={`Preview ${displayName}`}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element -- attachment URLs are dynamic / cross-origin */}
+                  {/* eslint-disable-next-line @next/next/no-img-element -- streamed via authenticated API */}
                   <img
-                    src={href}
-                    alt={a.fileName}
+                    src={previewUrl}
+                    alt={displayName}
                     className="h-28 w-28 object-cover transition group-hover:opacity-95 sm:h-32 sm:w-32"
                     loading="lazy"
                   />
@@ -76,9 +88,9 @@ export function TicketAttachmentList({ attachments }: { attachments: TicketAttac
                   <button
                     type="button"
                     onClick={() => setLightbox(a)}
-                    className="font-medium text-sky-700 hover:underline text-left break-all"
+                    className="text-left font-medium text-sky-700 hover:underline break-all"
                   >
-                    {a.fileName}
+                    {displayName}
                   </button>
                   {sizeLabel ? <p className="mt-0.5 text-slate-500">{sizeLabel}</p> : null}
                   <p className="mt-1 text-xs text-slate-400">Click preview to expand</p>
@@ -90,12 +102,10 @@ export function TicketAttachmentList({ attachments }: { attachments: TicketAttac
           return (
             <li key={a.id} className="text-sm">
               <a
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={downloadUrl}
                 className="font-medium text-sky-700 hover:underline break-all"
               >
-                {a.fileName}
+                {displayName}
               </a>
               {sizeLabel ? <span className="text-slate-500"> ({sizeLabel})</span> : null}
             </li>
@@ -108,20 +118,17 @@ export function TicketAttachmentList({ attachments }: { attachments: TicketAttac
           className="fixed inset-0 z-50 flex flex-col bg-black/85 p-4"
           role="dialog"
           aria-modal="true"
-          aria-label={`Preview ${lightbox.fileName}`}
+          aria-label={`Preview ${formatDisplayFileName(lightbox.fileName)}`}
           onClick={closeLightbox}
         >
           <div
             className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 pb-3 text-white"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="min-w-0 truncate text-sm font-medium">{lightbox.fileName}</p>
+            <p className="min-w-0 truncate text-sm font-medium">{formatDisplayFileName(lightbox.fileName)}</p>
             <div className="flex shrink-0 items-center gap-2">
               <a
-                href={resolveTicketAttachmentUrl(lightbox.fileUrl)}
-                download={lightbox.fileName}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={ticketAttachmentDownloadUrl(ticketId, lightbox.id)}
                 className="inline-flex items-center gap-1 rounded-lg bg-white/15 px-3 py-1.5 text-sm font-medium hover:bg-white/25"
               >
                 <Download className="h-4 w-4" />
@@ -143,8 +150,8 @@ export function TicketAttachmentList({ attachments }: { attachments: TicketAttac
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={resolveTicketAttachmentUrl(lightbox.fileUrl)}
-              alt={lightbox.fileName}
+              src={ticketAttachmentContentUrl(ticketId, lightbox.id)}
+              alt={formatDisplayFileName(lightbox.fileName)}
               className="max-h-[calc(100vh-6rem)] max-w-full object-contain"
             />
           </div>

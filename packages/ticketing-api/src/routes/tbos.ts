@@ -7,6 +7,7 @@ import { assignedOrganizationIds } from "../lib/ticket-access.js";
 import { resolveTbosActorUserId } from "../lib/tbos-actor.js";
 import { logTicketAudit } from "../lib/ticket-audit.js";
 import { saveTicketUpload } from "../lib/upload-storage.js";
+import { streamTicketAttachmentFile } from "../lib/serve-ticket-attachment.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -96,6 +97,23 @@ router.get("/tickets", async (req: TbosRequest, res) => {
       closedAt: row.closedAt?.toISOString() ?? null,
     })),
   });
+});
+
+router.get("/tickets/:ticketId/attachments/:attachmentId/file", async (req: TbosRequest, res) => {
+  const tbosUser = req.tbosUser!;
+  const orgScope = await orgFilterForTbos(tbosUser);
+  const ticket = await ticketingPrisma.ticket.findFirst({
+    where: { id: req.params.ticketId, ...orgScope },
+  });
+  if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+
+  const attachment = await ticketingPrisma.ticketAttachment.findFirst({
+    where: { id: req.params.attachmentId, ticketId: ticket.id },
+  });
+  if (!attachment) return res.status(404).json({ error: "Attachment not found" });
+
+  const download = req.query.download === "1" || req.query.download === "true";
+  await streamTicketAttachmentFile(attachment, res, { download });
 });
 
 router.get("/tickets/:id", async (req: TbosRequest, res) => {
@@ -300,6 +318,7 @@ router.post("/tickets/:id/attachments/upload", upload.single("file"), async (req
         ticketId: ticket.id,
         fileName: stored.fileName,
         fileUrl: stored.fileUrl,
+        storageKey: stored.storageKey,
         fileSize: stored.fileSize,
         uploadedById: actorId,
       },
