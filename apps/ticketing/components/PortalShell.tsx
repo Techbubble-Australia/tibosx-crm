@@ -15,13 +15,13 @@ type User = {
 const clientNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tickets", label: "My tickets", icon: Ticket },
-  { href: "/tickets/new", label: "New request", icon: Plus },
+  { href: "/tickets/new", label: "New ticket", icon: Plus },
 ];
 
 const consultantNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tickets", label: "Tickets", icon: Ticket },
-  { href: "/tickets/new", label: "Create for client", icon: Plus },
+  { href: "/tickets/new", label: "New ticket", icon: Plus },
   { href: "/consultant", label: "By company", icon: Users },
 ];
 
@@ -62,8 +62,15 @@ export function PortalShell({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3 text-sm">
-            <span className="hidden text-slate-600 sm:inline">{user.name}</span>
+          <div className="flex items-center gap-2 text-sm sm:gap-3">
+            <Link
+              href="/tickets/new"
+              className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-1.5 font-medium text-white hover:bg-sky-700"
+            >
+              <Plus className="h-4 w-4" />
+              New ticket
+            </Link>
+            <span className="hidden text-slate-600 md:inline">{user.name}</span>
             <button
               type="button"
               onClick={() => void logout()}
@@ -74,6 +81,22 @@ export function PortalShell({
             </button>
           </div>
         </div>
+        <nav className="flex gap-1 overflow-x-auto border-t border-slate-100 px-4 py-2 md:hidden">
+          {nav.map((item) => {
+            const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium ${
+                  active ? "bg-sky-50 text-sky-800" : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
       </header>
       <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6">
         <aside className="hidden w-56 shrink-0 md:block">

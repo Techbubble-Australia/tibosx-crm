@@ -47,15 +47,9 @@ export default function DashboardPage() {
           <p className="text-3xl font-semibold">{rows.length}</p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-4">
-          {role === "CONSULTANT" ? (
-            <Link href="/consultant" className="text-sm font-medium text-blue-600 hover:underline">
-              Open consultant queue →
-            </Link>
-          ) : (
-            <Link href="/tickets/new" className="text-sm font-medium text-blue-600 hover:underline">
-              Submit a new request →
-            </Link>
-          )}
+          <Link href="/tickets/new" className="text-sm font-medium text-sky-600 hover:underline">
+            {role === "CONSULTANT" ? "Create new ticket →" : "Submit a new request →"}
+          </Link>
         </div>
       </div>
       <section>
