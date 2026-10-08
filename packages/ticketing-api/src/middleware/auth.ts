@@ -9,7 +9,12 @@ function ticketingJwtSecret(): string {
 
 /** Verifies TBOS admin session JWTs (must match packages/api JWT_SECRET). */
 function tbosJwtSecret(): string {
-  return process.env.TBOS_JWT_SECRET || process.env.JWT_SECRET || "your-secret-key-change-in-production";
+  return (
+    process.env.TBOS_JWT_SECRET ||
+    process.env.JWT_SECRET ||
+    process.env.TICKETING_JWT_SECRET ||
+    "your-secret-key-change-in-production"
+  );
 }
 
 export type TicketingAuthUser = {

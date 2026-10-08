@@ -77,7 +77,7 @@ For **every** ticketing service (API + portal):
 | **Config file** | `railway.ticketing-api.toml` or `railway.ticketing.toml` |
 | **Service name** | `ticketing-api` / `ticketing` (name only; not the root path) |
 
-The repo **root `Dockerfile` builds ticketing-api** by default (for `ticketing_portal_backend`). The **portal** service must set `RAILWAY_DOCKERFILE_PATH=Dockerfile.ticketing` or `railway.ticketing.toml`.
+The repo **root `Dockerfile` builds the portal** (Next.js). The **backend** service (`ticketing_portal_backend`) **must** set `RAILWAY_DOCKERFILE_PATH=Dockerfile.ticketing-api` (or `/railway.ticketing-api.toml`) or it will deploy the portal image again.
 
 **If backend `/health` still shows `"service":"ticketing-portal"`**, redeploy after pulling latest, or fix **on the API service** (either approach):
 
@@ -97,7 +97,7 @@ The portal service should use `Dockerfile.ticketing` or root `Dockerfile` (porta
 - **Root directory:** **`/`** — do **not** pick `ticketing-api` from the Root Directory dropdown.
 - **Variables:**
   - `TICKETING_DATABASE_URL` — from ticketing Postgres
-  - `JWT_SECRET` — **same value as TBOS API** (for SSO)
+  - `JWT_SECRET` — **same value as TBOS API and admin** (required for SSO; do not rely on `TICKETING_JWT_SECRET` alone)
   - `TICKETING_ALLOWED_ORIGINS` — public portal URL + TBOS admin URL, comma-separated  
     e.g. `https://your-ticketing.up.railway.app,https://your-admin.up.railway.app`
 - Deploy: `pnpm run deploy:railway:ticketing-api`
@@ -138,7 +138,8 @@ pnpm --filter @techbubble/ticketing-database db:seed
 |--------|--------|
 | `/health` shows **Client Support Portal** login | That domain runs the **portal** (Next.js), not ticketing-api. API must use `Dockerfile.ticketing-api` on its own service; `/health` must return `"service":"ticketing-api"`. Portal `/health` returns `"service":"ticketing-portal"`. |
 | Deploy stuck / no build when selecting `ticketing-api` folder | Set **Root Directory** back to **`/`**. Use **Config file** `railway.ticketing-api.toml` + **Dockerfile** `Dockerfile.ticketing-api` from repo root. |
-| Wrong app / API image on deploy | Root `Dockerfile` = **ticketing-api**. Portal service needs `Dockerfile.ticketing`. TBOS api/web/admin need their `railway.*.toml`. |
+| Portal blank / 502, backend shows portal login | Portal redeployed API image: on **portal** use default root `Dockerfile` or `Dockerfile.ticketing`; on **backend** set `RAILWAY_DOCKERFILE_PATH=Dockerfile.ticketing-api`. |
+| Wrong app / API image on deploy | Root `Dockerfile` = **portal**. Backend needs `Dockerfile.ticketing-api`. TBOS api/web/admin need their `railway.*.toml`. |
 | Build fails with `npm ci` / missing `package-lock.json` | Old root Dockerfile; pull latest. Portal builds use **pnpm** via root `Dockerfile` or `Dockerfile.ticketing`. |
 | Portal 404 / nothing deployed | Separate **`ticketing`** service with `Dockerfile.ticketing`, not admin/web |
 | Login fails | `TICKETING_API_URL` on portal service; API healthy at `/health` |

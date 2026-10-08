@@ -1,22 +1,20 @@
-# Default Railway image when no service-specific config is set (root Dockerfile).
-# This builds the **ticketing API** so a service named "backend" deploys correctly.
+# Default Railway image (root Dockerfile) = **client portal** (Next.js).
 #
-# **Portal** service: set RAILWAY_DOCKERFILE_PATH=Dockerfile.ticketing
-#   (or Config file railway.ticketing.toml). Start: node apps/ticketing/server.js
+# **ticketing_portal_backend** must NOT use this file. On that service only, set:
+#   RAILWAY_DOCKERFILE_PATH=Dockerfile.ticketing-api
+#   Start: sh packages/ticketing-api/scripts/start-production.sh
+# Or Config file: /railway.ticketing-api.toml
 #
-# TBOS api/web/admin: railway.api.toml / railway.web.toml / railway.admin.toml
-#
-# Canonical copy: Dockerfile.ticketing-api (keep in sync).
+# Canonical copy: Dockerfile.ticketing
 FROM node:20-alpine AS base
 
 FROM base AS deps
-RUN apk add --no-cache libc6-compat openssl
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY packages/ticketing-database/package.json ./packages/ticketing-database/
-COPY packages/ticketing-api/package.json ./packages/ticketing-api/
 COPY packages/config/package.json ./packages/config/
+COPY apps/ticketing/package.json ./apps/ticketing/
 
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 RUN pnpm install --frozen-lockfile
@@ -26,33 +24,25 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-RUN pnpm --filter @techbubble/ticketing-database exec prisma generate
-RUN pnpm --filter @techbubble/ticketing-database build
-RUN pnpm --filter @techbubble/ticketing-api build
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN pnpm --filter @techbubble/ticketing build
 
 FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN apk add --no-cache openssl libc6-compat
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-COPY --from=builder --chown=nextjs:nodejs /app/packages/ticketing-api/dist ./packages/ticketing-api/dist
-COPY --from=builder --chown=nextjs:nodejs /app/packages/ticketing-api/package.json ./packages/ticketing-api/package.json
-COPY --from=builder --chown=nextjs:nodejs /app/packages/ticketing-database/package.json ./packages/ticketing-database/package.json
-COPY --from=builder --chown=nextjs:nodejs /app/packages/ticketing-database/dist ./packages/ticketing-database/dist
-COPY --from=builder --chown=nextjs:nodejs /app/packages/ticketing-database/prisma ./packages/ticketing-database/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/packages/ticketing-database/generated ./packages/ticketing-database/generated
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nextjs:nodejs /app/packages/ticketing-api/node_modules ./packages/ticketing-api/node_modules
-COPY --from=builder --chown=nextjs:nodejs /app/packages/ticketing-database/node_modules ./packages/ticketing-database/node_modules
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
-COPY --from=builder --chown=nextjs:nodejs /app/packages/ticketing-api/scripts/start-production.sh ./packages/ticketing-api/scripts/start-production.sh
+COPY --from=builder --chown=nextjs:nodejs /app/apps/ticketing/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/ticketing/.next/static ./apps/ticketing/.next/static
 
 USER nextjs
 
-EXPOSE 3003
+ENV HOSTNAME=0.0.0.0
 
-CMD ["sh", "packages/ticketing-api/scripts/start-production.sh"]
+EXPOSE 3000
+
+CMD ["node", "apps/ticketing/server.js"]
