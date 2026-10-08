@@ -4,15 +4,18 @@ This document describes the **public TechBubble website** and **TBOS** (TechBubb
 
 ## Architecture
 
-One product, three main applications sharing a **PostgreSQL** database and **Express API**:
+One product, four user-facing apps sharing a **PostgreSQL** database and **Express API**:
 
 | Piece | Role |
 |--------|------|
 | `apps/web` | Public **TechBubble** marketing site (port 3000) |
 | `apps/admin` | **TBOS** — internal business operating system (port 3002) |
-| `packages/api` | REST API, auth, uploads, business logic (port 3001) |
+| `apps/ticketing` | **Client support portal** — tickets for clients and consultants (port 3004) |
+| `packages/api` | REST API, auth, uploads, business logic, support ticketing routes (port 3001) |
 
-TBOS and the website both call the API. Staff work in TBOS; visitors use the public site.
+TBOS, the support portal, and the website call the API. Staff work in TBOS; visitors use the public site; clients and consultants use the support portal.
+
+See [ticketing-portal.md](./ticketing-portal.md) for support portal setup and deployment.
 
 ```mermaid
 flowchart LR

@@ -11,10 +11,10 @@ export function parseTicketingApiErrorBody(
   }
 
   if (status === 404) {
-    return `Ticketing API route not found (HTTP 404). Set TICKETING_API_URL to the ticketing-api service (verify ${status} vs GET /health with service "ticketing-api").`;
+    return `Support API route not found (HTTP 404). Set API_URL to the main TBOS API and ensure /api/ticketing/auth/tbos-sso is deployed.`;
   }
   if (status === 401) {
-    return "Invalid TBOS session for SSO. Ensure JWT_SECRET on ticketing-api matches the main TBOS API (packages/api), then log out and back into TBOS.";
+    return "Invalid TBOS session for SSO. Ensure JWT_SECRET on admin matches packages/api, then log out and back into TBOS.";
   }
   if (status === 403) {
     return "Your TBOS role is not allowed for the support portal (default: admin, sales).";
@@ -22,5 +22,5 @@ export function parseTicketingApiErrorBody(
   if (rawText.trim() && !rawText.trim().startsWith("<")) {
     return rawText.trim().slice(0, 200);
   }
-  return `Support portal SSO failed (HTTP ${status}). Check ticketing-api deploy logs.`;
+  return `Support portal SSO failed (HTTP ${status}). Check main API deploy logs.`;
 }

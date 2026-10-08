@@ -1,11 +1,6 @@
-# Default Railway image (root Dockerfile) = **client portal** (Next.js).
-#
-# **ticketing_portal_backend** must NOT use this file. On that service only, set:
-#   RAILWAY_DOCKERFILE_PATH=Dockerfile.ticketing-api
-#   Start: sh packages/ticketing-api/scripts/start-production.sh
-# Or Config file: /railway.ticketing-api.toml
-#
-# Canonical copy: Dockerfile.ticketing
+# Default Railway image (root Dockerfile) = **client support portal** (Next.js).
+# Ticketing API routes run on the main TBOS API service (packages/api), not a separate image.
+# Canonical portal copy: Dockerfile.ticketing (railway.ticketing.toml)
 FROM node:20-alpine AS base
 
 FROM base AS deps

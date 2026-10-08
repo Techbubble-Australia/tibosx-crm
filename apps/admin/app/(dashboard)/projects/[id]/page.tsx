@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
 import { ProjectForm, type ProjectFormValues } from "@/components/projects/ProjectForm";
+import { ProjectSupportPortalCard } from "@/components/projects/ProjectSupportPortalCard";
 
 export default function EditProjectPage() {
   const { id } = useParams<{ id: string }>();
@@ -54,12 +55,21 @@ export default function EditProjectPage() {
         {isLoading || !project ? (
           <p className="text-sm text-gray-400">Loading…</p>
         ) : (
+          <>
+          <ProjectSupportPortalCard
+            projectId={id}
+            supportOrganizationId={project.supportOrganizationId}
+            supportOrganizationName={project.supportOrganizationName}
+            supportOrganizationSlug={project.supportOrganizationSlug}
+            onEnabled={() => void loadProject()}
+          />
           <ProjectForm
             defaults={project}
             onSubmit={handleSubmit}
             isSaving={isSaving}
             onMembersRefresh={() => void loadProject()}
           />
+          </>
         )}
       </div>
     </ProjectManagementGuard>

@@ -25,7 +25,7 @@ function isSafeSegment(segment: string): boolean {
   return Boolean(segment) && segment !== "." && segment !== "..";
 }
 
-/** Same-origin `/uploads/tickets/*` → ticketing-api (for image previews in the portal). */
+/** Same-origin `/uploads/tickets/*` → main API (for image previews in the portal). */
 export async function proxyTicketUploadsRequest(req: NextRequest, pathSegments: string[]): Promise<NextResponse> {
   const safe = pathSegments.filter(isSafeSegment);
   if (safe.length === 0) {

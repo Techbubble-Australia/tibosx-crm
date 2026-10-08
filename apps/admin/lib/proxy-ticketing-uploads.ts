@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { supportApiBase } from "@/lib/support-api-base";
 
 const HOP_BY_HOP = new Set([
   "connection",
@@ -20,12 +21,6 @@ const SKIP_RESPONSE_HEADERS = new Set([
   "content-security-policy",
 ]);
 
-function ticketingApiBase(): string {
-  const raw = process.env.TICKETING_API_URL?.trim();
-  if (!raw) throw new Error("TICKETING_API_URL is not configured on admin");
-  return raw.replace(/\/$/, "");
-}
-
 function isSafeSegment(segment: string): boolean {
   return Boolean(segment) && segment !== "." && segment !== "..";
 }
@@ -36,7 +31,7 @@ export async function proxyTicketingUploadsRequest(req: NextRequest, pathSegment
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   const subpath = safe.map((s) => encodeURIComponent(decodeURIComponent(s))).join("/");
-  const target = `${ticketingApiBase()}/uploads/tickets/${subpath}${req.nextUrl.search}`;
+  const target = `${supportApiBase()}/uploads/tickets/${subpath}${req.nextUrl.search}`;
 
   const headers = new Headers();
   req.headers.forEach((value, key) => {

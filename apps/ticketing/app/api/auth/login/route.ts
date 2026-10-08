@@ -8,7 +8,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
-  const res = await fetch(`${getTicketingApiBase()}/api/auth/login`, {
+  const res = await fetch(`${getTicketingApiBase()}/api/ticketing/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email: body.email, password: body.password }),

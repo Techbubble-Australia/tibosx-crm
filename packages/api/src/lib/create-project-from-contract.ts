@@ -1,4 +1,5 @@
 import { prisma, type Prisma } from "@techbubble/database";
+import { ensureSupportOrganizationForProject } from "./support-organization";
 
 type WorkUnitRow = { year: number; month: number; workUnits: number };
 type MilestoneRow = { milestoneDate: Date; amount: Prisma.Decimal | number };
@@ -178,5 +179,10 @@ export async function createProjectFromContract(
   });
 
   await syncMembersFromContract(project.id, contractId);
+  try {
+    await ensureSupportOrganizationForProject(project.id);
+  } catch (error) {
+    console.error("Failed to create support organization for project:", error);
+  }
   return project;
 }

@@ -18,13 +18,18 @@ const SKIP_RESPONSE_HEADERS = new Set([
   "content-length",
 ]);
 
+/** Main TBOS API (support routes live under /api/ticketing/*). */
 export function getTicketingApiBase(): string {
-  return (process.env.TICKETING_API_URL || "http://127.0.0.1:3003").replace(/\/$/, "");
+  const raw =
+    process.env.API_URL?.trim() ||
+    process.env.TICKETING_API_URL?.trim() ||
+    "http://127.0.0.1:3001";
+  return raw.replace(/\/$/, "");
 }
 
 export async function proxyTicketingApiRequest(req: NextRequest, pathSegments: string[]): Promise<NextResponse> {
   const subpath = pathSegments.join("/");
-  const target = `${getTicketingApiBase()}/api/${subpath}${req.nextUrl.search}`;
+  const target = `${getTicketingApiBase()}/api/ticketing/${subpath}${req.nextUrl.search}`;
 
   const headers = new Headers();
   req.headers.forEach((value, key) => {

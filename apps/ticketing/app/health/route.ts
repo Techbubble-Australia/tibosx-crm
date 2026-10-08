@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-/** Lets load balancers and humans tell portal UI apart from ticketing-api (`service: ticketing-api`). */
+/** Lets load balancers tell portal UI apart from the main TBOS API. */
 export function GET() {
   return NextResponse.json({
     status: "ok",

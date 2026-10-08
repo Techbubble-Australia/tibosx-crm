@@ -1,13 +1,12 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { ADMIN_SESSION_COOKIE } from "@/lib/auth-cookie";
+import { supportApiBase } from "@/lib/support-api-base";
 import { parseTicketingApiErrorBody } from "@/lib/ticketing-api-error";
 import { normalizeTicketingPortalUrl } from "@/lib/ticketing-portal-url";
 
-function ticketingApiBase(): string | null {
-  const raw = process.env.TICKETING_API_URL?.trim();
-  if (!raw) return null;
-  const base = raw.replace(/\/$/, "");
+function apiBaseForProduction(): string | null {
+  const base = supportApiBase();
   const isLocal = /^(https?:\/\/)?(127\.0\.0\.1|localhost)(:\d+)?$/i.test(base);
   if (isLocal && process.env.NODE_ENV === "production") {
     return null;
@@ -17,13 +16,13 @@ function ticketingApiBase(): string | null {
 
 export async function GET() {
   const portalUrl = normalizeTicketingPortalUrl(process.env.NEXT_PUBLIC_TICKETING_PORTAL_URL);
-  const ticketingApi = ticketingApiBase();
+  const apiUrl = apiBaseForProduction();
 
-  if (!ticketingApi) {
+  if (!apiUrl) {
     return NextResponse.json(
       {
         error:
-          "TICKETING_API_URL is not set on the admin service (use the public https URL of ticketing-api, not localhost:3003).",
+          "API_URL is not set on the admin service (use the public https URL of the main TBOS API).",
       },
       { status: 503 },
     );
@@ -35,33 +34,24 @@ export async function GET() {
   }
 
   try {
-    const healthRes = await fetch(`${ticketingApi}/health`, { method: "GET" });
-    const healthJson = await healthRes.json().catch(() => null);
-    if (
-      !healthRes.ok ||
-      !healthJson ||
-      typeof healthJson !== "object" ||
-      (healthJson as { service?: string }).service !== "ticketing-api"
-    ) {
+    const healthRes = await fetch(`${apiUrl}/health`, { method: "GET" });
+    if (!healthRes.ok) {
       return NextResponse.json(
-        {
-          error:
-            `TICKETING_API_URL (${ticketingApi}) is not the ticketing-api service. Open ${ticketingApi}/health — expect {"service":"ticketing-api",...}.`,
-        },
+        { error: `Cannot reach TBOS API at ${apiUrl}/health.` },
         { status: 502 },
       );
     }
   } catch (err) {
     console.error("ticketing launch: health check failed", err);
     return NextResponse.json(
-      { error: `Cannot reach ticketing API at ${ticketingApi}/health.` },
+      { error: `Cannot reach TBOS API at ${apiUrl}/health.` },
       { status: 502 },
     );
   }
 
   let ssoRes: Response;
   try {
-    ssoRes = await fetch(`${ticketingApi}/api/auth/tbos-sso`, {
+    ssoRes = await fetch(`${apiUrl}/api/ticketing/auth/tbos-sso`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -73,7 +63,7 @@ export async function GET() {
     console.error("ticketing launch: tbos-sso fetch failed", err);
     return NextResponse.json(
       {
-        error: `Cannot reach ticketing API at ${ticketingApi}. Check TICKETING_API_URL and that ticketing-api is deployed.`,
+        error: `Cannot reach TBOS API at ${apiUrl}. Check API_URL and that the API service is deployed.`,
       },
       { status: 502 },
     );

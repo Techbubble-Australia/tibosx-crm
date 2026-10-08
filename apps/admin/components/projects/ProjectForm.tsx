@@ -79,6 +79,9 @@ export type ProjectFormValues = {
     performedByName: string;
     createdAt: string;
   }>;
+  supportOrganizationId?: string | null;
+  supportOrganizationName?: string | null;
+  supportOrganizationSlug?: string | null;
 };
 
 type ClientOption = { id: string; name: string };

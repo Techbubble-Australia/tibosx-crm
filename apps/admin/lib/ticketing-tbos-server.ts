@@ -1,11 +1,6 @@
 import { cookies } from "next/headers";
 import { ADMIN_SESSION_COOKIE } from "@/lib/auth-cookie";
-
-function ticketingApiBase(): string {
-  const raw = process.env.TICKETING_API_URL?.trim();
-  if (!raw) throw new Error("TICKETING_API_URL is not configured on admin");
-  return raw.replace(/\/$/, "");
-}
+import { supportApiBase } from "@/lib/support-api-base";
 
 export async function ticketingTbosFetch(path: string, init?: RequestInit): Promise<Response> {
   const token = cookies().get(ADMIN_SESSION_COOKIE)?.value;
@@ -20,5 +15,5 @@ export async function ticketingTbosFetch(path: string, init?: RequestInit): Prom
     headers.set("Content-Type", "application/json");
   }
 
-  return fetch(`${ticketingApiBase()}/api/tbos${path}`, { ...init, headers });
+  return fetch(`${supportApiBase()}/api/admin/ticketing${path}`, { ...init, headers });
 }

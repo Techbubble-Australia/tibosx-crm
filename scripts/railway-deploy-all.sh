@@ -39,7 +39,6 @@ case "${1:-all}" in
     deploy_service "api" "railway.api.toml"
     deploy_service "web" "railway.web.toml"
     deploy_service "admin" "railway.admin.toml"
-    deploy_service "ticketing-api" "railway.ticketing-api.toml"
     deploy_service "ticketing" "railway.ticketing.toml"
     echo "\nAll Railway services deployed successfully."
     ;;
@@ -52,14 +51,11 @@ case "${1:-all}" in
   admin)
     deploy_service "admin" "railway.admin.toml"
     ;;
-  ticketing-api)
-    deploy_service "ticketing-api" "railway.ticketing-api.toml"
-    ;;
   ticketing)
     deploy_service "ticketing" "railway.ticketing.toml"
     ;;
   *)
-    echo "Usage: $0 [all|api|web|admin|ticketing-api|ticketing]"
+    echo "Usage: $0 [all|api|web|admin|ticketing]"
     exit 1
     ;;
 esac

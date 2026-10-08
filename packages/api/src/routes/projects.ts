@@ -18,6 +18,10 @@ import {
   PROJECT_STATUS_LABELS,
   type ProjectCostType,
 } from "../lib/project-types";
+import {
+  ensureSupportOrganizationForProject,
+  syncConsultantAccessForOrganization,
+} from "../lib/support-organization";
 
 const router: IRouter = Router();
 
@@ -198,6 +202,7 @@ function serializeProject(row: {
   estimates?: unknown;
   actuals?: unknown;
   activityLogs?: unknown;
+  supportOrganization?: { id: string; name: string; slug: string } | null;
 }) {
   const fileUrls = Array.isArray(row.fileUrls)
     ? row.fileUrls.filter((url): url is string => typeof url === "string")
@@ -226,6 +231,9 @@ function serializeProject(row: {
     estimates: Array.isArray(row.estimates) ? row.estimates : [],
     actuals: Array.isArray(row.actuals) ? row.actuals : [],
     activityLogs: Array.isArray(row.activityLogs) ? row.activityLogs : [],
+    supportOrganizationId: row.supportOrganization?.id ?? null,
+    supportOrganizationName: row.supportOrganization?.name ?? null,
+    supportOrganizationSlug: row.supportOrganization?.slug ?? null,
   };
 }
 
@@ -248,6 +256,7 @@ const detailInclude = {
     orderBy: { createdAt: "desc" as const },
     include: { performedBy: { select: { name: true, email: true } } },
   },
+  supportOrganization: { select: { id: true, name: true, slug: true } },
 };
 
 async function syncMembersFromContract(projectId: string, contractId: string | null | undefined) {
@@ -366,6 +375,7 @@ router.get("/", async (req: AuthRequest, res) => {
         client: { select: { id: true, name: true } },
         projectManager: { select: { id: true, name: true, email: true } },
         contract: { select: { id: true, contractNumber: true, title: true, type: true, unit: true, currency: true } },
+        supportOrganization: { select: { id: true, name: true, slug: true } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -645,6 +655,10 @@ router.put("/:id", async (req: AuthRequest, res) => {
     });
 
     await syncMembersFromContract(projectId, data.contractId);
+    const linkedOrg = await prisma.organization.findFirst({ where: { projectId } });
+    if (linkedOrg && data.projectManagerId !== existing.projectManagerId) {
+      await syncConsultantAccessForOrganization(linkedOrg.id);
+    }
     const detail = await fetchProject(projectId);
     res.json({ data: detail ? mapDetail(detail) : null });
   } catch (error) {
@@ -653,6 +667,31 @@ router.put("/:id", async (req: AuthRequest, res) => {
     }
     console.error("Error updating project:", error);
     res.status(500).json({ error: "Failed to update project" });
+  }
+});
+
+router.post("/:id/support-organization", async (req: AuthRequest, res) => {
+  try {
+    const projectId = req.params.id;
+    if (!projectId) return res.status(400).json({ error: "Invalid id" });
+    if (!canManageProjects(req.user?.role ?? "")) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const org = await ensureSupportOrganizationForProject(projectId);
+    res.status(201).json({
+      data: {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        projectId: org.projectId,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "PROJECT_NOT_FOUND") {
+      return res.status(404).json({ error: "Project not found" });
+    }
+    console.error("Error enabling support organization:", error);
+    res.status(500).json({ error: "Failed to enable support portal for project" });
   }
 });
 

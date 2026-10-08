@@ -35,6 +35,12 @@ import { credentialTemplateRoutes } from "./routes/credentialTemplates";
 import { projectRoutes } from "./routes/projects";
 import { timesheetRoutes } from "./routes/timesheets";
 import { invoiceRoutes } from "./routes/invoices";
+import { authRoutes as ticketingPortalAuthRoutes } from "./ticketing/routes/auth";
+import { ticketRoutes as ticketingTicketRoutes } from "./ticketing/routes/tickets";
+import { organizationRoutes as ticketingOrgRoutes } from "./ticketing/routes/organizations";
+import { tbosRoutes as ticketingAdminRoutes } from "./ticketing/routes/tbos";
+import { createTicketUploadsMiddleware } from "./ticketing/middleware/serve-ticket-uploads";
+import { uploadDir as ticketUploadDir } from "./ticketing/lib/upload-storage";
 
 dotenv.config();
 
@@ -49,6 +55,11 @@ if (!objectStorageConfigured() && !fs.existsSync(absoluteUploadDir)) {
   fs.mkdirSync(absoluteUploadDir, { recursive: true });
 }
 app.use("/uploads", createUploadsMiddleware(absoluteUploadDir));
+const absoluteTicketUploadDir = ticketUploadDir();
+if (!objectStorageConfigured() && !fs.existsSync(absoluteTicketUploadDir)) {
+  fs.mkdirSync(absoluteTicketUploadDir, { recursive: true });
+}
+app.use("/uploads/tickets", createTicketUploadsMiddleware(absoluteTicketUploadDir));
 
 // Middleware
 app.use(helmet());
@@ -137,6 +148,16 @@ app.use(
   requireModule("project_management"),
   timesheetRoutes,
 );
+app.use(
+  "/api/admin/ticketing",
+  authMiddleware,
+  requireMfaEnrolled,
+  requireModule("sales"),
+  ticketingAdminRoutes,
+);
+app.use("/api/ticketing/auth", ticketingPortalAuthRoutes);
+app.use("/api/ticketing/tickets", ticketingTicketRoutes);
+app.use("/api/ticketing/organizations", ticketingOrgRoutes);
 app.use("/api/upload", ...websiteWrite, uploadRoutes);
 
 // Error handler
