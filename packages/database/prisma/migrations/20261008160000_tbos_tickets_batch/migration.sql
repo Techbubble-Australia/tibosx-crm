@@ -14,6 +14,7 @@ ALTER TABLE "AdminUser" ADD COLUMN "state" TEXT;
 ALTER TABLE "AdminUser" ADD COLUMN "country" TEXT;
 ALTER TABLE "AdminUser" ADD COLUMN "profileDetailsCompletedAt" TIMESTAMP(3);
 ALTER TABLE "AdminUser" ADD COLUMN "agreementDocumentUrl" TEXT;
+ALTER TABLE "AdminUser" ADD COLUMN "emergencyContacts" JSONB;
 
 CREATE TABLE "AdminUserActivityLog" (
     "id" TEXT NOT NULL,
