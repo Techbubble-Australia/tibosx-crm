@@ -22,10 +22,13 @@ async function handle(req: NextRequest, ctx: Ctx) {
 
     const res = await ticketingTbosFetch(subpath, init);
     const body = await res.arrayBuffer();
-    return new NextResponse(body, {
-      status: res.status,
-      headers: { "Content-Type": res.headers.get("Content-Type") || "application/json" },
+    const out = new NextResponse(body, { status: res.status, statusText: res.statusText });
+    const skip = new Set(["transfer-encoding", "content-encoding", "content-length"]);
+    res.headers.forEach((value, key) => {
+      if (skip.has(key.toLowerCase())) return;
+      out.headers.set(key, value);
     });
+    return out;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Ticketing API error";
     return NextResponse.json({ error: message }, { status: 503 });

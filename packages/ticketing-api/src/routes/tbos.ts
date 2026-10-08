@@ -1,8 +1,28 @@
 import { Router, type IRouter } from "express";
+import multer from "multer";
 import { z } from "zod";
-import { TicketStatus, ticketingPrisma } from "@techbubble/ticketing-database";
+import { TicketPriority, TicketStatus, TicketType, ticketingPrisma } from "@techbubble/ticketing-database";
 import { tbosAuthMiddleware, requireTbosAdmin, type TbosRequest } from "../middleware/tbos-auth.js";
 import { assignedOrganizationIds } from "../lib/ticket-access.js";
+import { resolveTbosActorUserId } from "../lib/tbos-actor.js";
+import { logTicketAudit } from "../lib/ticket-audit.js";
+import { saveTicketUpload } from "../lib/upload-storage.js";
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+const ticketUpdateSchema = z.object({
+  type: z.nativeEnum(TicketType).optional(),
+  priority: z.nativeEnum(TicketPriority).optional(),
+  status: z.nativeEnum(TicketStatus).optional(),
+  subject: z.string().min(1).max(300).optional(),
+  description: z.string().min(1).max(20000).optional(),
+  assignedToId: z.string().nullable().optional(),
+});
+
+const messageSchema = z.object({
+  body: z.string().min(1).max(20000),
+  isInternal: z.boolean().optional(),
+});
 
 const router: IRouter = Router();
 
@@ -151,6 +171,147 @@ router.put("/consultants/:consultantId/organizations", requireTbosAdmin, async (
     include: { organization: { select: { id: true, name: true, slug: true } } },
   });
   res.json({ data: assigned.map((a) => a.organization) });
+});
+
+router.get("/assignees", async (req: TbosRequest, res) => {
+  const tbosUser = req.tbosUser!;
+  if (isTbosAdminRole(tbosUser.role)) {
+    const rows = await ticketingPrisma.ticketingUser.findMany({
+      where: { role: "CONSULTANT", consultantVerified: true, active: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, email: true },
+    });
+    return res.json({ data: rows });
+  }
+  const actorId = await resolveTbosActorUserId(tbosUser);
+  const self = await ticketingPrisma.ticketingUser.findUnique({
+    where: { id: actorId },
+    select: { id: true, name: true, email: true },
+  });
+  res.json({ data: self ? [self] : [] });
+});
+
+router.patch("/tickets/:id", async (req: TbosRequest, res) => {
+  const tbosUser = req.tbosUser!;
+  const parsed = ticketUpdateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  const orgScope = await orgFilterForTbos(tbosUser);
+  const existing = await ticketingPrisma.ticket.findFirst({
+    where: { id: req.params.id, ...orgScope },
+  });
+  if (!existing) return res.status(404).json({ error: "Ticket not found" });
+
+  const actorId = await resolveTbosActorUserId(tbosUser);
+  const data: Record<string, unknown> = {};
+  for (const [field, value] of Object.entries(parsed.data)) {
+    if (value === undefined) continue;
+    data[field] = value;
+  }
+  if (parsed.data.status === TicketStatus.CLOSED || parsed.data.status === TicketStatus.RESOLVED) {
+    data.closedAt = new Date();
+  }
+  if (parsed.data.status && parsed.data.status !== TicketStatus.CLOSED && parsed.data.status !== TicketStatus.RESOLVED) {
+    data.closedAt = null;
+  }
+
+  const updated = await ticketingPrisma.ticket.update({
+    where: { id: existing.id },
+    data,
+    include: {
+      organization: { select: { id: true, name: true, slug: true } },
+      createdBy: { select: { id: true, name: true, email: true } },
+      assignedTo: { select: { id: true, name: true, email: true } },
+    },
+  });
+
+  for (const field of ["status", "priority", "type", "assignedToId", "subject"] as const) {
+    const next = parsed.data[field];
+    if (next === undefined) continue;
+    const prev = existing[field];
+    if (String(prev ?? "") !== String(next ?? "")) {
+      await logTicketAudit(existing.id, actorId, "UPDATED", {
+        field,
+        oldValue: String(prev ?? ""),
+        newValue: String(next ?? ""),
+      });
+    }
+  }
+
+  res.json({
+    data: {
+      ...updated,
+      createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString(),
+      closedAt: updated.closedAt?.toISOString() ?? null,
+    },
+  });
+});
+
+router.post("/tickets/:id/messages", async (req: TbosRequest, res) => {
+  const tbosUser = req.tbosUser!;
+  const parsed = messageSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  const orgScope = await orgFilterForTbos(tbosUser);
+  const ticket = await ticketingPrisma.ticket.findFirst({
+    where: { id: req.params.id, ...orgScope },
+  });
+  if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+
+  const actorId = await resolveTbosActorUserId(tbosUser);
+  const message = await ticketingPrisma.ticketMessage.create({
+    data: {
+      ticketId: ticket.id,
+      authorId: actorId,
+      body: parsed.data.body.trim(),
+      isInternal: Boolean(parsed.data.isInternal),
+    },
+    include: { author: { select: { id: true, name: true, email: true, role: true } } },
+  });
+
+  await ticketingPrisma.ticket.update({
+    where: { id: ticket.id },
+    data: { updatedAt: new Date() },
+  });
+
+  await logTicketAudit(ticket.id, actorId, "MESSAGE_ADDED", {
+    metadata: { messageId: message.id, isInternal: message.isInternal },
+  });
+
+  res.status(201).json({ data: message });
+});
+
+router.post("/tickets/:id/attachments/upload", upload.single("file"), async (req: TbosRequest, res) => {
+  const tbosUser = req.tbosUser!;
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+  const orgScope = await orgFilterForTbos(tbosUser);
+  const ticket = await ticketingPrisma.ticket.findFirst({
+    where: { id: req.params.id, ...orgScope },
+  });
+  if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+
+  const actorId = await resolveTbosActorUserId(tbosUser);
+  try {
+    const stored = await saveTicketUpload(req.file);
+    const attachment = await ticketingPrisma.ticketAttachment.create({
+      data: {
+        ticketId: ticket.id,
+        fileName: stored.fileName,
+        fileUrl: stored.fileUrl,
+        fileSize: stored.fileSize,
+        uploadedById: actorId,
+      },
+    });
+    await logTicketAudit(ticket.id, actorId, "ATTACHMENT_ADDED", {
+      metadata: { fileName: attachment.fileName },
+    });
+    res.status(201).json({ data: attachment });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Upload failed";
+    res.status(400).json({ error: message });
+  }
 });
 
 router.get("/consultants", requireTbosAdmin, async (_req, res) => {

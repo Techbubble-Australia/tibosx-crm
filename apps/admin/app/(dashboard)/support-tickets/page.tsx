@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { TICKET_PRIORITY_LABELS, TICKET_STATUS_LABELS } from "@/lib/support-ticket-labels";
 
 type TicketRow = {
   id: string;
@@ -14,14 +15,6 @@ type TicketRow = {
   type: string;
   organization?: { name: string };
   updatedAt: string;
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  OPEN: "Open",
-  IN_PROGRESS: "In progress",
-  PENDING_CLIENT: "Pending client",
-  RESOLVED: "Resolved",
-  CLOSED: "Closed",
 };
 
 export default function SupportTicketsPage() {
@@ -82,7 +75,7 @@ export default function SupportTicketsPage() {
           className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
         >
           <option value="">All statuses</option>
-          {Object.entries(STATUS_LABELS).map(([v, l]) => (
+          {Object.entries(TICKET_STATUS_LABELS).map(([v, l]) => (
             <option key={v} value={v}>{l}</option>
           ))}
         </select>
@@ -104,6 +97,7 @@ export default function SupportTicketsPage() {
             <tr>
               <th className="px-4 py-3">Ticket</th>
               <th className="px-4 py-3">Company</th>
+              <th className="px-4 py-3">Priority</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Updated</th>
             </tr>
@@ -111,7 +105,7 @@ export default function SupportTicketsPage() {
           <tbody className="divide-y dark:divide-gray-800">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-gray-500">No tickets found.</td>
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">No tickets found.</td>
               </tr>
             ) : (
               rows.map((row) => (
@@ -123,7 +117,8 @@ export default function SupportTicketsPage() {
                     <p className="text-gray-700 dark:text-gray-300">{row.subject}</p>
                   </td>
                   <td className="px-4 py-3">{row.organization?.name ?? "—"}</td>
-                  <td className="px-4 py-3">{STATUS_LABELS[row.status] ?? row.status}</td>
+                  <td className="px-4 py-3">{TICKET_PRIORITY_LABELS[row.priority] ?? row.priority}</td>
+                  <td className="px-4 py-3">{TICKET_STATUS_LABELS[row.status] ?? row.status}</td>
                   <td className="px-4 py-3 text-gray-500">{new Date(row.updatedAt).toLocaleString()}</td>
                 </tr>
               ))

@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { ticketingPrisma } from "@techbubble/ticketing-database";
 import { TICKETING_SESSION_COOKIE } from "../lib/session.js";
 
 /** Signs ticketing portal session JWTs. */
@@ -46,7 +47,7 @@ function extractToken(req: Request): string | undefined {
   return getCookie(req, TICKETING_SESSION_COOKIE);
 }
 
-export function authMiddleware(req: TicketingRequest, res: Response, next: NextFunction) {
+export async function authMiddleware(req: TicketingRequest, res: Response, next: NextFunction) {
   const token = extractToken(req);
   if (!token) {
     return res.status(401).json({ error: "Unauthorized: No token provided" });
@@ -56,13 +57,21 @@ export function authMiddleware(req: TicketingRequest, res: Response, next: NextF
     if (decoded.purpose === "tbos_exchange") {
       return res.status(401).json({ error: "Exchange token not valid for API access" });
     }
+    const dbUser = await ticketingPrisma.ticketingUser.findUnique({
+      where: { id: decoded.id },
+      select: { tbosRole: true, consultantVerified: true, role: true, organizationId: true, active: true },
+    });
+    if (!dbUser?.active) {
+      return res.status(401).json({ error: "Unauthorized: User not found" });
+    }
     req.ticketingUser = {
       id: decoded.id,
       email: decoded.email,
-      role: decoded.role,
-      organizationId: decoded.organizationId ?? null,
-      consultantVerified: Boolean(decoded.consultantVerified),
-      tbosRole: decoded.tbosRole ?? null,
+      role: dbUser.role,
+      organizationId: dbUser.organizationId ?? null,
+      consultantVerified: dbUser.consultantVerified,
+      // Prefer DB (SSO updates) over stale JWT claims — fixes empty ticket lists for TBOS admin.
+      tbosRole: dbUser.tbosRole ?? decoded.tbosRole ?? null,
     };
     next();
   } catch {

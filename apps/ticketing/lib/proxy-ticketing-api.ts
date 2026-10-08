@@ -1,6 +1,23 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
+const HOP_BY_HOP = new Set([
+  "connection",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailers",
+  "transfer-encoding",
+  "upgrade",
+]);
+
+const SKIP_RESPONSE_HEADERS = new Set([
+  "transfer-encoding",
+  "content-encoding",
+  "content-length",
+]);
+
 export function getTicketingApiBase(): string {
   return (process.env.TICKETING_API_URL || "http://127.0.0.1:3003").replace(/\/$/, "");
 }
@@ -12,7 +29,7 @@ export async function proxyTicketingApiRequest(req: NextRequest, pathSegments: s
   const headers = new Headers();
   req.headers.forEach((value, key) => {
     const low = key.toLowerCase();
-    if (low === "host") return;
+    if (low === "host" || HOP_BY_HOP.has(low)) return;
     headers.set(key, value);
   });
 
@@ -27,12 +44,18 @@ export async function proxyTicketingApiRequest(req: NextRequest, pathSegments: s
     init.duplex = "half";
   }
 
-  const res = await fetch(target, init);
-  const bodyBuf = await res.arrayBuffer();
-  const out = new NextResponse(bodyBuf, { status: res.status, statusText: res.statusText });
-  res.headers.forEach((value, key) => {
-    if (key.toLowerCase() === "transfer-encoding") return;
-    out.headers.set(key, value);
-  });
-  return out;
+  try {
+    const res = await fetch(target, init);
+    const bodyBuf = await res.arrayBuffer();
+    const out = new NextResponse(bodyBuf, { status: res.status, statusText: res.statusText });
+    res.headers.forEach((value, key) => {
+      const low = key.toLowerCase();
+      if (SKIP_RESPONSE_HEADERS.has(low) || HOP_BY_HOP.has(low)) return;
+      out.headers.set(key, value);
+    });
+    return out;
+  } catch (err) {
+    console.error("[ticketing api proxy]", target, err);
+    return NextResponse.json({ error: "Ticketing API unavailable" }, { status: 502 });
+  }
 }
