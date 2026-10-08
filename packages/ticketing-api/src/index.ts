@@ -20,7 +20,12 @@ const app = express();
 const PORT = Number(process.env.PORT || process.env.TICKETING_API_PORT || 3003);
 
 app.set("trust proxy", 1);
-app.use(helmet());
+app.use(
+  helmet({
+    // Allow portal/admin to embed ticket images from this API origin when not proxied.
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  }),
+);
 app.use(
   cors({
     origin:

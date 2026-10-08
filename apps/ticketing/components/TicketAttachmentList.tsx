@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Download, X } from "lucide-react";
+import { resolveTicketAttachmentUrl } from "@/lib/ticket-attachment-url";
 
 export type TicketAttachmentItem = {
   id: string;
@@ -50,6 +51,7 @@ export function TicketAttachmentList({ attachments }: { attachments: TicketAttac
     <>
       <ul className="space-y-3">
         {attachments.map((a) => {
+          const href = resolveTicketAttachmentUrl(a.fileUrl);
           const sizeLabel = formatFileSize(a.fileSize);
           const image = isImageAttachment(a.fileName);
 
@@ -64,7 +66,7 @@ export function TicketAttachmentList({ attachments }: { attachments: TicketAttac
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element -- attachment URLs are dynamic / cross-origin */}
                   <img
-                    src={a.fileUrl}
+                    src={href}
                     alt={a.fileName}
                     className="h-28 w-28 object-cover transition group-hover:opacity-95 sm:h-32 sm:w-32"
                     loading="lazy"
@@ -88,7 +90,7 @@ export function TicketAttachmentList({ attachments }: { attachments: TicketAttac
           return (
             <li key={a.id} className="text-sm">
               <a
-                href={a.fileUrl}
+                href={href}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-medium text-sky-700 hover:underline break-all"
@@ -116,7 +118,7 @@ export function TicketAttachmentList({ attachments }: { attachments: TicketAttac
             <p className="min-w-0 truncate text-sm font-medium">{lightbox.fileName}</p>
             <div className="flex shrink-0 items-center gap-2">
               <a
-                href={lightbox.fileUrl}
+                href={resolveTicketAttachmentUrl(lightbox.fileUrl)}
                 download={lightbox.fileName}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -141,7 +143,7 @@ export function TicketAttachmentList({ attachments }: { attachments: TicketAttac
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={lightbox.fileUrl}
+              src={resolveTicketAttachmentUrl(lightbox.fileUrl)}
               alt={lightbox.fileName}
               className="max-h-[calc(100vh-6rem)] max-w-full object-contain"
             />
