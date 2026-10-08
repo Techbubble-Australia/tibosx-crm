@@ -27,6 +27,7 @@ export default function NewUserPage() {
         body: JSON.stringify({
           email: formData.get("email"),
           name: formData.get("name") || undefined,
+          phone: formData.get("phone"),
           password: formData.get("password"),
           role,
           active: formData.get("active") === "on",
@@ -64,6 +65,10 @@ export default function NewUserPage() {
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Name</label>
           <input name="name" className={inputClass} />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Phone *</label>
+          <input name="phone" required className={inputClass} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Password *</label>

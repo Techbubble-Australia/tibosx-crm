@@ -21,6 +21,7 @@ export default function EditUserPage() {
   const [defaults, setDefaults] = useState<{
     email: string;
     name: string | null;
+    phone: string | null;
     active: boolean;
     mfaEnabled: boolean;
     passwordNeedsReset: boolean;
@@ -53,6 +54,7 @@ export default function EditUserPage() {
     const body: Record<string, unknown> = {
       email: formData.get("email"),
       name: formData.get("name") || null,
+      phone: String(formData.get("phone") ?? "").trim(),
       role,
       active: formData.get("active") === "on",
       passwordNeedsReset: formData.get("passwordNeedsReset") === "on",
@@ -105,6 +107,10 @@ export default function EditUserPage() {
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Name</label>
           <input name="name" defaultValue={defaults.name ?? ""} className={inputClass} />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Phone *</label>
+          <input name="phone" required defaultValue={defaults.phone ?? ""} className={inputClass} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">New password</label>

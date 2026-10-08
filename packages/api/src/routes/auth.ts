@@ -283,9 +283,7 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
     if (!existing) return res.status(404).json({ error: "User not found" });
 
     const patch: Record<string, unknown> = {};
-    const trackFields = [
-      "name",
-      "phone",
+    const addressFields = [
       "addressLine1",
       "addressLine2",
       "suburb",
@@ -294,9 +292,11 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
       "country",
     ] as const;
 
-    for (const field of trackFields) {
-      if (input[field] !== undefined) {
-        patch[field] = input[field] as string | null;
+    if (existing.role === "project_member") {
+      for (const field of addressFields) {
+        if (input[field] !== undefined) {
+          patch[field] = input[field] as string | null;
+        }
       }
     }
     if (input.emergencyContacts !== undefined) {
@@ -304,8 +304,8 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
     }
 
     const requiredForComplete = [
-      input.name ?? existing.name,
-      input.phone ?? existing.phone,
+      existing.name,
+      existing.phone,
       input.addressLine1 ?? existing.addressLine1,
       input.city ?? existing.city,
       input.country ?? existing.country,
@@ -317,8 +317,8 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
     }
 
     const updated = await prisma.$transaction(async (tx) => {
-      for (const field of trackFields) {
-        if (input[field] === undefined) continue;
+      for (const field of addressFields) {
+        if (existing.role !== "project_member" || input[field] === undefined) continue;
         const oldVal = (existing[field] as string | null) ?? null;
         const newVal = (input[field] as string | null) ?? null;
         await logAdminUserFieldChange(tx, u.id, u.id, field, oldVal, newVal);
@@ -403,6 +403,41 @@ router.get("/mfa/status", authMiddleware, async (req: AuthRequest, res) => {
       mfaEnrolledAt: user.mfaEnrolledAt?.toISOString() ?? null,
     },
   });
+});
+
+router.post("/password/change", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const u = req.user;
+    if (!u) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { currentPassword, newPassword } = passwordChangeSchema.parse(req.body);
+    const user = await prisma.adminUser.findUnique({ where: { id: u.id } });
+    if (!user?.passwordHash) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) {
+      return res.status(401).json({ error: "Current password is incorrect" });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const updated = await prisma.adminUser.update({
+      where: { id: u.id },
+      data: { passwordHash, passwordNeedsReset: false },
+      select: { id: true, email: true, role: true, mfaEnabled: true, passwordNeedsReset: true },
+    });
+
+    res.json({ data: { user: publicUser(updated) } });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Password change error:", error);
+    res.status(500).json({ error: "Failed to update password" });
+  }
 });
 
 router.post("/password/change-required", authMiddleware, async (req: AuthRequest, res) => {

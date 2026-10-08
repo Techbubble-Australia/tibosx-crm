@@ -10,6 +10,7 @@ const router: IRouter = Router();
 const createSchema = z.object({
   email: z.string().email(),
   name: z.string().max(200).optional(),
+  phone: z.string().min(1).max(50),
   password: z.string().min(8),
   role: z.enum(ADMIN_ROLES_LIST).default("website"),
   active: z.boolean().default(true),
@@ -19,6 +20,7 @@ const createSchema = z.object({
 const updateSchema = z.object({
   email: z.string().email().optional(),
   name: z.string().max(200).optional().nullable(),
+  phone: z.string().min(1).max(50).optional(),
   password: z.string().min(8).optional(),
   role: z.enum(ADMIN_ROLES_LIST).optional(),
   active: z.boolean().optional(),
@@ -29,6 +31,7 @@ function sanitizeUser(row: {
   id: string;
   email: string;
   name: string | null;
+  phone: string | null;
   role: string;
   active: boolean;
   mfaEnabled: boolean;
@@ -41,6 +44,7 @@ function sanitizeUser(row: {
     id: row.id,
     email: row.email,
     name: row.name,
+    phone: row.phone,
     role: row.role,
     active: row.active,
     mfaEnabled: row.mfaEnabled,
@@ -55,6 +59,7 @@ const userSelect = {
   id: true,
   email: true,
   name: true,
+  phone: true,
   role: true,
   active: true,
   mfaEnabled: true,
@@ -99,6 +104,7 @@ router.post("/", async (req, res) => {
       data: {
         email: data.email,
         name: data.name ?? null,
+        phone: data.phone.trim(),
         passwordHash,
         role: data.role,
         active: data.active,
@@ -133,6 +139,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
     const updateData: Record<string, unknown> = {};
     if (data.email !== undefined) updateData.email = data.email;
     if (data.name !== undefined) updateData.name = data.name;
+    if (data.phone !== undefined) updateData.phone = data.phone.trim();
     if (data.role !== undefined) updateData.role = data.role;
     if (data.active !== undefined) updateData.active = data.active;
     if (data.passwordNeedsReset !== undefined) updateData.passwordNeedsReset = data.passwordNeedsReset;

@@ -5,11 +5,18 @@ export const SIGNATURE_BLOCK_SELECTOR = '[data-signature-block="contractor"]';
 export const DEFAULT_SIGNATURE_WIDTH_PX = 260;
 export const DEFAULT_SIGNATURE_MIN_HEIGHT_PX = 100;
 
-export function createFlowSignatureBlockHtml(): string {
+export function newSignatureCaptureId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `sig-${crypto.randomUUID().slice(0, 8)}`;
+  }
+  return `sig-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function createFlowSignatureBlockHtml(captureId = newSignatureCaptureId()): string {
   return `<div data-signature-block="contractor" data-signature-layout="flow" class="signature-block signature-block--flow" contenteditable="false" style="width:auto;max-width:100%;min-width:140px;min-height:${DEFAULT_SIGNATURE_MIN_HEIGHT_PX}px;box-sizing:border-box;">
 <button type="button" data-signature-drag-handle class="signature-drag-handle" aria-label="Move signature block">Move</button>
 <p><strong>Signature</strong></p>
-<div data-signature-capture="contractor" class="signature-capture-area"></div>
+<div data-signature-capture="${captureId}" class="signature-capture-area"></div>
 <span data-signature-resize-handle class="signature-resize-handle" aria-hidden="true"></span>
 </div>`;
 }
@@ -180,47 +187,82 @@ export function prepareCellForSignature(cell: HTMLTableCellElement): void {
   cell.style.minHeight = `${minH}px`;
 }
 
+function upgradeLegacySignatureBlock(block: HTMLElement): void {
+  const strong = block.querySelector("p strong, strong");
+  if (strong) strong.textContent = "Signature";
+  block.querySelectorAll(".signature-hint").forEach((node) => node.remove());
+  const capture = block.querySelector("[data-signature-capture]");
+  if (capture instanceof HTMLElement && !capture.getAttribute("data-signature-capture")?.trim()) {
+    capture.setAttribute("data-signature-capture", newSignatureCaptureId());
+  }
+  if (!block.querySelector("[data-signature-capture]")) {
+    const captureId = newSignatureCaptureId();
+    const area = document.createElement("div");
+    area.setAttribute("data-signature-capture", captureId);
+    area.className = "signature-capture-area";
+    block.appendChild(area);
+  }
+}
+
 /** Move overlay/free blocks into document flow so tables reflow around them. */
 export function normalizeSignatureBlockToFlow(canvas: HTMLElement): void {
-  const block = canvas.querySelector(SIGNATURE_BLOCK_SELECTOR);
-  if (!(block instanceof HTMLElement)) return;
+  const blocks = Array.from(canvas.querySelectorAll(SIGNATURE_BLOCK_SELECTOR)).filter(
+    (node): node is HTMLElement => node instanceof HTMLElement,
+  );
+  if (!blocks.length) return;
 
-  applyFlowSignatureStyles(block);
-  ensureEditorChrome(block);
-
-  const layout = block.getAttribute("data-signature-layout");
-  const parent = block.parentElement;
-  const inFlowParent =
-    parent instanceof HTMLTableCellElement ||
-    parent instanceof HTMLParagraphElement ||
-    (parent instanceof HTMLDivElement && !parent.hasAttribute("data-template-canvas"));
-
-  const isOverlay =
-    layout === "free" ||
-    block.style.position === "absolute" ||
-    parent?.hasAttribute("data-template-canvas");
-
-  if (!isOverlay && inFlowParent) {
-    if (parent instanceof HTMLTableCellElement) prepareCellForSignature(parent);
-    return;
+  const seenCaptureIds = new Set<string>();
+  for (const block of blocks) {
+    const capture = block.querySelector("[data-signature-capture]");
+    if (!(capture instanceof HTMLElement)) continue;
+    let id = capture.getAttribute("data-signature-capture") ?? "";
+    if (!id || id === "contractor" || seenCaptureIds.has(id)) {
+      id = newSignatureCaptureId();
+      capture.setAttribute("data-signature-capture", id);
+    }
+    seenCaptureIds.add(id);
   }
-
-  if (!isOverlay) return;
 
   const contractorCell = findContractorSignatureCell(canvas);
-  if (contractorCell) {
-    block.remove();
-    contractorCell.appendChild(block);
-    prepareCellForSignature(contractorCell);
-    return;
-  }
 
-  if (parent?.hasAttribute("data-template-canvas")) {
-    block.remove();
-    const anchor = document.createElement("p");
-    anchor.className = "signature-flow-anchor";
-    anchor.appendChild(block);
-    canvas.appendChild(anchor);
+  for (const block of blocks) {
+    upgradeLegacySignatureBlock(block);
+    applyFlowSignatureStyles(block);
+    ensureEditorChrome(block);
+
+    const layout = block.getAttribute("data-signature-layout");
+    const parent = block.parentElement;
+    const inFlowParent =
+      parent instanceof HTMLTableCellElement ||
+      parent instanceof HTMLParagraphElement ||
+      (parent instanceof HTMLDivElement && !parent.hasAttribute("data-template-canvas"));
+
+    const isOverlay =
+      layout === "free" ||
+      block.style.position === "absolute" ||
+      parent?.hasAttribute("data-template-canvas");
+
+    if (!isOverlay && inFlowParent) {
+      if (parent instanceof HTMLTableCellElement) prepareCellForSignature(parent);
+      continue;
+    }
+
+    if (!isOverlay) continue;
+
+    if (contractorCell && parent?.hasAttribute("data-template-canvas") && blocks.length === 1) {
+      block.remove();
+      contractorCell.appendChild(block);
+      prepareCellForSignature(contractorCell);
+      continue;
+    }
+
+    if (parent?.hasAttribute("data-template-canvas")) {
+      block.remove();
+      const anchor = document.createElement("p");
+      anchor.className = "signature-flow-anchor";
+      anchor.appendChild(block);
+      canvas.appendChild(anchor);
+    }
   }
 }
 
@@ -242,11 +284,8 @@ export function findDropContainer(element: Element | null, canvas: HTMLElement):
 export function insertSignatureInContractorCell(html: string): string {
   const doc = parseTemplateDoc(html);
   const canvas = ensureTemplateCanvasOnDocument(doc);
-  if (canvas.querySelector(SIGNATURE_BLOCK_SELECTOR)) {
-    return doc.body.innerHTML;
-  }
   const cell = findContractorSignatureCell(canvas);
-  if (cell) {
+  if (cell && !cell.querySelector(SIGNATURE_BLOCK_SELECTOR)) {
     cell.insertAdjacentHTML("beforeend", createFlowSignatureBlockHtml());
   } else {
     canvas.insertAdjacentHTML("beforeend", createFlowSignatureBlockHtml());
@@ -261,7 +300,10 @@ export function serializeTemplateHtmlFromCanvas(canvas: HTMLElement): string {
 }
 
 export function appendSignatureBlock(sourceHtml: string): string {
-  return `${sourceHtml}${createFlowSignatureBlockHtml()}`;
+  const doc = parseTemplateDoc(sourceHtml);
+  const canvas = ensureTemplateCanvasOnDocument(doc);
+  canvas.insertAdjacentHTML("beforeend", createFlowSignatureBlockHtml());
+  return doc.body.innerHTML;
 }
 
 export function buildHtmlWithSignatureBlock(sourceHtml: string): string {

@@ -1,17 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
+import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { ProjectForm, type ProjectFormValues } from "@/components/projects/ProjectForm";
 import { ProjectSupportPortalCard } from "@/components/projects/ProjectSupportPortalCard";
 import { ProjectSupportSetup } from "@/components/projects/ProjectSupportSetup";
 
 export default function EditProjectPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const { isProjectMember, loading: sessionLoading } = useAdminSession();
   const [project, setProject] = useState<ProjectFormValues | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -23,8 +26,13 @@ export default function EditProjectPage() {
   }, [id]);
 
   useEffect(() => {
+    if (sessionLoading) return;
+    if (isProjectMember) {
+      router.replace("/projects");
+      return;
+    }
     void loadProject().finally(() => setIsLoading(false));
-  }, [loadProject]);
+  }, [loadProject, isProjectMember, router, sessionLoading]);
 
   async function handleSubmit(payload: Record<string, unknown>) {
     setIsSaving(true);

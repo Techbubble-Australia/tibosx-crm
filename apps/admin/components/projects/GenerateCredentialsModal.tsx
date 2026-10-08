@@ -38,7 +38,6 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
   const [values, setValues] = useState<Record<string, string>>({});
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
@@ -74,7 +73,8 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
     setValues((prev) => ({ ...prev, [key]: value }));
   }
 
-  function goToVariablesStep() {
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
     if (!templateId) {
       alert("Please select a template.");
       return;
@@ -92,12 +92,7 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
       alert("End date must be on or after start date.");
       return;
     }
-    setStep(2);
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const variables = selectedTemplate?.variables ?? [];
+    const variables = template?.variables ?? [];
     for (const variable of variables) {
       if (variable.required && !values[variable.key]?.trim()) {
         alert(`${variable.label} is required.`);
@@ -131,19 +126,16 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
-        <div className="shrink-0 border-b border-gray-100 p-6 dark:border-gray-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 sm:p-6">
+      <div className="flex max-h-[min(85vh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+        <div className="shrink-0 border-b border-gray-100 px-5 py-4 dark:border-gray-800">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Generate credentials</h3>
           <p className="mt-1 text-sm text-gray-500">
             {member.firstName} {member.lastName} ({member.email})
           </p>
-          {!tempPassword ? (
-            <p className="mt-2 text-xs text-gray-400">Step {step} of 2</p>
-          ) : null}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
           {tempPassword ? (
             <div className="space-y-3">
               <p className="text-sm text-green-700 dark:text-green-400">
@@ -151,18 +143,20 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
               </p>
               <div className="rounded-lg bg-gray-50 p-4 text-sm dark:bg-gray-800">
                 <p><span className="text-gray-500">Email:</span> {createdEmail}</p>
-                <p className="mt-2 font-mono"><span className="font-sans text-gray-500">Password:</span> {tempPassword}</p>
+                <p className="mt-2 font-mono">
+                  <span className="font-sans text-gray-500">Password:</span> {tempPassword}
+                </p>
               </div>
             </div>
           ) : loading ? (
             <div className="flex h-32 items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
             </div>
-          ) : step === 1 ? (
-            <div className="space-y-4">
-              <div>
+          ) : (
+            <form id="credential-vars-form" onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+              <div className="sticky top-0 z-10 -mx-1 rounded-lg border border-gray-100 bg-white/95 px-1 pb-3 pt-1 backdrop-blur dark:border-gray-800 dark:bg-gray-900/95">
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Template <span className="text-red-500">*</span>
+                  Select template <span className="text-red-500">*</span>
                 </label>
                 <select
                   className={inputClass}
@@ -176,6 +170,7 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
                   ))}
                 </select>
               </div>
+
               {selectedTemplate?.addStartDate ? (
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -206,9 +201,7 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
                   />
                 </div>
               ) : null}
-            </div>
-          ) : (
-            <form id="credential-vars-form" onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+
               {(selectedTemplate?.variables ?? []).map((variable) => (
                 <div key={variable.key}>
                   <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -241,7 +234,7 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
           )}
         </div>
 
-        <div className="flex shrink-0 justify-end gap-2 border-t border-gray-100 p-6 dark:border-gray-800">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-gray-100 px-5 py-4 dark:border-gray-800">
           {tempPassword ? (
             <button
               type="button"
@@ -259,34 +252,15 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
               >
                 Cancel
               </button>
-              {step === 1 ? (
-                <button
-                  type="button"
-                  onClick={goToVariablesStep}
-                  className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
-                >
-                  Next
-                </button>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setStep(1)}
-                    className="rounded-lg border border-gray-200 px-4 py-2 text-sm dark:border-gray-600"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="submit"
-                    form="credential-vars-form"
-                    disabled={saving}
-                    className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
-                  >
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                    Generate
-                  </button>
-                </>
-              )}
+              <button
+                type="submit"
+                form="credential-vars-form"
+                disabled={saving || loading}
+                className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Generate
+              </button>
             </>
           )}
         </div>

@@ -8,7 +8,12 @@ import {
   defaultCredentialValuesForProfile,
   type CredentialTemplateVariable,
 } from "../lib/credential-template-vars";
-import { renderTemplateHtml, wrapTemplateHtml } from "../lib/credential-template-render";
+import {
+  listSignatureCaptureIds,
+  renderTemplateHtml,
+  renderTemplateHtmlWithSignatures,
+  wrapTemplateHtml,
+} from "../lib/credential-template-render";
 import { saveUploadBuffer } from "../lib/save-upload-buffer";
 import { canManageProjects, getActorId, isProjectManagerRole, isProjectMemberRole } from "../lib/project-access";
 import {
@@ -508,11 +513,12 @@ router.get("/my-agreement", async (req: AuthRequest, res) => {
       member.credentialData && typeof member.credentialData === "object"
         ? (member.credentialData as Record<string, string>)
         : {};
+    const captureIds = listSignatureCaptureIds(member.credentialTemplate.html);
     const rendered = renderTemplateHtml(
       member.credentialTemplate.html,
       values,
       variables,
-      member.signatureDataUrl,
+      member.agreementSignedAt ? member.signatureDataUrl : null,
     );
 
     res.json({
@@ -525,6 +531,7 @@ router.get("/my-agreement", async (req: AuthRequest, res) => {
         html: wrapTemplateHtml(rendered),
         signed: Boolean(member.agreementSignedAt),
         signedAt: member.agreementSignedAt?.toISOString() ?? null,
+        signatureCaptureIds: captureIds,
       },
     });
   } catch (error) {
@@ -544,13 +551,10 @@ router.post("/my-agreement/sign", async (req: AuthRequest, res) => {
 
     const body = z
       .object({
-        signatureDataUrl: z.string().min(1).max(500_000),
+        signatureDataUrl: z.string().min(1).max(500_000).optional(),
+        signatures: z.record(z.string().min(1), z.string().min(1).max(500_000)).optional(),
       })
       .parse(req.body);
-
-    if (!body.signatureDataUrl.startsWith("data:image/")) {
-      return res.status(400).json({ error: "Invalid signature image" });
-    }
 
     const member = await prisma.projectMember.findFirst({
       where: { adminUserId: userId, credentialTemplateId: { not: null } },
@@ -566,12 +570,44 @@ router.post("/my-agreement/sign", async (req: AuthRequest, res) => {
       member.credentialData && typeof member.credentialData === "object"
         ? (member.credentialData as Record<string, string>)
         : {};
-    const rendered = renderTemplateHtml(
-      member.credentialTemplate.html,
-      values,
-      variables,
-      body.signatureDataUrl,
-    );
+    const captureIds = listSignatureCaptureIds(member.credentialTemplate.html);
+    const signatures: Record<string, string> = body.signatures ?? {};
+    if (body.signatureDataUrl) {
+      if (!body.signatureDataUrl.startsWith("data:image/")) {
+        return res.status(400).json({ error: "Invalid signature image" });
+      }
+      const soleCaptureId = captureIds.length === 1 ? captureIds[0] : undefined;
+      if (soleCaptureId) {
+        signatures[soleCaptureId] = body.signatureDataUrl;
+      } else if (!body.signatures) {
+        return res.status(400).json({ error: "Sign each signature field in the agreement" });
+      }
+    }
+
+    for (const dataUrl of Object.values(signatures)) {
+      if (!dataUrl.startsWith("data:image/")) {
+        return res.status(400).json({ error: "Invalid signature image" });
+      }
+    }
+
+    if (captureIds.length > 0) {
+      const missing = captureIds.filter((id) => !signatures[id]);
+      if (missing.length) {
+        return res.status(400).json({
+          error: "All signature fields must be signed before submitting",
+          missingCaptureIds: missing,
+        });
+      }
+    } else if (!body.signatureDataUrl) {
+      return res.status(400).json({ error: "Signature is required" });
+    }
+
+    const firstCaptureId = captureIds[0];
+    const primarySignature =
+      captureIds.length && firstCaptureId ? signatures[firstCaptureId] : body.signatureDataUrl!;
+    const rendered = captureIds.length
+      ? renderTemplateHtmlWithSignatures(member.credentialTemplate.html, values, variables, signatures)
+      : renderTemplateHtml(member.credentialTemplate.html, values, variables, primarySignature);
     const wrapped = wrapTemplateHtml(rendered);
     const documentUrl = await saveUploadBuffer(
       Buffer.from(wrapped, "utf8"),
@@ -583,7 +619,7 @@ router.post("/my-agreement/sign", async (req: AuthRequest, res) => {
       const row = await tx.projectMember.update({
         where: { id: member.id },
         data: {
-          signatureDataUrl: body.signatureDataUrl,
+          signatureDataUrl: primarySignature,
           agreementSignedAt: new Date(),
         },
       });
@@ -616,11 +652,7 @@ router.get("/:id", async (req: AuthRequest, res) => {
     if (!projectId) return res.status(400).json({ error: "Invalid id" });
     const role = req.user?.role ?? "";
     if (isProjectMemberRole(role)) {
-      const actorId = getActorId(req);
-      const membership = await prisma.projectMember.findFirst({
-        where: { projectId, adminUserId: actorId },
-      });
-      if (!membership) return res.status(403).json({ error: "Forbidden" });
+      return res.status(403).json({ error: "Forbidden" });
     }
     const row = await fetchProject(projectId);
     if (!row) return res.status(404).json({ error: "Not found" });
@@ -885,6 +917,14 @@ router.post("/:id/members/:memberId/generate-credentials", async (req: AuthReque
       mergedValues.name?.trim() ||
       mergedValues.Name?.trim() ||
       `${member.profile.firstName} ${member.profile.lastName}`.trim();
+    const phone =
+      mergedValues.phone?.trim() ||
+      mergedValues.Phone?.trim() ||
+      mergedValues.mobile?.trim() ||
+      member.profile.phone.trim();
+    if (!phone) {
+      return res.status(400).json({ error: "Phone is required to create the user account" });
+    }
 
     const existingUser = await prisma.adminUser.findUnique({ where: { email } });
     if (existingUser && existingUser.id !== member.adminUserId) {
@@ -902,6 +942,7 @@ router.post("/:id/members/:memberId/generate-credentials", async (req: AuthReque
               data: {
                 email,
                 name,
+                phone,
                 role: "project_member",
                 active: true,
                 passwordHash,
@@ -912,6 +953,7 @@ router.post("/:id/members/:memberId/generate-credentials", async (req: AuthReque
               data: {
                 email,
                 name,
+                phone,
                 role: "project_member",
                 active: true,
                 passwordHash,

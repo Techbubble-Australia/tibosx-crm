@@ -12,6 +12,17 @@ const TEMPLATE_PREVIEW_STYLES = `${DOCUMENT_TEMPLATE_STYLES}
 .signature-drag-handle, .signature-resize-handle, .table-width-resize-grip, .table-col-resize-grip { display: none !important; }
 `;
 
+export function listSignatureCaptureIds(html: string): string[] {
+  const ids: string[] = [];
+  const re = /data-signature-capture="([^"]+)"/gi;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(html)) !== null) {
+    const id = match[1]?.trim();
+    if (id && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
 export function wrapTemplateHtml(body: string): string {
   const content = body.trim();
   if (!content) return "";
@@ -55,13 +66,36 @@ export function renderTemplateHtml(
   if (signatureDataUrl) {
     const signatureImg = `<img src="${signatureDataUrl}" alt="Signature" style="max-height:80px;display:block;" />`;
     rendered = rendered.replace(
-      /<div([^>]*data-signature-capture="contractor"[^>]*)><\/div>/gi,
+      /<div([^>]*data-signature-capture="[^"]+"[^>]*)>\s*<\/div>/gi,
       `<div$1>${signatureImg}</div>`,
     );
+  }
+
+  return rendered;
+}
+
+export function renderTemplateHtmlWithSignatures(
+  html: string,
+  values: Record<string, string>,
+  variables: CredentialTemplateVariable[] = [],
+  signaturesByCaptureId: Record<string, string> = {},
+): string {
+  let rendered = renderTemplateHtml(html, values, variables, null);
+  const signedDate = new Date().toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+  for (const [captureId, dataUrl] of Object.entries(signaturesByCaptureId)) {
+    if (!dataUrl.startsWith("data:image/")) continue;
+    const signatureImg = `<img src="${dataUrl}" alt="Signature" style="max-height:80px;display:block;" />`;
+    const escaped = captureId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     rendered = rendered.replace(
-      /<p class="signature-hint">[\s\S]*?<\/p>/gi,
-      `<p class="signature-hint">Signed electronically.</p>`,
+      new RegExp(`<div([^>]*data-signature-capture="${escaped}"[^>]*)>\\s*</div>`, "gi"),
+      `<div$1>${signatureImg}</div>`,
     );
+    rendered = rendered.replace(new RegExp(`\\{Date\\}`, "gi"), signedDate);
   }
 
   return rendered;

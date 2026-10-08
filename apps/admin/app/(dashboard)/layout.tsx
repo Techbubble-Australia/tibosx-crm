@@ -39,6 +39,7 @@ import { MemberOnboardingGuard } from "@/components/MemberOnboardingGuard";
 import { TechBubbleLogo } from "@/components/TechBubbleLogo";
 import { InactivityLogout } from "@/components/InactivityLogout";
 import { TicketPortalLink } from "@/components/TicketPortalLink";
+import { ProfileHeaderLink } from "@/components/ProfileHeaderLink";
 import { roleLabel } from "@/lib/admin-roles";
 import { isCareerApplicationsPath, isJobListingsPath } from "@/lib/job-routes";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
@@ -78,7 +79,7 @@ const navGroups: NavGroup[] = [
     icon: FolderKanban,
     roles: ["admin", "sales", "project_manager", "project_member"],
     items: [
-      { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin", "project_manager"] },
+      { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin", "project_manager", "project_member"] },
       { href: "/timesheets", label: "Timesheets", icon: ClipboardCheck, roles: ["admin", "project_manager", "project_member"] },
       { href: "/support-tickets", label: "Support tickets", icon: ClipboardList, roles: ["admin", "sales"] },
       { href: "/agreement", label: "Agreement", icon: FileText, roles: ["project_member"] },
@@ -121,7 +122,7 @@ const navGroups: NavGroup[] = [
       { href: "/settings/departments", label: "Department", icon: Building, roles: ["admin", "website"] },
       { href: "/settings/levels", label: "Level", icon: Target, roles: ["admin", "website"] },
       { href: "/settings/templates", label: "Templates", icon: FileCode, roles: ["admin"] },
-      { href: "/settings/profile", label: "Profile", icon: UserCircle, roles: ["project_manager", "project_member"] },
+      { href: "/settings/profile", label: "Profile", icon: UserCircle, roles: ["admin", "recruiter_admin", "recruiter", "sales", "website", "project_manager", "project_member"] },
       { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin", "recruiter_admin", "recruiter", "sales", "website", "project_manager", "project_member"] },
       { href: "/users", label: "Users", icon: UserCircle, roles: ["admin"] },
     ],
@@ -369,7 +370,10 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
       <main className="min-w-0 flex-1 bg-gray-50 dark:bg-gray-950">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-6 py-4 dark:border-gray-700 dark:bg-gray-900 lg:px-8">
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{headerTitle(pathname)}</h1>
-          <TicketPortalLink />
+          <div className="flex flex-wrap items-center gap-2">
+            <ProfileHeaderLink />
+            <TicketPortalLink />
+          </div>
         </header>
         <div className="p-8">{children}</div>
       </main>

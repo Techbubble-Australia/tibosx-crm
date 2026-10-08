@@ -2,12 +2,26 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Info, Loader2, Plus, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { resolveDocumentHref } from "@/lib/media-url";
+import { roleLabel, type AdminRole, isAdminRole } from "@/lib/admin-roles";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
+
+const readOnlyClass = `${inputClass} bg-gray-50 dark:bg-gray-950`;
+
+const COUNTRY_OPTIONS = [
+  "Australia",
+  "India",
+  "Philippines",
+  "New Zealand",
+  "United Kingdom",
+  "United States",
+  "Singapore",
+  "Other",
+];
 
 type EmergencyContact = {
   name: string;
@@ -31,18 +45,25 @@ export default function ProfileSettingsPageInner() {
   const onboarding = searchParams.get("onboarding") === "1";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [role, setRole] = useState<AdminRole>("website");
   const [addressLine1, setAddressLine1] = useState("");
   const [addressLine2, setAddressLine2] = useState("");
   const [suburb, setSuburb] = useState("");
   const [city, setCity] = useState("");
   const [stateRegion, setStateRegion] = useState("");
   const [country, setCountry] = useState("");
-  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([{ name: "" }]);
+  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([{ name: "", email: "", phone: "" }]);
   const [agreementDocumentUrl, setAgreementDocumentUrl] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityRow[]>([]);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const isProjectMemberOnboarding = onboarding && role === "project_member";
 
   useEffect(() => {
     async function load() {
@@ -56,6 +77,8 @@ export default function ProfileSettingsPageInner() {
         setEmail(String(user.email ?? ""));
         setName(String(user.name ?? ""));
         setPhone(String(user.phone ?? ""));
+        const userRole = user.role;
+        if (typeof userRole === "string" && isAdminRole(userRole)) setRole(userRole);
         setAddressLine1(String(user.addressLine1 ?? ""));
         setAddressLine2(String(user.addressLine2 ?? ""));
         setSuburb(String(user.suburb ?? ""));
@@ -82,25 +105,51 @@ export default function ProfileSettingsPageInner() {
     setEmergencyContacts((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function validateEmergencyContacts(rows: EmergencyContact[]) {
+    const filled = rows.filter((row) => row.name.trim());
+    if (!filled.length) {
+      alert("Add at least one emergency contact.");
+      return false;
+    }
+    for (const row of filled) {
+      if (!row.email?.trim() || !row.phone?.trim()) {
+        alert("Each emergency contact needs a name, email, and phone.");
+        return false;
+      }
+    }
+    return true;
+  }
+
+  async function handleProfileSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!validateEmergencyContacts(emergencyContacts)) return;
+
+    if (isProjectMemberOnboarding) {
+      if (!addressLine1.trim() || !city.trim() || !country.trim()) {
+        alert("Address line 1, city, and country are required.");
+        return;
+      }
+    }
+
     setSaving(true);
     try {
+      const body: Record<string, unknown> = {
+        emergencyContacts: emergencyContacts.filter((row) => row.name.trim()),
+      };
+      if (isProjectMemberOnboarding) {
+        body.addressLine1 = addressLine1.trim();
+        body.addressLine2 = addressLine2.trim() || null;
+        body.suburb = suburb.trim() || null;
+        body.city = city.trim();
+        body.state = stateRegion.trim() || null;
+        body.country = country.trim();
+        body.markProfileComplete = true;
+      }
+
       const res = await adminFetch("/api/auth/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          phone: phone.trim() || null,
-          addressLine1: addressLine1.trim() || null,
-          addressLine2: addressLine2.trim() || null,
-          suburb: suburb.trim() || null,
-          city: city.trim() || null,
-          state: stateRegion.trim() || null,
-          country: country.trim() || null,
-          emergencyContacts: emergencyContacts.filter((row) => row.name.trim()),
-          markProfileComplete: true,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save profile");
@@ -111,6 +160,32 @@ export default function ProfileSettingsPageInner() {
       alert(error instanceof Error ? error.message : "Failed to save profile");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handlePasswordSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      alert("New passwords do not match.");
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      const res = await adminFetch("/api/auth/password/change", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to update password");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      alert("Password updated.");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to update password");
+    } finally {
+      setSavingPassword(false);
     }
   }
 
@@ -130,59 +205,134 @@ export default function ProfileSettingsPageInner() {
         </div>
       ) : null}
 
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Profile</h2>
-        <p className="text-sm text-gray-500">Your contact details and emergency contacts.</p>
+      <div className="flex items-start gap-3">
+        <Info className="mt-0.5 h-5 w-5 shrink-0 text-gray-400" aria-hidden />
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Your user record</h2>
+          <p className="text-sm text-gray-500">
+            Name, email, phone, and role are managed by your administrator. Update your password and emergency contacts
+            below.
+          </p>
+        </div>
       </div>
 
-      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-6">
-        <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-sm font-medium">Email</label>
-              <input className={`${inputClass} bg-gray-50 dark:bg-gray-950`} value={email} readOnly />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-sm font-medium">Full name *</label>
-              <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} required />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Phone *</label>
-              <input className={inputClass} value={phone} onChange={(e) => setPhone(e.target.value)} required />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Country *</label>
-              <input className={inputClass} value={country} onChange={(e) => setCountry(e.target.value)} required />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-sm font-medium">Address line 1 *</label>
-              <input className={inputClass} value={addressLine1} onChange={(e) => setAddressLine1(e.target.value)} required />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-sm font-medium">Address line 2</label>
-              <input className={inputClass} value={addressLine2} onChange={(e) => setAddressLine2(e.target.value)} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Suburb</label>
-              <input className={inputClass} value={suburb} onChange={(e) => setSuburb(e.target.value)} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">City *</label>
-              <input className={inputClass} value={city} onChange={(e) => setCity(e.target.value)} required />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">State</label>
-              <input className={inputClass} value={stateRegion} onChange={(e) => setStateRegion(e.target.value)} />
-            </div>
+      <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+        <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Account</h3>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className="mb-1 block text-sm font-medium">Email</label>
+            <input className={readOnlyClass} value={email} readOnly />
           </div>
-        </section>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Full name</label>
+            <input className={readOnlyClass} value={name} readOnly />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Phone</label>
+            <input className={readOnlyClass} value={phone || "—"} readOnly />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="mb-1 block text-sm font-medium">Role</label>
+            <input className={readOnlyClass} value={roleLabel(role)} readOnly />
+          </div>
+        </div>
+      </section>
+
+      <form onSubmit={(e) => void handlePasswordSubmit(e)} className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+        <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">New password</h3>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className="mb-1 block text-sm font-medium">Current password</label>
+            <input
+              type="password"
+              className={inputClass}
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">New password</label>
+            <input
+              type="password"
+              className={inputClass}
+              minLength={8}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              autoComplete="new-password"
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Confirm new password</label>
+            <input
+              type="password"
+              className={inputClass}
+              minLength={8}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
+              required
+            />
+          </div>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button
+            type="submit"
+            disabled={savingPassword}
+            className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+          >
+            {savingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Update password
+          </button>
+        </div>
+      </form>
+
+      <form onSubmit={(e) => void handleProfileSubmit(e)} className="space-y-6">
+        {isProjectMemberOnboarding ? (
+          <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+            <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Personal details</h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-sm font-medium">Address line 1 *</label>
+                <input className={inputClass} value={addressLine1} onChange={(e) => setAddressLine1(e.target.value)} required />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-sm font-medium">Address line 2</label>
+                <input className={inputClass} value={addressLine2} onChange={(e) => setAddressLine2(e.target.value)} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Suburb</label>
+                <input className={inputClass} value={suburb} onChange={(e) => setSuburb(e.target.value)} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">City *</label>
+                <input className={inputClass} value={city} onChange={(e) => setCity(e.target.value)} required />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">State</label>
+                <input className={inputClass} value={stateRegion} onChange={(e) => setStateRegion(e.target.value)} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Country *</label>
+                <select className={inputClass} value={country} onChange={(e) => setCountry(e.target.value)} required>
+                  <option value="">Select country…</option>
+                  {COUNTRY_OPTIONS.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-semibold text-gray-900 dark:text-gray-100">Emergency contacts</h3>
             <button
               type="button"
-              onClick={() => setEmergencyContacts((prev) => [...prev, { name: "" }])}
+              onClick={() => setEmergencyContacts((prev) => [...prev, { name: "", email: "", phone: "" }])}
               className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400"
             >
               <Plus className="h-4 w-4" /> Add
@@ -205,16 +355,17 @@ export default function ProfileSettingsPageInner() {
                 />
                 <input
                   className={inputClass}
-                  placeholder="Phone"
-                  value={contact.phone ?? ""}
-                  onChange={(e) => updateContact(index, { phone: e.target.value })}
+                  placeholder="Email *"
+                  type="email"
+                  value={contact.email ?? ""}
+                  onChange={(e) => updateContact(index, { email: e.target.value })}
                 />
                 <div className="flex gap-2">
                   <input
                     className={inputClass}
-                    placeholder="Email"
-                    value={contact.email ?? ""}
-                    onChange={(e) => updateContact(index, { email: e.target.value })}
+                    placeholder="Phone *"
+                    value={contact.phone ?? ""}
+                    onChange={(e) => updateContact(index, { phone: e.target.value })}
                   />
                   {emergencyContacts.length > 1 ? (
                     <button
@@ -229,37 +380,39 @@ export default function ProfileSettingsPageInner() {
               </div>
             ))}
           </div>
-        </section>
-
-        {agreementDocumentUrl ? (
-          <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-            <h3 className="mb-2 font-semibold text-gray-900 dark:text-gray-100">Signed agreement</h3>
-            <a
-              href={resolveDocumentHref(agreementDocumentUrl)}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+          <div className="mt-4 flex justify-end">
+            <button
+              type="submit"
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-lg bg-black px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
             >
-              Download agreement
-            </a>
-          </section>
-        ) : null}
-
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={saving}
-            className="inline-flex items-center gap-2 rounded-lg bg-black px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Save profile
-          </button>
-        </div>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {isProjectMemberOnboarding ? "Save and continue" : "Save emergency contacts"}
+            </button>
+          </div>
+        </section>
       </form>
 
-      {activity.length > 0 ? (
+      {agreementDocumentUrl ? (
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-          <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Activity log</h3>
+          <h3 className="mb-2 font-semibold text-gray-900 dark:text-gray-100">Agreements</h3>
+          <a
+            href={resolveDocumentHref(agreementDocumentUrl)}
+            target="_blank"
+            rel="noreferrer"
+            download
+            className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+          >
+            Download signed agreement
+          </a>
+        </section>
+      ) : null}
+
+      <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+        <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Activity log</h3>
+        {activity.length === 0 ? (
+          <p className="text-sm text-gray-500">No changes recorded yet.</p>
+        ) : (
           <ul className="divide-y divide-gray-100 text-sm dark:divide-gray-800">
             {activity.map((row) => (
               <li key={row.id} className="py-3">
@@ -273,8 +426,8 @@ export default function ProfileSettingsPageInner() {
               </li>
             ))}
           </ul>
-        </section>
-      ) : null}
+        )}
+      </section>
     </div>
   );
 }
