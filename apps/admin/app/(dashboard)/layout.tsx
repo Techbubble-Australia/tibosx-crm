@@ -70,17 +70,17 @@ const navGroups: NavGroup[] = [
       { href: "/opportunities", label: "Opportunities", icon: CircleDollarSign, roles: ["admin", "sales"] },
       { href: "/contracts", label: "Contracts", icon: ScrollText, roles: ["admin", "sales"] },
       { href: "/invoices", label: "Invoices", icon: FileText, roles: ["admin", "sales"] },
-      { href: "/support-tickets", label: "Support tickets", icon: ClipboardList, roles: ["admin", "sales"] },
     ],
   },
   {
     id: "project_management",
     label: "Project Management",
     icon: FolderKanban,
-    roles: ["admin", "project_manager", "project_member"],
+    roles: ["admin", "sales", "project_manager", "project_member"],
     items: [
       { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin", "project_manager"] },
       { href: "/timesheets", label: "Timesheets", icon: ClipboardCheck, roles: ["admin", "project_manager", "project_member"] },
+      { href: "/support-tickets", label: "Support tickets", icon: ClipboardList, roles: ["admin", "sales"] },
       { href: "/agreement", label: "Agreement", icon: FileText, roles: ["project_member"] },
     ],
   },
@@ -168,6 +168,15 @@ function groupIsActive(group: NavGroup, pathname: string): boolean {
       pathname.startsWith("/opportunities") ||
       pathname.startsWith("/contracts") ||
       pathname.startsWith("/invoices"))
+  ) {
+    return true;
+  }
+  if (
+    group.id === "project_management" &&
+    (pathname.startsWith("/projects") ||
+      pathname.startsWith("/timesheets") ||
+      pathname.startsWith("/agreement") ||
+      pathname.startsWith("/support-tickets"))
   ) {
     return true;
   }

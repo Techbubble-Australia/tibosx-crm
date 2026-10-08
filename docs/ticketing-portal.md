@@ -4,7 +4,7 @@ Support product: **Next.js portal** (`apps/ticketing`) and **TBOS API** (`packag
 
 ## Features
 
-- **TBOS Support tickets** — Sales → **Support tickets** lists tickets (admin: all projects; sales: assigned projects only). **Support projects** (admin) creates portal projects; **Consultant access** assigns projects per consultant.
+- **TBOS Support tickets** — Project Management → **Support tickets** lists tickets (admin: all projects; sales: assigned projects only). **Support projects** (admin) creates portal projects; **Consultant access** assigns projects per consultant.
 - **File uploads** — Clients attach files when creating tickets or on the ticket detail page. Uses the same storage as TBOS: **`OBJECT_STORAGE_*`** (Railway bucket) when set, otherwise disk under **`UPLOAD_DIR`/tickets** (API image pre-creates `/app/uploads/tickets`). Set **`TICKETING_PUBLIC_URL`** on the **main API** for attachment URLs in production if needed.
 - **Multi-tenant projects** — each client **support project** is an `Organization` (not the same as TBOS CRM clients). An org may optionally link to a TBOS **delivery** `Project` via `Organization.projectId` (created automatically when you create a project from a contract, or via **Enable support portal** on the project page / **Support projects** in admin). Client users only see tickets for their org.
 - **Ticket types** — technical, financial/loan, internal/external service.
@@ -85,7 +85,7 @@ Redeploy admin after env changes. Use **Support portal** in the TBOS header (adm
 
 | Task | Where in TBOS |
 |------|----------------|
-| Create a support **project** | **Sales → Support tickets → Support projects** → Add project (admin) |
+| Create a support **project** | **Project Management → Support tickets → Support projects** → Add project (admin) |
 | Link to delivery project | Project detail → **Enable support portal**, or Support projects → link TBOS project |
 | Assign projects to a **sales consultant** | **Support tickets → Consultant access** |
 | Create consultant (staff) | **Users** → role `sales` or `admin` → first **Support portal** SSO provisions ticketing account |
