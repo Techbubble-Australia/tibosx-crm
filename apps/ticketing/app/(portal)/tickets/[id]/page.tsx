@@ -28,6 +28,7 @@ type TicketDetail = {
   type: string;
   priority: string;
   status: string;
+  createdById: string;
   organization?: { name: string };
   messages: Message[];
   attachments: { id: string; fileName: string; fileUrl: string; fileSize?: number | null }[];
@@ -38,7 +39,7 @@ export default function TicketDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
-  const [me, setMe] = useState<{ role: string } | null>(null);
+  const [me, setMe] = useState<{ id: string; role: string } | null>(null);
   const [reply, setReply] = useState("");
   const [internal, setInternal] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -53,7 +54,7 @@ export default function TicketDetailPage() {
     reload();
     void ticketingFetch("/api/auth/me")
       .then((res) => res.json())
-      .then((data) => setMe(data.data as { role: string }));
+      .then((data) => setMe(data.data as { id: string; role: string }));
   }, [id]);
 
   async function savePatch(body: Record<string, unknown>) {
@@ -108,6 +109,8 @@ export default function TicketDetailPage() {
   }
 
   const isConsultant = me?.role === "CONSULTANT";
+  const isCreator = Boolean(me?.id && ticket.createdById === me.id);
+  const canChangeStatus = isConsultant && !isCreator;
 
   return (
     <div className="space-y-6">
@@ -140,7 +143,7 @@ export default function TicketDetailPage() {
         </div>
         <div>
           <p className="text-xs text-gray-500">Status</p>
-          {isConsultant ? (
+          {canChangeStatus ? (
             <select
               value={ticket.status}
               onChange={(e) => void savePatch({ status: e.target.value })}

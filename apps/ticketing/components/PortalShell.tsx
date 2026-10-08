@@ -72,14 +72,7 @@ export function PortalShell({
             </div>
           </div>
           <div className="flex items-center gap-2 text-sm sm:gap-3">
-            <Link
-              href="/tickets/new"
-              className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-1.5 font-medium text-white hover:bg-sky-700"
-            >
-              <Plus className="h-4 w-4" />
-              New ticket
-            </Link>
-            <span className="hidden text-slate-600 md:inline">{user.name}</span>
+            <span className="hidden text-slate-600 sm:inline">{user.name}</span>
             <button
               type="button"
               onClick={() => void logout()}

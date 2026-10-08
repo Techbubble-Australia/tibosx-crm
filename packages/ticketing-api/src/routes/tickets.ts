@@ -235,6 +235,9 @@ router.patch("/:id", async (req: TicketingRequest, res) => {
   }
 
   const isConsultant = user.role === "CONSULTANT" && user.consultantVerified;
+  if (isConsultant && existing.createdById === user.id && parsed.data.status !== undefined) {
+    return res.status(403).json({ error: "The ticket creator cannot change status" });
+  }
   if (!isConsultant) {
     const allowed = Object.keys(parsed.data).every((k) => k === "description" || k === "subject");
     if (!allowed || parsed.data.status || parsed.data.assignedToId !== undefined || parsed.data.priority || parsed.data.type) {

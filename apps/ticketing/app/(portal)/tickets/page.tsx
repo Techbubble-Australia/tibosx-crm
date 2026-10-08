@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
 import { ticketingFetch } from "@/lib/ticketing-fetch";
 import { TICKET_PRIORITY_LABELS, TICKET_STATUS_LABELS, TICKET_TYPE_LABELS } from "@/lib/ticket-labels";
 import { EmptyTickets } from "@/components/PortalShell";
@@ -35,16 +34,7 @@ export default function TicketsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold text-slate-900">Tickets</h1>
-          <Link
-            href="/tickets/new"
-            className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700"
-          >
-            <Plus className="h-4 w-4" />
-            New ticket
-          </Link>
-        </div>
+        <h1 className="text-2xl font-semibold text-slate-900">Tickets</h1>
         <div className="flex flex-wrap gap-2">
         <input
           value={q}
