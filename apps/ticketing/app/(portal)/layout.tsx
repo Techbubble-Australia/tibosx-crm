@@ -8,6 +8,7 @@ type Me = {
   name: string;
   email: string;
   role: string;
+  tbosRole?: string | null;
   organization?: { name: string } | null;
 };
 

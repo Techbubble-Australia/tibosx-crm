@@ -26,6 +26,7 @@ function serializeUser(user: {
   role: "CLIENT" | "CONSULTANT";
   organizationId: string | null;
   consultantVerified: boolean;
+  tbosRole?: string | null;
   organization?: { id: string; name: string; slug: string } | null;
 }) {
   return {
@@ -35,6 +36,7 @@ function serializeUser(user: {
     role: user.role,
     organizationId: user.organizationId,
     consultantVerified: user.consultantVerified,
+    tbosRole: user.tbosRole ?? null,
     organization: user.organization
       ? { id: user.organization.id, name: user.organization.name, slug: user.organization.slug }
       : null,

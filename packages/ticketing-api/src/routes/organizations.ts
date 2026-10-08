@@ -9,8 +9,13 @@ router.use(authMiddleware, requireConsultant);
 
 router.get("/", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
+  const dbUser = await ticketingPrisma.ticketingUser.findUnique({
+    where: { id: user.id },
+    select: { tbosRole: true },
+  });
+  const scopedUser = { ...user, tbosRole: dbUser?.tbosRole ?? user.tbosRole ?? null };
   let where: { active: boolean; id?: { in: string[] } } = { active: true };
-  if (!isTbosAdmin(user)) {
+  if (!isTbosAdmin(scopedUser)) {
     const orgIds = await assignedOrganizationIds(user.id);
     where = { active: true, id: { in: orgIds } };
   }
