@@ -5,7 +5,7 @@ Separate support product: **Next.js portal** (`apps/ticketing`), **Express API**
 ## Features
 
 - **TBOS Support tickets** — Sales → **Support tickets** lists tickets from the ticketing API (admin: all companies; sales: assigned companies only). **Consultant access** (admin) assigns companies per consultant.
-- **File uploads** — Clients attach files when creating tickets or on the ticket detail page (stored on ticketing-api; set `TICKETING_PUBLIC_URL` in production for download links).
+- **File uploads** — Clients attach files when creating tickets or on the ticket detail page. Uses the same storage as TBOS: **`OBJECT_STORAGE_*`** (Railway bucket) when set, otherwise disk under **`UPLOAD_DIR`/tickets** (Docker image pre-creates `/app/uploads/tickets`). Set **`TICKETING_PUBLIC_URL`** on ticketing-api for attachment URLs in production.
 - **Multi-tenant organizations** — client users only see tickets for their organization.
 - **Ticket types** — technical, financial/loan, internal/external service.
 - **Workflow** — Open → In progress → Pending client → Resolved → Closed; priorities Low–Urgent.
@@ -102,6 +102,9 @@ The portal service should use `Dockerfile.ticketing` or root `Dockerfile` (porta
   - `JWT_SECRET` — **same value as TBOS API and admin** (required for SSO; do not rely on `TICKETING_JWT_SECRET` alone)
   - `TICKETING_ALLOWED_ORIGINS` — public portal URL + TBOS admin URL, comma-separated  
     e.g. `https://your-ticketing.up.railway.app,https://your-admin.up.railway.app`
+  - `TICKETING_PUBLIC_URL` — same public URL as this API (attachment links)
+  - `OBJECT_STORAGE_*` — **copy from the TBOS API service** if you use a Railway bucket (recommended); ticket files are stored under `uploads/tickets/` in that bucket
+  - Optional disk fallback: `UPLOAD_DIR=/app/uploads` (image creates `/app/uploads/tickets` with correct permissions)
 - Deploy: `pnpm run deploy:railway:ticketing-api`
 - Generate a **public domain**; note the URL (e.g. `https://ticketing-api-xxx.up.railway.app`).
 

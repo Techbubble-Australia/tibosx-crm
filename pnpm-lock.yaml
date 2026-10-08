@@ -370,6 +370,9 @@ importers:
 
   packages/ticketing-api:
     dependencies:
+      '@aws-sdk/client-s3':
+        specifier: ^3.750.0
+        version: 3.1049.0
       '@techbubble/ticketing-database':
         specifier: workspace:*
         version: link:../ticketing-database

@@ -25,6 +25,15 @@ const consultantNav = [
   { href: "/consultant", label: "By company", icon: Users },
 ];
 
+function isNavItemActive(pathname: string, href: string): boolean {
+  if (pathname === href) return true;
+  if (href === "/dashboard") return false;
+  if (href === "/tickets") {
+    return pathname.startsWith("/tickets/") && !pathname.startsWith("/tickets/new");
+  }
+  return pathname.startsWith(`${href}/`);
+}
+
 export function PortalShell({
   user,
   children,
@@ -83,7 +92,7 @@ export function PortalShell({
         </div>
         <nav className="flex gap-1 overflow-x-auto border-t border-slate-100 px-4 py-2 md:hidden">
           {nav.map((item) => {
-            const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            const active = isNavItemActive(pathname, item.href);
             return (
               <Link
                 key={item.href}
@@ -102,7 +111,7 @@ export function PortalShell({
         <aside className="hidden w-56 shrink-0 md:block">
           <nav className="space-y-1 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
             {nav.map((item) => {
-              const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+              const active = isNavItemActive(pathname, item.href);
               return (
                 <Link
                   key={item.href}

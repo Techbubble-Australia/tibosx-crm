@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import fsp from "fs/promises";
 import path from "path";
+import { objectStorageConfigured, putUploadObject, TICKET_UPLOAD_OBJECT_PREFIX } from "./object-storage.js";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED = new Set([
@@ -14,8 +15,10 @@ const ALLOWED = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
 
+/** Local disk directory for ticket files (same pattern as TBOS `UPLOAD_DIR`, with a `tickets` subfolder). */
 export function uploadDir(): string {
-  return process.env.TICKETING_UPLOAD_DIR || path.join(process.cwd(), "uploads", "tickets");
+  const base = process.env.TICKETING_UPLOAD_DIR || process.env.UPLOAD_DIR || "./uploads";
+  return path.resolve(base, "tickets");
 }
 
 export function publicUploadBaseUrl(): string {
@@ -37,9 +40,20 @@ export async function saveTicketUpload(file: Express.Multer.File): Promise<{ fil
   if (err) throw new Error(err);
   const safeOriginal = file.originalname.replace(/[^\w.\-() ]+/g, "_").slice(0, 120);
   const stored = `${randomUUID()}-${safeOriginal}`;
-  const dir = uploadDir();
-  await fsp.mkdir(dir, { recursive: true });
-  await fsp.writeFile(path.join(dir, stored), file.buffer!);
+  const objectKey = `${TICKET_UPLOAD_OBJECT_PREFIX}/${stored}`;
+
+  if (objectStorageConfigured()) {
+    await putUploadObject({
+      key: objectKey,
+      body: file.buffer!,
+      contentType: file.mimetype || "application/octet-stream",
+    });
+  } else {
+    const dir = uploadDir();
+    await fsp.mkdir(dir, { recursive: true });
+    await fsp.writeFile(path.join(dir, stored), file.buffer!);
+  }
+
   return {
     fileName: file.originalname,
     fileUrl: `${publicUploadBaseUrl()}/${encodeURIComponent(stored)}`,
