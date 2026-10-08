@@ -77,6 +77,17 @@ For **every** ticketing service (API + portal):
 | **Config file** | `railway.ticketing-api.toml` or `railway.ticketing.toml` |
 | **Service name** | `ticketing-api` / `ticketing` (name only; not the root path) |
 
+**If both services build the portal** (backend `/health` shows `"service":"ticketing-portal"`), the API service is still using the root `Dockerfile`. Fix **on the API service only** (either approach):
+
+1. **Config file path:** `/railway.ticketing-api.toml` (absolute from repo root), or  
+2. **Service variable:** `RAILWAY_DOCKERFILE_PATH` = `Dockerfile.ticketing-api`  
+   **Start command:** `sh packages/ticketing-api/scripts/start-production.sh`
+
+Redeploy **ticketing_portal_backend**, then `/health` must show `"service":"ticketing-api"`.  
+The portal service should use `Dockerfile.ticketing` or root `Dockerfile` (portal image).
+
+**Do not** put `/login` on `TICKETING_API_URL` — that path exists only on the Next.js portal. The API has no login page; `…/login` on the API host means the wrong image is running there.
+
 ### 2. Service: `ticketing-api`
 
 - Create a service named **`ticketing-api`** (name must match `scripts/railway-deploy-all.sh`).
