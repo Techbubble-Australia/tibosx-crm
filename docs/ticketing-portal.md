@@ -54,6 +54,60 @@ Separate support product: **Next.js portal** (`apps/ticketing`), **Express API**
 | `TICKETING_ALLOWED_ORIGINS` | ticketing-api | CORS |
 | `TICKETING_TBOS_CONSULTANT_ROLES` | ticketing-api, TBOS | Who may SSO from TBOS |
 
-## Production
+## Railway deployment
 
-Deploy three additional units (or combine API with portal): ticketing DB, `ticketing-api`, `apps/ticketing`. Align `JWT_SECRET` / `TICKETING_JWT_SECRET` with TBOS for SSO.
+The monorepo did **not** ship ticketing until `railway.ticketing.toml` and `railway.ticketing-api.toml` were added. You need **two new Railway services** (plus a Postgres plugin for ticketing).
+
+### 1. Postgres for ticketing
+
+- Add a **new** PostgreSQL service (or database) in the same Railway project.
+- Copy its `DATABASE_URL` into the variable **`TICKETING_DATABASE_URL`** on the **ticketing-api** service (not `DATABASE_URL` for the main TBOS API).
+
+### 2. Service: `ticketing-api`
+
+- Create a service named **`ticketing-api`** (name must match `scripts/railway-deploy-all.sh`).
+- **Settings → Config file:** `railway.ticketing-api.toml` (or set Dockerfile path to `Dockerfile.ticketing-api`).
+- **Root directory:** repo root (not `apps/ticketing`).
+- **Variables:**
+  - `TICKETING_DATABASE_URL` — from ticketing Postgres
+  - `JWT_SECRET` — **same value as TBOS API** (for SSO)
+  - `TICKETING_ALLOWED_ORIGINS` — public portal URL + TBOS admin URL, comma-separated  
+    e.g. `https://your-ticketing.up.railway.app,https://your-admin.up.railway.app`
+- Deploy: `pnpm run deploy:railway:ticketing-api`
+- Generate a **public domain**; note the URL (e.g. `https://ticketing-api-xxx.up.railway.app`).
+
+### 3. Service: `ticketing` (portal UI)
+
+- Create a service named **`ticketing`**.
+- **Config file:** `railway.ticketing.toml` / `Dockerfile.ticketing`.
+- **Variables:**
+  - `TICKETING_API_URL` — **public** URL of ticketing-api (server-side proxy)
+  - `JWT_SECRET` — same as TBOS / ticketing-api
+- Deploy: `pnpm run deploy:railway:ticketing`
+- Generate a **public domain** for the portal (e.g. `https://ticketing-xxx.up.railway.app`).
+
+### 4. TBOS admin (existing service)
+
+On the **admin** service, set:
+
+- `TICKETING_API_URL` — public ticketing-api URL
+- `NEXT_PUBLIC_TICKETING_PORTAL_URL` — public portal URL (for SSO redirect)
+
+Redeploy admin after setting these. Use **Support portal** in the TBOS header (admin/sales roles).
+
+### 5. Seed (once)
+
+Run seed against production DB (locally with `TICKETING_DATABASE_URL` pointing at Railway, or Railway one-off command):
+
+```bash
+pnpm --filter @techbubble/ticketing-database db:seed
+```
+
+### Troubleshooting
+
+| Symptom | Check |
+|--------|--------|
+| Portal 404 / nothing deployed | Separate **`ticketing`** service with `Dockerfile.ticketing`, not admin/web |
+| Login fails | `TICKETING_API_URL` on portal service; API healthy at `/health` |
+| SSO from TBOS fails | `JWT_SECRET` aligned; `TICKETING_ALLOWED_ORIGINS` includes admin URL |
+| API crash on boot | `TICKETING_DATABASE_URL` set; migrations run via start script |

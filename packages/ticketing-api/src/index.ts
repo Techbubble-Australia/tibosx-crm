@@ -12,7 +12,7 @@ dotenv.config({ path: path.resolve(process.cwd(), "../../.env") });
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
 const app = express();
-const PORT = process.env.TICKETING_API_PORT || process.env.PORT || 3003;
+const PORT = Number(process.env.PORT || process.env.TICKETING_API_PORT || 3003);
 
 app.set("trust proxy", 1);
 app.use(helmet());

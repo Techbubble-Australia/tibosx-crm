@@ -1,0 +1,11 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.ticketing"
+watchPatterns = ["apps/ticketing/**", "packages/config/**", "pnpm-lock.yaml", "pnpm-workspace.yaml", "package.json", "Dockerfile.ticketing"]
+
+[deploy]
+startCommand = "node apps/ticketing/server.js"
+healthcheckPath = "/login"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
