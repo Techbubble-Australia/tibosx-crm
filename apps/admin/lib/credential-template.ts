@@ -8,9 +8,8 @@ export const DEFAULT_SIGNATURE_MIN_HEIGHT_PX = 100;
 export function createFlowSignatureBlockHtml(): string {
   return `<div data-signature-block="contractor" data-signature-layout="flow" class="signature-block signature-block--flow" contenteditable="false" style="width:auto;max-width:100%;min-width:140px;min-height:${DEFAULT_SIGNATURE_MIN_HEIGHT_PX}px;box-sizing:border-box;">
 <button type="button" data-signature-drag-handle class="signature-drag-handle" aria-label="Move signature block">Move</button>
-<p><strong>Contractor signature</strong></p>
+<p><strong>Signature</strong></p>
 <div data-signature-capture="contractor" class="signature-capture-area"></div>
-<p class="signature-hint">The contractor will sign here in the agreement portal.</p>
 <span data-signature-resize-handle class="signature-resize-handle" aria-hidden="true"></span>
 </div>`;
 }
@@ -259,6 +258,10 @@ export function serializeTemplateHtmlFromCanvas(canvas: HTMLElement): string {
   const root = canvas.closest("[data-template-canvas]") as HTMLElement | null;
   const raw = root?.outerHTML ?? canvas.outerHTML;
   return stripEditorArtifacts(raw);
+}
+
+export function appendSignatureBlock(sourceHtml: string): string {
+  return `${sourceHtml}${createFlowSignatureBlockHtml()}`;
 }
 
 export function buildHtmlWithSignatureBlock(sourceHtml: string): string {

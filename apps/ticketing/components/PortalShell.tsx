@@ -22,7 +22,7 @@ const consultantNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tickets", label: "Tickets", icon: Ticket },
   { href: "/tickets/new", label: "New ticket", icon: Plus },
-  { href: "/consultant", label: "By company", icon: Users },
+  { href: "/consultant", label: "By project", icon: Users },
 ];
 
 function isNavItemActive(pathname: string, href: string): boolean {
@@ -65,7 +65,7 @@ export function PortalShell({
               <p className="text-xs text-slate-500">
                 {isConsultant
                   ? isTbosAdmin
-                    ? "TBOS admin · all companies"
+                    ? "TBOS admin · all projects"
                     : "Consultant workspace"
                   : user.organization?.name ?? "Client portal"}
               </p>

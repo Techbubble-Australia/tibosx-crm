@@ -4,9 +4,9 @@ Separate support product: **Next.js portal** (`apps/ticketing`), **Express API**
 
 ## Features
 
-- **TBOS Support tickets** — Sales → **Support tickets** lists tickets from the ticketing API (admin: all companies; sales: assigned companies only). **Consultant access** (admin) assigns companies per consultant.
+- **TBOS Support tickets** — Sales → **Support tickets** lists tickets (admin: all projects; sales: assigned projects only). **Support projects** (admin) creates portal projects; **Consultant access** assigns projects per consultant.
 - **File uploads** — Clients attach files when creating tickets or on the ticket detail page. Uses the same storage as TBOS: **`OBJECT_STORAGE_*`** (Railway bucket) when set, otherwise disk under **`UPLOAD_DIR`/tickets** (Docker image pre-creates `/app/uploads/tickets`). Set **`TICKETING_PUBLIC_URL`** on ticketing-api for attachment URLs in production.
-- **Multi-tenant organizations** — client users only see tickets for their organization.
+- **Multi-tenant projects** — each client **support project** is an `Organization` in the ticketing DB (not the same as TBOS CRM clients). Client users only see tickets for their project.
 - **Ticket types** — technical, financial/loan, internal/external service.
 - **Workflow** — Open → In progress → Pending client → Resolved → Closed; priorities Low–Urgent.
 - **Messages** — client-visible thread; consultants can add **internal** notes.
@@ -129,7 +129,18 @@ On the **admin** service, set:
 
 Redeploy admin after setting these. Use **Support portal** in the TBOS header (admin/sales roles).
 
-### 5. Seed (once)
+### 5. Support projects and consultants (TBOS)
+
+Support **projects** are not TBOS CRM clients—they live in the ticketing database.
+
+| Task | Where in TBOS |
+|------|----------------|
+| Create a support **project** | **Sales → Support tickets → Support projects** → Add project (admin) |
+| Assign projects to a **sales consultant** | **Support tickets → Consultant access** → check projects → Save |
+| Create consultant (staff) | **Users** → role `sales` or `admin` → first **Support portal** SSO provisions ticketing account |
+| Create **client** portal login | Still via ticketing DB / seed (`CLIENT` user + `organizationId`)—no TBOS form yet |
+
+### 6. Seed (once)
 
 Run seed against production DB (locally with `TICKETING_DATABASE_URL` pointing at Railway, or Railway one-off command):
 

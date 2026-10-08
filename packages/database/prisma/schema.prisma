@@ -358,9 +358,10 @@ model Opportunity {
   active    Boolean  @default(true)
   ownerId   String?
   owner     AdminUser? @relation("OpportunityOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  jobs      JobListing[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  jobs       JobListing[]
+  timesheets Timesheet[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([clientId])
   @@index([contactId])
@@ -669,14 +670,18 @@ model SiteContent {
 }
 
 model CredentialTemplate {
-  id        String          @id @default(cuid())
-  name      String          @unique
-  html      String          @db.Text
+  id               String          @id @default(cuid())
+  name             String          @unique
+  html             String          @db.Text
   /// JSON: [{ key, label, type, options?, required }]
-  variables Json
-  members   ProjectMember[]
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  variables        Json
+  addStartDate     Boolean         @default(true)
+  requireStartDate Boolean         @default(true)
+  addEndDate       Boolean         @default(true)
+  requireEndDate   Boolean         @default(true)
+  members          ProjectMember[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 }
 
 model Project {
@@ -784,8 +789,10 @@ model ProjectActivityLog {
 
 model Timesheet {
   id            String               @id @default(cuid())
-  projectId     String
-  project       Project              @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  projectId     String?
+  project       Project?             @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  opportunityId String?
+  opportunity   Opportunity?         @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
   memberUserId  String
   memberUser    AdminUser            @relation("TimesheetMember", fields: [memberUserId], references: [id], onDelete: Restrict)
   startDate     DateTime
@@ -799,6 +806,7 @@ model Timesheet {
   updatedAt     DateTime             @updatedAt
 
   @@index([projectId])
+  @@index([opportunityId])
   @@index([memberUserId])
   @@index([status])
 }
@@ -821,6 +829,7 @@ model AdminUser {
   id           String   @id @default(cuid())
   email        String   @unique
   name         String?
+  phone        String?
   passwordHash String
   role         String   @default("admin")
   active       Boolean  @default(true)
@@ -829,6 +838,15 @@ model AdminUser {
   mfaEnabled    Boolean  @default(false)
   mfaEnrolledAt DateTime?
   passwordNeedsReset Boolean @default(false)
+  addressLine1  String?
+  addressLine2  String?
+  suburb        String?
+  city          String?
+  state         String?
+  country       String?
+  profileDetailsCompletedAt DateTime?
+  agreementDocumentUrl      String?  @db.Text
+  emergencyContacts         Json?
   sourcedProfiles CandidateProfile[] @relation("ProfileSourcedBy")
   ownedContracts Contract[] @relation("ContractOwner")
   ownedOpportunities Opportunity[] @relation("OpportunityOwner")
@@ -838,6 +856,24 @@ model AdminUser {
   timesheets Timesheet[] @relation("TimesheetMember")
   projectActivities ProjectActivityLog[] @relation("ProjectActivityPerformer")
   timesheetActivities TimesheetActivityLog[] @relation("TimesheetActivityPerformer")
+  activityLogs        AdminUserActivityLog[] @relation("AdminUserActivitySubject")
+  performedUserLogs   AdminUserActivityLog[] @relation("AdminUserActivityPerformer")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+model AdminUserActivityLog {
+  id            String     @id @default(cuid())
+  adminUserId   String
+  adminUser     AdminUser  @relation("AdminUserActivitySubject", fields: [adminUserId], references: [id], onDelete: Cascade)
+  action        String
+  fieldName     String?
+  oldValue      String?    @db.Text
+  newValue      String?    @db.Text
+  performedById String?
+  performedBy   AdminUser? @relation("AdminUserActivityPerformer", fields: [performedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime   @default(now())
+
+  @@index([adminUserId])
+  @@index([createdAt])
 }

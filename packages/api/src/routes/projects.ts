@@ -9,6 +9,7 @@ import {
   type CredentialTemplateVariable,
 } from "../lib/credential-template-vars";
 import { renderTemplateHtml, wrapTemplateHtml } from "../lib/credential-template-render";
+import { saveUploadBuffer } from "../lib/save-upload-buffer";
 import { canManageProjects, getActorId, isProjectManagerRole, isProjectMemberRole } from "../lib/project-access";
 import {
   generateProjectMonths,
@@ -57,6 +58,8 @@ const projectSchema = z.object({
 const generateCredentialsSchema = z.object({
   templateId: z.string().min(1),
   values: z.record(z.string(), z.string()),
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
 });
 
 function toNumber(value: { toString(): string } | number): number {
@@ -457,22 +460,51 @@ router.post("/my-agreement/sign", async (req: AuthRequest, res) => {
 
     const member = await prisma.projectMember.findFirst({
       where: { adminUserId: userId, credentialTemplateId: { not: null } },
+      include: { credentialTemplate: true },
       orderBy: { updatedAt: "desc" },
     });
-    if (!member) return res.status(404).json({ error: "No agreement assigned" });
+    if (!member?.credentialTemplate) return res.status(404).json({ error: "No agreement assigned" });
 
-    const updated = await prisma.projectMember.update({
-      where: { id: member.id },
-      data: {
-        signatureDataUrl: body.signatureDataUrl,
-        agreementSignedAt: new Date(),
-      },
+    const variables = Array.isArray(member.credentialTemplate.variables)
+      ? (member.credentialTemplate.variables as CredentialTemplateVariable[])
+      : [];
+    const values =
+      member.credentialData && typeof member.credentialData === "object"
+        ? (member.credentialData as Record<string, string>)
+        : {};
+    const rendered = renderTemplateHtml(
+      member.credentialTemplate.html,
+      values,
+      variables,
+      body.signatureDataUrl,
+    );
+    const wrapped = wrapTemplateHtml(rendered);
+    const documentUrl = await saveUploadBuffer(
+      Buffer.from(wrapped, "utf8"),
+      `agreement-${member.id}.html`,
+      "text/html; charset=utf-8",
+    );
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.projectMember.update({
+        where: { id: member.id },
+        data: {
+          signatureDataUrl: body.signatureDataUrl,
+          agreementSignedAt: new Date(),
+        },
+      });
+      await tx.adminUser.update({
+        where: { id: userId },
+        data: { agreementDocumentUrl: documentUrl },
+      });
+      return row;
     });
 
     res.json({
       data: {
         signed: true,
         signedAt: updated.agreementSignedAt?.toISOString() ?? null,
+        agreementDocumentUrl: documentUrl,
       },
     });
   } catch (error) {
@@ -488,6 +520,14 @@ router.get("/:id", async (req: AuthRequest, res) => {
   try {
     const projectId = req.params.id;
     if (!projectId) return res.status(400).json({ error: "Invalid id" });
+    const role = req.user?.role ?? "";
+    if (isProjectMemberRole(role)) {
+      const actorId = getActorId(req);
+      const membership = await prisma.projectMember.findFirst({
+        where: { projectId, adminUserId: actorId },
+      });
+      if (!membership) return res.status(403).json({ error: "Forbidden" });
+    }
     const row = await fetchProject(projectId);
     if (!row) return res.status(404).json({ error: "Not found" });
     res.json({ data: mapDetail(row) });
@@ -664,6 +704,15 @@ router.post("/:id/members/:memberId/generate-credentials", async (req: AuthReque
 
     const template = await prisma.credentialTemplate.findUnique({ where: { id: input.templateId } });
     if (!template) return res.status(404).json({ error: "Template not found" });
+    if (template.addStartDate && template.requireStartDate && !input.startDate) {
+      return res.status(400).json({ error: "Start date is required for this template" });
+    }
+    if (template.addEndDate && template.requireEndDate && !input.endDate) {
+      return res.status(400).json({ error: "End date is required for this template" });
+    }
+    if (input.startDate && input.endDate && input.endDate < input.startDate) {
+      return res.status(400).json({ error: "End date must be on or after start date" });
+    }
     const variables = Array.isArray(template.variables)
       ? (template.variables as CredentialTemplateVariable[])
       : [];
@@ -680,7 +729,22 @@ router.post("/:id/members/:memberId/generate-credentials", async (req: AuthReque
     }
 
     const defaults = defaultCredentialValuesForProfile(member.profile);
-    const mergedValues = { ...defaults, ...input.values };
+    const formatCredentialDate = (value: Date) =>
+      value.toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" });
+    const dateValues: Record<string, string> = {};
+    if (input.startDate) {
+      const formatted = formatCredentialDate(input.startDate);
+      dateValues.start_date = formatted;
+      dateValues.startDate = formatted;
+      dateValues.Start_Date = formatted;
+    }
+    if (input.endDate) {
+      const formatted = formatCredentialDate(input.endDate);
+      dateValues.end_date = formatted;
+      dateValues.endDate = formatted;
+      dateValues.End_Date = formatted;
+    }
+    const mergedValues = { ...defaults, ...dateValues, ...input.values };
     const email =
       mergedValues.email?.trim() || mergedValues.Email?.trim() || member.profile.email;
     const name =

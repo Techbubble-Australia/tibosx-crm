@@ -36,7 +36,7 @@ export default function ConsultantPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Consultant queue</h1>
-      <p className="text-sm text-gray-500">Manage tickets across all client organizations.</p>
+      <p className="text-sm text-gray-500">Manage tickets across your assigned client projects.</p>
       <select
         value={orgFilter}
         onChange={(e) => setOrgFilter(e.target.value)}

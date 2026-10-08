@@ -45,9 +45,8 @@ export const ContractorSignatureBlock = Node.create({
         },
         "Move",
       ],
-      ["p", {}, ["strong", {}, "Contractor signature"]],
+      ["p", {}, ["strong", {}, "Signature"]],
       ["div", { "data-signature-capture": "contractor", class: "signature-capture-area" }],
-      ["p", { class: "signature-hint" }, "The contractor will sign here in the agreement portal."],
       ["span", { "data-signature-resize-handle": "", class: "signature-resize-handle", "aria-hidden": "true" }],
     ];
   },

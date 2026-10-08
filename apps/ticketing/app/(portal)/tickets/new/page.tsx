@@ -64,7 +64,7 @@ export default function NewTicketPage() {
     setError("");
     try {
       if (isConsultant && !organizationId) {
-        throw new Error("Select the client company this ticket is for.");
+        throw new Error("Select the client project this ticket is for.");
       }
       const res = await ticketingFetch("/api/tickets", {
         method: "POST",
@@ -99,8 +99,8 @@ export default function NewTicketPage() {
         <p className="text-sm text-slate-500">
           {isConsultant
             ? isTbosAdmin
-              ? "As TBOS admin you can open tickets for any company."
-              : "Choose the client company, then enter ticket details."
+              ? "As TBOS admin you can open tickets for any project."
+              : "Choose the client project, then enter ticket details."
             : "Describe your issue and attach any helpful files."}
         </p>
       </div>
@@ -108,21 +108,21 @@ export default function NewTicketPage() {
       <form onSubmit={onSubmit} className="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         {isConsultant ? (
           <div>
-            <label className="mb-1 block text-sm font-medium">Client company</label>
+            <label className="mb-1 block text-sm font-medium">Client project</label>
             <select
               required
               value={organizationId}
               onChange={(e) => setOrganizationId(e.target.value)}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
             >
-              <option value="">Select company…</option>
+              <option value="">Select project…</option>
               {orgs.map((o) => (
                 <option key={o.id} value={o.id}>{o.name}</option>
               ))}
             </select>
             {orgs.length === 0 && me ? (
               <p className="mt-1 text-xs text-amber-700">
-                No companies available. TBOS admin: assign companies under Support tickets → Consultant access, or create organizations in the ticketing database.
+                No projects available. TBOS admin: add projects under Sales → Support tickets → Support projects, then assign consultants under Consultant access.
               </p>
             ) : null}
           </div>

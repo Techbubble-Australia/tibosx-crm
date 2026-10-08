@@ -4,9 +4,8 @@ import { DOCUMENT_TEMPLATE_STYLES } from "./document-template-styles";
 export const SIGNATURE_BLOCK_MARKER = "data-signature-block";
 
 export const SIGNATURE_BLOCK_HTML = `<div ${SIGNATURE_BLOCK_MARKER}="contractor" class="signature-block" contenteditable="false">
-<p><strong>Contractor signature</strong></p>
+<p><strong>Signature</strong></p>
 <div data-signature-capture="contractor" class="signature-capture-area"></div>
-<p class="signature-hint">The contractor will sign here in the agreement portal.</p>
 </div>`;
 
 const TEMPLATE_PREVIEW_STYLES = `${DOCUMENT_TEMPLATE_STYLES}

@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { AdminSessionProvider, useAdminSession } from "@/contexts/AdminSessionContext";
 import { MfaEnrollmentGuard } from "@/components/MfaEnrollmentGuard";
+import { MemberOnboardingGuard } from "@/components/MemberOnboardingGuard";
 import { TechBubbleLogo } from "@/components/TechBubbleLogo";
 import { InactivityLogout } from "@/components/InactivityLogout";
 import { TicketPortalLink } from "@/components/TicketPortalLink";
@@ -120,6 +121,7 @@ const navGroups: NavGroup[] = [
       { href: "/settings/departments", label: "Department", icon: Building, roles: ["admin", "website"] },
       { href: "/settings/levels", label: "Level", icon: Target, roles: ["admin", "website"] },
       { href: "/settings/templates", label: "Templates", icon: FileCode, roles: ["admin"] },
+      { href: "/settings/profile", label: "Profile", icon: UserCircle, roles: ["project_manager", "project_member"] },
       { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin", "recruiter_admin", "recruiter", "sales", "website", "project_manager", "project_member"] },
       { href: "/users", label: "Users", icon: UserCircle, roles: ["admin"] },
     ],
@@ -370,8 +372,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <AdminSessionProvider>
       <MfaEnrollmentGuard>
-        <InactivityLogout />
-        <DashboardChrome>{children}</DashboardChrome>
+        <MemberOnboardingGuard>
+          <InactivityLogout />
+          <DashboardChrome>{children}</DashboardChrome>
+        </MemberOnboardingGuard>
       </MfaEnrollmentGuard>
     </AdminSessionProvider>
   );

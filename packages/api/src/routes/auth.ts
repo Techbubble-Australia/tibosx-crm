@@ -16,6 +16,8 @@ import {
   encryptTotpSecret,
   verifyUserTotpCode,
 } from "../lib/mfa";
+import { getMemberOnboardingStatus } from "../lib/member-onboarding";
+import { logAdminUserFieldChange } from "../lib/admin-user-activity";
 
 const router: IRouter = Router();
 
@@ -171,6 +173,26 @@ router.post("/mfa/verify", async (req, res) => {
   }
 });
 
+const emergencyContactSchema = z.object({
+  name: z.string().min(1).max(200),
+  email: z.string().email().optional().or(z.literal("")),
+  phone: z.string().max(50).optional(),
+  relation: z.string().max(100).optional(),
+});
+
+const profileUpdateSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  phone: z.string().max(50).optional().nullable(),
+  addressLine1: z.string().max(300).optional().nullable(),
+  addressLine2: z.string().max(300).optional().nullable(),
+  suburb: z.string().max(100).optional().nullable(),
+  city: z.string().max(100).optional().nullable(),
+  state: z.string().max(100).optional().nullable(),
+  country: z.string().max(100).optional().nullable(),
+  emergencyContacts: z.array(emergencyContactSchema).max(5).optional(),
+  markProfileComplete: z.boolean().optional(),
+});
+
 router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
   const u = req.user;
   if (!u) {
@@ -183,24 +205,182 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
       id: true,
       email: true,
       name: true,
+      phone: true,
       role: true,
       mfaEnabled: true,
       mfaEnrolledAt: true,
       passwordNeedsReset: true,
+      addressLine1: true,
+      addressLine2: true,
+      suburb: true,
+      city: true,
+      state: true,
+      country: true,
+      emergencyContacts: true,
+      profileDetailsCompletedAt: true,
+      agreementDocumentUrl: true,
     },
   });
   if (!user) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
+  const onboarding =
+    user.role === "project_member" ? await getMemberOnboardingStatus(user.id) : null;
+
   res.json({
     data: {
       user: {
         ...publicUser(user),
         mfaEnrolledAt: user.mfaEnrolledAt?.toISOString() ?? null,
+        phone: user.phone,
+        addressLine1: user.addressLine1,
+        addressLine2: user.addressLine2,
+        suburb: user.suburb,
+        city: user.city,
+        state: user.state,
+        country: user.country,
+        emergencyContacts: user.emergencyContacts ?? [],
+        profileDetailsCompletedAt: user.profileDetailsCompletedAt?.toISOString() ?? null,
+        agreementDocumentUrl: user.agreementDocumentUrl,
+        onboarding,
       },
     },
   });
+});
+
+router.get("/profile/activity", authMiddleware, async (req: AuthRequest, res) => {
+  const u = req.user;
+  if (!u) return res.status(401).json({ error: "Unauthorized" });
+
+  const rows = await prisma.adminUserActivityLog.findMany({
+    where: { adminUserId: u.id },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+    include: { performedBy: { select: { name: true, email: true } } },
+  });
+
+  res.json({
+    data: rows.map((row) => ({
+      id: row.id,
+      action: row.action,
+      fieldName: row.fieldName,
+      oldValue: row.oldValue,
+      newValue: row.newValue,
+      performedByName: row.performedBy?.name || row.performedBy?.email || "",
+      createdAt: row.createdAt.toISOString(),
+    })),
+  });
+});
+
+router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const u = req.user;
+    if (!u) return res.status(401).json({ error: "Unauthorized" });
+
+    const input = profileUpdateSchema.parse(req.body);
+    const existing = await prisma.adminUser.findUnique({ where: { id: u.id } });
+    if (!existing) return res.status(404).json({ error: "User not found" });
+
+    const patch: Record<string, unknown> = {};
+    const trackFields = [
+      "name",
+      "phone",
+      "addressLine1",
+      "addressLine2",
+      "suburb",
+      "city",
+      "state",
+      "country",
+    ] as const;
+
+    for (const field of trackFields) {
+      if (input[field] !== undefined) {
+        patch[field] = input[field] as string | null;
+      }
+    }
+    if (input.emergencyContacts !== undefined) {
+      patch.emergencyContacts = input.emergencyContacts;
+    }
+
+    const requiredForComplete = [
+      input.name ?? existing.name,
+      input.phone ?? existing.phone,
+      input.addressLine1 ?? existing.addressLine1,
+      input.city ?? existing.city,
+      input.country ?? existing.country,
+    ];
+    const hasBasics = requiredForComplete.every((value) => Boolean(value && String(value).trim()));
+
+    if (input.markProfileComplete && hasBasics) {
+      patch.profileDetailsCompletedAt = new Date();
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      for (const field of trackFields) {
+        if (input[field] === undefined) continue;
+        const oldVal = (existing[field] as string | null) ?? null;
+        const newVal = (input[field] as string | null) ?? null;
+        await logAdminUserFieldChange(tx, u.id, u.id, field, oldVal, newVal);
+      }
+      if (input.emergencyContacts !== undefined) {
+        await logAdminUserFieldChange(
+          tx,
+          u.id,
+          u.id,
+          "emergencyContacts",
+          JSON.stringify(existing.emergencyContacts ?? []),
+          JSON.stringify(input.emergencyContacts),
+        );
+      }
+      return tx.adminUser.update({
+        where: { id: u.id },
+        data: patch,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          phone: true,
+          role: true,
+          mfaEnabled: true,
+          passwordNeedsReset: true,
+          addressLine1: true,
+          addressLine2: true,
+          suburb: true,
+          city: true,
+          state: true,
+          country: true,
+          emergencyContacts: true,
+          profileDetailsCompletedAt: true,
+          agreementDocumentUrl: true,
+        },
+      });
+    });
+
+    res.json({
+      data: {
+        user: {
+          ...publicUser(updated),
+          phone: updated.phone,
+          addressLine1: updated.addressLine1,
+          addressLine2: updated.addressLine2,
+          suburb: updated.suburb,
+          city: updated.city,
+          state: updated.state,
+          country: updated.country,
+          emergencyContacts: updated.emergencyContacts ?? [],
+          profileDetailsCompletedAt: updated.profileDetailsCompletedAt?.toISOString() ?? null,
+          agreementDocumentUrl: updated.agreementDocumentUrl,
+        },
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Profile update error:", error);
+    res.status(500).json({ error: "Failed to update profile" });
+  }
 });
 
 router.get("/mfa/status", authMiddleware, async (req: AuthRequest, res) => {

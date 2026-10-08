@@ -12,6 +12,7 @@ type TimesheetRow = {
   id: string;
   projectNumber: string;
   projectTitle: string;
+  targetLabel?: string;
   memberName: string;
   startDate: string;
   endDate: string;
@@ -163,9 +164,13 @@ export default function TimesheetsPage() {
                       </td>
                     ) : null}
                     <td className="px-4 py-3">
-                      <span className="font-mono text-xs text-gray-400">{row.projectNumber}</span>
-                      <br />
-                      {row.projectTitle}
+                      {row.targetLabel || (
+                        <>
+                          <span className="font-mono text-xs text-gray-400">{row.projectNumber}</span>
+                          <br />
+                          {row.projectTitle}
+                        </>
+                      )}
                     </td>
                     {canManageProjects ? (
                       <td className="px-4 py-3 text-gray-500">{row.memberName}</td>

@@ -148,6 +148,33 @@ router.get("/tickets/:id", async (req: TbosRequest, res) => {
   });
 });
 
+function slugifyOrganizationName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+router.post("/organizations", requireTbosAdmin, async (req: TbosRequest, res) => {
+  const parsed = z.object({ name: z.string().min(1).max(200) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Project name is required" });
+
+  const baseSlug = slugifyOrganizationName(parsed.data.name) || "project";
+  let slug = baseSlug;
+  let n = 1;
+  while (await ticketingPrisma.organization.findUnique({ where: { slug } })) {
+    slug = `${baseSlug}-${n++}`;
+  }
+
+  const row = await ticketingPrisma.organization.create({
+    data: { name: parsed.data.name.trim(), slug, active: true },
+    select: { id: true, name: true, slug: true },
+  });
+  res.status(201).json({ data: row });
+});
+
 router.get("/organizations", async (req: TbosRequest, res) => {
   const tbosUser = req.tbosUser!;
   const orgScope = await orgFilterForTbos(tbosUser);

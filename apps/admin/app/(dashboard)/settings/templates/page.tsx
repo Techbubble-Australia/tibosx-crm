@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { AdminOnlyGuard } from "@/components/AdminOnlyGuard";
 
@@ -73,19 +73,18 @@ export default function SettingsTemplatesPage() {
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id} className="border-b border-gray-50 dark:border-gray-800">
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{row.name}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
+                      <Link href={`/settings/templates/${row.id}`} className="hover:text-blue-600 hover:underline dark:hover:text-blue-400">
+                        {row.name}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3 text-gray-500">
                       {new Date(row.updatedAt).toLocaleDateString("en-AU")}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="inline-flex gap-2">
-                        <Link href={`/settings/templates/${row.id}`} className="rounded-lg border border-gray-200 p-2 hover:bg-gray-50 dark:border-gray-600">
-                          <Edit className="h-4 w-4" />
-                        </Link>
-                        <button type="button" onClick={() => void deleteRow(row.id)} className="rounded-lg border border-gray-200 p-2 text-red-500 hover:bg-red-50 dark:border-gray-600">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                      <button type="button" onClick={() => void deleteRow(row.id)} className="rounded-lg border border-gray-200 p-2 text-red-500 hover:bg-red-50 dark:border-gray-600" aria-label="Delete template">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </td>
                   </tr>
                 ))}

@@ -1580,7 +1580,9 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
             <p className="text-sm text-gray-400">No variations yet.</p>
           ) : (
             <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-              {variations.map((variation) => (
+              {variations.map((variation) => {
+                const variationProject = linkedProjects.find((row) => row.contractVariationId === variation.id);
+                return (
                 <li key={variation.id} className="flex items-start justify-between gap-3 py-3 text-sm">
                   <div>
                     <p className="font-medium text-gray-900 dark:text-gray-100">
@@ -1596,7 +1598,25 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                       <p className="text-gray-500 dark:text-gray-400">{variation.comments}</p>
                     ) : null}
                   </div>
-                  <div className="flex shrink-0 gap-1">
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    {status === "ACTIVE" && !variationProject ? (
+                      <button
+                        type="button"
+                        onClick={() => void createProject(variation.id)}
+                        disabled={creatingProjectFor === variation.id}
+                        className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                      >
+                        {creatingProjectFor === variation.id ? "Creating…" : "Create project"}
+                      </button>
+                    ) : variationProject ? (
+                      <Link
+                        href={`/projects/${variationProject.id}`}
+                        className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                      >
+                        {variationProject.projectNumber}
+                      </Link>
+                    ) : null}
+                    <div className="flex gap-1">
                   {canAddVariations ? (
                     <>
                       <button
@@ -1618,9 +1638,11 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                       </button>
                     </>
                   ) : null}
+                    </div>
                   </div>
                 </li>
-              ))}
+              );
+              })}
             </ul>
           )}
         </section>

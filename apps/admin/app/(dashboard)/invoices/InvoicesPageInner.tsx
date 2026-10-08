@@ -283,7 +283,7 @@ export default function InvoicesPageInner() {
                             </span>
                           </div>
                           <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Due {formatDate(row.dueDate)}
+                            Issued {formatDate(row.issueDate)} · Due {formatDate(row.dueDate)}
                           </p>
                           <p className="mt-1 truncate text-sm text-gray-600 dark:text-gray-400" title={`${row.contractNumber} — ${row.contractTitle}`}>
                             {row.contractNumber} — {row.contractTitle}
@@ -323,6 +323,9 @@ export default function InvoicesPageInner() {
                     <SortHeader label="Client" sortKey="clientName" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                   </th>
                   <th className="whitespace-nowrap px-4 py-3 text-left">
+                    <SortHeader label="Issue date" sortKey="issueDate" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                  </th>
+                  <th className="whitespace-nowrap px-4 py-3 text-left">
                     <SortHeader label="Due" sortKey="dueDate" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                   </th>
                   <th className="px-4 py-3 text-left">
@@ -337,7 +340,7 @@ export default function InvoicesPageInner() {
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {filteredRows.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-gray-400">No invoices found.</td>
+                    <td colSpan={9} className="px-4 py-8 text-center text-gray-400">No invoices found.</td>
                   </tr>
                 ) : (
                   filteredRows.map((row) => {
@@ -371,6 +374,9 @@ export default function InvoicesPageInner() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.clientName}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
+                          {formatDate(row.issueDate)}
+                        </td>
                         <td className="whitespace-nowrap px-4 py-3">
                           {editingDueId === row.id ? (
                             <input

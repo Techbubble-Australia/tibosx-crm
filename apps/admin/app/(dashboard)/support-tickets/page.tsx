@@ -51,14 +51,19 @@ export default function SupportTicketsPage() {
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Support tickets</h1>
           <p className="text-sm text-gray-500">
-            {role === "admin" ? "All client organizations" : "Organizations assigned to you"}
+            {role === "admin" ? "All client projects" : "Projects assigned to you"}
           </p>
         </div>
         <div className="flex gap-3 text-sm">
           {role === "admin" ? (
-            <Link href="/support-tickets/assignments" className="font-medium text-blue-600 hover:underline">
-              Consultant access
-            </Link>
+            <>
+              <Link href="/support-tickets/projects" className="font-medium text-blue-600 hover:underline">
+                Support projects
+              </Link>
+              <Link href="/support-tickets/assignments" className="font-medium text-blue-600 hover:underline">
+                Consultant access
+              </Link>
+            </>
           ) : null}
           <a href="/api/ticketing/launch" target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">
             Open full portal →
@@ -84,7 +89,7 @@ export default function SupportTicketsPage() {
           onChange={(e) => setOrganizationId(e.target.value)}
           className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
         >
-          <option value="">All companies</option>
+          <option value="">All projects</option>
           {orgs.map((o) => (
             <option key={o.id} value={o.id}>{o.name}</option>
           ))}

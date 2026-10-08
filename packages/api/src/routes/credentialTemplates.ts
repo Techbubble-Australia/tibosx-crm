@@ -29,6 +29,10 @@ const templateSchema = z.object({
   name: z.string().min(1).max(200),
   html: z.string().min(1),
   variables: z.array(variableSchema).optional(),
+  addStartDate: z.boolean().optional(),
+  requireStartDate: z.boolean().optional(),
+  addEndDate: z.boolean().optional(),
+  requireEndDate: z.boolean().optional(),
 });
 
 function serializeTemplate(row: {
@@ -36,6 +40,10 @@ function serializeTemplate(row: {
   name: string;
   html: string;
   variables: unknown;
+  addStartDate: boolean;
+  requireStartDate: boolean;
+  addEndDate: boolean;
+  requireEndDate: boolean;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -45,6 +53,10 @@ function serializeTemplate(row: {
     name: row.name,
     html: row.html,
     variables,
+    addStartDate: row.addStartDate,
+    requireStartDate: row.requireStartDate,
+    addEndDate: row.addEndDate,
+    requireEndDate: row.requireEndDate,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -114,7 +126,15 @@ router.post("/", async (req, res) => {
       ? data.variables
       : mergeVariablesFromHtml(data.html);
     const row = await prisma.credentialTemplate.create({
-      data: { name: data.name.trim(), html: data.html, variables },
+      data: {
+        name: data.name.trim(),
+        html: data.html,
+        variables,
+        addStartDate: data.addStartDate ?? true,
+        requireStartDate: data.requireStartDate ?? true,
+        addEndDate: data.addEndDate ?? true,
+        requireEndDate: data.requireEndDate ?? true,
+      },
     });
     res.status(201).json({ data: serializeTemplate(row) });
   } catch (error) {
@@ -134,7 +154,15 @@ router.put("/:id", async (req, res) => {
       : mergeVariablesFromHtml(data.html);
     const row = await prisma.credentialTemplate.update({
       where: { id: req.params.id },
-      data: { name: data.name.trim(), html: data.html, variables },
+      data: {
+        name: data.name.trim(),
+        html: data.html,
+        variables,
+        ...(data.addStartDate !== undefined ? { addStartDate: data.addStartDate } : {}),
+        ...(data.requireStartDate !== undefined ? { requireStartDate: data.requireStartDate } : {}),
+        ...(data.addEndDate !== undefined ? { addEndDate: data.addEndDate } : {}),
+        ...(data.requireEndDate !== undefined ? { requireEndDate: data.requireEndDate } : {}),
+      },
     });
     res.json({ data: serializeTemplate(row) });
   } catch (error) {

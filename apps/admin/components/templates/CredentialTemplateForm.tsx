@@ -5,6 +5,7 @@ import { GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import {
   buildHtmlWithSignatureBlock,
+  appendSignatureBlock,
   hasContractorSignatureBlock,
 } from "@/lib/credential-template";
 import { TemplateSignatureEditor } from "@/components/templates/TemplateSignatureEditor";
@@ -22,6 +23,10 @@ export type CredentialTemplateValues = {
   name: string;
   html: string;
   variables: CredentialVariable[];
+  addStartDate?: boolean;
+  requireStartDate?: boolean;
+  addEndDate?: boolean;
+  requireEndDate?: boolean;
 };
 
 const inputClass =
@@ -37,6 +42,10 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
   const [name, setName] = useState(defaults.name);
   const [html, setHtml] = useState(defaults.html);
   const [variables, setVariables] = useState<CredentialVariable[]>(defaults.variables);
+  const [addStartDate, setAddStartDate] = useState(defaults.addStartDate ?? true);
+  const [requireStartDate, setRequireStartDate] = useState(defaults.requireStartDate ?? true);
+  const [addEndDate, setAddEndDate] = useState(defaults.addEndDate ?? true);
+  const [requireEndDate, setRequireEndDate] = useState(defaults.requireEndDate ?? true);
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importedFileName, setImportedFileName] = useState("");
@@ -60,9 +69,9 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
   }, [html, name]);
 
   function insertSignatureBlock() {
-    if (hasContractorSignatureBlock(html)) return;
     setShowSignatureReminder(false);
-    void applyParsedHtml(buildHtmlWithSignatureBlock(html));
+    const next = hasContractorSignatureBlock(html) ? appendSignatureBlock(html) : buildHtmlWithSignatureBlock(html);
+    void applyParsedHtml(next);
   }
 
   async function parseVariables() {
@@ -198,6 +207,10 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
       id: defaults.id,
       name: name.trim(),
       html,
+      addStartDate,
+      requireStartDate,
+      addEndDate,
+      requireEndDate,
       variables: variables.map((row) => ({
         ...row,
         label: row.label.trim() || row.key,
@@ -221,6 +234,48 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
               aria-required="true"
               placeholder="Template name"
             />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={addStartDate}
+                onChange={(e) => {
+                  setAddStartDate(e.target.checked);
+                  if (!e.target.checked) setRequireStartDate(false);
+                }}
+              />
+              Collect start date when generating credentials
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={requireStartDate}
+                disabled={!addStartDate}
+                onChange={(e) => setRequireStartDate(e.target.checked)}
+              />
+              Start date required
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={addEndDate}
+                onChange={(e) => {
+                  setAddEndDate(e.target.checked);
+                  if (!e.target.checked) setRequireEndDate(false);
+                }}
+              />
+              Collect end date when generating credentials
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={requireEndDate}
+                disabled={!addEndDate}
+                onChange={(e) => setRequireEndDate(e.target.checked)}
+              />
+              End date required
+            </label>
           </div>
           <div>
             <div className="mb-1 flex flex-wrap items-center justify-between gap-2">

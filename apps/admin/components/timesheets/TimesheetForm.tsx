@@ -14,7 +14,8 @@ const readOnlyClass = "bg-gray-50 dark:bg-gray-900 cursor-not-allowed";
 
 export type TimesheetFormValues = {
   id?: string;
-  projectId: string;
+  projectId?: string | null;
+  opportunityId?: string | null;
   memberName?: string;
   startDate: string;
   endDate: string;
@@ -30,7 +31,7 @@ export type TimesheetFormValues = {
   }>;
 };
 
-type ProjectOption = { id: string; title: string; projectNumber: string };
+type TargetOption = { kind: "project" | "opportunity"; id: string; label: string };
 
 type Props = {
   defaults: Partial<TimesheetFormValues>;
@@ -56,24 +57,35 @@ function formatActivityDate(value: string) {
   });
 }
 
+function targetKey(kind: "project" | "opportunity", id: string) {
+  return `${kind}:${id}`;
+}
+
 export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }: Props) {
   const { userName, email } = useAdminSession();
-  const [projectId, setProjectId] = useState(defaults.projectId ?? "");
+  const initialKind: "project" | "opportunity" = defaults.opportunityId ? "opportunity" : "project";
+  const initialId = defaults.opportunityId ?? defaults.projectId ?? "";
+  const [selectedTarget, setSelectedTarget] = useState(
+    initialId ? targetKey(initialKind, initialId) : "",
+  );
+  const [managerName, setManagerName] = useState("");
   const [startDate, setStartDate] = useState(toDateInput(defaults.startDate));
   const [endDate, setEndDate] = useState(toDateInput(defaults.endDate));
   const [fileUrls, setFileUrls] = useState<string[]>(defaults.fileUrls ?? []);
-  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [targets, setTargets] = useState<TargetOption[]>([]);
   const [uploading, setUploading] = useState(false);
   const status = defaults.status ?? "DRAFT";
   const editable = !readOnly && status === "DRAFT";
 
   useEffect(() => {
-    void adminFetch("/api/admin/timesheets/active-projects")
+    void adminFetch("/api/admin/timesheets/active-targets")
       .then((r) => r.json())
       .then((data) => {
-        const list = (data.data as ProjectOption[]) ?? [];
-        setProjects(list);
-        if (!projectId && list[0]) setProjectId(list[0].id);
+        const list = (data.data as TargetOption[]) ?? [];
+        setTargets(list);
+        if (!selectedTarget && list[0]) {
+          setSelectedTarget(targetKey(list[0].kind, list[0].id));
+        }
       });
     if (!startDate || !endDate) {
       void adminFetch("/api/admin/timesheets/defaults")
@@ -85,6 +97,29 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
         });
     }
   }, []);
+
+  useEffect(() => {
+    if (!selectedTarget) {
+      setManagerName("");
+      return;
+    }
+    const [kind, id] = selectedTarget.split(":");
+    if (!kind || !id) {
+      setManagerName("");
+      return;
+    }
+    const query =
+      kind === "project"
+        ? `projectId=${encodeURIComponent(id)}`
+        : `opportunityId=${encodeURIComponent(id)}`;
+    void adminFetch(`/api/admin/timesheets/target-meta?${query}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const row = data.data as { managerName?: string };
+        setManagerName(row.managerName ?? "");
+      })
+      .catch(() => setManagerName(""));
+  }, [selectedTarget]);
 
   async function uploadFiles(files: FileList | null) {
     if (!files?.length || !editable) return;
@@ -109,11 +144,19 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!selectedTarget) {
+      alert("Select a project or case.");
+      return;
+    }
     if (!fileUrls.length) {
       alert("At least one file is required.");
       return;
     }
-    await onSubmit({ projectId, startDate, endDate, fileUrls });
+    const [kind, id] = selectedTarget.split(":");
+    const payload: Record<string, unknown> = { startDate, endDate, fileUrls };
+    if (kind === "project") payload.projectId = id;
+    else payload.opportunityId = id;
+    await onSubmit(payload);
   }
 
   return (
@@ -133,19 +176,25 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
             <input className={`${inputClass} ${readOnlyClass}`} value={TIMESHEET_STATUS_LABELS[status]} readOnly />
           </div>
           <div className="sm:col-span-2">
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Project *</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Project / case *</label>
             <select
               className={`${inputClass} ${editable ? "" : readOnlyClass}`}
-              value={projectId}
-              onChange={(e) => setProjectId(e.target.value)}
+              value={selectedTarget}
+              onChange={(e) => setSelectedTarget(e.target.value)}
               required
               disabled={!editable}
             >
-              <option value="">Select project…</option>
-              {projects.map((row) => (
-                <option key={row.id} value={row.id}>{row.projectNumber} — {row.title}</option>
+              <option value="">Select project or case…</option>
+              {targets.map((row) => (
+                <option key={targetKey(row.kind, row.id)} value={targetKey(row.kind, row.id)}>
+                  {row.kind === "opportunity" ? `Case: ${row.label}` : row.label}
+                </option>
               ))}
             </select>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Project manager / owner</label>
+            <input className={`${inputClass} ${readOnlyClass}`} value={managerName || "—"} readOnly />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Start date *</label>

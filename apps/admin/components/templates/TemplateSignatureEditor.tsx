@@ -75,16 +75,12 @@ export function TemplateSignatureEditor({
     const target = document.elementFromPoint(clientX, clientY);
     const container = findDropContainer(target, canvas);
 
-    let block = canvas.querySelector(SIGNATURE_BLOCK_SELECTOR);
-    if (!(block instanceof HTMLElement)) {
-      container.insertAdjacentHTML("beforeend", createFlowSignatureBlockHtml());
-      block = canvas.querySelector(SIGNATURE_BLOCK_SELECTOR);
-    } else {
-      applyFlowSignatureStyles(block);
-      container.appendChild(block);
-    }
+    container.insertAdjacentHTML("beforeend", createFlowSignatureBlockHtml());
+    const inserted = container.querySelectorAll(SIGNATURE_BLOCK_SELECTOR);
+    const block = inserted[inserted.length - 1];
 
     if (block instanceof HTMLElement) {
+      applyFlowSignatureStyles(block);
       ensureEditorChrome(block);
       if (container instanceof HTMLTableCellElement) prepareCellForSignature(container);
     }
