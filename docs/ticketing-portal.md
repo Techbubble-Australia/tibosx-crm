@@ -79,10 +79,12 @@ The monorepo did **not** ship ticketing until `railway.ticketing.toml` and `rail
 ### 3. Service: `ticketing` (portal UI)
 
 - Create a service named **`ticketing`**.
-- **Config file:** `railway.ticketing.toml` / `Dockerfile.ticketing`.
+- **Config file:** `railway.ticketing.toml` / `Dockerfile.ticketing` (optional if using root `Dockerfile`).
+- **Start command:** `node apps/ticketing/server.js` (do **not** use `pnpm start` / port **3004** — that is local dev only).
 - **Variables:**
-  - `TICKETING_API_URL` — **public** URL of ticketing-api (server-side proxy)
+  - `TICKETING_API_URL` — **public https** URL of ticketing-api, e.g. `https://ticketing-api-xxx.up.railway.app` (not `:3003` and not `127.0.0.1`)
   - `JWT_SECRET` — same as TBOS / ticketing-api
+- **Do not set `PORT=3004`** on Railway. The platform assigns `PORT`; the container must listen on that value.
 - Deploy: `pnpm run deploy:railway:ticketing`
 - Generate a **public domain** for the portal (e.g. `https://ticketing-xxx.up.railway.app`).
 
@@ -111,5 +113,6 @@ pnpm --filter @techbubble/ticketing-database db:seed
 | Build fails with `npm ci` / missing `package-lock.json` | Old root Dockerfile; pull latest. Portal builds use **pnpm** via root `Dockerfile` or `Dockerfile.ticketing`. |
 | Portal 404 / nothing deployed | Separate **`ticketing`** service with `Dockerfile.ticketing`, not admin/web |
 | Login fails | `TICKETING_API_URL` on portal service; API healthy at `/health` |
-| SSO from TBOS fails | `JWT_SECRET` aligned; `TICKETING_ALLOWED_ORIGINS` includes admin URL |
+| SSO from TBOS fails / HTTP 500 on `/api/ticketing/launch` | On **admin**: set `TICKETING_API_URL` to public ticketing-api URL (not unset / not `127.0.0.1:3003`). `JWT_SECRET` on ticketing-api must match **TBOS API** (`packages/api`). `NEXT_PUBLIC_TICKETING_PORTAL_URL` = portal origin only (`https://…`), not `…/login`. Redeploy admin after env changes. |
 | API crash on boot | `TICKETING_DATABASE_URL` set; migrations run via start script |
+| **Application failed to respond** (Railway edge) | Remove custom `PORT` (3003/3004). Redeploy with latest Docker image (`HOSTNAME=0.0.0.0`). Check deploy logs: process must run `node apps/ticketing/server.js`. |

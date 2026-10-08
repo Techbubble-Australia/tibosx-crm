@@ -2,7 +2,15 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { TICKETING_SESSION_COOKIE } from "../lib/session.js";
 
-const JWT_SECRET = process.env.TICKETING_JWT_SECRET || process.env.JWT_SECRET || "ticketing-dev-secret";
+/** Signs ticketing portal session JWTs. */
+function ticketingJwtSecret(): string {
+  return process.env.TICKETING_JWT_SECRET || process.env.JWT_SECRET || "ticketing-dev-secret";
+}
+
+/** Verifies TBOS admin session JWTs (must match packages/api JWT_SECRET). */
+function tbosJwtSecret(): string {
+  return process.env.TBOS_JWT_SECRET || process.env.JWT_SECRET || "your-secret-key-change-in-production";
+}
 
 export type TicketingAuthUser = {
   id: string;
@@ -38,7 +46,7 @@ export function authMiddleware(req: TicketingRequest, res: Response, next: NextF
     return res.status(401).json({ error: "Unauthorized: No token provided" });
   }
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as TicketingAuthUser & { purpose?: string };
+    const decoded = jwt.verify(token, ticketingJwtSecret()) as TicketingAuthUser & { purpose?: string };
     if (decoded.purpose === "tbos_exchange") {
       return res.status(401).json({ error: "Exchange token not valid for API access" });
     }
@@ -64,14 +72,25 @@ export function requireConsultant(req: TicketingRequest, res: Response, next: Ne
 }
 
 export function signTicketingToken(payload: TicketingAuthUser): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "8h" });
+  return jwt.sign(payload, ticketingJwtSecret(), { expiresIn: "8h" });
 }
 
 export function verifyTbosAdminToken(token: string): { id: string; email: string; role: string } | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { id?: string; email?: string; role?: string; purpose?: string };
+    const decoded = jwt.verify(token, tbosJwtSecret()) as {
+      id?: string;
+      email?: string;
+      role?: string;
+      purpose?: string;
+    };
     if (!decoded.id || !decoded.email) return null;
-    if (decoded.purpose === "mfa_pending") return null;
+    if (
+      decoded.purpose === "mfa_pending" ||
+      decoded.purpose === "mfa_setup_required" ||
+      decoded.purpose === "password_reset_required"
+    ) {
+      return null;
+    }
     return { id: decoded.id, email: decoded.email, role: decoded.role || "" };
   } catch {
     return null;

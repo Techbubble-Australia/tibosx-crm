@@ -42,6 +42,8 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   res.status(500).json({ error: "Something went wrong" });
 });
 
-app.listen(PORT, () => {
-  console.log(`Ticketing API listening on port ${PORT}`);
+const HOST = process.env.HOST || "0.0.0.0";
+
+app.listen(PORT, HOST, () => {
+  console.log(`Ticketing API listening on http://${HOST}:${PORT}`);
 });
