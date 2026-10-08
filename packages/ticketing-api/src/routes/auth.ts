@@ -114,15 +114,23 @@ router.post("/tbos-sso", async (req, res) => {
         role: "CONSULTANT",
         consultantVerified: true,
         tbosAdminUserId: tbosUser.id,
+        tbosRole: tbosRole,
       },
       include: { organization: true },
     });
-  } else if (!consultant.tbosAdminUserId) {
+  } else {
     consultant = await ticketingPrisma.ticketingUser.update({
       where: { id: consultant.id },
-      data: { tbosAdminUserId: tbosUser.id },
+      data: {
+        tbosAdminUserId: consultant.tbosAdminUserId ?? tbosUser.id,
+        tbosRole: tbosRole,
+      },
       include: { organization: true },
     });
+  }
+
+  if (!consultant) {
+    return res.status(500).json({ error: "Could not provision consultant account" });
   }
 
   const token = signTicketingToken({
@@ -131,6 +139,7 @@ router.post("/tbos-sso", async (req, res) => {
     role: consultant.role,
     organizationId: consultant.organizationId,
     consultantVerified: consultant.consultantVerified,
+    tbosRole: tbosRole,
   });
 
   res.json({ data: { token, user: serializeUser(consultant) } });

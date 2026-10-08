@@ -69,6 +69,7 @@ const navGroups: NavGroup[] = [
       { href: "/opportunities", label: "Opportunities", icon: CircleDollarSign, roles: ["admin", "sales"] },
       { href: "/contracts", label: "Contracts", icon: ScrollText, roles: ["admin", "sales"] },
       { href: "/invoices", label: "Invoices", icon: FileText, roles: ["admin", "sales"] },
+      { href: "/support-tickets", label: "Support tickets", icon: ClipboardList, roles: ["admin", "sales"] },
     ],
   },
   {

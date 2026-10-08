@@ -1,0 +1,39 @@
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import { ticketingTbosFetch } from "@/lib/ticketing-tbos-server";
+
+type Ctx = { params: { path?: string[] } };
+
+async function handle(req: NextRequest, ctx: Ctx) {
+  const segments = ctx.params.path ?? [];
+  const subpath = `/${segments.join("/")}${req.nextUrl.search}`;
+
+  try {
+    const hasBody = !["GET", "HEAD"].includes(req.method);
+    const init: RequestInit & { duplex?: "half" } = { method: req.method };
+    if (hasBody && req.body) {
+      init.body = req.body;
+      init.duplex = "half";
+      const contentType = req.headers.get("content-type");
+      if (contentType) {
+        init.headers = { "Content-Type": contentType };
+      }
+    }
+
+    const res = await ticketingTbosFetch(subpath, init);
+    const body = await res.arrayBuffer();
+    return new NextResponse(body, {
+      status: res.status,
+      headers: { "Content-Type": res.headers.get("Content-Type") || "application/json" },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Ticketing API error";
+    return NextResponse.json({ error: message }, { status: 503 });
+  }
+}
+
+export const GET = handle;
+export const POST = handle;
+export const PUT = handle;
+export const PATCH = handle;
+export const DELETE = handle;

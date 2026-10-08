@@ -20,29 +20,39 @@ type TicketRow = {
 export default function TicketsPage() {
   const [rows, setRows] = useState<TicketRow[]>([]);
   const [status, setStatus] = useState("");
+  const [q, setQ] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams();
     if (status) params.set("status", status);
+    if (q.trim().length >= 2) params.set("q", q.trim());
     void ticketingFetch(`/api/tickets?${params}`)
       .then((res) => res.json())
       .then((data) => setRows((data.data as TicketRow[]) ?? []));
-  }, [status]);
+  }, [status, q]);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Tickets</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">Tickets</h1>
+        <div className="flex flex-wrap gap-2">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search ticket # or subject"
+          className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+        />
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
         >
           <option value="">All statuses</option>
           {Object.entries(TICKET_STATUS_LABELS).map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
           ))}
         </select>
+        </div>
       </div>
       {rows.length === 0 ? (
         <EmptyTickets />

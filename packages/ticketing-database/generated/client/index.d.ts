@@ -24,6 +24,11 @@ export type Organization = $Result.DefaultSelection<Prisma.$OrganizationPayload>
  */
 export type TicketingUser = $Result.DefaultSelection<Prisma.$TicketingUserPayload>
 /**
+ * Model ConsultantOrganization
+ * 
+ */
+export type ConsultantOrganization = $Result.DefaultSelection<Prisma.$ConsultantOrganizationPayload>
+/**
  * Model Ticket
  * 
  */
@@ -246,6 +251,16 @@ export class PrismaClient<
     * ```
     */
   get ticketingUser(): Prisma.TicketingUserDelegate<ExtArgs>;
+
+  /**
+   * `prisma.consultantOrganization`: Exposes CRUD operations for the **ConsultantOrganization** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ConsultantOrganizations
+    * const consultantOrganizations = await prisma.consultantOrganization.findMany()
+    * ```
+    */
+  get consultantOrganization(): Prisma.ConsultantOrganizationDelegate<ExtArgs>;
 
   /**
    * `prisma.ticket`: Exposes CRUD operations for the **Ticket** model.
@@ -729,6 +744,7 @@ export namespace Prisma {
   export const ModelName: {
     Organization: 'Organization',
     TicketingUser: 'TicketingUser',
+    ConsultantOrganization: 'ConsultantOrganization',
     Ticket: 'Ticket',
     TicketMessage: 'TicketMessage',
     TicketAttachment: 'TicketAttachment',
@@ -748,7 +764,7 @@ export namespace Prisma {
 
   export type TypeMap<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, ClientOptions = {}> = {
     meta: {
-      modelProps: "organization" | "ticketingUser" | "ticket" | "ticketMessage" | "ticketAttachment" | "ticketAuditLog"
+      modelProps: "organization" | "ticketingUser" | "consultantOrganization" | "ticket" | "ticketMessage" | "ticketAttachment" | "ticketAuditLog"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -889,6 +905,76 @@ export namespace Prisma {
           count: {
             args: Prisma.TicketingUserCountArgs<ExtArgs>
             result: $Utils.Optional<TicketingUserCountAggregateOutputType> | number
+          }
+        }
+      }
+      ConsultantOrganization: {
+        payload: Prisma.$ConsultantOrganizationPayload<ExtArgs>
+        fields: Prisma.ConsultantOrganizationFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ConsultantOrganizationFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ConsultantOrganizationPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ConsultantOrganizationFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ConsultantOrganizationPayload>
+          }
+          findFirst: {
+            args: Prisma.ConsultantOrganizationFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ConsultantOrganizationPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ConsultantOrganizationFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ConsultantOrganizationPayload>
+          }
+          findMany: {
+            args: Prisma.ConsultantOrganizationFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ConsultantOrganizationPayload>[]
+          }
+          create: {
+            args: Prisma.ConsultantOrganizationCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ConsultantOrganizationPayload>
+          }
+          createMany: {
+            args: Prisma.ConsultantOrganizationCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ConsultantOrganizationCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ConsultantOrganizationPayload>[]
+          }
+          delete: {
+            args: Prisma.ConsultantOrganizationDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ConsultantOrganizationPayload>
+          }
+          update: {
+            args: Prisma.ConsultantOrganizationUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ConsultantOrganizationPayload>
+          }
+          deleteMany: {
+            args: Prisma.ConsultantOrganizationDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ConsultantOrganizationUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.ConsultantOrganizationUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ConsultantOrganizationPayload>
+          }
+          aggregate: {
+            args: Prisma.ConsultantOrganizationAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateConsultantOrganization>
+          }
+          groupBy: {
+            args: Prisma.ConsultantOrganizationGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ConsultantOrganizationGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ConsultantOrganizationCountArgs<ExtArgs>
+            result: $Utils.Optional<ConsultantOrganizationCountAggregateOutputType> | number
           }
         }
       }
@@ -1335,11 +1421,13 @@ export namespace Prisma {
   export type OrganizationCountOutputType = {
     users: number
     tickets: number
+    consultantOrganizations: number
   }
 
   export type OrganizationCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     users?: boolean | OrganizationCountOutputTypeCountUsersArgs
     tickets?: boolean | OrganizationCountOutputTypeCountTicketsArgs
+    consultantOrganizations?: boolean | OrganizationCountOutputTypeCountConsultantOrganizationsArgs
   }
 
   // Custom InputTypes
@@ -1367,6 +1455,13 @@ export namespace Prisma {
     where?: TicketWhereInput
   }
 
+  /**
+   * OrganizationCountOutputType without action
+   */
+  export type OrganizationCountOutputTypeCountConsultantOrganizationsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ConsultantOrganizationWhereInput
+  }
+
 
   /**
    * Count Type TicketingUserCountOutputType
@@ -1377,6 +1472,7 @@ export namespace Prisma {
     assignedTickets: number
     messages: number
     auditLogs: number
+    consultantOrganizations: number
   }
 
   export type TicketingUserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -1384,6 +1480,7 @@ export namespace Prisma {
     assignedTickets?: boolean | TicketingUserCountOutputTypeCountAssignedTicketsArgs
     messages?: boolean | TicketingUserCountOutputTypeCountMessagesArgs
     auditLogs?: boolean | TicketingUserCountOutputTypeCountAuditLogsArgs
+    consultantOrganizations?: boolean | TicketingUserCountOutputTypeCountConsultantOrganizationsArgs
   }
 
   // Custom InputTypes
@@ -1423,6 +1520,13 @@ export namespace Prisma {
    */
   export type TicketingUserCountOutputTypeCountAuditLogsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: TicketAuditLogWhereInput
+  }
+
+  /**
+   * TicketingUserCountOutputType without action
+   */
+  export type TicketingUserCountOutputTypeCountConsultantOrganizationsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ConsultantOrganizationWhereInput
   }
 
 
@@ -1653,6 +1757,7 @@ export namespace Prisma {
     updatedAt?: boolean
     users?: boolean | Organization$usersArgs<ExtArgs>
     tickets?: boolean | Organization$ticketsArgs<ExtArgs>
+    consultantOrganizations?: boolean | Organization$consultantOrganizationsArgs<ExtArgs>
     _count?: boolean | OrganizationCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["organization"]>
 
@@ -1677,6 +1782,7 @@ export namespace Prisma {
   export type OrganizationInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     users?: boolean | Organization$usersArgs<ExtArgs>
     tickets?: boolean | Organization$ticketsArgs<ExtArgs>
+    consultantOrganizations?: boolean | Organization$consultantOrganizationsArgs<ExtArgs>
     _count?: boolean | OrganizationCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type OrganizationIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
@@ -1686,6 +1792,7 @@ export namespace Prisma {
     objects: {
       users: Prisma.$TicketingUserPayload<ExtArgs>[]
       tickets: Prisma.$TicketPayload<ExtArgs>[]
+      consultantOrganizations: Prisma.$ConsultantOrganizationPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -2060,6 +2167,7 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     users<T extends Organization$usersArgs<ExtArgs> = {}>(args?: Subset<T, Organization$usersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TicketingUserPayload<ExtArgs>, T, "findMany"> | Null>
     tickets<T extends Organization$ticketsArgs<ExtArgs> = {}>(args?: Subset<T, Organization$ticketsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TicketPayload<ExtArgs>, T, "findMany"> | Null>
+    consultantOrganizations<T extends Organization$consultantOrganizationsArgs<ExtArgs> = {}>(args?: Subset<T, Organization$consultantOrganizationsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ConsultantOrganizationPayload<ExtArgs>, T, "findMany"> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2449,6 +2557,26 @@ export namespace Prisma {
   }
 
   /**
+   * Organization.consultantOrganizations
+   */
+  export type Organization$consultantOrganizationsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsultantOrganization
+     */
+    select?: ConsultantOrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ConsultantOrganizationInclude<ExtArgs> | null
+    where?: ConsultantOrganizationWhereInput
+    orderBy?: ConsultantOrganizationOrderByWithRelationInput | ConsultantOrganizationOrderByWithRelationInput[]
+    cursor?: ConsultantOrganizationWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ConsultantOrganizationScalarFieldEnum | ConsultantOrganizationScalarFieldEnum[]
+  }
+
+  /**
    * Organization without action
    */
   export type OrganizationDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -2482,6 +2610,7 @@ export namespace Prisma {
     organizationId: string | null
     consultantVerified: boolean | null
     tbosAdminUserId: string | null
+    tbosRole: string | null
     active: boolean | null
     createdAt: Date | null
     updatedAt: Date | null
@@ -2496,6 +2625,7 @@ export namespace Prisma {
     organizationId: string | null
     consultantVerified: boolean | null
     tbosAdminUserId: string | null
+    tbosRole: string | null
     active: boolean | null
     createdAt: Date | null
     updatedAt: Date | null
@@ -2510,6 +2640,7 @@ export namespace Prisma {
     organizationId: number
     consultantVerified: number
     tbosAdminUserId: number
+    tbosRole: number
     active: number
     createdAt: number
     updatedAt: number
@@ -2526,6 +2657,7 @@ export namespace Prisma {
     organizationId?: true
     consultantVerified?: true
     tbosAdminUserId?: true
+    tbosRole?: true
     active?: true
     createdAt?: true
     updatedAt?: true
@@ -2540,6 +2672,7 @@ export namespace Prisma {
     organizationId?: true
     consultantVerified?: true
     tbosAdminUserId?: true
+    tbosRole?: true
     active?: true
     createdAt?: true
     updatedAt?: true
@@ -2554,6 +2687,7 @@ export namespace Prisma {
     organizationId?: true
     consultantVerified?: true
     tbosAdminUserId?: true
+    tbosRole?: true
     active?: true
     createdAt?: true
     updatedAt?: true
@@ -2641,6 +2775,7 @@ export namespace Prisma {
     organizationId: string | null
     consultantVerified: boolean
     tbosAdminUserId: string | null
+    tbosRole: string | null
     active: boolean
     createdAt: Date
     updatedAt: Date
@@ -2672,6 +2807,7 @@ export namespace Prisma {
     organizationId?: boolean
     consultantVerified?: boolean
     tbosAdminUserId?: boolean
+    tbosRole?: boolean
     active?: boolean
     createdAt?: boolean
     updatedAt?: boolean
@@ -2680,6 +2816,7 @@ export namespace Prisma {
     assignedTickets?: boolean | TicketingUser$assignedTicketsArgs<ExtArgs>
     messages?: boolean | TicketingUser$messagesArgs<ExtArgs>
     auditLogs?: boolean | TicketingUser$auditLogsArgs<ExtArgs>
+    consultantOrganizations?: boolean | TicketingUser$consultantOrganizationsArgs<ExtArgs>
     _count?: boolean | TicketingUserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["ticketingUser"]>
 
@@ -2692,6 +2829,7 @@ export namespace Prisma {
     organizationId?: boolean
     consultantVerified?: boolean
     tbosAdminUserId?: boolean
+    tbosRole?: boolean
     active?: boolean
     createdAt?: boolean
     updatedAt?: boolean
@@ -2707,6 +2845,7 @@ export namespace Prisma {
     organizationId?: boolean
     consultantVerified?: boolean
     tbosAdminUserId?: boolean
+    tbosRole?: boolean
     active?: boolean
     createdAt?: boolean
     updatedAt?: boolean
@@ -2718,6 +2857,7 @@ export namespace Prisma {
     assignedTickets?: boolean | TicketingUser$assignedTicketsArgs<ExtArgs>
     messages?: boolean | TicketingUser$messagesArgs<ExtArgs>
     auditLogs?: boolean | TicketingUser$auditLogsArgs<ExtArgs>
+    consultantOrganizations?: boolean | TicketingUser$consultantOrganizationsArgs<ExtArgs>
     _count?: boolean | TicketingUserCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type TicketingUserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -2732,6 +2872,7 @@ export namespace Prisma {
       assignedTickets: Prisma.$TicketPayload<ExtArgs>[]
       messages: Prisma.$TicketMessagePayload<ExtArgs>[]
       auditLogs: Prisma.$TicketAuditLogPayload<ExtArgs>[]
+      consultantOrganizations: Prisma.$ConsultantOrganizationPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -2742,6 +2883,7 @@ export namespace Prisma {
       organizationId: string | null
       consultantVerified: boolean
       tbosAdminUserId: string | null
+      tbosRole: string | null
       active: boolean
       createdAt: Date
       updatedAt: Date
@@ -3114,6 +3256,7 @@ export namespace Prisma {
     assignedTickets<T extends TicketingUser$assignedTicketsArgs<ExtArgs> = {}>(args?: Subset<T, TicketingUser$assignedTicketsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TicketPayload<ExtArgs>, T, "findMany"> | Null>
     messages<T extends TicketingUser$messagesArgs<ExtArgs> = {}>(args?: Subset<T, TicketingUser$messagesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TicketMessagePayload<ExtArgs>, T, "findMany"> | Null>
     auditLogs<T extends TicketingUser$auditLogsArgs<ExtArgs> = {}>(args?: Subset<T, TicketingUser$auditLogsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TicketAuditLogPayload<ExtArgs>, T, "findMany"> | Null>
+    consultantOrganizations<T extends TicketingUser$consultantOrganizationsArgs<ExtArgs> = {}>(args?: Subset<T, TicketingUser$consultantOrganizationsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ConsultantOrganizationPayload<ExtArgs>, T, "findMany"> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3151,6 +3294,7 @@ export namespace Prisma {
     readonly organizationId: FieldRef<"TicketingUser", 'String'>
     readonly consultantVerified: FieldRef<"TicketingUser", 'Boolean'>
     readonly tbosAdminUserId: FieldRef<"TicketingUser", 'String'>
+    readonly tbosRole: FieldRef<"TicketingUser", 'String'>
     readonly active: FieldRef<"TicketingUser", 'Boolean'>
     readonly createdAt: FieldRef<"TicketingUser", 'DateTime'>
     readonly updatedAt: FieldRef<"TicketingUser", 'DateTime'>
@@ -3567,6 +3711,26 @@ export namespace Prisma {
   }
 
   /**
+   * TicketingUser.consultantOrganizations
+   */
+  export type TicketingUser$consultantOrganizationsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsultantOrganization
+     */
+    select?: ConsultantOrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ConsultantOrganizationInclude<ExtArgs> | null
+    where?: ConsultantOrganizationWhereInput
+    orderBy?: ConsultantOrganizationOrderByWithRelationInput | ConsultantOrganizationOrderByWithRelationInput[]
+    cursor?: ConsultantOrganizationWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ConsultantOrganizationScalarFieldEnum | ConsultantOrganizationScalarFieldEnum[]
+  }
+
+  /**
    * TicketingUser without action
    */
   export type TicketingUserDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -3578,6 +3742,933 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: TicketingUserInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model ConsultantOrganization
+   */
+
+  export type AggregateConsultantOrganization = {
+    _count: ConsultantOrganizationCountAggregateOutputType | null
+    _min: ConsultantOrganizationMinAggregateOutputType | null
+    _max: ConsultantOrganizationMaxAggregateOutputType | null
+  }
+
+  export type ConsultantOrganizationMinAggregateOutputType = {
+    id: string | null
+    consultantId: string | null
+    organizationId: string | null
+    createdAt: Date | null
+  }
+
+  export type ConsultantOrganizationMaxAggregateOutputType = {
+    id: string | null
+    consultantId: string | null
+    organizationId: string | null
+    createdAt: Date | null
+  }
+
+  export type ConsultantOrganizationCountAggregateOutputType = {
+    id: number
+    consultantId: number
+    organizationId: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type ConsultantOrganizationMinAggregateInputType = {
+    id?: true
+    consultantId?: true
+    organizationId?: true
+    createdAt?: true
+  }
+
+  export type ConsultantOrganizationMaxAggregateInputType = {
+    id?: true
+    consultantId?: true
+    organizationId?: true
+    createdAt?: true
+  }
+
+  export type ConsultantOrganizationCountAggregateInputType = {
+    id?: true
+    consultantId?: true
+    organizationId?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type ConsultantOrganizationAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ConsultantOrganization to aggregate.
+     */
+    where?: ConsultantOrganizationWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ConsultantOrganizations to fetch.
+     */
+    orderBy?: ConsultantOrganizationOrderByWithRelationInput | ConsultantOrganizationOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ConsultantOrganizationWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ConsultantOrganizations from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ConsultantOrganizations.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned ConsultantOrganizations
+    **/
+    _count?: true | ConsultantOrganizationCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ConsultantOrganizationMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ConsultantOrganizationMaxAggregateInputType
+  }
+
+  export type GetConsultantOrganizationAggregateType<T extends ConsultantOrganizationAggregateArgs> = {
+        [P in keyof T & keyof AggregateConsultantOrganization]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateConsultantOrganization[P]>
+      : GetScalarType<T[P], AggregateConsultantOrganization[P]>
+  }
+
+
+
+
+  export type ConsultantOrganizationGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ConsultantOrganizationWhereInput
+    orderBy?: ConsultantOrganizationOrderByWithAggregationInput | ConsultantOrganizationOrderByWithAggregationInput[]
+    by: ConsultantOrganizationScalarFieldEnum[] | ConsultantOrganizationScalarFieldEnum
+    having?: ConsultantOrganizationScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ConsultantOrganizationCountAggregateInputType | true
+    _min?: ConsultantOrganizationMinAggregateInputType
+    _max?: ConsultantOrganizationMaxAggregateInputType
+  }
+
+  export type ConsultantOrganizationGroupByOutputType = {
+    id: string
+    consultantId: string
+    organizationId: string
+    createdAt: Date
+    _count: ConsultantOrganizationCountAggregateOutputType | null
+    _min: ConsultantOrganizationMinAggregateOutputType | null
+    _max: ConsultantOrganizationMaxAggregateOutputType | null
+  }
+
+  type GetConsultantOrganizationGroupByPayload<T extends ConsultantOrganizationGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ConsultantOrganizationGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ConsultantOrganizationGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ConsultantOrganizationGroupByOutputType[P]>
+            : GetScalarType<T[P], ConsultantOrganizationGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ConsultantOrganizationSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    consultantId?: boolean
+    organizationId?: boolean
+    createdAt?: boolean
+    consultant?: boolean | TicketingUserDefaultArgs<ExtArgs>
+    organization?: boolean | OrganizationDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["consultantOrganization"]>
+
+  export type ConsultantOrganizationSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    consultantId?: boolean
+    organizationId?: boolean
+    createdAt?: boolean
+    consultant?: boolean | TicketingUserDefaultArgs<ExtArgs>
+    organization?: boolean | OrganizationDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["consultantOrganization"]>
+
+  export type ConsultantOrganizationSelectScalar = {
+    id?: boolean
+    consultantId?: boolean
+    organizationId?: boolean
+    createdAt?: boolean
+  }
+
+  export type ConsultantOrganizationInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    consultant?: boolean | TicketingUserDefaultArgs<ExtArgs>
+    organization?: boolean | OrganizationDefaultArgs<ExtArgs>
+  }
+  export type ConsultantOrganizationIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    consultant?: boolean | TicketingUserDefaultArgs<ExtArgs>
+    organization?: boolean | OrganizationDefaultArgs<ExtArgs>
+  }
+
+  export type $ConsultantOrganizationPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "ConsultantOrganization"
+    objects: {
+      consultant: Prisma.$TicketingUserPayload<ExtArgs>
+      organization: Prisma.$OrganizationPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      consultantId: string
+      organizationId: string
+      createdAt: Date
+    }, ExtArgs["result"]["consultantOrganization"]>
+    composites: {}
+  }
+
+  type ConsultantOrganizationGetPayload<S extends boolean | null | undefined | ConsultantOrganizationDefaultArgs> = $Result.GetResult<Prisma.$ConsultantOrganizationPayload, S>
+
+  type ConsultantOrganizationCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<ConsultantOrganizationFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: ConsultantOrganizationCountAggregateInputType | true
+    }
+
+  export interface ConsultantOrganizationDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['ConsultantOrganization'], meta: { name: 'ConsultantOrganization' } }
+    /**
+     * Find zero or one ConsultantOrganization that matches the filter.
+     * @param {ConsultantOrganizationFindUniqueArgs} args - Arguments to find a ConsultantOrganization
+     * @example
+     * // Get one ConsultantOrganization
+     * const consultantOrganization = await prisma.consultantOrganization.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ConsultantOrganizationFindUniqueArgs>(args: SelectSubset<T, ConsultantOrganizationFindUniqueArgs<ExtArgs>>): Prisma__ConsultantOrganizationClient<$Result.GetResult<Prisma.$ConsultantOrganizationPayload<ExtArgs>, T, "findUnique"> | null, null, ExtArgs>
+
+    /**
+     * Find one ConsultantOrganization that matches the filter or throw an error with `error.code='P2025'` 
+     * if no matches were found.
+     * @param {ConsultantOrganizationFindUniqueOrThrowArgs} args - Arguments to find a ConsultantOrganization
+     * @example
+     * // Get one ConsultantOrganization
+     * const consultantOrganization = await prisma.consultantOrganization.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ConsultantOrganizationFindUniqueOrThrowArgs>(args: SelectSubset<T, ConsultantOrganizationFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ConsultantOrganizationClient<$Result.GetResult<Prisma.$ConsultantOrganizationPayload<ExtArgs>, T, "findUniqueOrThrow">, never, ExtArgs>
+
+    /**
+     * Find the first ConsultantOrganization that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ConsultantOrganizationFindFirstArgs} args - Arguments to find a ConsultantOrganization
+     * @example
+     * // Get one ConsultantOrganization
+     * const consultantOrganization = await prisma.consultantOrganization.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ConsultantOrganizationFindFirstArgs>(args?: SelectSubset<T, ConsultantOrganizationFindFirstArgs<ExtArgs>>): Prisma__ConsultantOrganizationClient<$Result.GetResult<Prisma.$ConsultantOrganizationPayload<ExtArgs>, T, "findFirst"> | null, null, ExtArgs>
+
+    /**
+     * Find the first ConsultantOrganization that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ConsultantOrganizationFindFirstOrThrowArgs} args - Arguments to find a ConsultantOrganization
+     * @example
+     * // Get one ConsultantOrganization
+     * const consultantOrganization = await prisma.consultantOrganization.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ConsultantOrganizationFindFirstOrThrowArgs>(args?: SelectSubset<T, ConsultantOrganizationFindFirstOrThrowArgs<ExtArgs>>): Prisma__ConsultantOrganizationClient<$Result.GetResult<Prisma.$ConsultantOrganizationPayload<ExtArgs>, T, "findFirstOrThrow">, never, ExtArgs>
+
+    /**
+     * Find zero or more ConsultantOrganizations that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ConsultantOrganizationFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all ConsultantOrganizations
+     * const consultantOrganizations = await prisma.consultantOrganization.findMany()
+     * 
+     * // Get first 10 ConsultantOrganizations
+     * const consultantOrganizations = await prisma.consultantOrganization.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const consultantOrganizationWithIdOnly = await prisma.consultantOrganization.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends ConsultantOrganizationFindManyArgs>(args?: SelectSubset<T, ConsultantOrganizationFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ConsultantOrganizationPayload<ExtArgs>, T, "findMany">>
+
+    /**
+     * Create a ConsultantOrganization.
+     * @param {ConsultantOrganizationCreateArgs} args - Arguments to create a ConsultantOrganization.
+     * @example
+     * // Create one ConsultantOrganization
+     * const ConsultantOrganization = await prisma.consultantOrganization.create({
+     *   data: {
+     *     // ... data to create a ConsultantOrganization
+     *   }
+     * })
+     * 
+     */
+    create<T extends ConsultantOrganizationCreateArgs>(args: SelectSubset<T, ConsultantOrganizationCreateArgs<ExtArgs>>): Prisma__ConsultantOrganizationClient<$Result.GetResult<Prisma.$ConsultantOrganizationPayload<ExtArgs>, T, "create">, never, ExtArgs>
+
+    /**
+     * Create many ConsultantOrganizations.
+     * @param {ConsultantOrganizationCreateManyArgs} args - Arguments to create many ConsultantOrganizations.
+     * @example
+     * // Create many ConsultantOrganizations
+     * const consultantOrganization = await prisma.consultantOrganization.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ConsultantOrganizationCreateManyArgs>(args?: SelectSubset<T, ConsultantOrganizationCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many ConsultantOrganizations and returns the data saved in the database.
+     * @param {ConsultantOrganizationCreateManyAndReturnArgs} args - Arguments to create many ConsultantOrganizations.
+     * @example
+     * // Create many ConsultantOrganizations
+     * const consultantOrganization = await prisma.consultantOrganization.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many ConsultantOrganizations and only return the `id`
+     * const consultantOrganizationWithIdOnly = await prisma.consultantOrganization.createManyAndReturn({ 
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ConsultantOrganizationCreateManyAndReturnArgs>(args?: SelectSubset<T, ConsultantOrganizationCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ConsultantOrganizationPayload<ExtArgs>, T, "createManyAndReturn">>
+
+    /**
+     * Delete a ConsultantOrganization.
+     * @param {ConsultantOrganizationDeleteArgs} args - Arguments to delete one ConsultantOrganization.
+     * @example
+     * // Delete one ConsultantOrganization
+     * const ConsultantOrganization = await prisma.consultantOrganization.delete({
+     *   where: {
+     *     // ... filter to delete one ConsultantOrganization
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ConsultantOrganizationDeleteArgs>(args: SelectSubset<T, ConsultantOrganizationDeleteArgs<ExtArgs>>): Prisma__ConsultantOrganizationClient<$Result.GetResult<Prisma.$ConsultantOrganizationPayload<ExtArgs>, T, "delete">, never, ExtArgs>
+
+    /**
+     * Update one ConsultantOrganization.
+     * @param {ConsultantOrganizationUpdateArgs} args - Arguments to update one ConsultantOrganization.
+     * @example
+     * // Update one ConsultantOrganization
+     * const consultantOrganization = await prisma.consultantOrganization.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ConsultantOrganizationUpdateArgs>(args: SelectSubset<T, ConsultantOrganizationUpdateArgs<ExtArgs>>): Prisma__ConsultantOrganizationClient<$Result.GetResult<Prisma.$ConsultantOrganizationPayload<ExtArgs>, T, "update">, never, ExtArgs>
+
+    /**
+     * Delete zero or more ConsultantOrganizations.
+     * @param {ConsultantOrganizationDeleteManyArgs} args - Arguments to filter ConsultantOrganizations to delete.
+     * @example
+     * // Delete a few ConsultantOrganizations
+     * const { count } = await prisma.consultantOrganization.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ConsultantOrganizationDeleteManyArgs>(args?: SelectSubset<T, ConsultantOrganizationDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ConsultantOrganizations.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ConsultantOrganizationUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many ConsultantOrganizations
+     * const consultantOrganization = await prisma.consultantOrganization.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ConsultantOrganizationUpdateManyArgs>(args: SelectSubset<T, ConsultantOrganizationUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one ConsultantOrganization.
+     * @param {ConsultantOrganizationUpsertArgs} args - Arguments to update or create a ConsultantOrganization.
+     * @example
+     * // Update or create a ConsultantOrganization
+     * const consultantOrganization = await prisma.consultantOrganization.upsert({
+     *   create: {
+     *     // ... data to create a ConsultantOrganization
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the ConsultantOrganization we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ConsultantOrganizationUpsertArgs>(args: SelectSubset<T, ConsultantOrganizationUpsertArgs<ExtArgs>>): Prisma__ConsultantOrganizationClient<$Result.GetResult<Prisma.$ConsultantOrganizationPayload<ExtArgs>, T, "upsert">, never, ExtArgs>
+
+
+    /**
+     * Count the number of ConsultantOrganizations.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ConsultantOrganizationCountArgs} args - Arguments to filter ConsultantOrganizations to count.
+     * @example
+     * // Count the number of ConsultantOrganizations
+     * const count = await prisma.consultantOrganization.count({
+     *   where: {
+     *     // ... the filter for the ConsultantOrganizations we want to count
+     *   }
+     * })
+    **/
+    count<T extends ConsultantOrganizationCountArgs>(
+      args?: Subset<T, ConsultantOrganizationCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ConsultantOrganizationCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a ConsultantOrganization.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ConsultantOrganizationAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ConsultantOrganizationAggregateArgs>(args: Subset<T, ConsultantOrganizationAggregateArgs>): Prisma.PrismaPromise<GetConsultantOrganizationAggregateType<T>>
+
+    /**
+     * Group by ConsultantOrganization.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ConsultantOrganizationGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ConsultantOrganizationGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ConsultantOrganizationGroupByArgs['orderBy'] }
+        : { orderBy?: ConsultantOrganizationGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ConsultantOrganizationGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetConsultantOrganizationGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the ConsultantOrganization model
+   */
+  readonly fields: ConsultantOrganizationFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for ConsultantOrganization.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ConsultantOrganizationClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    consultant<T extends TicketingUserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, TicketingUserDefaultArgs<ExtArgs>>): Prisma__TicketingUserClient<$Result.GetResult<Prisma.$TicketingUserPayload<ExtArgs>, T, "findUniqueOrThrow"> | Null, Null, ExtArgs>
+    organization<T extends OrganizationDefaultArgs<ExtArgs> = {}>(args?: Subset<T, OrganizationDefaultArgs<ExtArgs>>): Prisma__OrganizationClient<$Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, "findUniqueOrThrow"> | Null, Null, ExtArgs>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the ConsultantOrganization model
+   */ 
+  interface ConsultantOrganizationFieldRefs {
+    readonly id: FieldRef<"ConsultantOrganization", 'String'>
+    readonly consultantId: FieldRef<"ConsultantOrganization", 'String'>
+    readonly organizationId: FieldRef<"ConsultantOrganization", 'String'>
+    readonly createdAt: FieldRef<"ConsultantOrganization", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * ConsultantOrganization findUnique
+   */
+  export type ConsultantOrganizationFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsultantOrganization
+     */
+    select?: ConsultantOrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ConsultantOrganizationInclude<ExtArgs> | null
+    /**
+     * Filter, which ConsultantOrganization to fetch.
+     */
+    where: ConsultantOrganizationWhereUniqueInput
+  }
+
+  /**
+   * ConsultantOrganization findUniqueOrThrow
+   */
+  export type ConsultantOrganizationFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsultantOrganization
+     */
+    select?: ConsultantOrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ConsultantOrganizationInclude<ExtArgs> | null
+    /**
+     * Filter, which ConsultantOrganization to fetch.
+     */
+    where: ConsultantOrganizationWhereUniqueInput
+  }
+
+  /**
+   * ConsultantOrganization findFirst
+   */
+  export type ConsultantOrganizationFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsultantOrganization
+     */
+    select?: ConsultantOrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ConsultantOrganizationInclude<ExtArgs> | null
+    /**
+     * Filter, which ConsultantOrganization to fetch.
+     */
+    where?: ConsultantOrganizationWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ConsultantOrganizations to fetch.
+     */
+    orderBy?: ConsultantOrganizationOrderByWithRelationInput | ConsultantOrganizationOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ConsultantOrganizations.
+     */
+    cursor?: ConsultantOrganizationWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ConsultantOrganizations from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ConsultantOrganizations.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ConsultantOrganizations.
+     */
+    distinct?: ConsultantOrganizationScalarFieldEnum | ConsultantOrganizationScalarFieldEnum[]
+  }
+
+  /**
+   * ConsultantOrganization findFirstOrThrow
+   */
+  export type ConsultantOrganizationFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsultantOrganization
+     */
+    select?: ConsultantOrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ConsultantOrganizationInclude<ExtArgs> | null
+    /**
+     * Filter, which ConsultantOrganization to fetch.
+     */
+    where?: ConsultantOrganizationWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ConsultantOrganizations to fetch.
+     */
+    orderBy?: ConsultantOrganizationOrderByWithRelationInput | ConsultantOrganizationOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ConsultantOrganizations.
+     */
+    cursor?: ConsultantOrganizationWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ConsultantOrganizations from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ConsultantOrganizations.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ConsultantOrganizations.
+     */
+    distinct?: ConsultantOrganizationScalarFieldEnum | ConsultantOrganizationScalarFieldEnum[]
+  }
+
+  /**
+   * ConsultantOrganization findMany
+   */
+  export type ConsultantOrganizationFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsultantOrganization
+     */
+    select?: ConsultantOrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ConsultantOrganizationInclude<ExtArgs> | null
+    /**
+     * Filter, which ConsultantOrganizations to fetch.
+     */
+    where?: ConsultantOrganizationWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ConsultantOrganizations to fetch.
+     */
+    orderBy?: ConsultantOrganizationOrderByWithRelationInput | ConsultantOrganizationOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing ConsultantOrganizations.
+     */
+    cursor?: ConsultantOrganizationWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ConsultantOrganizations from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ConsultantOrganizations.
+     */
+    skip?: number
+    distinct?: ConsultantOrganizationScalarFieldEnum | ConsultantOrganizationScalarFieldEnum[]
+  }
+
+  /**
+   * ConsultantOrganization create
+   */
+  export type ConsultantOrganizationCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsultantOrganization
+     */
+    select?: ConsultantOrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ConsultantOrganizationInclude<ExtArgs> | null
+    /**
+     * The data needed to create a ConsultantOrganization.
+     */
+    data: XOR<ConsultantOrganizationCreateInput, ConsultantOrganizationUncheckedCreateInput>
+  }
+
+  /**
+   * ConsultantOrganization createMany
+   */
+  export type ConsultantOrganizationCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many ConsultantOrganizations.
+     */
+    data: ConsultantOrganizationCreateManyInput | ConsultantOrganizationCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ConsultantOrganization createManyAndReturn
+   */
+  export type ConsultantOrganizationCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsultantOrganization
+     */
+    select?: ConsultantOrganizationSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * The data used to create many ConsultantOrganizations.
+     */
+    data: ConsultantOrganizationCreateManyInput | ConsultantOrganizationCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ConsultantOrganizationIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ConsultantOrganization update
+   */
+  export type ConsultantOrganizationUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsultantOrganization
+     */
+    select?: ConsultantOrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ConsultantOrganizationInclude<ExtArgs> | null
+    /**
+     * The data needed to update a ConsultantOrganization.
+     */
+    data: XOR<ConsultantOrganizationUpdateInput, ConsultantOrganizationUncheckedUpdateInput>
+    /**
+     * Choose, which ConsultantOrganization to update.
+     */
+    where: ConsultantOrganizationWhereUniqueInput
+  }
+
+  /**
+   * ConsultantOrganization updateMany
+   */
+  export type ConsultantOrganizationUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update ConsultantOrganizations.
+     */
+    data: XOR<ConsultantOrganizationUpdateManyMutationInput, ConsultantOrganizationUncheckedUpdateManyInput>
+    /**
+     * Filter which ConsultantOrganizations to update
+     */
+    where?: ConsultantOrganizationWhereInput
+  }
+
+  /**
+   * ConsultantOrganization upsert
+   */
+  export type ConsultantOrganizationUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsultantOrganization
+     */
+    select?: ConsultantOrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ConsultantOrganizationInclude<ExtArgs> | null
+    /**
+     * The filter to search for the ConsultantOrganization to update in case it exists.
+     */
+    where: ConsultantOrganizationWhereUniqueInput
+    /**
+     * In case the ConsultantOrganization found by the `where` argument doesn't exist, create a new ConsultantOrganization with this data.
+     */
+    create: XOR<ConsultantOrganizationCreateInput, ConsultantOrganizationUncheckedCreateInput>
+    /**
+     * In case the ConsultantOrganization was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ConsultantOrganizationUpdateInput, ConsultantOrganizationUncheckedUpdateInput>
+  }
+
+  /**
+   * ConsultantOrganization delete
+   */
+  export type ConsultantOrganizationDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsultantOrganization
+     */
+    select?: ConsultantOrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ConsultantOrganizationInclude<ExtArgs> | null
+    /**
+     * Filter which ConsultantOrganization to delete.
+     */
+    where: ConsultantOrganizationWhereUniqueInput
+  }
+
+  /**
+   * ConsultantOrganization deleteMany
+   */
+  export type ConsultantOrganizationDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ConsultantOrganizations to delete
+     */
+    where?: ConsultantOrganizationWhereInput
+  }
+
+  /**
+   * ConsultantOrganization without action
+   */
+  export type ConsultantOrganizationDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsultantOrganization
+     */
+    select?: ConsultantOrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ConsultantOrganizationInclude<ExtArgs> | null
   }
 
 
@@ -7686,12 +8777,23 @@ export namespace Prisma {
     organizationId: 'organizationId',
     consultantVerified: 'consultantVerified',
     tbosAdminUserId: 'tbosAdminUserId',
+    tbosRole: 'tbosRole',
     active: 'active',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
 
   export type TicketingUserScalarFieldEnum = (typeof TicketingUserScalarFieldEnum)[keyof typeof TicketingUserScalarFieldEnum]
+
+
+  export const ConsultantOrganizationScalarFieldEnum: {
+    id: 'id',
+    consultantId: 'consultantId',
+    organizationId: 'organizationId',
+    createdAt: 'createdAt'
+  };
+
+  export type ConsultantOrganizationScalarFieldEnum = (typeof ConsultantOrganizationScalarFieldEnum)[keyof typeof ConsultantOrganizationScalarFieldEnum]
 
 
   export const TicketScalarFieldEnum: {
@@ -7940,6 +9042,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"Organization"> | Date | string
     users?: TicketingUserListRelationFilter
     tickets?: TicketListRelationFilter
+    consultantOrganizations?: ConsultantOrganizationListRelationFilter
   }
 
   export type OrganizationOrderByWithRelationInput = {
@@ -7951,6 +9054,7 @@ export namespace Prisma {
     updatedAt?: SortOrder
     users?: TicketingUserOrderByRelationAggregateInput
     tickets?: TicketOrderByRelationAggregateInput
+    consultantOrganizations?: ConsultantOrganizationOrderByRelationAggregateInput
   }
 
   export type OrganizationWhereUniqueInput = Prisma.AtLeast<{
@@ -7965,6 +9069,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"Organization"> | Date | string
     users?: TicketingUserListRelationFilter
     tickets?: TicketListRelationFilter
+    consultantOrganizations?: ConsultantOrganizationListRelationFilter
   }, "id" | "slug">
 
   export type OrganizationOrderByWithAggregationInput = {
@@ -8003,6 +9108,7 @@ export namespace Prisma {
     organizationId?: StringNullableFilter<"TicketingUser"> | string | null
     consultantVerified?: BoolFilter<"TicketingUser"> | boolean
     tbosAdminUserId?: StringNullableFilter<"TicketingUser"> | string | null
+    tbosRole?: StringNullableFilter<"TicketingUser"> | string | null
     active?: BoolFilter<"TicketingUser"> | boolean
     createdAt?: DateTimeFilter<"TicketingUser"> | Date | string
     updatedAt?: DateTimeFilter<"TicketingUser"> | Date | string
@@ -8011,6 +9117,7 @@ export namespace Prisma {
     assignedTickets?: TicketListRelationFilter
     messages?: TicketMessageListRelationFilter
     auditLogs?: TicketAuditLogListRelationFilter
+    consultantOrganizations?: ConsultantOrganizationListRelationFilter
   }
 
   export type TicketingUserOrderByWithRelationInput = {
@@ -8022,6 +9129,7 @@ export namespace Prisma {
     organizationId?: SortOrderInput | SortOrder
     consultantVerified?: SortOrder
     tbosAdminUserId?: SortOrderInput | SortOrder
+    tbosRole?: SortOrderInput | SortOrder
     active?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -8030,6 +9138,7 @@ export namespace Prisma {
     assignedTickets?: TicketOrderByRelationAggregateInput
     messages?: TicketMessageOrderByRelationAggregateInput
     auditLogs?: TicketAuditLogOrderByRelationAggregateInput
+    consultantOrganizations?: ConsultantOrganizationOrderByRelationAggregateInput
   }
 
   export type TicketingUserWhereUniqueInput = Prisma.AtLeast<{
@@ -8044,6 +9153,7 @@ export namespace Prisma {
     role?: EnumTicketingUserRoleFilter<"TicketingUser"> | $Enums.TicketingUserRole
     organizationId?: StringNullableFilter<"TicketingUser"> | string | null
     consultantVerified?: BoolFilter<"TicketingUser"> | boolean
+    tbosRole?: StringNullableFilter<"TicketingUser"> | string | null
     active?: BoolFilter<"TicketingUser"> | boolean
     createdAt?: DateTimeFilter<"TicketingUser"> | Date | string
     updatedAt?: DateTimeFilter<"TicketingUser"> | Date | string
@@ -8052,6 +9162,7 @@ export namespace Prisma {
     assignedTickets?: TicketListRelationFilter
     messages?: TicketMessageListRelationFilter
     auditLogs?: TicketAuditLogListRelationFilter
+    consultantOrganizations?: ConsultantOrganizationListRelationFilter
   }, "id" | "email" | "tbosAdminUserId">
 
   export type TicketingUserOrderByWithAggregationInput = {
@@ -8063,6 +9174,7 @@ export namespace Prisma {
     organizationId?: SortOrderInput | SortOrder
     consultantVerified?: SortOrder
     tbosAdminUserId?: SortOrderInput | SortOrder
+    tbosRole?: SortOrderInput | SortOrder
     active?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -8083,9 +9195,64 @@ export namespace Prisma {
     organizationId?: StringNullableWithAggregatesFilter<"TicketingUser"> | string | null
     consultantVerified?: BoolWithAggregatesFilter<"TicketingUser"> | boolean
     tbosAdminUserId?: StringNullableWithAggregatesFilter<"TicketingUser"> | string | null
+    tbosRole?: StringNullableWithAggregatesFilter<"TicketingUser"> | string | null
     active?: BoolWithAggregatesFilter<"TicketingUser"> | boolean
     createdAt?: DateTimeWithAggregatesFilter<"TicketingUser"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"TicketingUser"> | Date | string
+  }
+
+  export type ConsultantOrganizationWhereInput = {
+    AND?: ConsultantOrganizationWhereInput | ConsultantOrganizationWhereInput[]
+    OR?: ConsultantOrganizationWhereInput[]
+    NOT?: ConsultantOrganizationWhereInput | ConsultantOrganizationWhereInput[]
+    id?: StringFilter<"ConsultantOrganization"> | string
+    consultantId?: StringFilter<"ConsultantOrganization"> | string
+    organizationId?: StringFilter<"ConsultantOrganization"> | string
+    createdAt?: DateTimeFilter<"ConsultantOrganization"> | Date | string
+    consultant?: XOR<TicketingUserRelationFilter, TicketingUserWhereInput>
+    organization?: XOR<OrganizationRelationFilter, OrganizationWhereInput>
+  }
+
+  export type ConsultantOrganizationOrderByWithRelationInput = {
+    id?: SortOrder
+    consultantId?: SortOrder
+    organizationId?: SortOrder
+    createdAt?: SortOrder
+    consultant?: TicketingUserOrderByWithRelationInput
+    organization?: OrganizationOrderByWithRelationInput
+  }
+
+  export type ConsultantOrganizationWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    consultantId_organizationId?: ConsultantOrganizationConsultantIdOrganizationIdCompoundUniqueInput
+    AND?: ConsultantOrganizationWhereInput | ConsultantOrganizationWhereInput[]
+    OR?: ConsultantOrganizationWhereInput[]
+    NOT?: ConsultantOrganizationWhereInput | ConsultantOrganizationWhereInput[]
+    consultantId?: StringFilter<"ConsultantOrganization"> | string
+    organizationId?: StringFilter<"ConsultantOrganization"> | string
+    createdAt?: DateTimeFilter<"ConsultantOrganization"> | Date | string
+    consultant?: XOR<TicketingUserRelationFilter, TicketingUserWhereInput>
+    organization?: XOR<OrganizationRelationFilter, OrganizationWhereInput>
+  }, "id" | "consultantId_organizationId">
+
+  export type ConsultantOrganizationOrderByWithAggregationInput = {
+    id?: SortOrder
+    consultantId?: SortOrder
+    organizationId?: SortOrder
+    createdAt?: SortOrder
+    _count?: ConsultantOrganizationCountOrderByAggregateInput
+    _max?: ConsultantOrganizationMaxOrderByAggregateInput
+    _min?: ConsultantOrganizationMinOrderByAggregateInput
+  }
+
+  export type ConsultantOrganizationScalarWhereWithAggregatesInput = {
+    AND?: ConsultantOrganizationScalarWhereWithAggregatesInput | ConsultantOrganizationScalarWhereWithAggregatesInput[]
+    OR?: ConsultantOrganizationScalarWhereWithAggregatesInput[]
+    NOT?: ConsultantOrganizationScalarWhereWithAggregatesInput | ConsultantOrganizationScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"ConsultantOrganization"> | string
+    consultantId?: StringWithAggregatesFilter<"ConsultantOrganization"> | string
+    organizationId?: StringWithAggregatesFilter<"ConsultantOrganization"> | string
+    createdAt?: DateTimeWithAggregatesFilter<"ConsultantOrganization"> | Date | string
   }
 
   export type TicketWhereInput = {
@@ -8415,6 +9582,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     users?: TicketingUserCreateNestedManyWithoutOrganizationInput
     tickets?: TicketCreateNestedManyWithoutOrganizationInput
+    consultantOrganizations?: ConsultantOrganizationCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUncheckedCreateInput = {
@@ -8426,6 +9594,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     users?: TicketingUserUncheckedCreateNestedManyWithoutOrganizationInput
     tickets?: TicketUncheckedCreateNestedManyWithoutOrganizationInput
+    consultantOrganizations?: ConsultantOrganizationUncheckedCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUpdateInput = {
@@ -8437,6 +9606,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     users?: TicketingUserUpdateManyWithoutOrganizationNestedInput
     tickets?: TicketUpdateManyWithoutOrganizationNestedInput
+    consultantOrganizations?: ConsultantOrganizationUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationUncheckedUpdateInput = {
@@ -8448,6 +9618,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     users?: TicketingUserUncheckedUpdateManyWithoutOrganizationNestedInput
     tickets?: TicketUncheckedUpdateManyWithoutOrganizationNestedInput
+    consultantOrganizations?: ConsultantOrganizationUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationCreateManyInput = {
@@ -8485,6 +9656,7 @@ export namespace Prisma {
     role: $Enums.TicketingUserRole
     consultantVerified?: boolean
     tbosAdminUserId?: string | null
+    tbosRole?: string | null
     active?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -8493,6 +9665,7 @@ export namespace Prisma {
     assignedTickets?: TicketCreateNestedManyWithoutAssignedToInput
     messages?: TicketMessageCreateNestedManyWithoutAuthorInput
     auditLogs?: TicketAuditLogCreateNestedManyWithoutActorInput
+    consultantOrganizations?: ConsultantOrganizationCreateNestedManyWithoutConsultantInput
   }
 
   export type TicketingUserUncheckedCreateInput = {
@@ -8504,6 +9677,7 @@ export namespace Prisma {
     organizationId?: string | null
     consultantVerified?: boolean
     tbosAdminUserId?: string | null
+    tbosRole?: string | null
     active?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -8511,6 +9685,7 @@ export namespace Prisma {
     assignedTickets?: TicketUncheckedCreateNestedManyWithoutAssignedToInput
     messages?: TicketMessageUncheckedCreateNestedManyWithoutAuthorInput
     auditLogs?: TicketAuditLogUncheckedCreateNestedManyWithoutActorInput
+    consultantOrganizations?: ConsultantOrganizationUncheckedCreateNestedManyWithoutConsultantInput
   }
 
   export type TicketingUserUpdateInput = {
@@ -8521,6 +9696,7 @@ export namespace Prisma {
     role?: EnumTicketingUserRoleFieldUpdateOperationsInput | $Enums.TicketingUserRole
     consultantVerified?: BoolFieldUpdateOperationsInput | boolean
     tbosAdminUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    tbosRole?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -8529,6 +9705,7 @@ export namespace Prisma {
     assignedTickets?: TicketUpdateManyWithoutAssignedToNestedInput
     messages?: TicketMessageUpdateManyWithoutAuthorNestedInput
     auditLogs?: TicketAuditLogUpdateManyWithoutActorNestedInput
+    consultantOrganizations?: ConsultantOrganizationUpdateManyWithoutConsultantNestedInput
   }
 
   export type TicketingUserUncheckedUpdateInput = {
@@ -8540,6 +9717,7 @@ export namespace Prisma {
     organizationId?: NullableStringFieldUpdateOperationsInput | string | null
     consultantVerified?: BoolFieldUpdateOperationsInput | boolean
     tbosAdminUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    tbosRole?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -8547,6 +9725,7 @@ export namespace Prisma {
     assignedTickets?: TicketUncheckedUpdateManyWithoutAssignedToNestedInput
     messages?: TicketMessageUncheckedUpdateManyWithoutAuthorNestedInput
     auditLogs?: TicketAuditLogUncheckedUpdateManyWithoutActorNestedInput
+    consultantOrganizations?: ConsultantOrganizationUncheckedUpdateManyWithoutConsultantNestedInput
   }
 
   export type TicketingUserCreateManyInput = {
@@ -8558,6 +9737,7 @@ export namespace Prisma {
     organizationId?: string | null
     consultantVerified?: boolean
     tbosAdminUserId?: string | null
+    tbosRole?: string | null
     active?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -8571,6 +9751,7 @@ export namespace Prisma {
     role?: EnumTicketingUserRoleFieldUpdateOperationsInput | $Enums.TicketingUserRole
     consultantVerified?: BoolFieldUpdateOperationsInput | boolean
     tbosAdminUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    tbosRole?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -8585,9 +9766,57 @@ export namespace Prisma {
     organizationId?: NullableStringFieldUpdateOperationsInput | string | null
     consultantVerified?: BoolFieldUpdateOperationsInput | boolean
     tbosAdminUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    tbosRole?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ConsultantOrganizationCreateInput = {
+    id?: string
+    createdAt?: Date | string
+    consultant: TicketingUserCreateNestedOneWithoutConsultantOrganizationsInput
+    organization: OrganizationCreateNestedOneWithoutConsultantOrganizationsInput
+  }
+
+  export type ConsultantOrganizationUncheckedCreateInput = {
+    id?: string
+    consultantId: string
+    organizationId: string
+    createdAt?: Date | string
+  }
+
+  export type ConsultantOrganizationUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    consultant?: TicketingUserUpdateOneRequiredWithoutConsultantOrganizationsNestedInput
+    organization?: OrganizationUpdateOneRequiredWithoutConsultantOrganizationsNestedInput
+  }
+
+  export type ConsultantOrganizationUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    consultantId?: StringFieldUpdateOperationsInput | string
+    organizationId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ConsultantOrganizationCreateManyInput = {
+    id?: string
+    consultantId: string
+    organizationId: string
+    createdAt?: Date | string
+  }
+
+  export type ConsultantOrganizationUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ConsultantOrganizationUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    consultantId?: StringFieldUpdateOperationsInput | string
+    organizationId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type TicketCreateInput = {
@@ -8966,11 +10195,21 @@ export namespace Prisma {
     none?: TicketWhereInput
   }
 
+  export type ConsultantOrganizationListRelationFilter = {
+    every?: ConsultantOrganizationWhereInput
+    some?: ConsultantOrganizationWhereInput
+    none?: ConsultantOrganizationWhereInput
+  }
+
   export type TicketingUserOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
   export type TicketOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type ConsultantOrganizationOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -9102,6 +10341,7 @@ export namespace Prisma {
     organizationId?: SortOrder
     consultantVerified?: SortOrder
     tbosAdminUserId?: SortOrder
+    tbosRole?: SortOrder
     active?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -9116,6 +10356,7 @@ export namespace Prisma {
     organizationId?: SortOrder
     consultantVerified?: SortOrder
     tbosAdminUserId?: SortOrder
+    tbosRole?: SortOrder
     active?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -9130,6 +10371,7 @@ export namespace Prisma {
     organizationId?: SortOrder
     consultantVerified?: SortOrder
     tbosAdminUserId?: SortOrder
+    tbosRole?: SortOrder
     active?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -9163,6 +10405,42 @@ export namespace Prisma {
     _max?: NestedStringNullableFilter<$PrismaModel>
   }
 
+  export type TicketingUserRelationFilter = {
+    is?: TicketingUserWhereInput
+    isNot?: TicketingUserWhereInput
+  }
+
+  export type OrganizationRelationFilter = {
+    is?: OrganizationWhereInput
+    isNot?: OrganizationWhereInput
+  }
+
+  export type ConsultantOrganizationConsultantIdOrganizationIdCompoundUniqueInput = {
+    consultantId: string
+    organizationId: string
+  }
+
+  export type ConsultantOrganizationCountOrderByAggregateInput = {
+    id?: SortOrder
+    consultantId?: SortOrder
+    organizationId?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type ConsultantOrganizationMaxOrderByAggregateInput = {
+    id?: SortOrder
+    consultantId?: SortOrder
+    organizationId?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type ConsultantOrganizationMinOrderByAggregateInput = {
+    id?: SortOrder
+    consultantId?: SortOrder
+    organizationId?: SortOrder
+    createdAt?: SortOrder
+  }
+
   export type EnumTicketTypeFilter<$PrismaModel = never> = {
     equals?: $Enums.TicketType | EnumTicketTypeFieldRefInput<$PrismaModel>
     in?: $Enums.TicketType[] | ListEnumTicketTypeFieldRefInput<$PrismaModel>
@@ -9193,16 +10471,6 @@ export namespace Prisma {
     gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
-  }
-
-  export type OrganizationRelationFilter = {
-    is?: OrganizationWhereInput
-    isNot?: OrganizationWhereInput
-  }
-
-  export type TicketingUserRelationFilter = {
-    is?: TicketingUserWhereInput
-    isNot?: TicketingUserWhereInput
   }
 
   export type TicketingUserNullableRelationFilter = {
@@ -9504,6 +10772,13 @@ export namespace Prisma {
     connect?: TicketWhereUniqueInput | TicketWhereUniqueInput[]
   }
 
+  export type ConsultantOrganizationCreateNestedManyWithoutOrganizationInput = {
+    create?: XOR<ConsultantOrganizationCreateWithoutOrganizationInput, ConsultantOrganizationUncheckedCreateWithoutOrganizationInput> | ConsultantOrganizationCreateWithoutOrganizationInput[] | ConsultantOrganizationUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: ConsultantOrganizationCreateOrConnectWithoutOrganizationInput | ConsultantOrganizationCreateOrConnectWithoutOrganizationInput[]
+    createMany?: ConsultantOrganizationCreateManyOrganizationInputEnvelope
+    connect?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
+  }
+
   export type TicketingUserUncheckedCreateNestedManyWithoutOrganizationInput = {
     create?: XOR<TicketingUserCreateWithoutOrganizationInput, TicketingUserUncheckedCreateWithoutOrganizationInput> | TicketingUserCreateWithoutOrganizationInput[] | TicketingUserUncheckedCreateWithoutOrganizationInput[]
     connectOrCreate?: TicketingUserCreateOrConnectWithoutOrganizationInput | TicketingUserCreateOrConnectWithoutOrganizationInput[]
@@ -9516,6 +10791,13 @@ export namespace Prisma {
     connectOrCreate?: TicketCreateOrConnectWithoutOrganizationInput | TicketCreateOrConnectWithoutOrganizationInput[]
     createMany?: TicketCreateManyOrganizationInputEnvelope
     connect?: TicketWhereUniqueInput | TicketWhereUniqueInput[]
+  }
+
+  export type ConsultantOrganizationUncheckedCreateNestedManyWithoutOrganizationInput = {
+    create?: XOR<ConsultantOrganizationCreateWithoutOrganizationInput, ConsultantOrganizationUncheckedCreateWithoutOrganizationInput> | ConsultantOrganizationCreateWithoutOrganizationInput[] | ConsultantOrganizationUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: ConsultantOrganizationCreateOrConnectWithoutOrganizationInput | ConsultantOrganizationCreateOrConnectWithoutOrganizationInput[]
+    createMany?: ConsultantOrganizationCreateManyOrganizationInputEnvelope
+    connect?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -9558,6 +10840,20 @@ export namespace Prisma {
     deleteMany?: TicketScalarWhereInput | TicketScalarWhereInput[]
   }
 
+  export type ConsultantOrganizationUpdateManyWithoutOrganizationNestedInput = {
+    create?: XOR<ConsultantOrganizationCreateWithoutOrganizationInput, ConsultantOrganizationUncheckedCreateWithoutOrganizationInput> | ConsultantOrganizationCreateWithoutOrganizationInput[] | ConsultantOrganizationUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: ConsultantOrganizationCreateOrConnectWithoutOrganizationInput | ConsultantOrganizationCreateOrConnectWithoutOrganizationInput[]
+    upsert?: ConsultantOrganizationUpsertWithWhereUniqueWithoutOrganizationInput | ConsultantOrganizationUpsertWithWhereUniqueWithoutOrganizationInput[]
+    createMany?: ConsultantOrganizationCreateManyOrganizationInputEnvelope
+    set?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
+    disconnect?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
+    delete?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
+    connect?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
+    update?: ConsultantOrganizationUpdateWithWhereUniqueWithoutOrganizationInput | ConsultantOrganizationUpdateWithWhereUniqueWithoutOrganizationInput[]
+    updateMany?: ConsultantOrganizationUpdateManyWithWhereWithoutOrganizationInput | ConsultantOrganizationUpdateManyWithWhereWithoutOrganizationInput[]
+    deleteMany?: ConsultantOrganizationScalarWhereInput | ConsultantOrganizationScalarWhereInput[]
+  }
+
   export type TicketingUserUncheckedUpdateManyWithoutOrganizationNestedInput = {
     create?: XOR<TicketingUserCreateWithoutOrganizationInput, TicketingUserUncheckedCreateWithoutOrganizationInput> | TicketingUserCreateWithoutOrganizationInput[] | TicketingUserUncheckedCreateWithoutOrganizationInput[]
     connectOrCreate?: TicketingUserCreateOrConnectWithoutOrganizationInput | TicketingUserCreateOrConnectWithoutOrganizationInput[]
@@ -9584,6 +10880,20 @@ export namespace Prisma {
     update?: TicketUpdateWithWhereUniqueWithoutOrganizationInput | TicketUpdateWithWhereUniqueWithoutOrganizationInput[]
     updateMany?: TicketUpdateManyWithWhereWithoutOrganizationInput | TicketUpdateManyWithWhereWithoutOrganizationInput[]
     deleteMany?: TicketScalarWhereInput | TicketScalarWhereInput[]
+  }
+
+  export type ConsultantOrganizationUncheckedUpdateManyWithoutOrganizationNestedInput = {
+    create?: XOR<ConsultantOrganizationCreateWithoutOrganizationInput, ConsultantOrganizationUncheckedCreateWithoutOrganizationInput> | ConsultantOrganizationCreateWithoutOrganizationInput[] | ConsultantOrganizationUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: ConsultantOrganizationCreateOrConnectWithoutOrganizationInput | ConsultantOrganizationCreateOrConnectWithoutOrganizationInput[]
+    upsert?: ConsultantOrganizationUpsertWithWhereUniqueWithoutOrganizationInput | ConsultantOrganizationUpsertWithWhereUniqueWithoutOrganizationInput[]
+    createMany?: ConsultantOrganizationCreateManyOrganizationInputEnvelope
+    set?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
+    disconnect?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
+    delete?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
+    connect?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
+    update?: ConsultantOrganizationUpdateWithWhereUniqueWithoutOrganizationInput | ConsultantOrganizationUpdateWithWhereUniqueWithoutOrganizationInput[]
+    updateMany?: ConsultantOrganizationUpdateManyWithWhereWithoutOrganizationInput | ConsultantOrganizationUpdateManyWithWhereWithoutOrganizationInput[]
+    deleteMany?: ConsultantOrganizationScalarWhereInput | ConsultantOrganizationScalarWhereInput[]
   }
 
   export type OrganizationCreateNestedOneWithoutUsersInput = {
@@ -9620,6 +10930,13 @@ export namespace Prisma {
     connect?: TicketAuditLogWhereUniqueInput | TicketAuditLogWhereUniqueInput[]
   }
 
+  export type ConsultantOrganizationCreateNestedManyWithoutConsultantInput = {
+    create?: XOR<ConsultantOrganizationCreateWithoutConsultantInput, ConsultantOrganizationUncheckedCreateWithoutConsultantInput> | ConsultantOrganizationCreateWithoutConsultantInput[] | ConsultantOrganizationUncheckedCreateWithoutConsultantInput[]
+    connectOrCreate?: ConsultantOrganizationCreateOrConnectWithoutConsultantInput | ConsultantOrganizationCreateOrConnectWithoutConsultantInput[]
+    createMany?: ConsultantOrganizationCreateManyConsultantInputEnvelope
+    connect?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
+  }
+
   export type TicketUncheckedCreateNestedManyWithoutCreatedByInput = {
     create?: XOR<TicketCreateWithoutCreatedByInput, TicketUncheckedCreateWithoutCreatedByInput> | TicketCreateWithoutCreatedByInput[] | TicketUncheckedCreateWithoutCreatedByInput[]
     connectOrCreate?: TicketCreateOrConnectWithoutCreatedByInput | TicketCreateOrConnectWithoutCreatedByInput[]
@@ -9646,6 +10963,13 @@ export namespace Prisma {
     connectOrCreate?: TicketAuditLogCreateOrConnectWithoutActorInput | TicketAuditLogCreateOrConnectWithoutActorInput[]
     createMany?: TicketAuditLogCreateManyActorInputEnvelope
     connect?: TicketAuditLogWhereUniqueInput | TicketAuditLogWhereUniqueInput[]
+  }
+
+  export type ConsultantOrganizationUncheckedCreateNestedManyWithoutConsultantInput = {
+    create?: XOR<ConsultantOrganizationCreateWithoutConsultantInput, ConsultantOrganizationUncheckedCreateWithoutConsultantInput> | ConsultantOrganizationCreateWithoutConsultantInput[] | ConsultantOrganizationUncheckedCreateWithoutConsultantInput[]
+    connectOrCreate?: ConsultantOrganizationCreateOrConnectWithoutConsultantInput | ConsultantOrganizationCreateOrConnectWithoutConsultantInput[]
+    createMany?: ConsultantOrganizationCreateManyConsultantInputEnvelope
+    connect?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
   }
 
   export type EnumTicketingUserRoleFieldUpdateOperationsInput = {
@@ -9722,6 +11046,20 @@ export namespace Prisma {
     deleteMany?: TicketAuditLogScalarWhereInput | TicketAuditLogScalarWhereInput[]
   }
 
+  export type ConsultantOrganizationUpdateManyWithoutConsultantNestedInput = {
+    create?: XOR<ConsultantOrganizationCreateWithoutConsultantInput, ConsultantOrganizationUncheckedCreateWithoutConsultantInput> | ConsultantOrganizationCreateWithoutConsultantInput[] | ConsultantOrganizationUncheckedCreateWithoutConsultantInput[]
+    connectOrCreate?: ConsultantOrganizationCreateOrConnectWithoutConsultantInput | ConsultantOrganizationCreateOrConnectWithoutConsultantInput[]
+    upsert?: ConsultantOrganizationUpsertWithWhereUniqueWithoutConsultantInput | ConsultantOrganizationUpsertWithWhereUniqueWithoutConsultantInput[]
+    createMany?: ConsultantOrganizationCreateManyConsultantInputEnvelope
+    set?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
+    disconnect?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
+    delete?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
+    connect?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
+    update?: ConsultantOrganizationUpdateWithWhereUniqueWithoutConsultantInput | ConsultantOrganizationUpdateWithWhereUniqueWithoutConsultantInput[]
+    updateMany?: ConsultantOrganizationUpdateManyWithWhereWithoutConsultantInput | ConsultantOrganizationUpdateManyWithWhereWithoutConsultantInput[]
+    deleteMany?: ConsultantOrganizationScalarWhereInput | ConsultantOrganizationScalarWhereInput[]
+  }
+
   export type TicketUncheckedUpdateManyWithoutCreatedByNestedInput = {
     create?: XOR<TicketCreateWithoutCreatedByInput, TicketUncheckedCreateWithoutCreatedByInput> | TicketCreateWithoutCreatedByInput[] | TicketUncheckedCreateWithoutCreatedByInput[]
     connectOrCreate?: TicketCreateOrConnectWithoutCreatedByInput | TicketCreateOrConnectWithoutCreatedByInput[]
@@ -9776,6 +11114,48 @@ export namespace Prisma {
     update?: TicketAuditLogUpdateWithWhereUniqueWithoutActorInput | TicketAuditLogUpdateWithWhereUniqueWithoutActorInput[]
     updateMany?: TicketAuditLogUpdateManyWithWhereWithoutActorInput | TicketAuditLogUpdateManyWithWhereWithoutActorInput[]
     deleteMany?: TicketAuditLogScalarWhereInput | TicketAuditLogScalarWhereInput[]
+  }
+
+  export type ConsultantOrganizationUncheckedUpdateManyWithoutConsultantNestedInput = {
+    create?: XOR<ConsultantOrganizationCreateWithoutConsultantInput, ConsultantOrganizationUncheckedCreateWithoutConsultantInput> | ConsultantOrganizationCreateWithoutConsultantInput[] | ConsultantOrganizationUncheckedCreateWithoutConsultantInput[]
+    connectOrCreate?: ConsultantOrganizationCreateOrConnectWithoutConsultantInput | ConsultantOrganizationCreateOrConnectWithoutConsultantInput[]
+    upsert?: ConsultantOrganizationUpsertWithWhereUniqueWithoutConsultantInput | ConsultantOrganizationUpsertWithWhereUniqueWithoutConsultantInput[]
+    createMany?: ConsultantOrganizationCreateManyConsultantInputEnvelope
+    set?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
+    disconnect?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
+    delete?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
+    connect?: ConsultantOrganizationWhereUniqueInput | ConsultantOrganizationWhereUniqueInput[]
+    update?: ConsultantOrganizationUpdateWithWhereUniqueWithoutConsultantInput | ConsultantOrganizationUpdateWithWhereUniqueWithoutConsultantInput[]
+    updateMany?: ConsultantOrganizationUpdateManyWithWhereWithoutConsultantInput | ConsultantOrganizationUpdateManyWithWhereWithoutConsultantInput[]
+    deleteMany?: ConsultantOrganizationScalarWhereInput | ConsultantOrganizationScalarWhereInput[]
+  }
+
+  export type TicketingUserCreateNestedOneWithoutConsultantOrganizationsInput = {
+    create?: XOR<TicketingUserCreateWithoutConsultantOrganizationsInput, TicketingUserUncheckedCreateWithoutConsultantOrganizationsInput>
+    connectOrCreate?: TicketingUserCreateOrConnectWithoutConsultantOrganizationsInput
+    connect?: TicketingUserWhereUniqueInput
+  }
+
+  export type OrganizationCreateNestedOneWithoutConsultantOrganizationsInput = {
+    create?: XOR<OrganizationCreateWithoutConsultantOrganizationsInput, OrganizationUncheckedCreateWithoutConsultantOrganizationsInput>
+    connectOrCreate?: OrganizationCreateOrConnectWithoutConsultantOrganizationsInput
+    connect?: OrganizationWhereUniqueInput
+  }
+
+  export type TicketingUserUpdateOneRequiredWithoutConsultantOrganizationsNestedInput = {
+    create?: XOR<TicketingUserCreateWithoutConsultantOrganizationsInput, TicketingUserUncheckedCreateWithoutConsultantOrganizationsInput>
+    connectOrCreate?: TicketingUserCreateOrConnectWithoutConsultantOrganizationsInput
+    upsert?: TicketingUserUpsertWithoutConsultantOrganizationsInput
+    connect?: TicketingUserWhereUniqueInput
+    update?: XOR<XOR<TicketingUserUpdateToOneWithWhereWithoutConsultantOrganizationsInput, TicketingUserUpdateWithoutConsultantOrganizationsInput>, TicketingUserUncheckedUpdateWithoutConsultantOrganizationsInput>
+  }
+
+  export type OrganizationUpdateOneRequiredWithoutConsultantOrganizationsNestedInput = {
+    create?: XOR<OrganizationCreateWithoutConsultantOrganizationsInput, OrganizationUncheckedCreateWithoutConsultantOrganizationsInput>
+    connectOrCreate?: OrganizationCreateOrConnectWithoutConsultantOrganizationsInput
+    upsert?: OrganizationUpsertWithoutConsultantOrganizationsInput
+    connect?: OrganizationWhereUniqueInput
+    update?: XOR<XOR<OrganizationUpdateToOneWithWhereWithoutConsultantOrganizationsInput, OrganizationUpdateWithoutConsultantOrganizationsInput>, OrganizationUncheckedUpdateWithoutConsultantOrganizationsInput>
   }
 
   export type OrganizationCreateNestedOneWithoutTicketsInput = {
@@ -10316,6 +11696,7 @@ export namespace Prisma {
     role: $Enums.TicketingUserRole
     consultantVerified?: boolean
     tbosAdminUserId?: string | null
+    tbosRole?: string | null
     active?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -10323,6 +11704,7 @@ export namespace Prisma {
     assignedTickets?: TicketCreateNestedManyWithoutAssignedToInput
     messages?: TicketMessageCreateNestedManyWithoutAuthorInput
     auditLogs?: TicketAuditLogCreateNestedManyWithoutActorInput
+    consultantOrganizations?: ConsultantOrganizationCreateNestedManyWithoutConsultantInput
   }
 
   export type TicketingUserUncheckedCreateWithoutOrganizationInput = {
@@ -10333,6 +11715,7 @@ export namespace Prisma {
     role: $Enums.TicketingUserRole
     consultantVerified?: boolean
     tbosAdminUserId?: string | null
+    tbosRole?: string | null
     active?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -10340,6 +11723,7 @@ export namespace Prisma {
     assignedTickets?: TicketUncheckedCreateNestedManyWithoutAssignedToInput
     messages?: TicketMessageUncheckedCreateNestedManyWithoutAuthorInput
     auditLogs?: TicketAuditLogUncheckedCreateNestedManyWithoutActorInput
+    consultantOrganizations?: ConsultantOrganizationUncheckedCreateNestedManyWithoutConsultantInput
   }
 
   export type TicketingUserCreateOrConnectWithoutOrganizationInput = {
@@ -10398,6 +11782,28 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type ConsultantOrganizationCreateWithoutOrganizationInput = {
+    id?: string
+    createdAt?: Date | string
+    consultant: TicketingUserCreateNestedOneWithoutConsultantOrganizationsInput
+  }
+
+  export type ConsultantOrganizationUncheckedCreateWithoutOrganizationInput = {
+    id?: string
+    consultantId: string
+    createdAt?: Date | string
+  }
+
+  export type ConsultantOrganizationCreateOrConnectWithoutOrganizationInput = {
+    where: ConsultantOrganizationWhereUniqueInput
+    create: XOR<ConsultantOrganizationCreateWithoutOrganizationInput, ConsultantOrganizationUncheckedCreateWithoutOrganizationInput>
+  }
+
+  export type ConsultantOrganizationCreateManyOrganizationInputEnvelope = {
+    data: ConsultantOrganizationCreateManyOrganizationInput | ConsultantOrganizationCreateManyOrganizationInput[]
+    skipDuplicates?: boolean
+  }
+
   export type TicketingUserUpsertWithWhereUniqueWithoutOrganizationInput = {
     where: TicketingUserWhereUniqueInput
     update: XOR<TicketingUserUpdateWithoutOrganizationInput, TicketingUserUncheckedUpdateWithoutOrganizationInput>
@@ -10426,6 +11832,7 @@ export namespace Prisma {
     organizationId?: StringNullableFilter<"TicketingUser"> | string | null
     consultantVerified?: BoolFilter<"TicketingUser"> | boolean
     tbosAdminUserId?: StringNullableFilter<"TicketingUser"> | string | null
+    tbosRole?: StringNullableFilter<"TicketingUser"> | string | null
     active?: BoolFilter<"TicketingUser"> | boolean
     createdAt?: DateTimeFilter<"TicketingUser"> | Date | string
     updatedAt?: DateTimeFilter<"TicketingUser"> | Date | string
@@ -10466,6 +11873,32 @@ export namespace Prisma {
     closedAt?: DateTimeNullableFilter<"Ticket"> | Date | string | null
   }
 
+  export type ConsultantOrganizationUpsertWithWhereUniqueWithoutOrganizationInput = {
+    where: ConsultantOrganizationWhereUniqueInput
+    update: XOR<ConsultantOrganizationUpdateWithoutOrganizationInput, ConsultantOrganizationUncheckedUpdateWithoutOrganizationInput>
+    create: XOR<ConsultantOrganizationCreateWithoutOrganizationInput, ConsultantOrganizationUncheckedCreateWithoutOrganizationInput>
+  }
+
+  export type ConsultantOrganizationUpdateWithWhereUniqueWithoutOrganizationInput = {
+    where: ConsultantOrganizationWhereUniqueInput
+    data: XOR<ConsultantOrganizationUpdateWithoutOrganizationInput, ConsultantOrganizationUncheckedUpdateWithoutOrganizationInput>
+  }
+
+  export type ConsultantOrganizationUpdateManyWithWhereWithoutOrganizationInput = {
+    where: ConsultantOrganizationScalarWhereInput
+    data: XOR<ConsultantOrganizationUpdateManyMutationInput, ConsultantOrganizationUncheckedUpdateManyWithoutOrganizationInput>
+  }
+
+  export type ConsultantOrganizationScalarWhereInput = {
+    AND?: ConsultantOrganizationScalarWhereInput | ConsultantOrganizationScalarWhereInput[]
+    OR?: ConsultantOrganizationScalarWhereInput[]
+    NOT?: ConsultantOrganizationScalarWhereInput | ConsultantOrganizationScalarWhereInput[]
+    id?: StringFilter<"ConsultantOrganization"> | string
+    consultantId?: StringFilter<"ConsultantOrganization"> | string
+    organizationId?: StringFilter<"ConsultantOrganization"> | string
+    createdAt?: DateTimeFilter<"ConsultantOrganization"> | Date | string
+  }
+
   export type OrganizationCreateWithoutUsersInput = {
     id?: string
     name: string
@@ -10474,6 +11907,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     tickets?: TicketCreateNestedManyWithoutOrganizationInput
+    consultantOrganizations?: ConsultantOrganizationCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUncheckedCreateWithoutUsersInput = {
@@ -10484,6 +11918,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     tickets?: TicketUncheckedCreateNestedManyWithoutOrganizationInput
+    consultantOrganizations?: ConsultantOrganizationUncheckedCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationCreateOrConnectWithoutUsersInput = {
@@ -10641,6 +12076,28 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type ConsultantOrganizationCreateWithoutConsultantInput = {
+    id?: string
+    createdAt?: Date | string
+    organization: OrganizationCreateNestedOneWithoutConsultantOrganizationsInput
+  }
+
+  export type ConsultantOrganizationUncheckedCreateWithoutConsultantInput = {
+    id?: string
+    organizationId: string
+    createdAt?: Date | string
+  }
+
+  export type ConsultantOrganizationCreateOrConnectWithoutConsultantInput = {
+    where: ConsultantOrganizationWhereUniqueInput
+    create: XOR<ConsultantOrganizationCreateWithoutConsultantInput, ConsultantOrganizationUncheckedCreateWithoutConsultantInput>
+  }
+
+  export type ConsultantOrganizationCreateManyConsultantInputEnvelope = {
+    data: ConsultantOrganizationCreateManyConsultantInput | ConsultantOrganizationCreateManyConsultantInput[]
+    skipDuplicates?: boolean
+  }
+
   export type OrganizationUpsertWithoutUsersInput = {
     update: XOR<OrganizationUpdateWithoutUsersInput, OrganizationUncheckedUpdateWithoutUsersInput>
     create: XOR<OrganizationCreateWithoutUsersInput, OrganizationUncheckedCreateWithoutUsersInput>
@@ -10660,6 +12117,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     tickets?: TicketUpdateManyWithoutOrganizationNestedInput
+    consultantOrganizations?: ConsultantOrganizationUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationUncheckedUpdateWithoutUsersInput = {
@@ -10670,6 +12128,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     tickets?: TicketUncheckedUpdateManyWithoutOrganizationNestedInput
+    consultantOrganizations?: ConsultantOrganizationUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type TicketUpsertWithWhereUniqueWithoutCreatedByInput = {
@@ -10763,6 +12222,174 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"TicketAuditLog"> | Date | string
   }
 
+  export type ConsultantOrganizationUpsertWithWhereUniqueWithoutConsultantInput = {
+    where: ConsultantOrganizationWhereUniqueInput
+    update: XOR<ConsultantOrganizationUpdateWithoutConsultantInput, ConsultantOrganizationUncheckedUpdateWithoutConsultantInput>
+    create: XOR<ConsultantOrganizationCreateWithoutConsultantInput, ConsultantOrganizationUncheckedCreateWithoutConsultantInput>
+  }
+
+  export type ConsultantOrganizationUpdateWithWhereUniqueWithoutConsultantInput = {
+    where: ConsultantOrganizationWhereUniqueInput
+    data: XOR<ConsultantOrganizationUpdateWithoutConsultantInput, ConsultantOrganizationUncheckedUpdateWithoutConsultantInput>
+  }
+
+  export type ConsultantOrganizationUpdateManyWithWhereWithoutConsultantInput = {
+    where: ConsultantOrganizationScalarWhereInput
+    data: XOR<ConsultantOrganizationUpdateManyMutationInput, ConsultantOrganizationUncheckedUpdateManyWithoutConsultantInput>
+  }
+
+  export type TicketingUserCreateWithoutConsultantOrganizationsInput = {
+    id?: string
+    email: string
+    passwordHash: string
+    name: string
+    role: $Enums.TicketingUserRole
+    consultantVerified?: boolean
+    tbosAdminUserId?: string | null
+    tbosRole?: string | null
+    active?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    organization?: OrganizationCreateNestedOneWithoutUsersInput
+    createdTickets?: TicketCreateNestedManyWithoutCreatedByInput
+    assignedTickets?: TicketCreateNestedManyWithoutAssignedToInput
+    messages?: TicketMessageCreateNestedManyWithoutAuthorInput
+    auditLogs?: TicketAuditLogCreateNestedManyWithoutActorInput
+  }
+
+  export type TicketingUserUncheckedCreateWithoutConsultantOrganizationsInput = {
+    id?: string
+    email: string
+    passwordHash: string
+    name: string
+    role: $Enums.TicketingUserRole
+    organizationId?: string | null
+    consultantVerified?: boolean
+    tbosAdminUserId?: string | null
+    tbosRole?: string | null
+    active?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    createdTickets?: TicketUncheckedCreateNestedManyWithoutCreatedByInput
+    assignedTickets?: TicketUncheckedCreateNestedManyWithoutAssignedToInput
+    messages?: TicketMessageUncheckedCreateNestedManyWithoutAuthorInput
+    auditLogs?: TicketAuditLogUncheckedCreateNestedManyWithoutActorInput
+  }
+
+  export type TicketingUserCreateOrConnectWithoutConsultantOrganizationsInput = {
+    where: TicketingUserWhereUniqueInput
+    create: XOR<TicketingUserCreateWithoutConsultantOrganizationsInput, TicketingUserUncheckedCreateWithoutConsultantOrganizationsInput>
+  }
+
+  export type OrganizationCreateWithoutConsultantOrganizationsInput = {
+    id?: string
+    name: string
+    slug: string
+    active?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    users?: TicketingUserCreateNestedManyWithoutOrganizationInput
+    tickets?: TicketCreateNestedManyWithoutOrganizationInput
+  }
+
+  export type OrganizationUncheckedCreateWithoutConsultantOrganizationsInput = {
+    id?: string
+    name: string
+    slug: string
+    active?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    users?: TicketingUserUncheckedCreateNestedManyWithoutOrganizationInput
+    tickets?: TicketUncheckedCreateNestedManyWithoutOrganizationInput
+  }
+
+  export type OrganizationCreateOrConnectWithoutConsultantOrganizationsInput = {
+    where: OrganizationWhereUniqueInput
+    create: XOR<OrganizationCreateWithoutConsultantOrganizationsInput, OrganizationUncheckedCreateWithoutConsultantOrganizationsInput>
+  }
+
+  export type TicketingUserUpsertWithoutConsultantOrganizationsInput = {
+    update: XOR<TicketingUserUpdateWithoutConsultantOrganizationsInput, TicketingUserUncheckedUpdateWithoutConsultantOrganizationsInput>
+    create: XOR<TicketingUserCreateWithoutConsultantOrganizationsInput, TicketingUserUncheckedCreateWithoutConsultantOrganizationsInput>
+    where?: TicketingUserWhereInput
+  }
+
+  export type TicketingUserUpdateToOneWithWhereWithoutConsultantOrganizationsInput = {
+    where?: TicketingUserWhereInput
+    data: XOR<TicketingUserUpdateWithoutConsultantOrganizationsInput, TicketingUserUncheckedUpdateWithoutConsultantOrganizationsInput>
+  }
+
+  export type TicketingUserUpdateWithoutConsultantOrganizationsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    passwordHash?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    role?: EnumTicketingUserRoleFieldUpdateOperationsInput | $Enums.TicketingUserRole
+    consultantVerified?: BoolFieldUpdateOperationsInput | boolean
+    tbosAdminUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    tbosRole?: NullableStringFieldUpdateOperationsInput | string | null
+    active?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    organization?: OrganizationUpdateOneWithoutUsersNestedInput
+    createdTickets?: TicketUpdateManyWithoutCreatedByNestedInput
+    assignedTickets?: TicketUpdateManyWithoutAssignedToNestedInput
+    messages?: TicketMessageUpdateManyWithoutAuthorNestedInput
+    auditLogs?: TicketAuditLogUpdateManyWithoutActorNestedInput
+  }
+
+  export type TicketingUserUncheckedUpdateWithoutConsultantOrganizationsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    passwordHash?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    role?: EnumTicketingUserRoleFieldUpdateOperationsInput | $Enums.TicketingUserRole
+    organizationId?: NullableStringFieldUpdateOperationsInput | string | null
+    consultantVerified?: BoolFieldUpdateOperationsInput | boolean
+    tbosAdminUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    tbosRole?: NullableStringFieldUpdateOperationsInput | string | null
+    active?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdTickets?: TicketUncheckedUpdateManyWithoutCreatedByNestedInput
+    assignedTickets?: TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+    messages?: TicketMessageUncheckedUpdateManyWithoutAuthorNestedInput
+    auditLogs?: TicketAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  }
+
+  export type OrganizationUpsertWithoutConsultantOrganizationsInput = {
+    update: XOR<OrganizationUpdateWithoutConsultantOrganizationsInput, OrganizationUncheckedUpdateWithoutConsultantOrganizationsInput>
+    create: XOR<OrganizationCreateWithoutConsultantOrganizationsInput, OrganizationUncheckedCreateWithoutConsultantOrganizationsInput>
+    where?: OrganizationWhereInput
+  }
+
+  export type OrganizationUpdateToOneWithWhereWithoutConsultantOrganizationsInput = {
+    where?: OrganizationWhereInput
+    data: XOR<OrganizationUpdateWithoutConsultantOrganizationsInput, OrganizationUncheckedUpdateWithoutConsultantOrganizationsInput>
+  }
+
+  export type OrganizationUpdateWithoutConsultantOrganizationsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    active?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    users?: TicketingUserUpdateManyWithoutOrganizationNestedInput
+    tickets?: TicketUpdateManyWithoutOrganizationNestedInput
+  }
+
+  export type OrganizationUncheckedUpdateWithoutConsultantOrganizationsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    active?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    users?: TicketingUserUncheckedUpdateManyWithoutOrganizationNestedInput
+    tickets?: TicketUncheckedUpdateManyWithoutOrganizationNestedInput
+  }
+
   export type OrganizationCreateWithoutTicketsInput = {
     id?: string
     name: string
@@ -10771,6 +12398,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     users?: TicketingUserCreateNestedManyWithoutOrganizationInput
+    consultantOrganizations?: ConsultantOrganizationCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUncheckedCreateWithoutTicketsInput = {
@@ -10781,6 +12409,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     users?: TicketingUserUncheckedCreateNestedManyWithoutOrganizationInput
+    consultantOrganizations?: ConsultantOrganizationUncheckedCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationCreateOrConnectWithoutTicketsInput = {
@@ -10796,6 +12425,7 @@ export namespace Prisma {
     role: $Enums.TicketingUserRole
     consultantVerified?: boolean
     tbosAdminUserId?: string | null
+    tbosRole?: string | null
     active?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -10803,6 +12433,7 @@ export namespace Prisma {
     assignedTickets?: TicketCreateNestedManyWithoutAssignedToInput
     messages?: TicketMessageCreateNestedManyWithoutAuthorInput
     auditLogs?: TicketAuditLogCreateNestedManyWithoutActorInput
+    consultantOrganizations?: ConsultantOrganizationCreateNestedManyWithoutConsultantInput
   }
 
   export type TicketingUserUncheckedCreateWithoutCreatedTicketsInput = {
@@ -10814,12 +12445,14 @@ export namespace Prisma {
     organizationId?: string | null
     consultantVerified?: boolean
     tbosAdminUserId?: string | null
+    tbosRole?: string | null
     active?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     assignedTickets?: TicketUncheckedCreateNestedManyWithoutAssignedToInput
     messages?: TicketMessageUncheckedCreateNestedManyWithoutAuthorInput
     auditLogs?: TicketAuditLogUncheckedCreateNestedManyWithoutActorInput
+    consultantOrganizations?: ConsultantOrganizationUncheckedCreateNestedManyWithoutConsultantInput
   }
 
   export type TicketingUserCreateOrConnectWithoutCreatedTicketsInput = {
@@ -10835,6 +12468,7 @@ export namespace Prisma {
     role: $Enums.TicketingUserRole
     consultantVerified?: boolean
     tbosAdminUserId?: string | null
+    tbosRole?: string | null
     active?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -10842,6 +12476,7 @@ export namespace Prisma {
     createdTickets?: TicketCreateNestedManyWithoutCreatedByInput
     messages?: TicketMessageCreateNestedManyWithoutAuthorInput
     auditLogs?: TicketAuditLogCreateNestedManyWithoutActorInput
+    consultantOrganizations?: ConsultantOrganizationCreateNestedManyWithoutConsultantInput
   }
 
   export type TicketingUserUncheckedCreateWithoutAssignedTicketsInput = {
@@ -10853,12 +12488,14 @@ export namespace Prisma {
     organizationId?: string | null
     consultantVerified?: boolean
     tbosAdminUserId?: string | null
+    tbosRole?: string | null
     active?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     createdTickets?: TicketUncheckedCreateNestedManyWithoutCreatedByInput
     messages?: TicketMessageUncheckedCreateNestedManyWithoutAuthorInput
     auditLogs?: TicketAuditLogUncheckedCreateNestedManyWithoutActorInput
+    consultantOrganizations?: ConsultantOrganizationUncheckedCreateNestedManyWithoutConsultantInput
   }
 
   export type TicketingUserCreateOrConnectWithoutAssignedTicketsInput = {
@@ -10971,6 +12608,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     users?: TicketingUserUpdateManyWithoutOrganizationNestedInput
+    consultantOrganizations?: ConsultantOrganizationUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationUncheckedUpdateWithoutTicketsInput = {
@@ -10981,6 +12619,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     users?: TicketingUserUncheckedUpdateManyWithoutOrganizationNestedInput
+    consultantOrganizations?: ConsultantOrganizationUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type TicketingUserUpsertWithoutCreatedTicketsInput = {
@@ -11002,6 +12641,7 @@ export namespace Prisma {
     role?: EnumTicketingUserRoleFieldUpdateOperationsInput | $Enums.TicketingUserRole
     consultantVerified?: BoolFieldUpdateOperationsInput | boolean
     tbosAdminUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    tbosRole?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -11009,6 +12649,7 @@ export namespace Prisma {
     assignedTickets?: TicketUpdateManyWithoutAssignedToNestedInput
     messages?: TicketMessageUpdateManyWithoutAuthorNestedInput
     auditLogs?: TicketAuditLogUpdateManyWithoutActorNestedInput
+    consultantOrganizations?: ConsultantOrganizationUpdateManyWithoutConsultantNestedInput
   }
 
   export type TicketingUserUncheckedUpdateWithoutCreatedTicketsInput = {
@@ -11020,12 +12661,14 @@ export namespace Prisma {
     organizationId?: NullableStringFieldUpdateOperationsInput | string | null
     consultantVerified?: BoolFieldUpdateOperationsInput | boolean
     tbosAdminUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    tbosRole?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     assignedTickets?: TicketUncheckedUpdateManyWithoutAssignedToNestedInput
     messages?: TicketMessageUncheckedUpdateManyWithoutAuthorNestedInput
     auditLogs?: TicketAuditLogUncheckedUpdateManyWithoutActorNestedInput
+    consultantOrganizations?: ConsultantOrganizationUncheckedUpdateManyWithoutConsultantNestedInput
   }
 
   export type TicketingUserUpsertWithoutAssignedTicketsInput = {
@@ -11047,6 +12690,7 @@ export namespace Prisma {
     role?: EnumTicketingUserRoleFieldUpdateOperationsInput | $Enums.TicketingUserRole
     consultantVerified?: BoolFieldUpdateOperationsInput | boolean
     tbosAdminUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    tbosRole?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -11054,6 +12698,7 @@ export namespace Prisma {
     createdTickets?: TicketUpdateManyWithoutCreatedByNestedInput
     messages?: TicketMessageUpdateManyWithoutAuthorNestedInput
     auditLogs?: TicketAuditLogUpdateManyWithoutActorNestedInput
+    consultantOrganizations?: ConsultantOrganizationUpdateManyWithoutConsultantNestedInput
   }
 
   export type TicketingUserUncheckedUpdateWithoutAssignedTicketsInput = {
@@ -11065,12 +12710,14 @@ export namespace Prisma {
     organizationId?: NullableStringFieldUpdateOperationsInput | string | null
     consultantVerified?: BoolFieldUpdateOperationsInput | boolean
     tbosAdminUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    tbosRole?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     createdTickets?: TicketUncheckedUpdateManyWithoutCreatedByNestedInput
     messages?: TicketMessageUncheckedUpdateManyWithoutAuthorNestedInput
     auditLogs?: TicketAuditLogUncheckedUpdateManyWithoutActorNestedInput
+    consultantOrganizations?: ConsultantOrganizationUncheckedUpdateManyWithoutConsultantNestedInput
   }
 
   export type TicketMessageUpsertWithWhereUniqueWithoutTicketInput = {
@@ -11183,6 +12830,7 @@ export namespace Prisma {
     role: $Enums.TicketingUserRole
     consultantVerified?: boolean
     tbosAdminUserId?: string | null
+    tbosRole?: string | null
     active?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -11190,6 +12838,7 @@ export namespace Prisma {
     createdTickets?: TicketCreateNestedManyWithoutCreatedByInput
     assignedTickets?: TicketCreateNestedManyWithoutAssignedToInput
     auditLogs?: TicketAuditLogCreateNestedManyWithoutActorInput
+    consultantOrganizations?: ConsultantOrganizationCreateNestedManyWithoutConsultantInput
   }
 
   export type TicketingUserUncheckedCreateWithoutMessagesInput = {
@@ -11201,12 +12850,14 @@ export namespace Prisma {
     organizationId?: string | null
     consultantVerified?: boolean
     tbosAdminUserId?: string | null
+    tbosRole?: string | null
     active?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     createdTickets?: TicketUncheckedCreateNestedManyWithoutCreatedByInput
     assignedTickets?: TicketUncheckedCreateNestedManyWithoutAssignedToInput
     auditLogs?: TicketAuditLogUncheckedCreateNestedManyWithoutActorInput
+    consultantOrganizations?: ConsultantOrganizationUncheckedCreateNestedManyWithoutConsultantInput
   }
 
   export type TicketingUserCreateOrConnectWithoutMessagesInput = {
@@ -11280,6 +12931,7 @@ export namespace Prisma {
     role?: EnumTicketingUserRoleFieldUpdateOperationsInput | $Enums.TicketingUserRole
     consultantVerified?: BoolFieldUpdateOperationsInput | boolean
     tbosAdminUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    tbosRole?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -11287,6 +12939,7 @@ export namespace Prisma {
     createdTickets?: TicketUpdateManyWithoutCreatedByNestedInput
     assignedTickets?: TicketUpdateManyWithoutAssignedToNestedInput
     auditLogs?: TicketAuditLogUpdateManyWithoutActorNestedInput
+    consultantOrganizations?: ConsultantOrganizationUpdateManyWithoutConsultantNestedInput
   }
 
   export type TicketingUserUncheckedUpdateWithoutMessagesInput = {
@@ -11298,12 +12951,14 @@ export namespace Prisma {
     organizationId?: NullableStringFieldUpdateOperationsInput | string | null
     consultantVerified?: BoolFieldUpdateOperationsInput | boolean
     tbosAdminUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    tbosRole?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     createdTickets?: TicketUncheckedUpdateManyWithoutCreatedByNestedInput
     assignedTickets?: TicketUncheckedUpdateManyWithoutAssignedToNestedInput
     auditLogs?: TicketAuditLogUncheckedUpdateManyWithoutActorNestedInput
+    consultantOrganizations?: ConsultantOrganizationUncheckedUpdateManyWithoutConsultantNestedInput
   }
 
   export type TicketCreateWithoutAttachmentsInput = {
@@ -11443,6 +13098,7 @@ export namespace Prisma {
     role: $Enums.TicketingUserRole
     consultantVerified?: boolean
     tbosAdminUserId?: string | null
+    tbosRole?: string | null
     active?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -11450,6 +13106,7 @@ export namespace Prisma {
     createdTickets?: TicketCreateNestedManyWithoutCreatedByInput
     assignedTickets?: TicketCreateNestedManyWithoutAssignedToInput
     messages?: TicketMessageCreateNestedManyWithoutAuthorInput
+    consultantOrganizations?: ConsultantOrganizationCreateNestedManyWithoutConsultantInput
   }
 
   export type TicketingUserUncheckedCreateWithoutAuditLogsInput = {
@@ -11461,12 +13118,14 @@ export namespace Prisma {
     organizationId?: string | null
     consultantVerified?: boolean
     tbosAdminUserId?: string | null
+    tbosRole?: string | null
     active?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     createdTickets?: TicketUncheckedCreateNestedManyWithoutCreatedByInput
     assignedTickets?: TicketUncheckedCreateNestedManyWithoutAssignedToInput
     messages?: TicketMessageUncheckedCreateNestedManyWithoutAuthorInput
+    consultantOrganizations?: ConsultantOrganizationUncheckedCreateNestedManyWithoutConsultantInput
   }
 
   export type TicketingUserCreateOrConnectWithoutAuditLogsInput = {
@@ -11540,6 +13199,7 @@ export namespace Prisma {
     role?: EnumTicketingUserRoleFieldUpdateOperationsInput | $Enums.TicketingUserRole
     consultantVerified?: BoolFieldUpdateOperationsInput | boolean
     tbosAdminUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    tbosRole?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -11547,6 +13207,7 @@ export namespace Prisma {
     createdTickets?: TicketUpdateManyWithoutCreatedByNestedInput
     assignedTickets?: TicketUpdateManyWithoutAssignedToNestedInput
     messages?: TicketMessageUpdateManyWithoutAuthorNestedInput
+    consultantOrganizations?: ConsultantOrganizationUpdateManyWithoutConsultantNestedInput
   }
 
   export type TicketingUserUncheckedUpdateWithoutAuditLogsInput = {
@@ -11558,12 +13219,14 @@ export namespace Prisma {
     organizationId?: NullableStringFieldUpdateOperationsInput | string | null
     consultantVerified?: BoolFieldUpdateOperationsInput | boolean
     tbosAdminUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    tbosRole?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     createdTickets?: TicketUncheckedUpdateManyWithoutCreatedByNestedInput
     assignedTickets?: TicketUncheckedUpdateManyWithoutAssignedToNestedInput
     messages?: TicketMessageUncheckedUpdateManyWithoutAuthorNestedInput
+    consultantOrganizations?: ConsultantOrganizationUncheckedUpdateManyWithoutConsultantNestedInput
   }
 
   export type TicketingUserCreateManyOrganizationInput = {
@@ -11574,6 +13237,7 @@ export namespace Prisma {
     role: $Enums.TicketingUserRole
     consultantVerified?: boolean
     tbosAdminUserId?: string | null
+    tbosRole?: string | null
     active?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -11594,6 +13258,12 @@ export namespace Prisma {
     closedAt?: Date | string | null
   }
 
+  export type ConsultantOrganizationCreateManyOrganizationInput = {
+    id?: string
+    consultantId: string
+    createdAt?: Date | string
+  }
+
   export type TicketingUserUpdateWithoutOrganizationInput = {
     id?: StringFieldUpdateOperationsInput | string
     email?: StringFieldUpdateOperationsInput | string
@@ -11602,6 +13272,7 @@ export namespace Prisma {
     role?: EnumTicketingUserRoleFieldUpdateOperationsInput | $Enums.TicketingUserRole
     consultantVerified?: BoolFieldUpdateOperationsInput | boolean
     tbosAdminUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    tbosRole?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -11609,6 +13280,7 @@ export namespace Prisma {
     assignedTickets?: TicketUpdateManyWithoutAssignedToNestedInput
     messages?: TicketMessageUpdateManyWithoutAuthorNestedInput
     auditLogs?: TicketAuditLogUpdateManyWithoutActorNestedInput
+    consultantOrganizations?: ConsultantOrganizationUpdateManyWithoutConsultantNestedInput
   }
 
   export type TicketingUserUncheckedUpdateWithoutOrganizationInput = {
@@ -11619,6 +13291,7 @@ export namespace Prisma {
     role?: EnumTicketingUserRoleFieldUpdateOperationsInput | $Enums.TicketingUserRole
     consultantVerified?: BoolFieldUpdateOperationsInput | boolean
     tbosAdminUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    tbosRole?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -11626,6 +13299,7 @@ export namespace Prisma {
     assignedTickets?: TicketUncheckedUpdateManyWithoutAssignedToNestedInput
     messages?: TicketMessageUncheckedUpdateManyWithoutAuthorNestedInput
     auditLogs?: TicketAuditLogUncheckedUpdateManyWithoutActorNestedInput
+    consultantOrganizations?: ConsultantOrganizationUncheckedUpdateManyWithoutConsultantNestedInput
   }
 
   export type TicketingUserUncheckedUpdateManyWithoutOrganizationInput = {
@@ -11636,6 +13310,7 @@ export namespace Prisma {
     role?: EnumTicketingUserRoleFieldUpdateOperationsInput | $Enums.TicketingUserRole
     consultantVerified?: BoolFieldUpdateOperationsInput | boolean
     tbosAdminUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    tbosRole?: NullableStringFieldUpdateOperationsInput | string | null
     active?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -11692,6 +13367,24 @@ export namespace Prisma {
     closedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
+  export type ConsultantOrganizationUpdateWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    consultant?: TicketingUserUpdateOneRequiredWithoutConsultantOrganizationsNestedInput
+  }
+
+  export type ConsultantOrganizationUncheckedUpdateWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    consultantId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ConsultantOrganizationUncheckedUpdateManyWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    consultantId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type TicketCreateManyCreatedByInput = {
     id?: string
     ticketNumber: string
@@ -11738,6 +13431,12 @@ export namespace Prisma {
     oldValue?: string | null
     newValue?: string | null
     metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+  }
+
+  export type ConsultantOrganizationCreateManyConsultantInput = {
+    id?: string
+    organizationId: string
     createdAt?: Date | string
   }
 
@@ -11900,6 +13599,24 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type ConsultantOrganizationUpdateWithoutConsultantInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    organization?: OrganizationUpdateOneRequiredWithoutConsultantOrganizationsNestedInput
+  }
+
+  export type ConsultantOrganizationUncheckedUpdateWithoutConsultantInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    organizationId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ConsultantOrganizationUncheckedUpdateManyWithoutConsultantInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    organizationId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type TicketMessageCreateManyTicketInput = {
     id?: string
     authorId: string
@@ -12037,6 +13754,10 @@ export namespace Prisma {
      * @deprecated Use TicketingUserDefaultArgs instead
      */
     export type TicketingUserArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = TicketingUserDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use ConsultantOrganizationDefaultArgs instead
+     */
+    export type ConsultantOrganizationArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = ConsultantOrganizationDefaultArgs<ExtArgs>
     /**
      * @deprecated Use TicketDefaultArgs instead
      */

@@ -23,6 +23,7 @@ export type TicketingAuthUser = {
   role: "CLIENT" | "CONSULTANT";
   organizationId: string | null;
   consultantVerified: boolean;
+  tbosRole?: string | null;
 };
 
 export interface TicketingRequest extends Request {
@@ -61,6 +62,7 @@ export function authMiddleware(req: TicketingRequest, res: Response, next: NextF
       role: decoded.role,
       organizationId: decoded.organizationId ?? null,
       consultantVerified: Boolean(decoded.consultantVerified),
+      tbosRole: decoded.tbosRole ?? null,
     };
     next();
   } catch {

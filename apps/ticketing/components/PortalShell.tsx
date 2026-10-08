@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LifeBuoy, LogOut, Plus, Ticket } from "lucide-react";
+import { LayoutDashboard, LifeBuoy, LogOut, Plus, Ticket, Users } from "lucide-react";
 
 type User = {
   name: string;
@@ -10,6 +10,18 @@ type User = {
   role: string;
   organization?: { name: string } | null;
 };
+
+const clientNav = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/tickets", label: "My tickets", icon: Ticket },
+  { href: "/tickets/new", label: "New request", icon: Plus },
+];
+
+const consultantNav = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/tickets", label: "Tickets", icon: Ticket },
+  { href: "/consultant", label: "By company", icon: Users },
+];
 
 export function PortalShell({
   user,
@@ -21,6 +33,7 @@ export function PortalShell({
   const pathname = usePathname();
   const router = useRouter();
   const isConsultant = user.role === "CONSULTANT";
+  const nav = isConsultant ? consultantNav : clientNav;
 
   async function logout() {
     await fetch("/api/auth/session", { method: "DELETE" });
@@ -28,64 +41,71 @@ export function PortalShell({
   }
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <LifeBuoy className="h-6 w-6" />
+    <div className="min-h-screen bg-slate-50">
+      <header className="border-b border-slate-200 bg-white shadow-sm">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-600 text-white">
+              <LifeBuoy className="h-5 w-5" />
+            </div>
             <div>
-              <p className="font-semibold">Client Support</p>
-              <p className="text-xs text-gray-500">
-                {isConsultant ? "Consultant console" : user.organization?.name ?? "Client portal"}
+              <p className="font-semibold text-slate-900">TechBubble Support</p>
+              <p className="text-xs text-slate-500">
+                {isConsultant ? "Consultant workspace" : user.organization?.name ?? "Client portal"}
               </p>
             </div>
           </div>
-          <nav className="flex items-center gap-4 text-sm">
-            <Link
-              href="/dashboard"
-              className={pathname === "/dashboard" ? "font-medium text-black" : "text-gray-600 hover:text-black"}
+          <div className="flex items-center gap-3 text-sm">
+            <span className="hidden text-slate-600 sm:inline">{user.name}</span>
+            <button
+              type="button"
+              onClick={() => void logout()}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-slate-600 hover:bg-slate-50"
             >
-              Dashboard
-            </Link>
-            <Link
-              href="/tickets"
-              className={pathname.startsWith("/tickets") ? "font-medium text-black" : "text-gray-600 hover:text-black"}
-            >
-              Tickets
-            </Link>
-            {isConsultant ? (
-              <Link
-                href="/consultant"
-                className={pathname === "/consultant" ? "font-medium text-black" : "text-gray-600 hover:text-black"}
-              >
-                All clients
-              </Link>
-            ) : (
-              <Link
-                href="/tickets/new"
-                className="inline-flex items-center gap-1 rounded-lg bg-black px-3 py-1.5 text-white"
-              >
-                <Plus className="h-4 w-4" />
-                New ticket
-              </Link>
-            )}
-            <span className="hidden text-gray-500 sm:inline">{user.name}</span>
-            <button type="button" onClick={() => void logout()} className="text-gray-500 hover:text-black" aria-label="Log out">
               <LogOut className="h-4 w-4" />
+              Sign out
             </button>
-          </nav>
+          </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
+      <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6">
+        <aside className="hidden w-56 shrink-0 md:block">
+          <nav className="space-y-1 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+            {nav.map((item) => {
+              const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                    active ? "bg-sky-50 text-sky-800" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  }`}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </aside>
+        <main className="min-w-0 flex-1">{children}</main>
+      </div>
     </div>
   );
 }
 
 export function EmptyTickets() {
   return (
-    <div className="rounded-xl border border-dashed border-gray-200 bg-white p-10 text-center text-gray-500">
-      <Ticket className="mx-auto mb-2 h-8 w-8 text-gray-300" />
-      <p>No tickets yet.</p>
+    <div className="rounded-xl border border-dashed border-slate-200 bg-white p-12 text-center text-slate-500 shadow-sm">
+      <Ticket className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+      <p className="font-medium text-slate-700">No tickets yet</p>
+      <p className="mt-1 text-sm">Submit a request and our team will respond shortly.</p>
+      <Link
+        href="/tickets/new"
+        className="mt-4 inline-flex rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+      >
+        Create ticket
+      </Link>
     </div>
   );
 }

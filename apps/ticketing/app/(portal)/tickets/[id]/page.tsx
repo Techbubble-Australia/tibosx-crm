@@ -40,6 +40,7 @@ export default function TicketDetailPage() {
   const [me, setMe] = useState<{ role: string } | null>(null);
   const [reply, setReply] = useState("");
   const [internal, setInternal] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   function reload() {
     void ticketingFetch(`/api/tickets/${id}`)
@@ -66,6 +67,24 @@ export default function TicketDetailPage() {
       return;
     }
     reload();
+  }
+
+  async function onUploadFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await ticketingFetch(`/api/tickets/${id}/attachments/upload`, { method: "POST", body: form });
+      if (!res.ok) throw new Error("Upload failed");
+      reload();
+    } catch {
+      alert("Could not upload file");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
   }
 
   async function sendMessage(e: React.FormEvent) {
@@ -141,10 +160,18 @@ export default function TicketDetailPage() {
         <p className="whitespace-pre-wrap text-sm text-gray-700">{ticket.description}</p>
       </section>
 
-      {ticket.attachments.length > 0 ? (
-        <section className="rounded-xl border border-gray-200 bg-white p-4">
-          <h2 className="mb-2 font-semibold">Attachments</h2>
-          <ul className="text-sm text-blue-600">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold">Attachments</h2>
+          <label className="cursor-pointer text-sm font-medium text-sky-600 hover:underline">
+            {uploading ? "Uploading…" : "Add file"}
+            <input type="file" className="hidden" onChange={onUploadFile} disabled={uploading} />
+          </label>
+        </div>
+        {ticket.attachments.length === 0 ? (
+          <p className="text-sm text-slate-500">No files attached.</p>
+        ) : (
+          <ul className="space-y-1 text-sm text-sky-600">
             {ticket.attachments.map((a) => (
               <li key={a.id}>
                 <a href={a.fileUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
@@ -153,8 +180,8 @@ export default function TicketDetailPage() {
               </li>
             ))}
           </ul>
-        </section>
-      ) : null}
+        )}
+      </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-4">
         <h2 className="mb-4 font-semibold">Conversation</h2>

@@ -44,8 +44,9 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users   TicketingUser[]
-  tickets Ticket[]
+  users                   TicketingUser[]
+  tickets                 Ticket[]
+  consultantOrganizations ConsultantOrganization[]
 }
 
 model TicketingUser {
@@ -58,17 +59,33 @@ model TicketingUser {
   organization       Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   consultantVerified Boolean           @default(false)
   tbosAdminUserId    String?           @unique
+  // TBOS role at last SSO/login (e.g. admin, sales) for consultant scoping
+  tbosRole           String?
   active             Boolean           @default(true)
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
-  createdTickets  Ticket[]         @relation("TicketCreatedBy")
-  assignedTickets Ticket[]         @relation("TicketAssignedTo")
-  messages        TicketMessage[]
-  auditLogs       TicketAuditLog[] @relation("AuditActor")
+  createdTickets          Ticket[]                 @relation("TicketCreatedBy")
+  assignedTickets         Ticket[]                 @relation("TicketAssignedTo")
+  messages                TicketMessage[]
+  auditLogs               TicketAuditLog[]         @relation("AuditActor")
+  consultantOrganizations ConsultantOrganization[]
 
   @@index([organizationId])
   @@index([role])
+}
+
+model ConsultantOrganization {
+  id             String        @id @default(cuid())
+  consultantId   String
+  consultant     TicketingUser @relation(fields: [consultantId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+
+  @@unique([consultantId, organizationId])
+  @@index([consultantId])
+  @@index([organizationId])
 }
 
 model Ticket {

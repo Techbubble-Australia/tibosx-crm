@@ -21,17 +21,27 @@ async function main() {
     },
   });
 
+  const consultantEmail = process.env.TICKETING_SEED_CONSULTANT_EMAIL || "consultant@techbubble.com.au";
   const consultantPassword = await bcrypt.hash(process.env.TICKETING_SEED_CONSULTANT_PASSWORD || "ConsultantDemo123!", 10);
-  await ticketingPrisma.ticketingUser.upsert({
-    where: { email: process.env.TICKETING_SEED_CONSULTANT_EMAIL || "consultant@techbubble.com.au" },
-    update: { consultantVerified: true },
+  const consultant = await ticketingPrisma.ticketingUser.upsert({
+    where: { email: consultantEmail },
+    update: { consultantVerified: true, tbosRole: "sales" },
     create: {
-      email: process.env.TICKETING_SEED_CONSULTANT_EMAIL || "consultant@techbubble.com.au",
+      email: consultantEmail,
       passwordHash: consultantPassword,
       name: "Support Consultant",
       role: "CONSULTANT",
       consultantVerified: true,
+      tbosRole: "sales",
     },
+  });
+
+  await ticketingPrisma.consultantOrganization.upsert({
+    where: {
+      consultantId_organizationId: { consultantId: consultant.id, organizationId: org.id },
+    },
+    update: {},
+    create: { consultantId: consultant.id, organizationId: org.id },
   });
 
   console.log("Ticketing seed complete:", { organizationId: org.id });

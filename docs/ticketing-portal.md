@@ -4,6 +4,8 @@ Separate support product: **Next.js portal** (`apps/ticketing`), **Express API**
 
 ## Features
 
+- **TBOS Support tickets** — Sales → **Support tickets** lists tickets from the ticketing API (admin: all companies; sales: assigned companies only). **Consultant access** (admin) assigns companies per consultant.
+- **File uploads** — Clients attach files when creating tickets or on the ticket detail page (stored on ticketing-api; set `TICKETING_PUBLIC_URL` in production for download links).
 - **Multi-tenant organizations** — client users only see tickets for their organization.
 - **Ticket types** — technical, financial/loan, internal/external service.
 - **Workflow** — Open → In progress → Pending client → Resolved → Closed; priorities Low–Urgent.

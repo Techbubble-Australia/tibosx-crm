@@ -140,9 +140,17 @@ exports.Prisma.TicketingUserScalarFieldEnum = {
   organizationId: 'organizationId',
   consultantVerified: 'consultantVerified',
   tbosAdminUserId: 'tbosAdminUserId',
+  tbosRole: 'tbosRole',
   active: 'active',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
+};
+
+exports.Prisma.ConsultantOrganizationScalarFieldEnum = {
+  id: 'id',
+  consultantId: 'consultantId',
+  organizationId: 'organizationId',
+  createdAt: 'createdAt'
 };
 
 exports.Prisma.TicketScalarFieldEnum = {
@@ -247,6 +255,7 @@ exports.TicketStatus = exports.$Enums.TicketStatus = {
 exports.Prisma.ModelName = {
   Organization: 'Organization',
   TicketingUser: 'TicketingUser',
+  ConsultantOrganization: 'ConsultantOrganization',
   Ticket: 'Ticket',
   TicketMessage: 'TicketMessage',
   TicketAttachment: 'TicketAttachment',

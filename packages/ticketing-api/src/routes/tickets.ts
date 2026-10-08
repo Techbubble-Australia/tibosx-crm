@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import multer from "multer";
 import { z } from "zod";
 import {
   TicketPriority,
@@ -9,6 +10,10 @@ import {
 import { authMiddleware, type TicketingRequest } from "../middleware/auth.js";
 import { logTicketAudit } from "../lib/ticket-audit.js";
 import { nextTicketNumber } from "../lib/ticket-number.js";
+import { canAccessTicketOrganization, ticketOrganizationFilter } from "../lib/ticket-access.js";
+import { saveTicketUpload } from "../lib/upload-storage.js";
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const router: IRouter = Router();
 
@@ -36,10 +41,6 @@ const messageSchema = z.object({
   isInternal: z.boolean().optional(),
 });
 
-function canAccessTicket(user: NonNullable<TicketingRequest["ticketingUser"]>, organizationId: string) {
-  if (user.role === "CONSULTANT" && user.consultantVerified) return true;
-  return user.role === "CLIENT" && user.organizationId === organizationId;
-}
 
 function serializeTicket(row: {
   id: string;
@@ -83,21 +84,35 @@ router.get("/", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
   const status = typeof req.query.status === "string" ? req.query.status : "";
   const organizationId = typeof req.query.organizationId === "string" ? req.query.organizationId : "";
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+
+  const orgFilter = await ticketOrganizationFilter(user);
+  if (orgFilter === "deny") return res.status(403).json({ error: "Access denied" });
 
   const where: {
-    organizationId?: string;
+    organizationId?: string | { in: string[] };
     status?: TicketStatus;
-  } = {};
+    OR?: Array<{ subject?: { contains: string; mode: "insensitive" }; ticketNumber?: { contains: string; mode: "insensitive" } }>;
+  } = { ...orgFilter };
 
-  if (user.role === "CLIENT") {
-    if (!user.organizationId) return res.status(403).json({ error: "No organization linked" });
-    where.organizationId = user.organizationId;
-  } else if (organizationId) {
+  if (organizationId) {
+    if (orgFilter.organizationId && typeof orgFilter.organizationId === "object") {
+      if (!orgFilter.organizationId.in.includes(organizationId)) {
+        return res.json({ data: [] });
+      }
+    }
     where.organizationId = organizationId;
   }
 
   if (status && Object.values(TicketStatus).includes(status as TicketStatus)) {
     where.status = status as TicketStatus;
+  }
+
+  if (q.length >= 2) {
+    where.OR = [
+      { subject: { contains: q, mode: "insensitive" } },
+      { ticketNumber: { contains: q, mode: "insensitive" } },
+    ];
   }
 
   const rows = await ticketingPrisma.ticket.findMany({
@@ -169,7 +184,7 @@ router.get("/:id", async (req: TicketingRequest, res) => {
       auditLogs: { orderBy: { createdAt: "desc" }, take: 100, include: { actor: { select: { id: true, name: true } } } },
     },
   });
-  if (!ticket || !canAccessTicket(user, ticket.organizationId)) {
+  if (!ticket || !(await canAccessTicketOrganization(user, ticket.organizationId))) {
     return res.status(404).json({ error: "Ticket not found" });
   }
 
@@ -198,7 +213,7 @@ router.patch("/:id", async (req: TicketingRequest, res) => {
   if (!parsed.success) return res.status(400).json({ error: "Validation error", details: parsed.error.errors });
 
   const existing = await ticketingPrisma.ticket.findUnique({ where: { id: req.params.id } });
-  if (!existing || !canAccessTicket(user, existing.organizationId)) {
+  if (!existing || !(await canAccessTicketOrganization(user, existing.organizationId))) {
     return res.status(404).json({ error: "Ticket not found" });
   }
 
@@ -257,7 +272,7 @@ router.post("/:id/messages", async (req: TicketingRequest, res) => {
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
 
   const ticket = await ticketingPrisma.ticket.findUnique({ where: { id: req.params.id } });
-  if (!ticket || !canAccessTicket(user, ticket.organizationId)) {
+  if (!ticket || !(await canAccessTicketOrganization(user, ticket.organizationId))) {
     return res.status(404).json({ error: "Ticket not found" });
   }
 
@@ -288,6 +303,36 @@ router.post("/:id/messages", async (req: TicketingRequest, res) => {
   res.status(201).json({ data: message });
 });
 
+router.post("/:id/attachments/upload", upload.single("file"), async (req: TicketingRequest, res) => {
+  const user = req.ticketingUser!;
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+  const ticket = await ticketingPrisma.ticket.findUnique({ where: { id: req.params.id } });
+  if (!ticket || !(await canAccessTicketOrganization(user, ticket.organizationId))) {
+    return res.status(404).json({ error: "Ticket not found" });
+  }
+
+  try {
+    const stored = await saveTicketUpload(req.file);
+    const attachment = await ticketingPrisma.ticketAttachment.create({
+      data: {
+        ticketId: ticket.id,
+        fileName: stored.fileName,
+        fileUrl: stored.fileUrl,
+        fileSize: stored.fileSize,
+        uploadedById: user.id,
+      },
+    });
+    await logTicketAudit(ticket.id, user.id, "ATTACHMENT_ADDED", {
+      metadata: { fileName: attachment.fileName },
+    });
+    res.status(201).json({ data: attachment });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Upload failed";
+    res.status(400).json({ error: message });
+  }
+});
+
 router.post("/:id/attachments", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
   const body = z
@@ -300,7 +345,7 @@ router.post("/:id/attachments", async (req: TicketingRequest, res) => {
   if (!body.success) return res.status(400).json({ error: "Validation error" });
 
   const ticket = await ticketingPrisma.ticket.findUnique({ where: { id: req.params.id } });
-  if (!ticket || !canAccessTicket(user, ticket.organizationId)) {
+  if (!ticket || !(await canAccessTicketOrganization(user, ticket.organizationId))) {
     return res.status(404).json({ error: "Ticket not found" });
   }
 

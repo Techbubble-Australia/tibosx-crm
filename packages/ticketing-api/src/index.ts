@@ -7,6 +7,8 @@ import path from "path";
 import { authRoutes } from "./routes/auth.js";
 import { ticketRoutes } from "./routes/tickets.js";
 import { organizationRoutes } from "./routes/organizations.js";
+import { tbosRoutes } from "./routes/tbos.js";
+import { uploadDir } from "./lib/upload-storage.js";
 
 dotenv.config({ path: path.resolve(process.cwd(), "../../.env") });
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
@@ -33,7 +35,10 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", service: "ticketing-api", timestamp: new Date().toISOString() });
 });
 
+app.use("/uploads/tickets", express.static(uploadDir(), { maxAge: "7d", fallthrough: true }));
+
 app.use("/api/auth", authRoutes);
+app.use("/api/tbos", tbosRoutes);
 app.use("/api/tickets", ticketRoutes);
 app.use("/api/organizations", organizationRoutes);
 
