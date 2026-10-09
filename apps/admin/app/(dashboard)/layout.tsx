@@ -91,8 +91,6 @@ const navGroups: NavGroup[] = [
     roles: ["admin", "customer_support"],
     items: [
       { href: "/support-tickets", label: "Support tickets", icon: ClipboardList, roles: ["admin", "customer_support"] },
-      { href: "/support-tickets/projects", label: "Support projects", icon: FolderKanban, roles: ["admin", "customer_support"] },
-      { href: "/support-tickets/assignments", label: "Consultant access", icon: Users, roles: ["admin", "customer_support"] },
     ],
   },
   {
