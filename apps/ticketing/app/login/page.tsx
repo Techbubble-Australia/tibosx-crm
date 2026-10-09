@@ -36,7 +36,7 @@ export default function LoginPage() {
         <h1 className="mb-1 text-xl font-semibold">Client Support Portal</h1>
         <p className="mb-6 text-sm text-gray-500">
           Sign in with your organization account to manage support tickets. Client approvers can review timesheets under{" "}
-          <strong>Timesheet approvals</strong> after sign-in.
+          <strong>Timesheets</strong> after sign-in.
         </p>
         {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}
         <label className="mb-1 block text-sm font-medium">Email</label>

@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { prisma } from "@techbubble/database";
 import { authMiddleware, type TicketingRequest } from "../middleware/auth.js";
+import { resolveClientTimesheetProjectIds } from "../lib/client-timesheet-projects.js";
 
 const router: IRouter = Router();
 
@@ -9,23 +10,20 @@ router.use(authMiddleware);
 
 router.get("/summary", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
-  if (user.role !== "CLIENT" || !user.organizationId) {
+  if (user.role !== "CLIENT") {
     return res.json({ data: { total: 0, pendingApproval: 0 } });
   }
 
-  const org = await prisma.organization.findUnique({
-    where: { id: user.organizationId },
-    select: { projectId: true },
-  });
-  if (!org?.projectId) {
+  const projectIds = await resolveClientTimesheetProjectIds(user.id, user.organizationId ?? null);
+  if (!projectIds.length) {
     return res.json({ data: { total: 0, pendingApproval: 0 } });
   }
 
   const [total, pendingApproval] = await Promise.all([
-    prisma.timesheet.count({ where: { projectId: org.projectId } }),
+    prisma.timesheet.count({ where: { projectId: { in: projectIds } } }),
     prisma.timesheet.count({
       where: {
-        projectId: org.projectId,
+        projectId: { in: projectIds },
         status: "SUBMITTED",
         approverKind: "CLIENT_CONTACT",
       },
@@ -37,18 +35,15 @@ router.get("/summary", async (req: TicketingRequest, res) => {
 
 router.get("/", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
-  if (user.role !== "CLIENT" || !user.organizationId) {
-    return res.status(403).json({ error: "Forbidden" });
+  if (user.role !== "CLIENT") {
+    return res.json({ data: [] });
   }
 
   const status = typeof req.query.status === "string" ? req.query.status : "";
-  const org = await prisma.organization.findUnique({
-    where: { id: user.organizationId },
-    select: { projectId: true },
-  });
-  if (!org?.projectId) return res.json({ data: [] });
+  const projectIds = await resolveClientTimesheetProjectIds(user.id, user.organizationId);
+  if (!projectIds.length) return res.json({ data: [] });
 
-  const where: { projectId: string; status?: string } = { projectId: org.projectId };
+  const where: { projectId: { in: string[] }; status?: string } = { projectId: { in: projectIds } };
   if (status) where.status = status;
 
   const rows = await prisma.timesheet.findMany({
@@ -74,8 +69,8 @@ router.get("/", async (req: TicketingRequest, res) => {
 
 router.get("/pending-approval", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
-  if (user.role !== "CLIENT" || !user.organizationId) {
-    return res.status(403).json({ error: "Forbidden" });
+  if (user.role !== "CLIENT") {
+    return res.json({ data: [] });
   }
 
   const links = await prisma.projectClientContact.findMany({

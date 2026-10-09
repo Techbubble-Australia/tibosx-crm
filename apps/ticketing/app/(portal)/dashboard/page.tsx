@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { ClipboardCheck } from "lucide-react";
 import { ticketingFetch } from "@/lib/ticketing-fetch";
 import { TICKET_STATUS_LABELS, TICKET_TYPE_LABELS } from "@/lib/ticket-labels";
 import { EmptyTickets } from "@/components/PortalShell";
@@ -74,17 +75,43 @@ export default function DashboardPage() {
         </div>
         {isClient ? (
           <>
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <Link
+              href="/timesheets"
+              className="rounded-xl border border-gray-200 bg-white p-4 transition hover:border-sky-200 hover:bg-sky-50/50"
+            >
               <p className="text-sm text-gray-500">Timesheets awaiting approval</p>
               <p className="text-3xl font-semibold">{timesheets.pendingApproval}</p>
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
+            </Link>
+            <Link
+              href="/timesheets"
+              className="rounded-xl border border-gray-200 bg-white p-4 transition hover:border-sky-200 hover:bg-sky-50/50"
+            >
               <p className="text-sm text-gray-500">Total timesheets</p>
               <p className="text-3xl font-semibold">{timesheets.total}</p>
-            </div>
+            </Link>
           </>
         ) : null}
       </div>
+
+      {isClient ? (
+        <Link
+          href="/timesheets"
+          className="flex items-center justify-between rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sky-900 hover:bg-sky-100"
+        >
+          <div className="flex items-center gap-3">
+            <ClipboardCheck className="h-8 w-8 text-sky-600" />
+            <div>
+              <p className="font-medium">Timesheets</p>
+              <p className="text-sm text-sky-700">
+                {timesheets.pendingApproval > 0
+                  ? `${timesheets.pendingApproval} awaiting approval · ${timesheets.total} total`
+                  : `${timesheets.total} on your project`}
+              </p>
+            </div>
+          </div>
+          <span className="text-sm font-medium">Open →</span>
+        </Link>
+      ) : null}
 
       <section>
         <h2 className="mb-3 font-semibold">Recent activity</h2>
