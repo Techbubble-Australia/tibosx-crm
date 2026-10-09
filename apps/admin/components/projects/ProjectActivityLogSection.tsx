@@ -27,6 +27,8 @@ function formatAction(log: ActivityLog): string {
       return "Project created";
     case "UPDATED":
       return "Project updated";
+    case "FIELD_UPDATED":
+      return log.fieldName ? `${log.fieldName} updated` : "Field updated";
     case "CREDENTIALS_GENERATED":
       return `Credentials generated for ${log.newValue ?? "member"}`;
     default:
@@ -49,6 +51,11 @@ export function ProjectActivityLogSection({ logs }: Props) {
           {logs.map((log) => (
             <li key={log.id} className="py-3 text-sm">
               <p className="font-medium text-gray-900 dark:text-gray-100">{formatAction(log)}</p>
+              {log.fieldName && (log.oldValue || log.newValue) ? (
+                <p className="text-gray-600 dark:text-gray-400">
+                  {log.oldValue ?? "—"} → {log.newValue ?? "—"}
+                </p>
+              ) : null}
               {log.reason ? <p className="text-gray-600 dark:text-gray-400">Reason: {log.reason}</p> : null}
               <p className="mt-1 text-xs text-gray-400">
                 {formatActivityDate(log.createdAt)}

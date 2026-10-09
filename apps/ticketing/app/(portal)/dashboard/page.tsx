@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ClipboardCheck } from "lucide-react";
 import { ticketingFetch } from "@/lib/ticketing-fetch";
 import { TICKET_STATUS_LABELS, TICKET_TYPE_LABELS } from "@/lib/ticket-labels";
 import { EmptyTickets } from "@/components/PortalShell";
@@ -17,30 +16,45 @@ type TicketRow = {
   updatedAt: string;
 };
 
+type ActivityRow = {
+  id: string;
+  action: string;
+  ticketNumber: string;
+  subject: string;
+  createdAt: string;
+  actorName: string;
+};
+
+type TimesheetSummary = {
+  total: number;
+  pendingApproval: number;
+};
+
 export default function DashboardPage() {
   const [rows, setRows] = useState<TicketRow[]>([]);
+  const [activity, setActivity] = useState<ActivityRow[]>([]);
+  const [timesheets, setTimesheets] = useState<TimesheetSummary>({ total: 0, pendingApproval: 0 });
   const [role, setRole] = useState<string>("CLIENT");
-  const [canApproveTimesheets, setCanApproveTimesheets] = useState(false);
-  const [pendingTimesheets, setPendingTimesheets] = useState(0);
 
   useEffect(() => {
     void ticketingFetch("/api/auth/me")
       .then((res) => res.json())
-      .then((data) => {
-        const me = data.data as { role: string; canApproveTimesheets?: boolean };
-        setRole(me.role);
-        setCanApproveTimesheets(Boolean(me.canApproveTimesheets));
-      });
+      .then((data) => setRole((data.data as { role: string }).role));
     void ticketingFetch("/api/tickets")
       .then((res) => res.json())
       .then((data) => setRows((data.data as TicketRow[]) ?? []));
-    void ticketingFetch("/api/timesheets/pending-approval")
+    void ticketingFetch("/api/tickets/activity/recent")
       .then((res) => res.json())
-      .then((data) => setPendingTimesheets(((data.data as unknown[]) ?? []).length))
-      .catch(() => setPendingTimesheets(0));
+      .then((data) => setActivity((data.data as ActivityRow[]) ?? []))
+      .catch(() => setActivity([]));
+    void ticketingFetch("/api/timesheets/summary")
+      .then((res) => res.json())
+      .then((data) => setTimesheets((data.data as TimesheetSummary) ?? { total: 0, pendingApproval: 0 }))
+      .catch(() => setTimesheets({ total: 0, pendingApproval: 0 }));
   }, []);
 
   const open = rows.filter((r) => !["CLOSED", "RESOLVED"].includes(r.status));
+  const isClient = role === "CLIENT";
 
   return (
     <div className="space-y-6">
@@ -48,27 +62,8 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-semibold">Dashboard</h1>
         <p className="text-sm text-gray-500">Track active requests and recent updates.</p>
       </div>
-      {role === "CLIENT" && canApproveTimesheets ? (
-        <Link
-          href="/timesheets"
-          className="flex items-center justify-between rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sky-900 hover:bg-sky-100"
-        >
-          <div className="flex items-center gap-3">
-            <ClipboardCheck className="h-8 w-8 text-sky-600" />
-            <div>
-              <p className="font-medium">Timesheet approvals</p>
-              <p className="text-sm text-sky-700">
-                {pendingTimesheets > 0
-                  ? `${pendingTimesheets} waiting for your review`
-                  : "No timesheets pending"}
-              </p>
-            </div>
-          </div>
-          <span className="text-sm font-medium">Open →</span>
-        </Link>
-      ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-gray-200 bg-white p-4">
           <p className="text-sm text-gray-500">Open tickets</p>
           <p className="text-3xl font-semibold">{open.length}</p>
@@ -77,19 +72,52 @@ export default function DashboardPage() {
           <p className="text-sm text-gray-500">Total tickets</p>
           <p className="text-3xl font-semibold">{rows.length}</p>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <Link href="/tickets/new" className="text-sm font-medium text-sky-600 hover:underline">
-            {role === "CONSULTANT" ? "Create new ticket →" : "Submit a new request →"}
-          </Link>
-        </div>
+        {isClient ? (
+          <>
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <p className="text-sm text-gray-500">Timesheets awaiting approval</p>
+              <p className="text-3xl font-semibold">{timesheets.pendingApproval}</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <p className="text-sm text-gray-500">Total timesheets</p>
+              <p className="text-3xl font-semibold">{timesheets.total}</p>
+            </div>
+          </>
+        ) : null}
       </div>
+
       <section>
-        <h2 className="mb-3 font-semibold">Recent tickets</h2>
-        {rows.length === 0 ? (
+        <h2 className="mb-3 font-semibold">Recent activity</h2>
+        {activity.length === 0 ? (
           <EmptyTickets />
         ) : (
+          <ul className="relative space-y-0 border-l-2 border-sky-200 pl-4">
+            {activity.slice(0, 12).map((row) => (
+              <li key={row.id} className="relative pb-4">
+                <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-sky-500" />
+                <p className="text-sm font-medium text-slate-900">
+                  <Link href={`/tickets/${row.id}`} className="text-sky-700 hover:underline">
+                    {row.ticketNumber}
+                  </Link>
+                  {" · "}
+                  {row.action.replaceAll("_", " ")}
+                </p>
+                <p className="text-sm text-slate-600">{row.subject}</p>
+                <p className="text-xs text-slate-400">
+                  {new Date(row.createdAt).toLocaleString()}
+                  {row.actorName ? ` · ${row.actorName}` : ""}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {rows.length > 0 ? (
+        <section>
+          <h2 className="mb-3 font-semibold">Tickets</h2>
           <ul className="divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white">
-            {rows.slice(0, 8).map((row) => (
+            {rows.slice(0, 5).map((row) => (
               <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
                 <div>
                   <Link href={`/tickets/${row.id}`} className="font-medium text-blue-600 hover:underline">
@@ -97,15 +125,15 @@ export default function DashboardPage() {
                   </Link>
                   <p className="text-gray-700">{row.subject}</p>
                   <p className="text-xs text-gray-500">
-                    {TICKET_TYPE_LABELS[row.type]} · {TICKET_STATUS_LABELS[row.status]}
+                    {TICKET_TYPE_LABELS[row.type] ?? row.type} · {TICKET_STATUS_LABELS[row.status] ?? row.status}
                   </p>
                 </div>
                 <span className="text-xs text-gray-400">{new Date(row.updatedAt).toLocaleString()}</span>
               </li>
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      ) : null}
     </div>
   );
 }

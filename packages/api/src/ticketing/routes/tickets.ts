@@ -81,6 +81,41 @@ function serializeTicket(row: {
   };
 }
 
+router.get("/activity/recent", async (req: TicketingRequest, res) => {
+  const user = req.ticketingUser!;
+  const orgFilter = await ticketOrganizationFilter(user);
+  if (orgFilter === "deny") return res.json({ data: [] });
+
+  const tickets = await prisma.ticket.findMany({
+    where: orgFilter,
+    select: { id: true, ticketNumber: true, subject: true },
+    take: 50,
+  });
+  const ticketIds = tickets.map((t) => t.id);
+  if (!ticketIds.length) return res.json({ data: [] });
+
+  const logs = await prisma.ticketAuditLog.findMany({
+    where: { ticketId: { in: ticketIds } },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+    include: {
+      ticket: { select: { id: true, ticketNumber: true, subject: true } },
+      actor: { select: { name: true, email: true } },
+    },
+  });
+
+  res.json({
+    data: logs.map((row) => ({
+      id: row.ticket.id,
+      action: row.action,
+      ticketNumber: row.ticket.ticketNumber,
+      subject: row.ticket.subject,
+      createdAt: row.createdAt.toISOString(),
+      actorName: row.actor?.name || row.actor?.email || "",
+    })),
+  });
+});
+
 router.get("/", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
   const status = typeof req.query.status === "string" ? req.query.status : "";

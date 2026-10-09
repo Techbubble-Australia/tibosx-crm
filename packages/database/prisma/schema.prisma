@@ -329,12 +329,36 @@ model Client {
   contacts      ClientContact[]
   opportunities Opportunity[]
   contracts     Contract[]
-  projects      Project[]
+  projects        Project[]
+  workspaceGroups WorkspaceGroup[]
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
   @@index([order])
   @@index([status])
+}
+
+model WorkspaceGroup {
+  id        String   @id @default(cuid())
+  name      String
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  members   WorkspaceGroupMember[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
+}
+
+model WorkspaceGroupMember {
+  id          String         @id @default(cuid())
+  groupId     String
+  group       WorkspaceGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  adminUserId String
+  adminUser   AdminUser      @relation("WorkspaceGroupMember", fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, adminUserId])
+  @@index([adminUserId])
 }
 
 model Opportunity {
@@ -922,6 +946,7 @@ model AdminUser {
   performedUserLogs   AdminUserActivityLog[] @relation("AdminUserActivityPerformer")
   ticketingUser       TicketingUser?         @relation("TicketingTbosUser")
   supportGroupMemberships ProjectSupportGroupMember[] @relation("SupportGroupMember")
+  workspaceGroupMemberships WorkspaceGroupMember[]      @relation("WorkspaceGroupMember")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -954,6 +979,9 @@ enum TicketType {
   FINANCIAL_LOAN
   SERVICE_INTERNAL
   SERVICE_EXTERNAL
+  BUG
+  ENHANCEMENT
+  OTHER
 }
 
 enum TicketPriority {

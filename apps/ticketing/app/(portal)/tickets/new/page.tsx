@@ -4,10 +4,15 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ticketingFetch } from "@/lib/ticketing-fetch";
-import { TICKET_PRIORITIES, TICKET_PRIORITY_LABELS, TICKET_TYPES, TICKET_TYPE_LABELS } from "@/lib/ticket-labels";
+import {
+  CLIENT_REQUEST_TYPES,
+  TICKET_PRIORITIES,
+  TICKET_PRIORITY_LABELS,
+  TICKET_TYPE_LABELS,
+} from "@/lib/ticket-labels";
 import { FileUploadField } from "@/components/FileUploadField";
 
-type Me = { role: string; tbosRole?: string | null };
+type Me = { role: string; tbosRole?: string | null; organization?: { id: string; name: string } | null };
 type Org = { id: string; name: string };
 
 export default function NewTicketPage() {
@@ -29,7 +34,13 @@ export default function NewTicketPage() {
   useEffect(() => {
     void ticketingFetch("/api/auth/me")
       .then((res) => res.json())
-      .then((data) => setMe(data.data as Me));
+      .then((data) => {
+        const payload = data.data as Me;
+        setMe(payload);
+        if (payload.role === "CLIENT" && payload.organization?.id) {
+          setOrganizationId(payload.organization.id);
+        }
+      });
   }, []);
 
   useEffect(() => {
@@ -108,7 +119,7 @@ export default function NewTicketPage() {
       <form onSubmit={onSubmit} className="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         {isConsultant ? (
           <div>
-            <label className="mb-1 block text-sm font-medium">Client project</label>
+            <label className="mb-1 block text-sm font-medium">Project *</label>
             <select
               required
               value={organizationId}
@@ -126,19 +137,41 @@ export default function NewTicketPage() {
               </p>
             ) : null}
           </div>
-        ) : null}
+        ) : (
+          <div>
+            <label className="mb-1 block text-sm font-medium">Project *</label>
+            <input
+              readOnly
+              value={me?.organization?.name ?? ""}
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+            />
+          </div>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium">Request type</label>
-            <select value={type} onChange={(e) => setType(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
-              {TICKET_TYPES.map((t) => (
-                <option key={t} value={t}>{TICKET_TYPE_LABELS[t]}</option>
+            <label className="mb-1 block text-sm font-medium">Request type *</label>
+            <select
+              required
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            >
+              {(isConsultant
+                ? Object.entries(TICKET_TYPE_LABELS)
+                : CLIENT_REQUEST_TYPES.map((row) => [row.value, row.label] as const)
+              ).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Priority</label>
-            <select value={priority} onChange={(e) => setPriority(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+            <label className="mb-1 block text-sm font-medium">Priority *</label>
+            <select
+              required
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            >
               {TICKET_PRIORITIES.map((p) => (
                 <option key={p} value={p}>{TICKET_PRIORITY_LABELS[p]}</option>
               ))}
@@ -146,11 +179,11 @@ export default function NewTicketPage() {
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">Subject</label>
+          <label className="mb-1 block text-sm font-medium">Subject *</label>
           <input required value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Brief summary" />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">Description</label>
+          <label className="mb-1 block text-sm font-medium">Description *</label>
           <textarea required rows={6} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Steps to reproduce, expected behavior, etc." />
         </div>
         <FileUploadField files={files} onChange={setFiles} />

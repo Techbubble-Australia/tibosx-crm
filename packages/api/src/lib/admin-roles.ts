@@ -8,13 +8,15 @@ export const ADMIN_ROLES = [
   "website",
   "project_manager",
   "project_member",
+  "customer_support",
+  "client",
 ] as const;
 
 export const ADMIN_ROLES_LIST = ADMIN_ROLES;
 
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
-export type TbModule = "recruitment" | "website" | "sales" | "users" | "project_management";
+export type TbModule = "recruitment" | "website" | "sales" | "users" | "project_management" | "workspace";
 
 const MODULE_ROLE_MAP: Record<TbModule, readonly AdminRole[]> = {
   recruitment: ["admin", "recruiter_admin", "recruiter"],
@@ -22,6 +24,7 @@ const MODULE_ROLE_MAP: Record<TbModule, readonly AdminRole[]> = {
   sales: ["admin", "sales"],
   users: ["admin"],
   project_management: ["admin", "project_manager", "project_member"],
+  workspace: ["admin", "customer_support"],
 };
 
 export function isAdminRole(value: string): value is AdminRole {

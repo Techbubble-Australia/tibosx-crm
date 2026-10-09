@@ -16,6 +16,7 @@ import {
 } from "../lib/credential-template-render";
 import { saveUploadBuffer } from "../lib/save-upload-buffer";
 import { canManageProjects, getActorId, isProjectManagerRole, isProjectMemberRole } from "../lib/project-access";
+import { logProjectFieldChanges, type ProjectSnapshot } from "../lib/project-activity";
 import {
   generateProjectMonths,
   PROJECT_COST_TYPES,
@@ -743,19 +744,42 @@ router.put("/:id", async (req: AuthRequest, res) => {
         })
       : null;
 
+    const beforeSnapshot: ProjectSnapshot = {
+      title: existing.title,
+      description: existing.description,
+      clientId: existing.clientId,
+      kind: existing.kind,
+      status: existing.status,
+      projectManagerId: existing.projectManagerId,
+      contractId: existing.contractId,
+      startDate: existing.startDate,
+      endDate: existing.endDate,
+    };
+    const afterSnapshot: ProjectSnapshot = {
+      title: data.title.trim(),
+      description: data.description.trim(),
+      clientId: data.clientId,
+      kind: data.kind ?? existing.kind,
+      status: data.status ?? existing.status,
+      projectManagerId: data.projectManagerId,
+      contractId: data.contractId ?? null,
+      startDate: data.startDate,
+      endDate: data.endDate,
+    };
+
     await prisma.$transaction(async (tx) => {
       await tx.project.update({
         where: { id: projectId },
         data: {
-          title: data.title.trim(),
-          description: data.description.trim(),
-          clientId: data.clientId,
-          kind: data.kind ?? existing.kind,
-          status: data.status ?? existing.status,
-          projectManagerId: data.projectManagerId,
-          contractId: data.contractId ?? null,
-          startDate: data.startDate,
-          endDate: data.endDate,
+          title: afterSnapshot.title,
+          description: afterSnapshot.description,
+          clientId: afterSnapshot.clientId,
+          kind: afterSnapshot.kind,
+          status: afterSnapshot.status,
+          projectManagerId: afterSnapshot.projectManagerId,
+          contractId: afterSnapshot.contractId,
+          startDate: afterSnapshot.startDate,
+          endDate: afterSnapshot.endDate,
           fileUrls: data.fileUrls ?? [],
         },
       });
@@ -766,13 +790,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
       const actuals = data.actuals ?? [];
       await replaceEstimates(tx, projectId, estimates);
       await replaceActuals(tx, projectId, actuals);
-      await tx.projectActivityLog.create({
-        data: {
-          projectId,
-          action: "UPDATED",
-          performedById: getActorId(req) || null,
-        },
-      });
+      await logProjectFieldChanges(tx, projectId, beforeSnapshot, afterSnapshot, getActorId(req) || null);
     });
 
     const nextStatus = data.status ?? existing.status;

@@ -3,13 +3,15 @@
 import { LifeBuoy } from "lucide-react";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 
-const CONSULTANT_ROLES = new Set(
-  (process.env.NEXT_PUBLIC_TICKETING_TBOS_CONSULTANT_ROLES || "admin,sales").split(",").map((r) => r.trim()),
+const PORTAL_ROLES = new Set(
+  (process.env.NEXT_PUBLIC_TICKETING_TBOS_CONSULTANT_ROLES || "admin,sales,customer_support,client")
+    .split(",")
+    .map((r) => r.trim()),
 );
 
 export function TicketPortalLink() {
   const { role } = useAdminSession();
-  if (!CONSULTANT_ROLES.has(role)) return null;
+  if (!PORTAL_ROLES.has(role)) return null;
 
   return (
     <a

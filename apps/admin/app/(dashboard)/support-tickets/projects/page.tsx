@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { canAccessWorkspace } from "@/lib/admin-roles";
 
 type SupportProject = {
   id: string;
@@ -44,7 +45,7 @@ export default function SupportProjectsPage() {
   );
 
   useEffect(() => {
-    if (role !== "admin") return;
+    if (!canAccessWorkspace(role)) return;
     load();
   }, [role]);
 
@@ -90,8 +91,8 @@ export default function SupportProjectsPage() {
     }
   }
 
-  if (role !== "admin") {
-    return <p className="text-gray-500">Admin only.</p>;
+  if (!canAccessWorkspace(role)) {
+    return <p className="text-gray-500">You do not have access to Workspace.</p>;
   }
 
   return (
@@ -112,9 +113,9 @@ export default function SupportProjectsPage() {
           <ul className="mt-2 space-y-2">
             {unlinkedTbosProjects.slice(0, 8).map((p) => (
               <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                <Link href={`/projects/${p.id}`} className="text-gray-900 hover:underline dark:text-gray-100">
+                <span className="text-gray-900 dark:text-gray-100">
                   {p.projectNumber} — {p.title}
-                </Link>
+                </span>
                 <button
                   type="button"
                   disabled={saving}
@@ -175,10 +176,10 @@ export default function SupportProjectsPage() {
                 {p.projectId ? (
                   <p className="mt-0.5 text-xs text-gray-500">
                     TBOS:{" "}
-                    <Link href={`/projects/${p.projectId}`} className="text-blue-600 hover:underline">
+                    <span className="text-gray-600 dark:text-gray-300">
                       {p.projectNumber ?? p.projectId}
                       {p.projectTitle ? ` — ${p.projectTitle}` : ""}
-                    </Link>
+                    </span>
                   </p>
                 ) : (
                   <p className="mt-0.5 text-xs text-gray-400">Not linked to a TBOS delivery project</p>

@@ -53,12 +53,7 @@ export function ProjectSupportPortalCard({
           {supportOrganizationSlug ? (
             <span className="font-mono text-xs text-gray-400">{supportOrganizationSlug}</span>
           ) : null}
-          <Link
-            href="/support-tickets/projects"
-            className="text-blue-600 hover:underline"
-          >
-            Manage support projects
-          </Link>
+          <span className="text-gray-500">Linked in Workspace → Support projects</span>
         </div>
       ) : (
         <button

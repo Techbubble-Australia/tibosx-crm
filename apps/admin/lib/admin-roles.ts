@@ -6,11 +6,13 @@ export const ADMIN_ROLES = [
   "website",
   "project_manager",
   "project_member",
+  "customer_support",
+  "client",
 ] as const;
 
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
-export type TbModule = "recruitment" | "website" | "sales" | "users" | "project_management";
+export type TbModule = "recruitment" | "website" | "sales" | "users" | "project_management" | "workspace";
 
 export type RolePermission = {
   id: string;
@@ -22,6 +24,8 @@ export type RolePermission = {
   website: boolean;
   project_manager: boolean;
   project_member: boolean;
+  customer_support: boolean;
+  client: boolean;
 };
 
 export const ROLE_META: Record<AdminRole, { label: string; description: string }> = {
@@ -53,6 +57,14 @@ export const ROLE_META: Record<AdminRole, { label: string; description: string }
     label: "Project member",
     description: "Submit and manage own timesheets for assigned active projects.",
   },
+  customer_support: {
+    label: "Customer support",
+    description: "Workspace module — support tickets and client case management.",
+  },
+  client: {
+    label: "Client",
+    description: "Support portal access for end clients (no TBOS modules).",
+  },
 };
 
 const MODULE_ROLE_MAP: Record<TbModule, readonly AdminRole[]> = {
@@ -61,6 +73,19 @@ const MODULE_ROLE_MAP: Record<TbModule, readonly AdminRole[]> = {
   sales: ["admin", "sales"],
   users: ["admin"],
   project_management: ["admin", "project_manager", "project_member"],
+  workspace: ["admin", "customer_support"],
+};
+
+const denyAllExceptSecurity: Record<AdminRole, boolean> = {
+  admin: true,
+  recruiter_admin: true,
+  recruiter: true,
+  sales: true,
+  website: true,
+  project_manager: true,
+  project_member: true,
+  customer_support: true,
+  client: false,
 };
 
 export const ROLE_PERMISSIONS: RolePermission[] = [
@@ -74,6 +99,8 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
     website: false,
     project_manager: false,
     project_member: false,
+    customer_support: false,
+    client: false,
   },
   {
     id: "website",
@@ -85,6 +112,8 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
     website: true,
     project_manager: false,
     project_member: false,
+    customer_support: false,
+    client: false,
   },
   {
     id: "sales",
@@ -96,6 +125,8 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
     website: false,
     project_manager: false,
     project_member: false,
+    customer_support: false,
+    client: false,
   },
   {
     id: "project_management",
@@ -107,6 +138,21 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
     website: false,
     project_manager: true,
     project_member: true,
+    customer_support: false,
+    client: false,
+  },
+  {
+    id: "workspace",
+    label: "Workspace module (support tickets)",
+    admin: true,
+    recruiter_admin: false,
+    recruiter: false,
+    sales: false,
+    website: false,
+    project_manager: false,
+    project_member: false,
+    customer_support: true,
+    client: false,
   },
   {
     id: "users",
@@ -118,6 +164,21 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
     website: false,
     project_manager: false,
     project_member: false,
+    customer_support: false,
+    client: false,
+  },
+  {
+    id: "support_portal",
+    label: "Support portal (client ticketing)",
+    admin: true,
+    recruiter_admin: false,
+    recruiter: false,
+    sales: true,
+    website: false,
+    project_manager: false,
+    project_member: false,
+    customer_support: true,
+    client: true,
   },
   {
     id: "security",
@@ -129,6 +190,8 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
     website: true,
     project_manager: true,
     project_member: true,
+    customer_support: true,
+    client: true,
   },
 ];
 
@@ -138,11 +201,17 @@ export function isAdminRole(value: string): value is AdminRole {
 
 export function canAccessModule(role: string, module: TbModule): boolean {
   if (!isAdminRole(role)) return false;
+  if (role === "client") return false;
   return MODULE_ROLE_MAP[module].includes(role);
 }
 
+export function canAccessTbosModules(role: string): boolean {
+  if (!isAdminRole(role)) return false;
+  return denyAllExceptSecurity[role];
+}
+
 export function canMutateContent(role: string): boolean {
-  return isAdminRole(role);
+  return isAdminRole(role) && role !== "client";
 }
 
 export function canManageUsers(role: string): boolean {
@@ -189,6 +258,10 @@ export function canAccessProjectManagement(role: string): boolean {
   return canAccessModule(role, "project_management");
 }
 
+export function canAccessWorkspace(role: string): boolean {
+  return canAccessModule(role, "workspace");
+}
+
 export function canManageProjects(role: string): boolean {
   return role === "admin" || role === "project_manager";
 }
@@ -205,6 +278,8 @@ export function roleLabel(role: string): string {
 }
 
 export function defaultLandingPath(role: string): string {
+  if (role === "client") return "/settings/security";
+  if (canAccessWorkspace(role)) return "/support-tickets";
   if (canAccessRecruitment(role)) return "/database/dashboard";
   if (canAccessProjectManagement(role)) {
     return canManageProjects(role) ? "/projects" : "/agreement";

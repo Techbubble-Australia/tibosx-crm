@@ -72,8 +72,18 @@ function RejectDialog({
   );
 }
 
+type AllRow = {
+  id: string;
+  status: string;
+  memberName: string;
+  startDate: string;
+  endDate: string;
+};
+
 export default function ClientTimesheetsPage() {
   const [rows, setRows] = useState<PendingRow[]>([]);
+  const [allRows, setAllRows] = useState<AllRow[]>([]);
+  const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [canApprove, setCanApprove] = useState(false);
   const [error, setError] = useState("");
@@ -83,21 +93,24 @@ export default function ClientTimesheetsPage() {
   const load = useCallback(() => {
     setLoading(true);
     setError("");
+    const params = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : "";
     void Promise.all([
       ticketingFetch("/api/auth/me").then((r) => r.json()),
       ticketingFetch("/api/timesheets/pending-approval").then((r) => r.json()),
+      ticketingFetch(`/api/timesheets${params}`).then((r) => r.json()),
     ])
-      .then(([meData, listData]) => {
+      .then(([meData, listData, allData]) => {
         const me = meData.data as { canApproveTimesheets?: boolean };
         setCanApprove(Boolean(me.canApproveTimesheets));
         if (!listData.data && listData.error) {
           throw new Error(String(listData.error));
         }
         setRows((listData.data as PendingRow[]) ?? []);
+        setAllRows((allData.data as AllRow[]) ?? []);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load timesheets"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [statusFilter]);
 
   useEffect(() => {
     load();
@@ -147,11 +160,44 @@ export default function ClientTimesheetsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Timesheet approvals</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">Timesheets</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Review and approve time submitted by your support team for this project.
+          View all timesheets for your project and approve submissions when you are an approver.
         </p>
       </div>
+
+      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Filter by status</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          >
+            <option value="">All</option>
+            <option value="DRAFT">Draft</option>
+            <option value="SUBMITTED">Submitted</option>
+            <option value="APPROVED">Approved</option>
+            <option value="REJECTED">Rejected</option>
+          </select>
+        </div>
+      </div>
+
+      {allRows.length > 0 ? (
+        <section>
+          <h2 className="mb-2 font-semibold text-slate-900">All timesheets</h2>
+          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+            {allRows.map((row) => (
+              <li key={row.id} className="px-4 py-3 text-sm">
+                <p className="font-medium text-slate-900">{row.memberName}</p>
+                <p className="text-slate-600">
+                  {formatDate(row.startDate)} – {formatDate(row.endDate)} · {row.status}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {error ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>

@@ -44,7 +44,7 @@ export default function EditProjectPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save project");
-      setProject(data.data as ProjectFormValues);
+      router.push("/projects");
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to save project");
     } finally {

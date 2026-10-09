@@ -7,6 +7,71 @@ const router: IRouter = Router();
 
 router.use(authMiddleware);
 
+router.get("/summary", async (req: TicketingRequest, res) => {
+  const user = req.ticketingUser!;
+  if (user.role !== "CLIENT" || !user.organizationId) {
+    return res.json({ data: { total: 0, pendingApproval: 0 } });
+  }
+
+  const org = await prisma.organization.findUnique({
+    where: { id: user.organizationId },
+    select: { projectId: true },
+  });
+  if (!org?.projectId) {
+    return res.json({ data: { total: 0, pendingApproval: 0 } });
+  }
+
+  const [total, pendingApproval] = await Promise.all([
+    prisma.timesheet.count({ where: { projectId: org.projectId } }),
+    prisma.timesheet.count({
+      where: {
+        projectId: org.projectId,
+        status: "SUBMITTED",
+        approverKind: "CLIENT_CONTACT",
+      },
+    }),
+  ]);
+
+  res.json({ data: { total, pendingApproval } });
+});
+
+router.get("/", async (req: TicketingRequest, res) => {
+  const user = req.ticketingUser!;
+  if (user.role !== "CLIENT" || !user.organizationId) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const status = typeof req.query.status === "string" ? req.query.status : "";
+  const org = await prisma.organization.findUnique({
+    where: { id: user.organizationId },
+    select: { projectId: true },
+  });
+  if (!org?.projectId) return res.json({ data: [] });
+
+  const where: { projectId: string; status?: string } = { projectId: org.projectId };
+  if (status) where.status = status;
+
+  const rows = await prisma.timesheet.findMany({
+    where,
+    include: {
+      memberUser: { select: { name: true, email: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 100,
+  });
+
+  res.json({
+    data: rows.map((row) => ({
+      id: row.id,
+      status: row.status,
+      memberName: row.memberUser?.name || row.memberUser?.email || "",
+      startDate: row.startDate.toISOString(),
+      endDate: row.endDate.toISOString(),
+      approverKind: row.approverKind,
+    })),
+  });
+});
+
 router.get("/pending-approval", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
   if (user.role !== "CLIENT" || !user.organizationId) {

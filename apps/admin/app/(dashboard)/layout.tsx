@@ -32,6 +32,7 @@ import {
   FolderKanban,
   FileCode,
   ClipboardCheck,
+  Info,
 } from "lucide-react";
 import { AdminSessionProvider, useAdminSession } from "@/contexts/AdminSessionContext";
 import { MfaEnrollmentGuard } from "@/components/MfaEnrollmentGuard";
@@ -39,7 +40,6 @@ import { MemberOnboardingGuard } from "@/components/MemberOnboardingGuard";
 import { TechBubbleLogo } from "@/components/TechBubbleLogo";
 import { InactivityLogout } from "@/components/InactivityLogout";
 import { TicketPortalLink } from "@/components/TicketPortalLink";
-import { ProfileHeaderLink } from "@/components/ProfileHeaderLink";
 import { roleLabel } from "@/lib/admin-roles";
 import { isCareerApplicationsPath, isJobListingsPath } from "@/lib/job-routes";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
@@ -81,8 +81,18 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin", "project_manager", "project_member"] },
       { href: "/timesheets", label: "Timesheets", icon: ClipboardCheck, roles: ["admin", "project_manager", "project_member"] },
-      { href: "/support-tickets", label: "Support tickets", icon: ClipboardList, roles: ["admin", "sales"] },
       { href: "/agreement", label: "Agreement", icon: FileText, roles: ["project_member"] },
+    ],
+  },
+  {
+    id: "workspace",
+    label: "Workspace",
+    icon: ClipboardList,
+    roles: ["admin", "customer_support"],
+    items: [
+      { href: "/support-tickets", label: "Support tickets", icon: ClipboardList, roles: ["admin", "customer_support"] },
+      { href: "/support-tickets/projects", label: "Support projects", icon: FolderKanban, roles: ["admin", "customer_support"] },
+      { href: "/support-tickets/assignments", label: "Consultant access", icon: Users, roles: ["admin", "customer_support"] },
     ],
   },
   {
@@ -115,15 +125,16 @@ const navGroups: NavGroup[] = [
     id: "settings",
     label: "Settings",
     icon: Settings,
-    roles: ["admin", "recruiter_admin", "recruiter", "sales", "website"],
+    roles: ["admin", "recruiter_admin", "recruiter", "sales", "website", "customer_support", "client", "project_manager", "project_member"],
     items: [
       { href: "/settings/categories", label: "Category", icon: Layers, roles: ["admin", "website"] },
       { href: "/settings/technologies", label: "Technology", icon: Cpu, roles: ["admin", "website"] },
       { href: "/settings/departments", label: "Department", icon: Building, roles: ["admin", "website"] },
       { href: "/settings/levels", label: "Level", icon: Target, roles: ["admin", "website"] },
       { href: "/settings/templates", label: "Templates", icon: FileCode, roles: ["admin"] },
-      { href: "/settings/profile", label: "Profile", icon: UserCircle, roles: ["admin", "recruiter_admin", "recruiter", "sales", "website", "project_manager", "project_member"] },
-      { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin", "recruiter_admin", "recruiter", "sales", "website", "project_manager", "project_member"] },
+      { href: "/settings/groups", label: "Groups", icon: Users, roles: ["admin"] },
+      { href: "/settings/profile", label: "Profile", icon: UserCircle, roles: ["admin", "recruiter_admin", "recruiter", "sales", "website", "project_manager", "project_member", "customer_support", "client"] },
+      { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin", "recruiter_admin", "recruiter", "sales", "website", "project_manager", "project_member", "customer_support", "client"] },
       { href: "/users", label: "Users", icon: UserCircle, roles: ["admin"] },
     ],
   },
@@ -263,9 +274,19 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
           ) : null}
           {!loading && email && !sidebarCollapsed ? (
             <div className="mt-3 min-w-0 space-y-1 border-t border-gray-100 pt-3 dark:border-gray-800">
-              <p className="truncate text-xs text-gray-500 dark:text-gray-400" title={email}>
-                {email}
-              </p>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <p className="min-w-0 flex-1 truncate text-xs text-gray-500 dark:text-gray-400" title={email}>
+                  {email}
+                </p>
+                <Link
+                  href="/settings/profile"
+                  className="shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                  title="Your user record"
+                  aria-label="Open your user record"
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </Link>
+              </div>
               <p className="text-xs font-medium text-gray-700 dark:text-gray-300">{roleLabel(role)}</p>
             </div>
           ) : null}
@@ -370,10 +391,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
       <main className="min-w-0 flex-1 bg-gray-50 dark:bg-gray-950">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-6 py-4 dark:border-gray-700 dark:bg-gray-900 lg:px-8">
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{headerTitle(pathname)}</h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <ProfileHeaderLink />
-            <TicketPortalLink />
-          </div>
+          <TicketPortalLink />
         </header>
         <div className="p-8">{children}</div>
       </main>

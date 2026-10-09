@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ClipboardCheck, LayoutDashboard, LifeBuoy, LogOut, Plus, Ticket, Users } from "lucide-react";
+import { ClipboardCheck, LayoutDashboard, LifeBuoy, LogOut, Plus, Ticket } from "lucide-react";
 
 type User = {
   name: string;
@@ -13,23 +13,16 @@ type User = {
   organization?: { name: string } | null;
 };
 
-const clientNavBase = [
+const clientNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tickets", label: "My tickets", icon: Ticket },
-  { href: "/tickets/new", label: "New ticket", icon: Plus },
+  { href: "/timesheets", label: "Timesheets", icon: ClipboardCheck },
 ];
-
-const clientApproverNavItem = {
-  href: "/timesheets",
-  label: "Timesheet approvals",
-  icon: ClipboardCheck,
-};
 
 const consultantNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tickets", label: "Tickets", icon: Ticket },
   { href: "/tickets/new", label: "New ticket", icon: Plus },
-  { href: "/consultant", label: "By project", icon: Users },
 ];
 
 function isNavItemActive(pathname: string, href: string): boolean {
@@ -52,11 +45,7 @@ export function PortalShell({
   const router = useRouter();
   const isConsultant = user.role === "CONSULTANT";
   const isTbosAdmin = (user.tbosRole || "").toLowerCase() === "admin";
-  const nav = isConsultant
-    ? consultantNav
-    : user.canApproveTimesheets
-      ? [...clientNavBase, clientApproverNavItem]
-      : clientNavBase;
+  const nav = isConsultant ? consultantNav : clientNav;
 
   async function logout() {
     await fetch("/api/auth/session", { method: "DELETE" });

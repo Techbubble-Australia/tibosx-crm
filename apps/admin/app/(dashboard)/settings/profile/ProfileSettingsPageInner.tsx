@@ -64,6 +64,7 @@ export default function ProfileSettingsPageInner() {
   const [confirmPassword, setConfirmPassword] = useState("");
 
   const isProjectMemberOnboarding = onboarding && role === "project_member";
+  const canEditAccountFields = role === "admin";
 
   useEffect(() => {
     async function load() {
@@ -136,6 +137,11 @@ export default function ProfileSettingsPageInner() {
       const body: Record<string, unknown> = {
         emergencyContacts: emergencyContacts.filter((row) => row.name.trim()),
       };
+      if (canEditAccountFields) {
+        body.name = name.trim();
+        body.email = email.trim();
+        body.phone = phone.trim() || null;
+      }
       if (isProjectMemberOnboarding) {
         body.addressLine1 = addressLine1.trim();
         body.addressLine2 = addressLine2.trim() || null;
@@ -210,8 +216,9 @@ export default function ProfileSettingsPageInner() {
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Your user record</h2>
           <p className="text-sm text-gray-500">
-            Name, email, phone, and role are managed by your administrator. Update your password and emergency contacts
-            below.
+            {canEditAccountFields
+              ? "As an administrator you can update your account details below, plus password and emergency contacts."
+              : "Name, email, phone, and role are managed by your administrator. Update your password and emergency contacts below."}
           </p>
         </div>
       </div>
@@ -221,15 +228,30 @@ export default function ProfileSettingsPageInner() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="mb-1 block text-sm font-medium">Email</label>
-            <input className={readOnlyClass} value={email} readOnly />
+            <input
+              className={canEditAccountFields ? inputClass : readOnlyClass}
+              value={email}
+              readOnly={!canEditAccountFields}
+              onChange={(e) => setEmail(e.target.value)}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Full name</label>
-            <input className={readOnlyClass} value={name} readOnly />
+            <input
+              className={canEditAccountFields ? inputClass : readOnlyClass}
+              value={name}
+              readOnly={!canEditAccountFields}
+              onChange={(e) => setName(e.target.value)}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Phone</label>
-            <input className={readOnlyClass} value={phone || "—"} readOnly />
+            <input
+              className={canEditAccountFields ? inputClass : readOnlyClass}
+              value={phone}
+              readOnly={!canEditAccountFields}
+              onChange={(e) => setPhone(e.target.value)}
+            />
           </div>
           <div className="sm:col-span-2">
             <label className="mb-1 block text-sm font-medium">Role</label>

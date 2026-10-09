@@ -182,7 +182,8 @@ const emergencyContactSchema = z.object({
 
 const profileUpdateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
-  phone: z.string().max(50).optional().nullable(),
+  email: z.string().email().optional(),
+  phone: z.string().min(1).max(50).optional().nullable(),
   addressLine1: z.string().max(300).optional().nullable(),
   addressLine2: z.string().max(300).optional().nullable(),
   suburb: z.string().max(100).optional().nullable(),
@@ -292,6 +293,12 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
       "country",
     ] as const;
 
+    if (existing.role === "admin") {
+      if (input.name !== undefined) patch.name = input.name.trim();
+      if (input.phone !== undefined) patch.phone = input.phone?.trim() || null;
+      if (input.email !== undefined) patch.email = input.email.trim().toLowerCase();
+    }
+
     if (existing.role === "project_member") {
       for (const field of addressFields) {
         if (input[field] !== undefined) {
@@ -317,6 +324,14 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
     }
 
     const updated = await prisma.$transaction(async (tx) => {
+      if (existing.role === "admin") {
+        for (const field of ["name", "phone", "email"] as const) {
+          if (input[field] === undefined) continue;
+          const oldVal = (existing[field] as string | null) ?? null;
+          const newVal = (patch[field] as string | null) ?? null;
+          await logAdminUserFieldChange(tx, u.id, u.id, field, oldVal, newVal);
+        }
+      }
       for (const field of addressFields) {
         if (existing.role !== "project_member" || input[field] === undefined) continue;
         const oldVal = (existing[field] as string | null) ?? null;

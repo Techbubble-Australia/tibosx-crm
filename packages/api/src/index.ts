@@ -40,6 +40,7 @@ import { ticketRoutes as ticketingTicketRoutes } from "./ticketing/routes/ticket
 import { organizationRoutes as ticketingOrgRoutes } from "./ticketing/routes/organizations";
 import { ticketingTimesheetRoutes } from "./ticketing/routes/timesheets";
 import { tbosRoutes as ticketingAdminRoutes } from "./ticketing/routes/tbos";
+import { workspaceGroupRoutes } from "./routes/workspaceGroups";
 import { createTicketUploadsMiddleware } from "./ticketing/middleware/serve-ticket-uploads";
 import { uploadDir as ticketUploadDir } from "./ticketing/lib/upload-storage";
 
@@ -129,6 +130,13 @@ app.use("/api/admin/sales-dashboard", authMiddleware, requireMfaEnrolled, requir
 app.use("/api/admin/invoices", authMiddleware, requireMfaEnrolled, requireModule("sales"), invoiceRoutes);
 app.use("/api/admin/users", authMiddleware, requireMfaEnrolled, requireRole("admin"), adminUserRoutes);
 app.use(
+  "/api/admin/workspace-groups",
+  authMiddleware,
+  requireMfaEnrolled,
+  requireRole("admin"),
+  workspaceGroupRoutes,
+);
+app.use(
   "/api/admin/credential-templates",
   authMiddleware,
   requireMfaEnrolled,
@@ -153,7 +161,7 @@ app.use(
   "/api/admin/ticketing",
   authMiddleware,
   requireMfaEnrolled,
-  requireModule("sales"),
+  requireAnyModule("sales", "workspace"),
   ticketingAdminRoutes,
 );
 app.use("/api/ticketing/auth", ticketingPortalAuthRoutes);
