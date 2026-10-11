@@ -43,9 +43,28 @@ export function canManageProfileOwnership(role: string): boolean {
   return role === "admin" || role === "recruiter_admin";
 }
 
+export function parseAdditionalRoles(value: unknown): AdminRole[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((r): r is AdminRole => typeof r === "string" && isAdminRole(r));
+}
+
+export function effectiveRoleList(primary: string, additional?: unknown): string[] {
+  const list: string[] = [];
+  const add = (r: string) => {
+    if (!list.includes(r)) list.push(r);
+  };
+  add(primary);
+  for (const r of parseAdditionalRoles(additional)) add(r);
+  return list;
+}
+
 export function canAccessModule(role: string, module: TbModule): boolean {
   if (!isAdminRole(role)) return false;
   return MODULE_ROLE_MAP[module].includes(role);
+}
+
+export function canAccessModuleForUser(primary: string, additional: unknown, module: TbModule): boolean {
+  return effectiveRoleList(primary, additional).some((role) => canAccessModule(role, module));
 }
 
 export function canMutateContent(role: string): boolean {

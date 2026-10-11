@@ -3,9 +3,17 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth";
-import { ADMIN_ROLES_LIST, assertCanModifyAdminUser } from "../lib/admin-roles";
+import { ADMIN_ROLES_LIST, assertCanModifyAdminUser, isAdminRole } from "../lib/admin-roles";
+import { logAdminUserFieldChange } from "../lib/admin-user-activity";
 
 const router: IRouter = Router();
+
+const emergencyContactSchema = z.object({
+  name: z.string().min(1).max(200),
+  email: z.string().email().optional().or(z.literal("")),
+  phone: z.string().max(50).optional(),
+  relation: z.string().max(100).optional(),
+});
 
 const createSchema = z.object({
   email: z.string().email(),
@@ -13,6 +21,8 @@ const createSchema = z.object({
   phone: z.string().min(1).max(50),
   password: z.string().min(8),
   role: z.enum(ADMIN_ROLES_LIST).default("website"),
+  additionalRoles: z.array(z.enum(ADMIN_ROLES_LIST)).max(10).optional(),
+  profilePhotoUrl: z.string().max(2000).optional().nullable(),
   active: z.boolean().default(true),
   passwordNeedsReset: z.boolean().default(false),
 });
@@ -23,9 +33,39 @@ const updateSchema = z.object({
   phone: z.string().min(1).max(50).optional(),
   password: z.string().min(8).optional(),
   role: z.enum(ADMIN_ROLES_LIST).optional(),
+  additionalRoles: z.array(z.enum(ADMIN_ROLES_LIST)).max(10).optional(),
+  profilePhotoUrl: z.string().max(2000).optional().nullable(),
   active: z.boolean().optional(),
   passwordNeedsReset: z.boolean().optional(),
+  addressLine1: z.string().max(300).optional().nullable(),
+  addressLine2: z.string().max(300).optional().nullable(),
+  suburb: z.string().max(100).optional().nullable(),
+  city: z.string().max(100).optional().nullable(),
+  state: z.string().max(100).optional().nullable(),
+  country: z.string().max(100).optional().nullable(),
+  emergencyContacts: z.array(emergencyContactSchema).max(5).optional(),
 });
+
+const listSelect = {
+  id: true,
+  email: true,
+  name: true,
+  phone: true,
+  role: true,
+  additionalRoles: true,
+  profilePhotoUrl: true,
+  active: true,
+  mfaEnabled: true,
+  mfaEnrolledAt: true,
+  passwordNeedsReset: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+function parseAdditionalRoles(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((r): r is string => typeof r === "string" && isAdminRole(r));
+}
 
 function sanitizeUser(row: {
   id: string;
@@ -33,6 +73,8 @@ function sanitizeUser(row: {
   name: string | null;
   phone: string | null;
   role: string;
+  additionalRoles?: unknown;
+  profilePhotoUrl?: string | null;
   active: boolean;
   mfaEnabled: boolean;
   mfaEnrolledAt: Date | null;
@@ -46,34 +88,73 @@ function sanitizeUser(row: {
     name: row.name,
     phone: row.phone,
     role: row.role,
+    additionalRoles: parseAdditionalRoles(row.additionalRoles),
+    profilePhotoUrl: row.profilePhotoUrl ?? null,
     active: row.active,
     mfaEnabled: row.mfaEnabled,
     mfaEnrolledAt: row.mfaEnrolledAt?.toISOString() ?? null,
     passwordNeedsReset: row.passwordNeedsReset,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
-const userSelect = {
-  id: true,
-  email: true,
-  name: true,
-  phone: true,
-  role: true,
-  active: true,
-  mfaEnabled: true,
-  mfaEnrolledAt: true,
-  passwordNeedsReset: true,
-  createdAt: true,
-  updatedAt: true,
+const detailSelect = {
+  ...listSelect,
+  addressLine1: true,
+  addressLine2: true,
+  suburb: true,
+  city: true,
+  state: true,
+  country: true,
+  emergencyContacts: true,
+  agreementDocumentUrl: true,
+  profileDetailsCompletedAt: true,
 } as const;
+
+function sanitizeDetail(row: {
+  id: string;
+  email: string;
+  name: string | null;
+  phone: string | null;
+  role: string;
+  additionalRoles?: unknown;
+  profilePhotoUrl?: string | null;
+  active: boolean;
+  mfaEnabled: boolean;
+  mfaEnrolledAt: Date | null;
+  passwordNeedsReset: boolean;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  suburb: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  emergencyContacts: unknown;
+  agreementDocumentUrl: string | null;
+  profileDetailsCompletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    ...sanitizeUser(row),
+    addressLine1: row.addressLine1,
+    addressLine2: row.addressLine2,
+    suburb: row.suburb,
+    city: row.city,
+    state: row.state,
+    country: row.country,
+    emergencyContacts: Array.isArray(row.emergencyContacts) ? row.emergencyContacts : [],
+    agreementDocumentUrl: row.agreementDocumentUrl,
+    profileDetailsCompletedAt: row.profileDetailsCompletedAt?.toISOString() ?? null,
+  };
+}
 
 router.get("/", async (_req, res) => {
   try {
     const rows = await prisma.adminUser.findMany({
       orderBy: { email: "asc" },
-      select: userSelect,
+      select: listSelect,
     });
     res.json({ data: rows.map(sanitizeUser) });
   } catch (error) {
@@ -82,14 +163,63 @@ router.get("/", async (_req, res) => {
   }
 });
 
+router.get("/:id/activity", async (req, res) => {
+  try {
+    const rows = await prisma.adminUserActivityLog.findMany({
+      where: { adminUserId: req.params.id },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      include: { performedBy: { select: { name: true, email: true } } },
+    });
+    res.json({
+      data: rows.map((row) => ({
+        id: row.id,
+        action: row.action,
+        fieldName: row.fieldName,
+        oldValue: row.oldValue,
+        newValue: row.newValue,
+        performedByName: row.performedBy?.name || row.performedBy?.email || "",
+        createdAt: row.createdAt.toISOString(),
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching user activity:", error);
+    res.status(500).json({ error: "Failed to fetch activity" });
+  }
+});
+
 router.get("/:id", async (req, res) => {
   try {
     const row = await prisma.adminUser.findUnique({
       where: { id: req.params.id },
-      select: userSelect,
+      select: detailSelect,
     });
     if (!row) return res.status(404).json({ error: "Not found" });
-    res.json({ data: sanitizeUser(row) });
+
+    const membership = await prisma.projectMember.findFirst({
+      where: { adminUserId: row.id },
+      select: {
+        id: true,
+        projectId: true,
+        project: { select: { projectNumber: true, title: true } },
+        profile: { select: { firstName: true, lastName: true, email: true } },
+      },
+    });
+
+    res.json({
+      data: {
+        ...sanitizeDetail(row),
+        projectMembership: membership
+          ? {
+              memberId: membership.id,
+              projectId: membership.projectId,
+              projectLabel: `${membership.project.projectNumber} — ${membership.project.title}`,
+              profileName: `${membership.profile.firstName} ${membership.profile.lastName}`.trim(),
+              profileEmail: membership.profile.email,
+            }
+          : null,
+      },
+    });
   } catch (error) {
     console.error("Error fetching admin user:", error);
     res.status(500).json({ error: "Failed to fetch user" });
@@ -107,10 +237,12 @@ router.post("/", async (req, res) => {
         phone: data.phone.trim(),
         passwordHash,
         role: data.role,
+        additionalRoles: data.additionalRoles?.length ? data.additionalRoles : undefined,
+        profilePhotoUrl: data.profilePhotoUrl ?? null,
         active: data.active,
         passwordNeedsReset: data.passwordNeedsReset,
       },
-      select: userSelect,
+      select: listSelect,
     });
     res.status(201).json({ data: sanitizeUser(row) });
   } catch (error) {
@@ -136,23 +268,92 @@ router.put("/:id", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: guardError });
     }
 
-    const updateData: Record<string, unknown> = {};
-    if (data.email !== undefined) updateData.email = data.email;
-    if (data.name !== undefined) updateData.name = data.name;
-    if (data.phone !== undefined) updateData.phone = data.phone.trim();
-    if (data.role !== undefined) updateData.role = data.role;
-    if (data.active !== undefined) updateData.active = data.active;
-    if (data.passwordNeedsReset !== undefined) updateData.passwordNeedsReset = data.passwordNeedsReset;
-    if (data.password) {
-      updateData.passwordHash = await bcrypt.hash(data.password, 10);
-    }
+    const actorId = req.user?.id ?? "";
 
-    const row = await prisma.adminUser.update({
-      where: { id: req.params.id },
-      data: updateData,
-      select: userSelect,
+    const row = await prisma.$transaction(async (tx) => {
+      const updateData: Record<string, unknown> = {};
+      const logField = async (field: string, oldVal: string | null, newVal: string | null) => {
+        await logAdminUserFieldChange(tx, existing.id, actorId, field, oldVal, newVal);
+      };
+
+      if (data.email !== undefined && data.email !== existing.email) {
+        updateData.email = data.email;
+        await logField("email", existing.email, data.email);
+      }
+      if (data.name !== undefined && data.name !== existing.name) {
+        updateData.name = data.name;
+        await logField("name", existing.name, data.name);
+      }
+      if (data.phone !== undefined && data.phone.trim() !== (existing.phone ?? "")) {
+        updateData.phone = data.phone.trim();
+        await logField("phone", existing.phone, data.phone.trim());
+      }
+      if (data.role !== undefined && data.role !== existing.role) {
+        updateData.role = data.role;
+        await logField("role", existing.role, data.role);
+      }
+      if (data.additionalRoles !== undefined) {
+        const oldJson = JSON.stringify(parseAdditionalRoles(existing.additionalRoles));
+        const newJson = JSON.stringify(data.additionalRoles);
+        if (oldJson !== newJson) {
+          updateData.additionalRoles = data.additionalRoles;
+          await logField("additionalRoles", oldJson, newJson);
+        }
+      }
+      if (data.profilePhotoUrl !== undefined && data.profilePhotoUrl !== existing.profilePhotoUrl) {
+        updateData.profilePhotoUrl = data.profilePhotoUrl;
+        await logField("profilePhotoUrl", existing.profilePhotoUrl, data.profilePhotoUrl);
+      }
+      if (data.active !== undefined && data.active !== existing.active) {
+        updateData.active = data.active;
+        await logField("active", String(existing.active), String(data.active));
+      }
+      if (data.passwordNeedsReset !== undefined && data.passwordNeedsReset !== existing.passwordNeedsReset) {
+        updateData.passwordNeedsReset = data.passwordNeedsReset;
+        await logField(
+          "passwordNeedsReset",
+          String(existing.passwordNeedsReset),
+          String(data.passwordNeedsReset),
+        );
+      }
+      const addressFields = [
+        "addressLine1",
+        "addressLine2",
+        "suburb",
+        "city",
+        "state",
+        "country",
+      ] as const;
+      for (const field of addressFields) {
+        if (data[field] === undefined) continue;
+        const oldVal = (existing[field] as string | null) ?? null;
+        const newVal = data[field] ?? null;
+        if (oldVal !== newVal) {
+          updateData[field] = newVal;
+          await logField(field, oldVal, newVal);
+        }
+      }
+      if (data.emergencyContacts !== undefined) {
+        const oldJson = JSON.stringify(existing.emergencyContacts ?? []);
+        const newJson = JSON.stringify(data.emergencyContacts);
+        if (oldJson !== newJson) {
+          updateData.emergencyContacts = data.emergencyContacts;
+          await logField("emergencyContacts", oldJson, newJson);
+        }
+      }
+      if (data.password) {
+        updateData.passwordHash = await bcrypt.hash(data.password, 10);
+        await logField("password", "(hidden)", "(updated)");
+      }
+
+      return tx.adminUser.update({
+        where: { id: existing.id },
+        data: updateData,
+        select: detailSelect,
+      });
     });
-    res.json({ data: sanitizeUser(row) });
+
+    res.json({ data: sanitizeDetail(row) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });

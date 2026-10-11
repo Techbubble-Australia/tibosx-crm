@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ClipboardCheck, LayoutDashboard, LifeBuoy, LogOut, Plus, Ticket } from "lucide-react";
+import { ClipboardCheck, LayoutDashboard, LifeBuoy, Plus, Ticket } from "lucide-react";
+import { UserAccountMenu } from "@/components/UserAccountMenu";
 
 type User = {
   name: string;
@@ -10,6 +11,7 @@ type User = {
   role: string;
   tbosRole?: string | null;
   canApproveTimesheets?: boolean;
+  profilePhotoUrl?: string | null;
   organization?: { name: string } | null;
 };
 
@@ -71,17 +73,12 @@ export function PortalShell({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-sm sm:gap-3">
-            <span className="hidden text-slate-600 sm:inline">{user.name}</span>
-            <button
-              type="button"
-              onClick={() => void logout()}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-slate-600 hover:bg-slate-50"
-            >
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </button>
-          </div>
+          <UserAccountMenu
+            name={user.name}
+            email={user.email}
+            photoUrl={user.profilePhotoUrl}
+            onSignOut={() => void logout()}
+          />
         </div>
         <nav className="flex gap-1 overflow-x-auto border-t border-slate-100 px-4 py-2 md:hidden">
           {nav.map((item) => {

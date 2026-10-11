@@ -22,9 +22,11 @@ import {
 
 type AdminSession = {
   role: AdminRole;
+  additionalRoles: AdminRole[];
   email: string;
   userId: string;
   userName: string | null;
+  profilePhotoUrl: string | null;
   loading: boolean;
   canAccessRecruitment: boolean;
   canAccessWebsite: boolean;
@@ -48,6 +50,8 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
   const [email, setEmail] = useState("");
   const [userId, setUserId] = useState("");
   const [userName, setUserName] = useState<string | null>(null);
+  const [additionalRoles, setAdditionalRoles] = useState<AdminRole[]>([]);
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -72,6 +76,14 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
         } else {
           setUserName(null);
         }
+        const extra = data?.data?.user?.additionalRoles;
+        if (Array.isArray(extra)) {
+          setAdditionalRoles(extra.filter((r): r is AdminRole => typeof r === "string" && isAdminRole(r)));
+        } else {
+          setAdditionalRoles([]);
+        }
+        const photo = data?.data?.user?.profilePhotoUrl;
+        setProfilePhotoUrl(typeof photo === "string" && photo.trim() ? photo.trim() : null);
       })
       .catch(() => undefined)
       .finally(() => setLoading(false));
@@ -80,9 +92,11 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
   const value = useMemo(
     () => ({
       role,
+      additionalRoles,
       email,
       userId,
       userName,
+      profilePhotoUrl,
       loading,
       canAccessRecruitment: canAccessRecruitment(role),
       canAccessWebsite: canAccessWebsite(role),
@@ -98,7 +112,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       canDeleteProfiles: canDeleteProfiles(role),
       canManageProfileOwnership: canManageProfileOwnership(role),
     }),
-    [role, email, userId, userName, loading],
+    [role, additionalRoles, email, userId, userName, profilePhotoUrl, loading],
   );
 
   return <AdminSessionContext.Provider value={value}>{children}</AdminSessionContext.Provider>;

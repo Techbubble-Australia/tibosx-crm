@@ -199,10 +199,37 @@ export function isAdminRole(value: string): value is AdminRole {
   return (ADMIN_ROLES as readonly string[]).includes(value);
 }
 
+/** Primary role plus any additional roles assigned on the user record. */
+export function getEffectiveRoles(primary: string, additional?: string[] | null): AdminRole[] {
+  const seen = new Set<AdminRole>();
+  const add = (value: string) => {
+    if (isAdminRole(value)) seen.add(value);
+  };
+  add(primary);
+  for (const value of additional ?? []) add(value);
+  return [...seen];
+}
+
+export function anyEffectiveRole(
+  primary: string,
+  additional: string[] | null | undefined,
+  allowed: readonly string[],
+): boolean {
+  return getEffectiveRoles(primary, additional).some((r) => allowed.includes(r));
+}
+
 export function canAccessModule(role: string, module: TbModule): boolean {
   if (!isAdminRole(role)) return false;
   if (role === "client") return false;
   return MODULE_ROLE_MAP[module].includes(role);
+}
+
+export function canAccessModuleWithRoles(
+  primary: string,
+  additional: string[] | null | undefined,
+  module: TbModule,
+): boolean {
+  return getEffectiveRoles(primary, additional).some((r) => canAccessModule(r, module));
 }
 
 export function canAccessTbosModules(role: string): boolean {
@@ -275,6 +302,11 @@ export function roleLabel(role: string): string {
     return ROLE_META[role].label;
   }
   return role;
+}
+
+export function formatRolesLabel(primary: string, additional?: string[] | null): string {
+  const labels = getEffectiveRoles(primary, additional).map((r) => roleLabel(r));
+  return labels.length ? labels.join(", ") : roleLabel(primary);
 }
 
 export function defaultLandingPath(role: string): string {

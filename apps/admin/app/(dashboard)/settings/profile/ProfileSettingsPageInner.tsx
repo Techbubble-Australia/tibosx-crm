@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Info, Loader2, Plus, Trash2 } from "lucide-react";
+import { UserPhotoField } from "@/components/users/UserPhotoField";
 import { adminFetch } from "@/lib/admin-api";
 import { resolveDocumentHref } from "@/lib/media-url";
 import { roleLabel, type AdminRole, isAdminRole } from "@/lib/admin-roles";
@@ -59,6 +60,7 @@ export default function ProfileSettingsPageInner() {
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([{ name: "", email: "", phone: "" }]);
   const [agreementDocumentUrl, setAgreementDocumentUrl] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityRow[]>([]);
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -92,6 +94,11 @@ export default function ProfileSettingsPageInner() {
         }
         setAgreementDocumentUrl(
           typeof user.agreementDocumentUrl === "string" ? user.agreementDocumentUrl : null,
+        );
+        setProfilePhotoUrl(
+          typeof user.profilePhotoUrl === "string" && user.profilePhotoUrl.trim()
+            ? user.profilePhotoUrl.trim()
+            : null,
         );
         const activityData = await activityRes.json();
         setActivity((activityData.data as ActivityRow[]) ?? []);
@@ -136,6 +143,7 @@ export default function ProfileSettingsPageInner() {
     try {
       const body: Record<string, unknown> = {
         emergencyContacts: emergencyContacts.filter((row) => row.name.trim()),
+        profilePhotoUrl,
       };
       if (canEditAccountFields) {
         body.name = name.trim();
@@ -225,6 +233,14 @@ export default function ProfileSettingsPageInner() {
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
         <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Account</h3>
+        <div className="mb-4">
+          <UserPhotoField
+            name={name}
+            email={email}
+            photoUrl={profilePhotoUrl}
+            onChange={setProfilePhotoUrl}
+          />
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="mb-1 block text-sm font-medium">Email</label>

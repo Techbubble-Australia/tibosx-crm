@@ -10,6 +10,7 @@ type Me = {
   role: string;
   tbosRole?: string | null;
   canApproveTimesheets?: boolean;
+  profilePhotoUrl?: string | null;
   organization?: { name: string } | null;
 };
 

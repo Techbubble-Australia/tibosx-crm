@@ -24,6 +24,7 @@ function serializeUser(user: {
   id: string;
   email: string;
   name: string;
+  profilePhotoUrl?: string | null;
   role: "CLIENT" | "CONSULTANT";
   organizationId: string | null;
   consultantVerified: boolean;
@@ -34,6 +35,7 @@ function serializeUser(user: {
     id: user.id,
     email: user.email,
     name: user.name,
+    profilePhotoUrl: user.profilePhotoUrl ?? null,
     role: user.role,
     organizationId: user.organizationId,
     consultantVerified: user.consultantVerified,
@@ -158,10 +160,31 @@ router.post("/tbos-sso", async (req, res) => {
   }
 });
 
+const profilePatchSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  profilePhotoUrl: z.string().max(2000).optional().nullable(),
+});
+
+router.patch("/profile", authMiddleware, async (req: TicketingRequest, res) => {
+  const input = profilePatchSchema.safeParse(req.body);
+  if (!input.success) return res.status(400).json({ error: "Invalid profile data" });
+
+  const updated = await prisma.ticketingUser.update({
+    where: { id: req.ticketingUser!.id },
+    data: {
+      ...(input.data.name !== undefined ? { name: input.data.name.trim() } : {}),
+      ...(input.data.profilePhotoUrl !== undefined ? { profilePhotoUrl: input.data.profilePhotoUrl } : {}),
+    },
+    include: { organization: true },
+  });
+
+  res.json({ data: serializeUser(updated) });
+});
+
 router.get("/me", authMiddleware, async (req: TicketingRequest, res) => {
   const user = await prisma.ticketingUser.findUnique({
     where: { id: req.ticketingUser!.id },
-    include: { organization: true },
+    include: { organization: true, tbosAdminUser: { select: { profilePhotoUrl: true } } },
   });
   if (!user || !user.active) return res.status(401).json({ error: "User not found" });
   const approverLink =
@@ -171,9 +194,13 @@ router.get("/me", authMiddleware, async (req: TicketingRequest, res) => {
           select: { id: true },
         })
       : null;
+  const photo =
+    user.profilePhotoUrl?.trim() ||
+    user.tbosAdminUser?.profilePhotoUrl?.trim() ||
+    null;
   res.json({
     data: {
-      ...serializeUser(user),
+      ...serializeUser({ ...user, profilePhotoUrl: photo }),
       canApproveTimesheets: Boolean(approverLink),
     },
   });

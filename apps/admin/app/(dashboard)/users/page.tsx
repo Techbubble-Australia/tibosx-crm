@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
-import { roleLabel } from "@/lib/admin-roles";
+import { formatRolesLabel, roleLabel } from "@/lib/admin-roles";
 import { RolePermissionsCard } from "@/components/users/RolePermissionsCard";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
 import { TablePagination } from "@/components/ui/TablePagination";
@@ -16,6 +16,7 @@ interface UserRow {
   email: string;
   name: string | null;
   role: string;
+  additionalRoles?: string[];
   active: boolean;
   mfaEnabled: boolean;
 }
@@ -128,9 +129,15 @@ export default function UsersPage() {
             ) : (
               paginated.map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                  <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{row.email}</td>
+                  <td className="px-4 py-3 font-medium">
+                    <Link href={`/users/${row.id}`} className="text-gray-900 hover:underline dark:text-gray-100">
+                      {row.email}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.name || "—"}</td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{roleLabel(row.role)}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                    {formatRolesLabel(row.role, row.additionalRoles)}
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -155,12 +162,6 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex items-center gap-2">
-                      <Link
-                        href={`/users/${row.id}`}
-                        className="rounded p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Link>
                       <button
                         type="button"
                         onClick={() => void deleteRow(row.id)}

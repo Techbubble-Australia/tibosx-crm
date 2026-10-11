@@ -184,6 +184,7 @@ const profileUpdateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   email: z.string().email().optional(),
   phone: z.string().min(1).max(50).optional().nullable(),
+  profilePhotoUrl: z.string().max(2000).optional().nullable(),
   addressLine1: z.string().max(300).optional().nullable(),
   addressLine2: z.string().max(300).optional().nullable(),
   suburb: z.string().max(100).optional().nullable(),
@@ -220,6 +221,8 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
       emergencyContacts: true,
       profileDetailsCompletedAt: true,
       agreementDocumentUrl: true,
+      profilePhotoUrl: true,
+      additionalRoles: true,
     },
   });
   if (!user) {
@@ -244,6 +247,10 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
         emergencyContacts: user.emergencyContacts ?? [],
         profileDetailsCompletedAt: user.profileDetailsCompletedAt?.toISOString() ?? null,
         agreementDocumentUrl: user.agreementDocumentUrl,
+        profilePhotoUrl: user.profilePhotoUrl ?? null,
+        additionalRoles: Array.isArray(user.additionalRoles)
+          ? (user.additionalRoles as string[]).filter((r) => typeof r === "string")
+          : [],
         onboarding,
       },
     },
@@ -309,6 +316,9 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
     if (input.emergencyContacts !== undefined) {
       patch.emergencyContacts = input.emergencyContacts;
     }
+    if (input.profilePhotoUrl !== undefined) {
+      patch.profilePhotoUrl = input.profilePhotoUrl;
+    }
 
     const requiredForComplete = [
       existing.name,
@@ -348,6 +358,16 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
           JSON.stringify(input.emergencyContacts),
         );
       }
+      if (input.profilePhotoUrl !== undefined && input.profilePhotoUrl !== existing.profilePhotoUrl) {
+        await logAdminUserFieldChange(
+          tx,
+          u.id,
+          u.id,
+          "profilePhotoUrl",
+          existing.profilePhotoUrl,
+          input.profilePhotoUrl,
+        );
+      }
       return tx.adminUser.update({
         where: { id: u.id },
         data: patch,
@@ -368,6 +388,7 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
           emergencyContacts: true,
           profileDetailsCompletedAt: true,
           agreementDocumentUrl: true,
+          profilePhotoUrl: true,
         },
       });
     });
@@ -386,6 +407,7 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
           emergencyContacts: updated.emergencyContacts ?? [],
           profileDetailsCompletedAt: updated.profileDetailsCompletedAt?.toISOString() ?? null,
           agreementDocumentUrl: updated.agreementDocumentUrl,
+          profilePhotoUrl: updated.profilePhotoUrl ?? null,
         },
       },
     });

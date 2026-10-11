@@ -918,6 +918,9 @@ model AdminUser {
   phone        String?
   passwordHash String
   role         String   @default("admin")
+  /// Extra TBOS roles (union with `role` for permissions and navigation).
+  additionalRoles Json?
+  profilePhotoUrl String?
   active       Boolean  @default(true)
   /// AES-256-GCM encrypted TOTP secret (set during MFA enrollment).
   totpSecretEnc String?
@@ -1020,6 +1023,7 @@ model TicketingUser {
   email              String            @unique
   passwordHash       String
   name               String
+  profilePhotoUrl    String?
   role               TicketingUserRole
   organizationId     String?
   organization       Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)

@@ -32,15 +32,15 @@ import {
   FolderKanban,
   FileCode,
   ClipboardCheck,
-  Info,
 } from "lucide-react";
+import { UserAccountMenu } from "@/components/UserAccountMenu";
+import { anyEffectiveRole } from "@/lib/admin-roles";
 import { AdminSessionProvider, useAdminSession } from "@/contexts/AdminSessionContext";
 import { MfaEnrollmentGuard } from "@/components/MfaEnrollmentGuard";
 import { MemberOnboardingGuard } from "@/components/MemberOnboardingGuard";
 import { TechBubbleLogo } from "@/components/TechBubbleLogo";
 import { InactivityLogout } from "@/components/InactivityLogout";
 import { TicketPortalLink } from "@/components/TicketPortalLink";
-import { roleLabel } from "@/lib/admin-roles";
 import { isCareerApplicationsPath, isJobListingsPath } from "@/lib/job-routes";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 
@@ -131,7 +131,6 @@ const navGroups: NavGroup[] = [
       { href: "/settings/levels", label: "Level", icon: Target, roles: ["admin", "website"] },
       { href: "/settings/templates", label: "Templates", icon: FileCode, roles: ["admin"] },
       { href: "/settings/groups", label: "Groups", icon: Users, roles: ["admin"] },
-      { href: "/settings/profile", label: "Profile", icon: UserCircle, roles: ["admin", "recruiter_admin", "recruiter", "sales", "website", "project_manager", "project_member", "customer_support", "client"] },
       { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin", "recruiter_admin", "recruiter", "sales", "website", "project_manager", "project_member", "customer_support", "client"] },
       { href: "/users", label: "Users", icon: UserCircle, roles: ["admin"] },
     ],
@@ -139,6 +138,12 @@ const navGroups: NavGroup[] = [
 ];
 
 function headerTitle(pathname: string): string {
+  if (pathname.startsWith("/settings/profile")) {
+    return "My profile";
+  }
+  if (pathname.startsWith("/users")) {
+    return "Users";
+  }
   if (isCareerApplicationsPath(pathname)) {
     return "Career Applications";
   }
@@ -214,7 +219,7 @@ function navItemIsActive(item: NavItem, pathname: string): boolean {
 
 function DashboardChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { role, email, loading } = useAdminSession();
+  const { role, additionalRoles, email, userName, profilePhotoUrl, userId, loading } = useAdminSession();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const { collapsed: sidebarCollapsed, toggle: toggleSidebar } = useSidebarCollapsed();
 
@@ -235,10 +240,10 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
       navGroups
         .map((group) => ({
           ...group,
-          items: group.items.filter((item) => item.roles.includes(role)),
+          items: group.items.filter((item) => anyEffectiveRole(role, additionalRoles, item.roles)),
         }))
-        .filter((group) => group.roles.includes(role) && group.items.length > 0),
-    [role],
+        .filter((group) => anyEffectiveRole(role, additionalRoles, group.roles) && group.items.length > 0),
+    [role, additionalRoles],
   );
 
   function toggleGroup(id: string) {
@@ -271,21 +276,8 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">TechBubble Business Operating System</p>
           ) : null}
           {!loading && email && !sidebarCollapsed ? (
-            <div className="mt-3 min-w-0 space-y-1 border-t border-gray-100 pt-3 dark:border-gray-800">
-              <div className="flex min-w-0 items-center gap-1.5">
-                <p className="min-w-0 flex-1 truncate text-xs text-gray-500 dark:text-gray-400" title={email}>
-                  {email}
-                </p>
-                <Link
-                  href="/settings/profile"
-                  className="shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-                  title="Your user record"
-                  aria-label="Open your user record"
-                >
-                  <Info className="h-3.5 w-3.5" />
-                </Link>
-              </div>
-              <p className="text-xs font-medium text-gray-700 dark:text-gray-300">{roleLabel(role)}</p>
+            <div className="mt-3 min-w-0 border-t border-gray-100 pt-3 dark:border-gray-800">
+              <p className="truncate text-xs text-gray-500 dark:text-gray-400" title={email}>{email}</p>
             </div>
           ) : null}
         </div>
@@ -389,7 +381,22 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
       <main className="min-w-0 flex-1 bg-gray-50 dark:bg-gray-950">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-6 py-4 dark:border-gray-700 dark:bg-gray-900 lg:px-8">
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{headerTitle(pathname)}</h1>
-          <TicketPortalLink />
+          <div className="flex items-center gap-3">
+            <TicketPortalLink />
+            {!loading && email ? (
+              <UserAccountMenu
+                name={userName}
+                email={email}
+                photoUrl={profilePhotoUrl}
+                profileHref="/settings/profile"
+                onSignOut={() => {
+                  void fetch("/api/auth/logout", { method: "POST", credentials: "include" }).finally(() => {
+                    window.location.href = "/login";
+                  });
+                }}
+              />
+            ) : null}
+          </div>
         </header>
         <div className="p-8">{children}</div>
       </main>
