@@ -33,7 +33,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <form onSubmit={onSubmit} className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-1 text-xl font-semibold">Client Support Portal</h1>
+        <h1 className="mb-1 text-xl font-semibold">TechBubble Support</h1>
         <p className="mb-6 text-sm text-gray-500">
           Sign in with your organization account to manage support tickets. Client approvers can review timesheets under{" "}
           <strong>Timesheets</strong> after sign-in.

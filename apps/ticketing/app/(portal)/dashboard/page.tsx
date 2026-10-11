@@ -56,6 +56,7 @@ export default function DashboardPage() {
 
   const open = rows.filter((r) => !["CLOSED", "RESOLVED"].includes(r.status));
   const isClient = role === "CLIENT";
+  const isConsultant = role === "CONSULTANT";
 
   return (
     <div className="space-y-6">
@@ -90,6 +91,15 @@ export default function DashboardPage() {
               <p className="text-3xl font-semibold">{timesheets.total}</p>
             </Link>
           </>
+        ) : null}
+        {isConsultant ? (
+          <Link
+            href="/timesheets"
+            className="rounded-xl border border-gray-200 bg-white p-4 transition hover:border-sky-200 hover:bg-sky-50/50 sm:col-span-2"
+          >
+            <p className="text-sm text-gray-500">Timesheets</p>
+            <p className="text-lg font-semibold">Log time on projects & cases</p>
+          </Link>
         ) : null}
       </div>
 

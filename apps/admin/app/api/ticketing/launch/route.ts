@@ -86,6 +86,6 @@ export async function GET() {
     return NextResponse.json({ error: "Invalid SSO response" }, { status: 502 });
   }
 
-  const redirectUrl = `${portalUrl}/auth/consultant?token=${encodeURIComponent(token)}`;
+  const redirectUrl = `${portalUrl.replace(/\/$/, "")}/auth/consultant?token=${encodeURIComponent(token)}&next=${encodeURIComponent("/dashboard")}`;
   return NextResponse.redirect(redirectUrl);
 }

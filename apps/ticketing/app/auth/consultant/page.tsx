@@ -14,14 +14,19 @@ export default function ConsultantAuthPage() {
       setError("Missing SSO token.");
       return;
     }
-    void fetch("/api/auth/session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    })
+    void fetch("/api/auth/session", { method: "DELETE" })
+      .catch(() => undefined)
+      .then(() =>
+        fetch("/api/auth/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        }),
+      )
       .then((res) => {
         if (!res.ok) throw new Error("Failed to establish session");
-        router.replace("/dashboard");
+        const next = searchParams.get("next");
+        router.replace(next && next.startsWith("/") ? next : "/dashboard");
       })
       .catch(() => setError("Could not sign you in from TBOS. Try logging in manually."));
   }, [searchParams, router]);

@@ -40,6 +40,7 @@ import { ticketRoutes as ticketingTicketRoutes } from "./ticketing/routes/ticket
 import { organizationRoutes as ticketingOrgRoutes } from "./ticketing/routes/organizations";
 import { ticketingTimesheetRoutes } from "./ticketing/routes/timesheets";
 import { ticketingProfilePhotoRoutes } from "./ticketing/routes/profilePhoto";
+import { memberTimesheetRoutes } from "./ticketing/routes/member-timesheets";
 import { tbosRoutes as ticketingAdminRoutes } from "./ticketing/routes/tbos";
 import { workspaceGroupRoutes } from "./routes/workspaceGroups";
 import { createTicketUploadsMiddleware } from "./ticketing/middleware/serve-ticket-uploads";
@@ -170,6 +171,7 @@ app.use("/api/ticketing/tickets", ticketingTicketRoutes);
 app.use("/api/ticketing/organizations", ticketingOrgRoutes);
 app.use("/api/ticketing/timesheets", ticketingTimesheetRoutes);
 app.use("/api/ticketing/profile", ticketingProfilePhotoRoutes);
+app.use("/api/ticketing/member-timesheets", memberTimesheetRoutes);
 app.use("/api/upload", ...websiteWrite, uploadRoutes);
 
 // Error handler

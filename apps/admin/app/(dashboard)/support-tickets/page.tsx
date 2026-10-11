@@ -91,7 +91,9 @@ export default function SupportTicketsPage() {
         >
           <option value="">All projects</option>
           {orgs.map((o) => (
-            <option key={o.id} value={o.id}>{o.name}</option>
+            <option key={o.id} value={o.id}>
+              {o.name}
+            </option>
           ))}
         </select>
       </div>

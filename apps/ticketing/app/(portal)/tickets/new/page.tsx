@@ -110,7 +110,7 @@ export default function NewTicketPage() {
         <p className="text-sm text-slate-500">
           {isConsultant
             ? isTbosAdmin
-              ? "As TBOS admin you can open tickets for any project."
+              ? "Choose an active support project, then enter ticket details."
               : "Choose the client project, then enter ticket details."
             : "Describe your issue and attach any helpful files."}
         </p>

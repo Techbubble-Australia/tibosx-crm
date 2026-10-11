@@ -24,6 +24,7 @@ const clientNav = [
 const consultantNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tickets", label: "Tickets", icon: Ticket },
+  { href: "/timesheets", label: "Timesheets", icon: ClipboardCheck },
   { href: "/tickets/new", label: "New ticket", icon: Plus },
 ];
 
@@ -46,7 +47,6 @@ export function PortalShell({
   const pathname = usePathname();
   const router = useRouter();
   const isConsultant = user.role === "CONSULTANT";
-  const isTbosAdmin = (user.tbosRole || "").toLowerCase() === "admin";
   const nav = isConsultant ? consultantNav : clientNav;
 
   async function logout() {
@@ -64,13 +64,6 @@ export function PortalShell({
             </div>
             <div>
               <p className="font-semibold text-slate-900">TechBubble Support</p>
-              <p className="text-xs text-slate-500">
-                {isConsultant
-                  ? isTbosAdmin
-                    ? "TBOS admin · all projects"
-                    : "Consultant workspace"
-                  : user.organization?.name ?? "Client portal"}
-              </p>
             </div>
           </div>
           <UserAccountMenu

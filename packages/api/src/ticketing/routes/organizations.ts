@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { prisma } from "@techbubble/database";
 import { authMiddleware, requireConsultant, type TicketingRequest } from "../middleware/auth.js";
 import { assignedOrganizationIds, isTbosAdmin } from "../lib/ticket-access.js";
+import { listSupportPortalOrganizations } from "../lib/support-portal-orgs.js";
 
 const router: IRouter = Router();
 
@@ -9,17 +10,11 @@ router.use(authMiddleware, requireConsultant);
 
 router.get("/", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
-  let where: { active: boolean; id?: { in: string[] } } = { active: true };
-  if (!isTbosAdmin(user)) {
-    const orgIds = await assignedOrganizationIds(user.id);
-    where = { active: true, id: { in: orgIds } };
-  }
-  const rows = await prisma.organization.findMany({
-    where,
-    orderBy: { name: "asc" },
-    select: { id: true, name: true, slug: true },
+  const scopeIds = isTbosAdmin(user) ? null : await assignedOrganizationIds(user.id);
+  const rows = await listSupportPortalOrganizations(scopeIds);
+  res.json({
+    data: rows.map((row) => ({ id: row.id, name: row.name, slug: row.slug })),
   });
-  res.json({ data: rows });
 });
 
 export { router as organizationRoutes };

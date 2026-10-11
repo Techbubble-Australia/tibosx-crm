@@ -13,6 +13,7 @@ import {
   slugifySupportOrganizationName,
   syncConsultantAccessForOrganization,
 } from "../../lib/support-organization.js";
+import { listSupportPortalOrganizations } from "../lib/support-portal-orgs.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -218,32 +219,15 @@ router.post("/organizations", requireTbosAdmin, async (req: TbosRequest, res) =>
 router.get("/organizations", async (req: TbosRequest, res) => {
   const tbosUser = req.tbosUser!;
   const orgScope = await orgFilterForTbos(tbosUser);
-  const where =
+  const scopeIds =
     orgScope.organizationId && typeof orgScope.organizationId === "object"
-      ? { id: { in: orgScope.organizationId.in }, active: true }
-      : { active: true };
+      ? orgScope.organizationId.in
+      : isTbosAdminRole(tbosUser.role)
+        ? null
+        : [];
 
-  const rows = await prisma.organization.findMany({
-    where,
-    orderBy: { name: "asc" },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      projectId: true,
-      project: { select: { id: true, projectNumber: true, title: true } },
-    },
-  });
-  res.json({
-    data: rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      slug: row.slug,
-      projectId: row.projectId,
-      projectNumber: row.project?.projectNumber ?? null,
-      projectTitle: row.project?.title ?? null,
-    })),
-  });
+  const rows = await listSupportPortalOrganizations(scopeIds);
+  res.json({ data: rows });
 });
 
 router.put("/consultants/:consultantId/organizations", requireTbosAdmin, async (req: TbosRequest, res) => {

@@ -81,6 +81,14 @@ type AllRow = {
   endDate: string;
 };
 
+type MemberRow = {
+  id: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  targetLabel: string;
+};
+
 async function fetchJson<T>(path: string, fallback: T): Promise<T> {
   try {
     const res = await ticketingFetch(path);
@@ -98,7 +106,8 @@ export default function ClientTimesheetsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [canApprove, setCanApprove] = useState(false);
-  const [isClient, setIsClient] = useState(true);
+  const [role, setRole] = useState<string>("CLIENT");
+  const [memberRows, setMemberRows] = useState<MemberRow[]>([]);
   const [error, setError] = useState("");
   const [actingId, setActingId] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
@@ -111,13 +120,15 @@ export default function ClientTimesheetsPage() {
       ticketingFetch("/api/auth/me").then((r) => r.json()),
       fetchJson<PendingRow[]>("/api/timesheets/pending-approval", []),
       fetchJson<AllRow[]>(`/api/timesheets${params}`, []),
+      fetchJson<MemberRow[]>("/api/member-timesheets", []),
     ])
-      .then(([meData, pending, all]) => {
+      .then(([meData, pending, all, member]) => {
         const me = meData.data as { canApproveTimesheets?: boolean; role?: string };
-        setIsClient(me.role === "CLIENT");
+        setRole(me.role ?? "CLIENT");
         setCanApprove(Boolean(me.canApproveTimesheets));
         setRows(pending);
         setAllRows(all);
+        setMemberRows(member);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load timesheets"))
       .finally(() => setLoading(false));
@@ -168,11 +179,58 @@ export default function ClientTimesheetsPage() {
     );
   }
 
-  if (!isClient) {
+  if (role === "CONSULTANT") {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900">Timesheets</h1>
+            <p className="mt-1 text-sm text-slate-500">Log time against projects and support cases assigned to you.</p>
+          </div>
+          <Link
+            href="/timesheets/new"
+            className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+          >
+            New timesheet
+          </Link>
+        </div>
+        {memberRows.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-white p-10 text-center text-slate-500">
+            <p className="font-medium text-slate-700">No timesheets yet</p>
+            <p className="mt-1 text-sm">Create a timesheet for an active project or case.</p>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="border-b bg-slate-50 text-left text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Project / case</th>
+                  <th className="px-4 py-3">Period</th>
+                  <th className="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {memberRows.map((row) => (
+                  <tr key={row.id}>
+                    <td className="px-4 py-3 font-medium text-slate-900">{row.targetLabel}</td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {formatDate(row.startDate)} – {formatDate(row.endDate)}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">{row.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (role !== "CLIENT") {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-10 text-center text-slate-600">
-        <p className="font-medium text-slate-900">Timesheets are for client portal users</p>
-        <p className="mt-1 text-sm">Sign in with a client contact account to view and approve timesheets.</p>
+        <p className="font-medium text-slate-900">Timesheets unavailable</p>
         <Link href="/dashboard" className="mt-4 inline-block text-sm text-sky-600 hover:underline">Back to dashboard</Link>
       </div>
     );
