@@ -205,7 +205,7 @@ export function ProjectSupportSetup({ projectId, project, onUpdated }: Props) {
                     {m.hasCredentials ? (
                       <span className="text-xs text-green-600">TBOS credentials</span>
                     ) : (
-                      <span className="text-xs text-amber-600">Generate credentials</span>
+                      <span className="text-xs text-amber-600">Create user</span>
                     )}
                   </label>
                 </li>

@@ -34,6 +34,7 @@ export default function EditClientPage() {
   const [fetching, setFetching] = useState(true);
   const [defaults, setDefaults] = useState<ClientDefaults | null>(null);
   const [contacts, setContacts] = useState<ClientContactInput[]>([]);
+  const [creatingUserIndex, setCreatingUserIndex] = useState<number | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -51,11 +52,13 @@ export default function EditClientPage() {
         });
         setContacts(
           (row.contacts ?? []).map((contact) => ({
+            id: (contact as ClientContactInput).id,
             name: contact.name,
             email: contact.email,
             position: contact.position ?? "",
             phoneCountryCode: contact.phoneCountryCode,
             phoneNumber: contact.phoneNumber,
+            adminUserId: (contact as ClientContactInput).adminUserId ?? null,
           })),
         );
       } catch (e) {
@@ -66,6 +69,32 @@ export default function EditClientPage() {
     }
     void load();
   }, [id]);
+
+  async function createUserForContact(contact: ClientContactInput, index: number) {
+    if (!contact.id) {
+      alert("Save the client before creating a user for this contact.");
+      return;
+    }
+    setCreatingUserIndex(index);
+    try {
+      const res = await adminFetch(`/api/admin/clients/contacts/${contact.id}/create-user`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to create user");
+      const adminUserId = (data.data as { adminUserId?: string }).adminUserId;
+      if (adminUserId) {
+        setContacts((prev) =>
+          prev.map((row, i) => (i === index ? { ...row, adminUserId } : row)),
+        );
+        router.push(`/users/${adminUserId}`);
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to create user");
+    } finally {
+      setCreatingUserIndex(null);
+    }
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -135,7 +164,13 @@ export default function EditClientPage() {
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Order</label>
           <input name="order" type="number" defaultValue={defaults.order} className={inputClass} />
         </div>
-        <ClientContactsField contacts={contacts} onChange={setContacts} inputClassName={inputClass} />
+        <ClientContactsField
+          contacts={contacts}
+          onChange={setContacts}
+          inputClassName={inputClass}
+          creatingUserIndex={creatingUserIndex}
+          onCreateUser={(contact, index) => void createUserForContact(contact, index)}
+        />
         <ClientStatusFields
           defaultProspect={defaults.status === "PROSPECT"}
           defaultActive={defaults.status !== "INACTIVE"}

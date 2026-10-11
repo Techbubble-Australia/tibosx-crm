@@ -1,14 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { Plus, Trash2 } from "lucide-react";
 import { PHONE_COUNTRY_CODES } from "@/lib/phone-country-codes";
 
 export type ClientContactInput = {
+  id?: string;
   name: string;
   email: string;
   position: string;
   phoneCountryCode: string;
   phoneNumber: string;
+  adminUserId?: string | null;
 };
 
 type ClientContactsFieldProps = {
@@ -16,6 +19,8 @@ type ClientContactsFieldProps = {
   onChange: (contacts: ClientContactInput[]) => void;
   inputClassName?: string;
   labelClassName?: string;
+  onCreateUser?: (contact: ClientContactInput, index: number) => void;
+  creatingUserIndex?: number | null;
 };
 
 const emptyContact = (): ClientContactInput => ({
@@ -31,6 +36,8 @@ export function ClientContactsField({
   onChange,
   inputClassName = "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white",
   labelClassName = "mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100",
+  onCreateUser,
+  creatingUserIndex = null,
 }: ClientContactsFieldProps) {
   function updateContact(index: number, patch: Partial<ClientContactInput>) {
     onChange(contacts.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -72,19 +79,42 @@ export function ClientContactsField({
               key={index}
               className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 dark:border-gray-700 dark:bg-gray-800/40"
             >
-              <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   Contact {index + 1}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => removeContact(index)}
-                  className="inline-flex items-center gap-1 rounded p-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                  aria-label={`Remove contact ${index + 1}`}
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden />
-                  Remove
-                </button>
+                <div className="flex items-center gap-2">
+                  {onCreateUser ? (
+                    contact.adminUserId ? (
+                      <Link
+                        href={`/users/${contact.adminUserId}`}
+                        className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                      >
+                        View user record
+                      </Link>
+                    ) : contact.id ? (
+                      <button
+                        type="button"
+                        disabled={creatingUserIndex === index}
+                        onClick={() => onCreateUser(contact, index)}
+                        className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium hover:bg-white dark:border-gray-600"
+                      >
+                        {creatingUserIndex === index ? "Creating…" : "Create user"}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-400">Save client first</span>
+                    )
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => removeContact(index)}
+                    className="inline-flex items-center gap-1 rounded p-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    aria-label={`Remove contact ${index + 1}`}
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden />
+                    Remove
+                  </button>
+                </div>
               </div>
               <div className="space-y-3">
                 <div>

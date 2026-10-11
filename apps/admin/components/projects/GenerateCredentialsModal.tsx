@@ -35,15 +35,21 @@ type Props = {
 export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess }: Props) {
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [templateId, setTemplateId] = useState("");
+  const [inviteEmail, setInviteEmail] = useState(member.email);
   const [values, setValues] = useState<Record<string, string>>({});
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [tempPassword, setTempPassword] = useState<string | null>(null);
-  const [createdEmail, setCreatedEmail] = useState<string | null>(null);
+  const [done, setDone] = useState<{ email: string; inviteEmailSent: boolean; temporaryPassword?: string } | null>(
+    null,
+  );
 
   const selectedTemplate = templates.find((row) => row.id === templateId);
+
+  useEffect(() => {
+    setInviteEmail(member.email);
+  }, [member.email]);
 
   useEffect(() => {
     async function load() {
@@ -79,6 +85,10 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
       alert("Please select a template.");
       return;
     }
+    if (!inviteEmail.trim()) {
+      alert("Email is required.");
+      return;
+    }
     const template = selectedTemplate;
     if (template?.addStartDate && template.requireStartDate && !startDate) {
       alert("Start date is required.");
@@ -101,7 +111,11 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
     }
     setSaving(true);
     try {
-      const body: Record<string, unknown> = { templateId, values };
+      const body: Record<string, unknown> = {
+        templateId,
+        inviteEmail: inviteEmail.trim(),
+        values,
+      };
       if (startDate) body.startDate = startDate;
       if (endDate) body.endDate = endDate;
       const res = await adminFetch(
@@ -113,13 +127,20 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
         },
       );
       const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to generate credentials");
-      const result = data.data as { temporaryPassword?: string; email?: string };
-      setTempPassword(result.temporaryPassword ?? null);
-      setCreatedEmail(result.email ?? null);
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to invite user");
+      const result = data.data as {
+        email?: string;
+        inviteEmailSent?: boolean;
+        temporaryPassword?: string;
+      };
+      setDone({
+        email: result.email ?? inviteEmail.trim(),
+        inviteEmailSent: Boolean(result.inviteEmailSent),
+        temporaryPassword: result.temporaryPassword,
+      });
       onSuccess();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to generate credentials");
+      alert(error instanceof Error ? error.message : "Failed to invite user");
     } finally {
       setSaving(false);
     }
@@ -129,43 +150,61 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 sm:p-6">
       <div className="flex max-h-[min(85vh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
         <div className="shrink-0 border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Generate credentials</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Create user</h3>
           <p className="mt-1 text-sm text-gray-500">
-            {member.firstName} {member.lastName} ({member.email})
+            {member.firstName} {member.lastName}
           </p>
-          {!tempPassword && !loading ? (
-            <div className="mt-4">
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Select template <span className="text-red-500">*</span>
-              </label>
-              <select
-                className={inputClass}
-                value={templateId}
-                onChange={(e) => setTemplateId(e.target.value)}
-                required
-                form="credential-vars-form"
-              >
-                <option value="">Select template…</option>
-                {templates.map((row) => (
-                  <option key={row.id} value={row.id}>{row.name}</option>
-                ))}
-              </select>
+          {!done && !loading ? (
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Email <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  className={inputClass}
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  required
+                  form="credential-vars-form"
+                  placeholder="company.email@client.com"
+                />
+                <p className="mt-1 text-xs text-gray-500">Use the company email for the TBOS user record when possible.</p>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Agreement template <span className="text-red-500">*</span>
+                </label>
+                <select
+                  className={inputClass}
+                  value={templateId}
+                  onChange={(e) => setTemplateId(e.target.value)}
+                  required
+                  form="credential-vars-form"
+                >
+                  <option value="">Select template…</option>
+                  {templates.map((row) => (
+                    <option key={row.id} value={row.id}>{row.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           ) : null}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
-          {tempPassword ? (
-            <div className="space-y-3">
-              <p className="text-sm text-green-700 dark:text-green-400">
-                User account created. Share the temporary password securely — it will only be shown once.
+          {done ? (
+            <div className="space-y-3 text-sm">
+              <p className="text-green-700 dark:text-green-400">
+                {done.inviteEmailSent
+                  ? `Invitation email sent to ${done.email} with sign-in details. MFA enrollment is required on first sign-in.`
+                  : "User created. Email could not be sent — share the temporary password securely."}
               </p>
-              <div className="rounded-lg bg-gray-50 p-4 text-sm dark:bg-gray-800">
-                <p><span className="text-gray-500">Email:</span> {createdEmail}</p>
-                <p className="mt-2 font-mono">
-                  <span className="font-sans text-gray-500">Password:</span> {tempPassword}
-                </p>
-              </div>
+              {!done.inviteEmailSent && done.temporaryPassword ? (
+                <div className="rounded-lg bg-gray-50 p-4 font-mono dark:bg-gray-800">
+                  Temporary password: {done.temporaryPassword}
+                </div>
+              ) : null}
             </div>
           ) : loading ? (
             <div className="flex h-32 items-center justify-center">
@@ -237,7 +276,7 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
         </div>
 
         <div className="flex shrink-0 justify-end gap-2 border-t border-gray-100 px-5 py-4 dark:border-gray-800">
-          {tempPassword ? (
+          {done ? (
             <button
               type="button"
               onClick={onClose}
@@ -261,7 +300,7 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
                 className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Generate
+                Invite user
               </button>
             </>
           )}

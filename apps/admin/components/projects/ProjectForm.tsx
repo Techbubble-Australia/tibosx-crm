@@ -20,6 +20,7 @@ import {
   type ProjectStatus,
 } from "@/lib/project-types";
 import { GenerateCredentialsModal } from "@/components/projects/GenerateCredentialsModal";
+import { AddProjectMemberModal } from "@/components/projects/AddProjectMemberModal";
 import { ProjectActivityLogSection } from "@/components/projects/ProjectActivityLogSection";
 
 const inputClass =
@@ -53,6 +54,7 @@ export type ProjectMemberRow = {
   email: string;
   phone: string;
   hasCredentials: boolean;
+  adminUserId?: string | null;
   adminUserEmail: string | null;
 };
 
@@ -144,6 +146,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
   const [users, setUsers] = useState<UserOption[]>([]);
   const [uploading, setUploading] = useState(false);
   const [credentialMember, setCredentialMember] = useState<ProjectMemberRow | null>(null);
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
 
   useEffect(() => {
     void Promise.all([
@@ -387,16 +390,26 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
 
         {defaults.id ? (
           <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-            <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Members</h3>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h3 className="font-semibold text-gray-900 dark:text-gray-100">Members</h3>
+              <button
+                type="button"
+                onClick={() => setAddMemberOpen(true)}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600"
+              >
+                Add member
+              </button>
+            </div>
             {members.length === 0 ? (
-              <p className="text-sm text-gray-400">No members yet. Assign profiles on the linked contract.</p>
+              <p className="text-sm text-gray-400">No members yet. Use Add member to pull from the contract or profile database.</p>
             ) : (
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
                     <th className="py-2">Name</th>
                     <th className="py-2">Email</th>
-                    <th className="py-2">Credentials</th>
+                    <th className="py-2">Phone</th>
+                    <th className="py-2">User record</th>
                     <th className="py-2" />
                   </tr>
                 </thead>
@@ -405,15 +418,26 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                     <tr key={member.id} className="border-b border-gray-50 dark:border-gray-800">
                       <td className="py-2">{member.firstName} {member.lastName}</td>
                       <td className="py-2">{member.email}</td>
-                      <td className="py-2">{member.hasCredentials ? member.adminUserEmail ?? "Yes" : "—"}</td>
+                      <td className="py-2">{member.phone || "—"}</td>
+                      <td className="py-2">
+                        {member.hasCredentials && member.adminUserId ? (
+                          <Link href={`/users/${member.adminUserId}`} className="text-blue-600 hover:underline dark:text-blue-400">
+                            {member.adminUserEmail ?? member.email}
+                          </Link>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                       <td className="py-2 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setCredentialMember(member)}
-                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-600"
-                        >
-                          Generate credentials
-                        </button>
+                        {!member.hasCredentials ? (
+                          <button
+                            type="button"
+                            onClick={() => setCredentialMember(member)}
+                            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-600"
+                          >
+                            Create user
+                          </button>
+                        ) : null}
                       </td>
                     </tr>
                   ))}
@@ -456,6 +480,22 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
           </button>
         </div>
       </form>
+
+      {addMemberOpen && defaults.id ? (
+        <AddProjectMemberModal
+          projectId={defaults.id}
+          onClose={() => setAddMemberOpen(false)}
+          onAdded={() => {
+            onMembersRefresh?.();
+            void adminFetch(`/api/admin/projects/${defaults.id}`)
+              .then((r) => r.json())
+              .then((data) => {
+                const project = data.data as ProjectFormValues;
+                setMembers(project.members ?? []);
+              });
+          }}
+        />
+      ) : null}
 
       {credentialMember && defaults.id ? (
         <GenerateCredentialsModal

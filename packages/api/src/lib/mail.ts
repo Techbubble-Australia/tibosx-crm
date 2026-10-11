@@ -112,6 +112,45 @@ export async function sendSupportTicketNotificationEmail(input: {
   }
 }
 
+export async function sendUserInviteEmail(input: {
+  to: string;
+  name: string;
+  temporaryPassword: string;
+  loginUrl: string;
+  extraText?: string;
+}): Promise<void> {
+  const resend = getResendClient();
+  const subject = "Your TechBubble account invitation";
+  const text = `Hello ${input.name},
+
+An account has been created for you on TechBubble Business Operating System (TBOS).
+
+Sign-in email: ${input.to}
+Temporary password: ${input.temporaryPassword}
+
+Sign in here: ${input.loginUrl}
+
+You will be asked to set a new password and enroll in multi-factor authentication (MFA) on first sign-in.
+${input.extraText ?? ""}
+
+If you did not expect this email, please contact your administrator.`;
+
+  if (!resend) {
+    console.info("[user-invite-email] RESEND not configured; would send to", input.to, subject);
+    return;
+  }
+
+  const { error } = await resend.emails.send({
+    from: getMailFrom(),
+    to: [input.to],
+    subject,
+    text,
+  });
+  if (error) {
+    throw new Error(error.message || "Failed to send invite email");
+  }
+}
+
 export async function sendCareerApplicationEmail(data: CareerApplicationEmailData): Promise<void> {
   const resend = getResendClient();
   if (!resend) {

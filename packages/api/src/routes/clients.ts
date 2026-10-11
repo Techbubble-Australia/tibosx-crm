@@ -1,7 +1,11 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
+import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 import { prisma } from "@techbubble/database";
 import { CLIENT_STATUSES } from "../lib/client-status";
+import type { AuthRequest } from "../middleware/auth";
+import { emailTbosUserInvite } from "../lib/user-invite.js";
 
 const router: IRouter = Router();
 
@@ -53,6 +57,70 @@ async function allocateNextClientOrder(): Promise<number> {
   const result = await prisma.client.aggregate({ _max: { order: true } });
   return (result._max.order ?? 0) + 1;
 }
+
+router.post("/contacts/:contactId/create-user", async (req: AuthRequest, res) => {
+  try {
+    const contact = await prisma.clientContact.findUnique({
+      where: { id: req.params.contactId },
+    });
+    if (!contact) return res.status(404).json({ error: "Contact not found" });
+
+    const email = contact.email.trim().toLowerCase();
+    const existing = await prisma.adminUser.findUnique({ where: { email } });
+    if (existing) {
+      return res.json({
+        data: {
+          adminUserId: existing.id,
+          email: existing.email,
+          alreadyExists: true,
+        },
+      });
+    }
+
+    const phone = `${contact.phoneCountryCode} ${contact.phoneNumber}`.trim();
+    const tempPassword = randomBytes(12).toString("base64url");
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+    const user = await prisma.adminUser.create({
+      data: {
+        email,
+        name: contact.name.trim(),
+        phone,
+        role: "client",
+        active: true,
+        passwordHash,
+        passwordNeedsReset: true,
+        mfaEnabled: false,
+      },
+    });
+
+    let inviteEmailSent = false;
+    try {
+      await emailTbosUserInvite({
+        to: user.email,
+        name: user.name || user.email,
+        temporaryPassword: tempPassword,
+        context: "client",
+      });
+      inviteEmailSent = true;
+    } catch (error) {
+      console.error("Client invite email failed:", error);
+    }
+
+    res.status(201).json({
+      data: {
+        adminUserId: user.id,
+        email: user.email,
+        inviteEmailSent,
+        temporaryPassword: inviteEmailSent ? undefined : tempPassword,
+        alreadyExists: false,
+      },
+    });
+  } catch (error) {
+    console.error("Error creating user from client contact:", error);
+    res.status(500).json({ error: "Failed to create user" });
+  }
+});
 
 router.get("/next-order", async (_req, res) => {
   try {
@@ -142,7 +210,37 @@ router.get("/:id", async (req, res) => {
       },
     });
     if (!row) return res.status(404).json({ error: "Not found" });
-    res.json({ data: serializeClient(row) });
+
+    const emails = row.contacts.map((c) => c.email.trim().toLowerCase());
+    const users = emails.length
+      ? await prisma.adminUser.findMany({
+          where: { email: { in: emails } },
+          select: { id: true, email: true },
+        })
+      : [];
+    const userByEmail = new Map(users.map((u) => [u.email.toLowerCase(), u.id]));
+
+    const data = serializeClient(row);
+    const contacts = (row.contacts as Array<{
+      id: string;
+      name: string;
+      email: string;
+      position: string | null;
+      phoneCountryCode: string;
+      phoneNumber: string;
+      order: number;
+    }>).map((c) => ({
+      id: c.id,
+      name: c.name,
+      email: c.email,
+      position: c.position ?? "",
+      phoneCountryCode: c.phoneCountryCode,
+      phoneNumber: c.phoneNumber,
+      order: c.order,
+      adminUserId: userByEmail.get(c.email.trim().toLowerCase()) ?? null,
+    }));
+
+    res.json({ data: { ...data, contacts } });
   } catch (error) {
     console.error("Error fetching client:", error);
     res.status(500).json({ error: "Failed to fetch client" });

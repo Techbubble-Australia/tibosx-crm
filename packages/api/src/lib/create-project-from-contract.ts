@@ -78,20 +78,6 @@ async function replaceEstimates(
   });
 }
 
-async function syncMembersFromContract(projectId: string, contractId: string) {
-  const profiles = await prisma.contractProfile.findMany({
-    where: { contractId },
-    select: { profileId: true },
-  });
-  for (const row of profiles) {
-    await prisma.projectMember.upsert({
-      where: { projectId_profileId: { projectId, profileId: row.profileId } },
-      create: { projectId, profileId: row.profileId },
-      update: {},
-    });
-  }
-}
-
 export async function createProjectFromContract(
   contractId: string,
   projectManagerId: string,
@@ -178,7 +164,6 @@ export async function createProjectFromContract(
     return created;
   });
 
-  await syncMembersFromContract(project.id, contractId);
   try {
     await ensureSupportOrganizationForProject(project.id);
   } catch (error) {

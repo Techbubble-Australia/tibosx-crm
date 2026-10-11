@@ -21,7 +21,7 @@ export default function ConsultantAuthPage() {
     })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to establish session");
-        router.replace("/consultant");
+        router.replace("/dashboard");
       })
       .catch(() => setError("Could not sign you in from TBOS. Try logging in manually."));
   }, [searchParams, router]);

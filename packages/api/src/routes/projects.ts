@@ -16,6 +16,7 @@ import {
 } from "../lib/credential-template-render";
 import { saveUploadBuffer } from "../lib/save-upload-buffer";
 import { canManageProjects, getActorId, isProjectManagerRole, isProjectMemberRole } from "../lib/project-access";
+import { emailTbosUserInvite } from "../lib/user-invite.js";
 import { logProjectFieldChanges, type ProjectSnapshot } from "../lib/project-activity";
 import {
   generateProjectMonths,
@@ -75,6 +76,7 @@ const projectSchema = z.object({
 
 const generateCredentialsSchema = z.object({
   templateId: z.string().min(1),
+  inviteEmail: z.string().email(),
   values: z.record(z.string(), z.string()),
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
@@ -300,21 +302,6 @@ const detailInclude = {
     },
   },
 };
-
-async function syncMembersFromContract(projectId: string, contractId: string | null | undefined) {
-  if (!contractId) return;
-  const profiles = await prisma.contractProfile.findMany({
-    where: { contractId },
-    select: { profileId: true },
-  });
-  for (const row of profiles) {
-    await prisma.projectMember.upsert({
-      where: { projectId_profileId: { projectId, profileId: row.profileId } },
-      create: { projectId, profileId: row.profileId },
-      update: {},
-    });
-  }
-}
 
 async function replaceEstimates(
   tx: Prisma.TransactionClient,
@@ -711,7 +698,6 @@ router.post("/", async (req: AuthRequest, res) => {
       return created;
     });
 
-    await syncMembersFromContract(row.id, data.contractId);
     if ((data.kind ?? "DELIVERY") === "SUPPORT" && (data.status ?? "DRAFT") === "ACTIVE") {
       await activateSupportProject(row.id);
     }
@@ -799,7 +785,6 @@ router.put("/:id", async (req: AuthRequest, res) => {
       await activateSupportProject(projectId);
     }
 
-    await syncMembersFromContract(projectId, data.contractId);
     const linkedOrg = await prisma.organization.findFirst({ where: { projectId } });
     if (linkedOrg && data.projectManagerId !== existing.projectManagerId) {
       await syncConsultantAccessForOrganization(linkedOrg.id);
@@ -864,6 +849,135 @@ router.delete("/:id", async (req: AuthRequest, res) => {
   }
 });
 
+router.get("/:id/member-options", async (req: AuthRequest, res) => {
+  try {
+    const projectId = req.params.id;
+    if (!projectId) return res.status(400).json({ error: "Invalid id" });
+    if (!canManageProjects(req.user?.role ?? "") && !isProjectManagerRole(req.user?.role ?? "")) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { contractId: true },
+    });
+    if (!project) return res.status(404).json({ error: "Not found" });
+
+    const existing = await prisma.projectMember.findMany({
+      where: { projectId },
+      select: { profileId: true },
+    });
+    const exclude = new Set(existing.map((row) => row.profileId));
+
+    const mapProfile = (p: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone: string;
+    }) => ({
+      profileId: p.id,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      email: p.email,
+      phone: p.phone,
+    });
+
+    let contractProfiles: ReturnType<typeof mapProfile>[] = [];
+    if (project.contractId) {
+      const rows = await prisma.contractProfile.findMany({
+        where: { contractId: project.contractId },
+        include: {
+          profile: {
+            select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+          },
+        },
+      });
+      contractProfiles = rows
+        .filter((row) => !exclude.has(row.profileId))
+        .map((row) => mapProfile(row.profile));
+    }
+
+    const databaseProfiles = await prisma.candidateProfile.findMany({
+      where: { id: { notIn: [...exclude] } },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+      take: 150,
+      select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+    });
+
+    res.json({
+      data: {
+        contractProfiles,
+        databaseProfiles: databaseProfiles.map(mapProfile),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching member options:", error);
+    res.status(500).json({ error: "Failed to fetch member options" });
+  }
+});
+
+const addMemberSchema = z.object({
+  profileId: z.string().min(1),
+});
+
+router.post("/:id/members", async (req: AuthRequest, res) => {
+  try {
+    const projectId = req.params.id;
+    if (!projectId) return res.status(400).json({ error: "Invalid id" });
+    if (!canManageProjects(req.user?.role ?? "") && !isProjectManagerRole(req.user?.role ?? "")) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const { profileId } = addMemberSchema.parse(req.body);
+    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { id: true } });
+    if (!project) return res.status(404).json({ error: "Not found" });
+
+    const profile = await prisma.candidateProfile.findUnique({ where: { id: profileId } });
+    if (!profile) return res.status(404).json({ error: "Profile not found" });
+
+    const member = await prisma.projectMember.upsert({
+      where: { projectId_profileId: { projectId, profileId } },
+      create: { projectId, profileId },
+      update: {},
+      include: {
+        profile: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            available: true,
+          },
+        },
+        adminUser: { select: { id: true, email: true, name: true } },
+      },
+    });
+
+    await prisma.projectActivityLog.create({
+      data: {
+        projectId,
+        action: "MEMBER_ADDED",
+        newValue: profile.email,
+        performedById: getActorId(req) || null,
+      },
+    });
+
+    const detail = await fetchProject(projectId);
+    res.status(201).json({
+      data: {
+        member: serializeMember(member),
+        project: detail ? mapDetail(detail) : null,
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error adding project member:", error);
+    res.status(500).json({ error: "Failed to add member" });
+  }
+});
+
 router.post("/:id/members/:memberId/generate-credentials", async (req: AuthRequest, res) => {
   try {
     const projectId = req.params.id;
@@ -882,6 +996,9 @@ router.post("/:id/members/:memberId/generate-credentials", async (req: AuthReque
       },
     });
     if (!member) return res.status(404).json({ error: "Member not found" });
+    if (member.adminUserId) {
+      return res.status(400).json({ error: "This member already has a user record" });
+    }
     if (role === "project_manager" && member.project.projectManagerId !== getActorId(req)) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -928,9 +1045,15 @@ router.post("/:id/members/:memberId/generate-credentials", async (req: AuthReque
       dateValues.endDate = formatted;
       dateValues.End_Date = formatted;
     }
-    const mergedValues = { ...defaults, ...dateValues, ...input.values };
-    const email =
-      mergedValues.email?.trim() || mergedValues.Email?.trim() || member.profile.email;
+    const inviteEmail = input.inviteEmail.trim().toLowerCase();
+    const mergedValues: Record<string, string> = {
+      ...defaults,
+      ...dateValues,
+      ...input.values,
+      email: inviteEmail,
+      Email: inviteEmail,
+    };
+    const email = inviteEmail;
     const name =
       mergedValues.name?.trim() ||
       mergedValues.Name?.trim() ||
@@ -965,6 +1088,7 @@ router.post("/:id/members/:memberId/generate-credentials", async (req: AuthReque
                 active: true,
                 passwordHash,
                 passwordNeedsReset: true,
+                mfaEnabled: false,
               },
             })
           : await tx.adminUser.create({
@@ -976,6 +1100,7 @@ router.post("/:id/members/:memberId/generate-credentials", async (req: AuthReque
                 active: true,
                 passwordHash,
                 passwordNeedsReset: true,
+                mfaEnabled: false,
               },
             });
 
@@ -1006,13 +1131,27 @@ router.post("/:id/members/:memberId/generate-credentials", async (req: AuthReque
       console.error("Support consultant provisioning failed:", error);
     }
 
+    let inviteEmailSent = false;
+    try {
+      await emailTbosUserInvite({
+        to: adminUser.email,
+        name: adminUser.name || adminUser.email,
+        temporaryPassword: tempPassword,
+        context: "project_member",
+      });
+      inviteEmailSent = true;
+    } catch (error) {
+      console.error("Invite email failed:", error);
+    }
+
     const detail = await fetchProject(projectId);
     res.json({
       data: {
         memberId: member.id,
         adminUserId: adminUser.id,
         email: adminUser.email,
-        temporaryPassword: tempPassword,
+        inviteEmailSent,
+        temporaryPassword: inviteEmailSent ? undefined : tempPassword,
         project: detail ? mapDetail(detail) : null,
       },
     });
@@ -1020,8 +1159,8 @@ router.post("/:id/members/:memberId/generate-credentials", async (req: AuthReque
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
     }
-    console.error("Error generating credentials:", error);
-    res.status(500).json({ error: "Failed to generate credentials" });
+    console.error("Error creating user:", error);
+    res.status(500).json({ error: "Failed to create user" });
   }
 });
 
