@@ -1,6 +1,15 @@
 import path from "path";
 import { promises as fsp } from "fs";
+import type { Readable } from "stream";
 import { getUploadObjectForResponse, objectStorageConfigured } from "./object-storage";
+
+async function readableToUtf8(stream: Readable): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
 
 export async function readUploadTextByUrl(uploadUrl: string): Promise<string | null> {
   if (!uploadUrl.startsWith("/uploads/")) return null;
@@ -10,12 +19,8 @@ export async function readUploadTextByUrl(uploadUrl: string): Promise<string | n
 
   if (objectStorageConfigured()) {
     const obj = await getUploadObjectForResponse(key);
-    if (!obj?.body) return null;
-    const chunks: Buffer[] = [];
-    for await (const chunk of obj.body as AsyncIterable<Buffer>) {
-      chunks.push(Buffer.from(chunk));
-    }
-    return Buffer.concat(chunks).toString("utf8");
+    if (!obj?.stream) return null;
+    return readableToUtf8(obj.stream);
   }
 
   const uploadDir = process.env.UPLOAD_DIR || "./uploads";
