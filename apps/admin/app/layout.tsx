@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "TBOS",
-  description: "TechBubble Business Operating System",
+  title: "TIBOSX.AI",
+  description: "AI-powered Business Operating System",
 };
 
 export default function RootLayout({

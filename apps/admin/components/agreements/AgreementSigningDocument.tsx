@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SignaturePad } from "@/components/agreements/SignaturePad";
+import { DOCUMENT_TEMPLATE_STYLES } from "@/lib/document-template-styles";
 
 type Props = {
   html: string;
@@ -87,6 +88,9 @@ export function AgreementSigningDocument({
         dangerouslySetInnerHTML={{ __html: html }}
       />
       <style>{`
+        ${DOCUMENT_TEMPLATE_STYLES}
+        .agreement-signing-doc ul { list-style: disc; padding-left: 1.5rem; margin: 0.5rem 0; }
+        .agreement-signing-doc ol { list-style: decimal; padding-left: 1.5rem; margin: 0.5rem 0; }
         .agreement-signature-target {
           min-height: 56px;
           border-bottom: 1px dashed #2563eb;
@@ -100,28 +104,31 @@ export function AgreementSigningDocument({
       `}</style>
 
       {activeCaptureId ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-          <h4 className="mb-2 font-medium text-gray-900 dark:text-gray-100">Draw your signature</h4>
-          <SignaturePad onChange={setDraftSignature} />
-          <div className="mt-3 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveCaptureId(null);
-                setDraftSignature(null);
-              }}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm dark:border-gray-600"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={!draftSignature}
-              onClick={saveActiveSignature}
-              className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
-            >
-              Save signature
-            </button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+            <h4 className="mb-2 font-medium text-gray-900 dark:text-gray-100">Draw your signature</h4>
+            <p className="mb-3 text-xs text-gray-500">Today&apos;s date will be recorded when you submit the agreement.</p>
+            <SignaturePad onChange={setDraftSignature} />
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveCaptureId(null);
+                  setDraftSignature(null);
+                }}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm dark:border-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!draftSignature}
+                onClick={saveActiveSignature}
+                className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+              >
+                Save signature
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

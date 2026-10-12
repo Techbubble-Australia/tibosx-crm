@@ -11,6 +11,7 @@ import { AdminRolesMultiSelect, rolesFromApi, rolesToApi } from "@/components/us
 import { UserPhotoField } from "@/components/users/UserPhotoField";
 import { UserAssignCredentialsModal } from "@/components/users/UserAssignCredentialsModal";
 import type { AdminRole } from "@/lib/admin-roles";
+import { COUNTRY_OPTIONS } from "@/lib/country-options";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
@@ -231,8 +232,8 @@ export default function EditUserPage() {
           <p className="mb-4 text-xs text-gray-500">Usually completed by the member during first login after signing their contract.</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <label className="mb-1 block text-sm font-medium">Address line 1</label>
-              <input name="addressLine1" defaultValue={defaults.addressLine1 ?? ""} className={inputClass} />
+              <label className="mb-1 block text-sm font-medium">Address line 1 *</label>
+              <input name="addressLine1" required defaultValue={defaults.addressLine1 ?? ""} className={inputClass} />
             </div>
             <div className="sm:col-span-2">
               <label className="mb-1 block text-sm font-medium">Address line 2</label>
@@ -243,16 +244,21 @@ export default function EditUserPage() {
               <input name="suburb" defaultValue={defaults.suburb ?? ""} className={inputClass} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">City</label>
-              <input name="city" defaultValue={defaults.city ?? ""} className={inputClass} />
+              <label className="mb-1 block text-sm font-medium">City *</label>
+              <input name="city" required defaultValue={defaults.city ?? ""} className={inputClass} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">State</label>
               <input name="state" defaultValue={defaults.state ?? ""} className={inputClass} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Country</label>
-              <input name="country" defaultValue={defaults.country ?? ""} className={inputClass} />
+              <label className="mb-1 block text-sm font-medium">Country *</label>
+              <select name="country" required defaultValue={defaults.country ?? ""} className={inputClass}>
+                <option value="">Select country…</option>
+                {COUNTRY_OPTIONS.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
             </div>
           </div>
         </section>

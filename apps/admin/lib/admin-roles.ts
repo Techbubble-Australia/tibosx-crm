@@ -318,7 +318,7 @@ export function defaultLandingPath(role: string): string {
   if (canAccessWorkspace(role)) return "/support-tickets";
   if (canAccessRecruitment(role)) return "/database/dashboard";
   if (canAccessProjectManagement(role)) {
-    return canManageProjects(role) ? "/projects" : "/agreement";
+    return canManageProjects(role) ? "/projects" : "/timesheets";
   }
   if (canAccessWebsite(role)) return "/pages";
   if (canAccessSales(role)) return "/clients/active";

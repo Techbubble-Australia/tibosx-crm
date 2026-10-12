@@ -68,13 +68,13 @@ export function Header() {
             >
               Contact
             </Link>
-            <Link
-              href="/contact"
+            <a
+              href="https://tibosx.ai.techbubble.com.au"
               className="inline-flex items-center gap-2 rounded-[14px] bg-[#111111] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-neutral-800"
             >
-              Get Started
+              Login to TIBOSX.AI
               <ArrowRight className="h-4 w-4 shrink-0 text-white" strokeWidth={2} aria-hidden />
-            </Link>
+            </a>
           </div>
 
           <button
@@ -106,14 +106,14 @@ export function Header() {
                 </Link>
               );
             })}
-            <Link
-              href="/contact"
+            <a
+              href="https://tibosx.ai.techbubble.com.au"
               onClick={() => setIsMenuOpen(false)}
               className="mt-4 inline-flex items-center justify-center gap-2 rounded-full bg-black px-4 py-3 text-sm font-semibold text-white"
             >
-              Get Started
+              Login to TIBOSX.AI
               <ArrowRight className="h-4 w-4" strokeWidth={2} aria-hidden />
-            </Link>
+            </a>
           </nav>
         </div>
       )}

@@ -93,8 +93,10 @@ function collectPlaceholderLabels(text: string): string[] {
 function dedupeSubstringLabels(labels: string[]): string[] {
   return labels.filter((label, index) => {
     const lower = label.toLowerCase();
+    const key = labelToVariableKey(label);
     return !labels.some((other, otherIndex) => {
       if (index === otherIndex) return false;
+      if (labelToVariableKey(other) !== key) return false;
       const otherLower = other.toLowerCase();
       return otherLower.includes(lower) && other.length > label.length;
     });

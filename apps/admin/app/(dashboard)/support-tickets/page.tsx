@@ -54,21 +54,6 @@ export default function SupportTicketsPage() {
             {role === "admin" ? "All client projects" : "Projects assigned to you"}
           </p>
         </div>
-        <div className="flex gap-3 text-sm">
-          {role === "admin" ? (
-            <>
-              <Link href="/support-tickets/projects" className="font-medium text-blue-600 hover:underline">
-                Support projects
-              </Link>
-              <Link href="/support-tickets/assignments" className="font-medium text-blue-600 hover:underline">
-                Consultant access
-              </Link>
-            </>
-          ) : null}
-          <a href="/api/ticketing/launch" target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">
-            Open full portal →
-          </a>
-        </div>
       </div>
 
       {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}

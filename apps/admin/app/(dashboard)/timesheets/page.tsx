@@ -126,7 +126,7 @@ export default function TimesheetsPage() {
                 href="/timesheets/new"
                 className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
               >
-                <Plus className="h-4 w-4" /> New timesheet
+                <Plus className="h-4 w-4" /> Create Timesheet
               </Link>
             ) : null}
           </div>
@@ -146,7 +146,7 @@ export default function TimesheetsPage() {
                 href="/timesheets/new"
                 className="mt-4 inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
               >
-                <Plus className="h-4 w-4" /> Create timesheet
+                <Plus className="h-4 w-4" /> Create Timesheet
               </Link>
             ) : null}
           </div>

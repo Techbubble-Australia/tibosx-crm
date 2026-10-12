@@ -1,0 +1,123 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { adminFetch } from "@/lib/admin-api";
+import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { AgreementSigningDocument } from "@/components/agreements/AgreementSigningDocument";
+
+type AgreementData = {
+  templateName: string;
+  projectTitle: string;
+  projectNumber: string;
+  html: string;
+  signed: boolean;
+  signatureCaptureIds?: string[];
+};
+
+function extractAgreementBody(html: string): string {
+  const match = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  return match?.[1]?.trim() ? match[1].trim() : html;
+}
+
+export function AgreementOnboardingGate() {
+  const { isEffectiveProjectMember, loading: sessionLoading } = useAdminSession();
+  const [agreement, setAgreement] = useState<AgreementData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [signatures, setSignatures] = useState<Record<string, string>>({});
+  const [signedCaptureIds, setSignedCaptureIds] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  const captureIds = useMemo(() => agreement?.signatureCaptureIds ?? [], [agreement?.signatureCaptureIds]);
+  const bodyHtml = useMemo(() => (agreement ? extractAgreementBody(agreement.html) : ""), [agreement]);
+  const allSigned = captureIds.length > 0 && signedCaptureIds.length === captureIds.length;
+  const showModal = !sessionLoading && isEffectiveProjectMember && agreement && !agreement.signed;
+
+  useEffect(() => {
+    if (sessionLoading || !isEffectiveProjectMember) {
+      setLoading(false);
+      return;
+    }
+    void adminFetch("/api/admin/projects/my-agreement")
+      .then(async (res) => {
+        if (res.status === 404) return null;
+        const data = await res.json();
+        if (!res.ok) return null;
+        return data.data as AgreementData;
+      })
+      .then((row) => setAgreement(row))
+      .finally(() => setLoading(false));
+  }, [sessionLoading, isEffectiveProjectMember]);
+
+  async function handleSubmit() {
+    if (!allSigned) {
+      alert("Please sign every signature field in the agreement.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await adminFetch("/api/admin/projects/my-agreement/sign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ signatures }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to sign agreement");
+      const refresh = await adminFetch("/api/admin/projects/my-agreement");
+      const refreshData = await refresh.json();
+      if (refresh.ok) setAgreement(refreshData.data as AgreementData);
+      window.location.reload();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to sign agreement");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading || !showModal) return null;
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4">
+      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+        <div className="border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{agreement.templateName}</h2>
+          <p className="text-sm text-gray-500">
+            {agreement.projectNumber} · {agreement.projectTitle}
+          </p>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Sign your agreement before using TIBOSX.AI. Click each highlighted signature field.
+          </p>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <AgreementSigningDocument
+            html={bodyHtml}
+            captureIds={captureIds}
+            signedCaptureIds={signedCaptureIds}
+            onSignedCaptureIdsChange={setSignedCaptureIds}
+            signatures={signatures}
+            onSignaturesChange={setSignatures}
+          />
+        </div>
+        <div className="border-t border-gray-100 px-6 py-4 dark:border-gray-800">
+          {allSigned ? (
+            <button
+              type="button"
+              onClick={() => void handleSubmit()}
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-lg bg-black px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Submit signed agreement
+            </button>
+          ) : (
+            <p className="text-sm text-gray-500">
+              {captureIds.length
+                ? `${signedCaptureIds.length} of ${captureIds.length} signature fields completed.`
+                : "No signature fields found — contact your administrator."}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

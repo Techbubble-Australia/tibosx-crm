@@ -17,7 +17,13 @@ import {
   verifyUserTotpCode,
 } from "../lib/mfa";
 import { getMemberOnboardingStatus } from "../lib/member-onboarding";
+import {
+  addressComplete,
+  bankDetailsComplete,
+  emergencyContactsComplete,
+} from "../lib/member-profile";
 import { logAdminUserFieldChange } from "../lib/admin-user-activity";
+import { effectiveRoleList } from "../lib/admin-roles";
 
 const router: IRouter = Router();
 
@@ -180,6 +186,16 @@ const emergencyContactSchema = z.object({
   relation: z.string().max(100).optional(),
 });
 
+const bankDetailsSchema = z.object({
+  bankName: z.string().min(1).max(200),
+  accountName: z.string().min(1).max(200),
+  accountNumber: z.string().min(1).max(100),
+  country: z.string().min(1).max(100),
+  swiftCode: z.string().max(50).optional(),
+  bsb: z.string().max(50).optional(),
+  notes: z.string().max(2000).optional(),
+});
+
 const profileUpdateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   email: z.string().email().optional(),
@@ -191,6 +207,9 @@ const profileUpdateSchema = z.object({
   city: z.string().max(100).optional().nullable(),
   state: z.string().max(100).optional().nullable(),
   country: z.string().max(100).optional().nullable(),
+  bankDetails: bankDetailsSchema.optional(),
+  idProofUrl: z.string().max(2000).optional().nullable(),
+  addressProofUrl: z.string().max(2000).optional().nullable(),
   emergencyContacts: z.array(emergencyContactSchema).max(5).optional(),
   markProfileComplete: z.boolean().optional(),
 });
@@ -222,6 +241,9 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
       profileDetailsCompletedAt: true,
       agreementDocumentUrl: true,
       profilePhotoUrl: true,
+      bankDetails: true,
+      idProofUrl: true,
+      addressProofUrl: true,
       additionalRoles: true,
     },
   });
@@ -229,8 +251,9 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const onboarding =
-    user.role === "project_member" ? await getMemberOnboardingStatus(user.id) : null;
+  const onboarding = effectiveRoleList(user.role, user.additionalRoles).includes("project_member")
+    ? await getMemberOnboardingStatus(user.id)
+    : null;
 
   res.json({
     data: {
@@ -247,6 +270,9 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
         emergencyContacts: user.emergencyContacts ?? [],
         profileDetailsCompletedAt: user.profileDetailsCompletedAt?.toISOString() ?? null,
         agreementDocumentUrl: user.agreementDocumentUrl,
+        bankDetails: user.bankDetails ?? null,
+        idProofUrl: user.idProofUrl,
+        addressProofUrl: user.addressProofUrl,
         profilePhotoUrl: user.profilePhotoUrl ?? null,
         additionalRoles: Array.isArray(user.additionalRoles)
           ? (user.additionalRoles as string[]).filter((r) => typeof r === "string")
@@ -312,6 +338,9 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
           patch[field] = input[field] as string | null;
         }
       }
+      if (input.bankDetails !== undefined) patch.bankDetails = input.bankDetails;
+      if (input.idProofUrl !== undefined) patch.idProofUrl = input.idProofUrl;
+      if (input.addressProofUrl !== undefined) patch.addressProofUrl = input.addressProofUrl;
     }
     if (input.emergencyContacts !== undefined) {
       patch.emergencyContacts = input.emergencyContacts;
@@ -320,16 +349,23 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
       patch.profilePhotoUrl = input.profilePhotoUrl;
     }
 
-    const requiredForComplete = [
-      existing.name,
-      existing.phone,
-      input.addressLine1 ?? existing.addressLine1,
-      input.city ?? existing.city,
-      input.country ?? existing.country,
-    ];
-    const hasBasics = requiredForComplete.every((value) => Boolean(value && String(value).trim()));
+    const mergedForComplete = {
+      addressLine1: (input.addressLine1 ?? existing.addressLine1) as string | null,
+      city: (input.city ?? existing.city) as string | null,
+      country: (input.country ?? existing.country) as string | null,
+      bankDetails: input.bankDetails ?? existing.bankDetails,
+      idProofUrl: (input.idProofUrl ?? existing.idProofUrl) as string | null,
+      addressProofUrl: (input.addressProofUrl ?? existing.addressProofUrl) as string | null,
+      emergencyContacts: input.emergencyContacts ?? existing.emergencyContacts,
+    };
+    const hasFullProfile =
+      addressComplete(mergedForComplete) &&
+      bankDetailsComplete(mergedForComplete.bankDetails) &&
+      emergencyContactsComplete(mergedForComplete.emergencyContacts) &&
+      Boolean(mergedForComplete.idProofUrl?.trim()) &&
+      Boolean(mergedForComplete.addressProofUrl?.trim());
 
-    if (input.markProfileComplete && hasBasics) {
+    if (input.markProfileComplete && hasFullProfile) {
       patch.profileDetailsCompletedAt = new Date();
     }
 

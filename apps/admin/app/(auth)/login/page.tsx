@@ -91,6 +91,14 @@ export default function LoginPage() {
         throw new Error(typeof data.error === "string" ? data.error : "MFA verification failed");
       }
 
+      if (data.requiresPasswordReset) {
+        window.location.assign("/settings/security?reset=required");
+        return;
+      }
+      if (data.requiresMfaSetup) {
+        window.location.assign("/settings/security?mfa=required");
+        return;
+      }
       window.location.assign(defaultLandingPath(data?.user?.role ?? "website"));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "MFA verification failed");
@@ -107,12 +115,12 @@ export default function LoginPage() {
             <TechBubbleLogo />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            {step === "mfa" ? "Two-factor authentication" : "TBOS"}
+            {step === "mfa" ? "Two-factor authentication" : "TIBOSX.AI"}
           </h1>
           <p className="mt-2 text-gray-500 dark:text-gray-400">
             {step === "mfa"
               ? `Enter the 6-digit code from your authenticator app for ${emailHint}.`
-              : "TechBubble Business Operating System"}
+              : "AI-powered Business Operating System"}
           </p>
         </div>
 

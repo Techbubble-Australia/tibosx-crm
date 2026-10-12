@@ -935,6 +935,10 @@ model AdminUser {
   country       String?
   profileDetailsCompletedAt DateTime?
   agreementDocumentUrl      String?  @db.Text
+  bankDetails               Json?
+  idProofUrl                String?  @db.Text
+  addressProofUrl           String?  @db.Text
+  userFiles                 Json?
   emergencyContacts         Json?
   sourcedProfiles CandidateProfile[] @relation("ProfileSourcedBy")
   ownedContracts Contract[] @relation("ContractOwner")

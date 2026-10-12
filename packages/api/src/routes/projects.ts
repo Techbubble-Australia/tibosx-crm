@@ -15,6 +15,7 @@ import {
   wrapTemplateHtml,
 } from "../lib/credential-template-render";
 import { saveUploadBuffer } from "../lib/save-upload-buffer";
+import { readUploadTextByUrl } from "../lib/read-upload-buffer";
 import { canManageProjects, getActorId, isProjectManagerRole, isProjectMemberRole } from "../lib/project-access";
 import { emailTbosUserInvite } from "../lib/user-invite.js";
 import { logProjectFieldChanges, type ProjectSnapshot } from "../lib/project-activity";
@@ -502,12 +503,32 @@ router.get("/my-agreement", async (req: AuthRequest, res) => {
         ? (member.credentialData as Record<string, string>)
         : {};
     const captureIds = listSignatureCaptureIds(member.credentialTemplate.html);
-    const rendered = renderTemplateHtml(
-      member.credentialTemplate.html,
-      values,
-      variables,
-      member.agreementSignedAt ? member.signatureDataUrl : null,
-    );
+    let html = "";
+    if (member.agreementSignedAt) {
+      const storedUser = await prisma.adminUser.findUnique({
+        where: { id: userId },
+        select: { agreementDocumentUrl: true },
+      });
+      const storedHtml =
+        storedUser?.agreementDocumentUrl
+          ? await readUploadTextByUrl(storedUser.agreementDocumentUrl)
+          : null;
+      html = storedHtml?.trim()
+        ? storedHtml
+        : wrapTemplateHtml(
+            renderTemplateHtmlWithSignatures(
+              member.credentialTemplate.html,
+              values,
+              variables,
+              member.signatureDataUrl
+                ? { [captureIds[0] ?? "contractor"]: member.signatureDataUrl }
+                : {},
+            ),
+          );
+    } else {
+      const rendered = renderTemplateHtml(member.credentialTemplate.html, values, variables, null);
+      html = wrapTemplateHtml(rendered);
+    }
 
     res.json({
       data: {
@@ -516,7 +537,7 @@ router.get("/my-agreement", async (req: AuthRequest, res) => {
         projectTitle: member.project.title,
         projectNumber: member.project.projectNumber,
         templateName: member.credentialTemplate.name,
-        html: wrapTemplateHtml(rendered),
+        html,
         signed: Boolean(member.agreementSignedAt),
         signedAt: member.agreementSignedAt?.toISOString() ?? null,
         signatureCaptureIds: captureIds,
@@ -590,12 +611,25 @@ router.post("/my-agreement/sign", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Signature is required" });
     }
 
+    const signDate = new Date().toLocaleDateString("en-AU", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+    const valuesWithDate = {
+      ...values,
+      date: signDate,
+      signature_date: signDate,
+      contractor_signature_date: signDate,
+      personnel_signature_date: signDate,
+    };
+
     const firstCaptureId = captureIds[0];
     const primarySignature =
       captureIds.length && firstCaptureId ? signatures[firstCaptureId] : body.signatureDataUrl!;
     const rendered = captureIds.length
-      ? renderTemplateHtmlWithSignatures(member.credentialTemplate.html, values, variables, signatures)
-      : renderTemplateHtml(member.credentialTemplate.html, values, variables, primarySignature);
+      ? renderTemplateHtmlWithSignatures(member.credentialTemplate.html, valuesWithDate, variables, signatures)
+      : renderTemplateHtml(member.credentialTemplate.html, valuesWithDate, variables, primarySignature);
     const wrapped = wrapTemplateHtml(rendered);
     const documentUrl = await saveUploadBuffer(
       Buffer.from(wrapped, "utf8"),

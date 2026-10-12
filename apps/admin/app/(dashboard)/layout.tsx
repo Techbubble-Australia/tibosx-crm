@@ -38,6 +38,8 @@ import { anyEffectiveRole } from "@/lib/admin-roles";
 import { AdminSessionProvider, useAdminSession } from "@/contexts/AdminSessionContext";
 import { MfaEnrollmentGuard } from "@/components/MfaEnrollmentGuard";
 import { MemberOnboardingGuard } from "@/components/MemberOnboardingGuard";
+import { AgreementOnboardingGate } from "@/components/onboarding/AgreementOnboardingGate";
+import { MemberProfileCompletionGate } from "@/components/onboarding/MemberProfileCompletionGate";
 import { TechBubbleLogo } from "@/components/TechBubbleLogo";
 import { InactivityLogout } from "@/components/InactivityLogout";
 import { TicketPortalLink } from "@/components/TicketPortalLink";
@@ -81,7 +83,6 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin", "project_manager", "project_member"] },
       { href: "/timesheets", label: "Timesheets", icon: ClipboardCheck, roles: ["admin", "project_manager", "project_member"] },
-      { href: "/agreement", label: "Agreement", icon: FileText, roles: ["project_member"] },
     ],
   },
   {
@@ -169,7 +170,7 @@ function headerTitle(pathname: string): string {
     const hit = group.items.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
     if (hit) return hit.label;
   }
-  return "TBOS";
+  return "TIBOSX.AI";
 }
 
 function groupIsActive(group: NavGroup, pathname: string): boolean {
@@ -273,7 +274,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
             </button>
           </div>
           {!sidebarCollapsed ? (
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">TechBubble Business Operating System</p>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">AI-powered Business Operating System</p>
           ) : null}
           {!loading && email && !sidebarCollapsed ? (
             <div className="mt-3 min-w-0 border-t border-gray-100 pt-3 dark:border-gray-800">
@@ -409,6 +410,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <AdminSessionProvider>
       <MfaEnrollmentGuard>
         <MemberOnboardingGuard>
+          <AgreementOnboardingGate />
+          <MemberProfileCompletionGate />
           <InactivityLogout />
           <DashboardChrome>{children}</DashboardChrome>
         </MemberOnboardingGuard>

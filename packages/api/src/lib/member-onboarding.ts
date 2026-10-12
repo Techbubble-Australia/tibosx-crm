@@ -1,4 +1,9 @@
 import { prisma } from "@techbubble/database";
+import {
+  addressComplete,
+  bankDetailsComplete,
+  emergencyContactsComplete,
+} from "./member-profile";
 
 export type MemberOnboardingStatus = {
   hasAgreementAssignment: boolean;
@@ -11,7 +16,16 @@ export async function getMemberOnboardingStatus(userId: string): Promise<MemberO
   const [user, member] = await Promise.all([
     prisma.adminUser.findUnique({
       where: { id: userId },
-      select: { profileDetailsCompletedAt: true },
+      select: {
+        profileDetailsCompletedAt: true,
+        addressLine1: true,
+        city: true,
+        country: true,
+        bankDetails: true,
+        idProofUrl: true,
+        addressProofUrl: true,
+        emergencyContacts: true,
+      },
     }),
     prisma.projectMember.findFirst({
       where: { adminUserId: userId, credentialTemplateId: { not: null } },
@@ -22,7 +36,14 @@ export async function getMemberOnboardingStatus(userId: string): Promise<MemberO
 
   const hasAgreementAssignment = Boolean(member);
   const agreementSigned = !member || Boolean(member.agreementSignedAt);
-  const profileComplete = Boolean(user?.profileDetailsCompletedAt);
+  const profileComplete = Boolean(
+    user &&
+      addressComplete(user) &&
+      bankDetailsComplete(user.bankDetails) &&
+      emergencyContactsComplete(user.emergencyContacts) &&
+      Boolean(user.idProofUrl?.trim()) &&
+      Boolean(user.addressProofUrl?.trim()),
+  );
   const canSubmitTimesheets = agreementSigned && profileComplete;
 
   return {

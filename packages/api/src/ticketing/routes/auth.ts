@@ -101,6 +101,16 @@ router.post("/tbos-sso", async (req, res) => {
     return res.status(403).json({ error: "Your TBOS role is not authorized for the support portal" });
   }
 
+  const tbosAdmin = await prisma.adminUser.findUnique({
+    where: { id: tbosUser.id },
+    select: { name: true, email: true, profilePhotoUrl: true },
+  });
+  const displayName =
+    tbosAdmin?.name?.trim() ||
+    tbosAdmin?.email?.split("@")[0] ||
+    tbosUser.email.split("@")[0] ||
+    "Consultant";
+
   let consultant = await prisma.ticketingUser.findFirst({
     where: {
       role: "CONSULTANT",
@@ -114,7 +124,8 @@ router.post("/tbos-sso", async (req, res) => {
     consultant = await prisma.ticketingUser.create({
       data: {
         email: tbosUser.email.toLowerCase(),
-        name: tbosUser.email.split("@")[0] || "Consultant",
+        name: displayName,
+        profilePhotoUrl: tbosAdmin?.profilePhotoUrl ?? null,
         passwordHash: await bcrypt.hash(randomUUID(), 10),
         role: "CONSULTANT",
         consultantVerified: true,
@@ -129,6 +140,8 @@ router.post("/tbos-sso", async (req, res) => {
       data: {
         tbosAdminUserId: consultant.tbosAdminUserId ?? tbosUser.id,
         tbosRole: tbosRole,
+        name: displayName,
+        profilePhotoUrl: tbosAdmin?.profilePhotoUrl ?? consultant.profilePhotoUrl,
       },
       include: { organization: true },
     });

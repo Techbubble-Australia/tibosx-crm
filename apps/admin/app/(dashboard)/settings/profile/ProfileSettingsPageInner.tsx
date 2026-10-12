@@ -7,22 +7,12 @@ import { UserPhotoField } from "@/components/users/UserPhotoField";
 import { adminFetch } from "@/lib/admin-api";
 import { resolveDocumentHref } from "@/lib/media-url";
 import { roleLabel, type AdminRole, isAdminRole } from "@/lib/admin-roles";
+import { COUNTRY_OPTIONS } from "@/lib/country-options";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
 
 const readOnlyClass = `${inputClass} bg-gray-50 dark:bg-gray-950`;
-
-const COUNTRY_OPTIONS = [
-  "Australia",
-  "India",
-  "Philippines",
-  "New Zealand",
-  "United Kingdom",
-  "United States",
-  "Singapore",
-  "Other",
-];
 
 type EmergencyContact = {
   name: string;
@@ -231,7 +221,35 @@ export default function ProfileSettingsPageInner() {
         </div>
       </div>
 
-      <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void (async () => {
+            if (!canEditAccountFields) return;
+            setSaving(true);
+            try {
+              const res = await adminFetch("/api/auth/profile", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  name: name.trim(),
+                  email: email.trim(),
+                  phone: phone.trim() || null,
+                  profilePhotoUrl,
+                }),
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save");
+              alert("Account saved.");
+            } catch (error) {
+              alert(error instanceof Error ? error.message : "Failed to save");
+            } finally {
+              setSaving(false);
+            }
+          })();
+        }}
+        className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900"
+      >
         <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Account</h3>
         <div className="mb-4">
           <UserPhotoField
@@ -274,7 +292,19 @@ export default function ProfileSettingsPageInner() {
             <input className={readOnlyClass} value={roleLabel(role)} readOnly />
           </div>
         </div>
-      </section>
+        {canEditAccountFields ? (
+          <div className="mt-4 flex justify-end">
+            <button
+              type="submit"
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Save account
+            </button>
+          </div>
+        ) : null}
+      </form>
 
       <form onSubmit={(e) => void handlePasswordSubmit(e)} className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
         <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">New password</h3>
@@ -433,7 +463,7 @@ export default function ProfileSettingsPageInner() {
 
       {agreementDocumentUrl ? (
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-          <h3 className="mb-2 font-semibold text-gray-900 dark:text-gray-100">Agreements</h3>
+          <h3 className="mb-2 font-semibold text-gray-900 dark:text-gray-100">Files</h3>
           <a
             href={resolveDocumentHref(agreementDocumentUrl)}
             target="_blank"
