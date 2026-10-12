@@ -15,13 +15,21 @@ function jwtSecretKey() {
 }
 
 const LOGIN_PATH = "/login";
+const FORGOT_PASSWORD_PATH = "/forgot-password";
+const RESET_PASSWORD_PATH = "/reset-password";
 const CHANGE_PASSWORD_PATH = "/change-password";
 const MFA_SETUP_PATH = "/mfa-setup";
 
-const PUBLIC_AUTH_PATHS = [LOGIN_PATH, CHANGE_PASSWORD_PATH, MFA_SETUP_PATH];
+const PUBLIC_UNAUTHENTICATED_PATHS = [LOGIN_PATH, FORGOT_PASSWORD_PATH, RESET_PASSWORD_PATH];
 
-function isPublicAuthPath(pathname: string): boolean {
-  return PUBLIC_AUTH_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+const SESSION_AUTH_PATHS = [CHANGE_PASSWORD_PATH, MFA_SETUP_PATH];
+
+function isPublicUnauthenticatedPath(pathname: string): boolean {
+  return PUBLIC_UNAUTHENTICATED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
+
+function isSessionAuthPath(pathname: string): boolean {
+  return SESSION_AUTH_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }
 
 function redirectTo(request: NextRequest, pathname: string) {
@@ -32,7 +40,11 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
 
-  if (pathname.startsWith(LOGIN_PATH)) {
+  if (isPublicUnauthenticatedPath(pathname)) {
+    if (pathname.startsWith(FORGOT_PASSWORD_PATH) || pathname.startsWith(RESET_PASSWORD_PATH)) {
+      return NextResponse.next();
+    }
+
     if (!token) {
       return NextResponse.next();
     }
@@ -54,7 +66,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (isPublicAuthPath(pathname)) {
+  if (isSessionAuthPath(pathname)) {
     if (!token) {
       return redirectTo(request, LOGIN_PATH);
     }

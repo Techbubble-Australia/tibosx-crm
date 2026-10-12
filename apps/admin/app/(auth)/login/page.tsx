@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Lock, Mail, Loader2, ShieldCheck } from "lucide-react";
 import { defaultLandingPath } from "@/lib/admin-roles";
@@ -148,7 +149,15 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">Password</label>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">Password</label>
+                <Link
+                  href="/forgot-password"
+                  className="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input

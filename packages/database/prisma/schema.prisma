@@ -927,6 +927,9 @@ model AdminUser {
   mfaEnabled    Boolean  @default(false)
   mfaEnrolledAt DateTime?
   passwordNeedsReset Boolean @default(false)
+  /// SHA-256 hash of one-time email password reset token.
+  passwordResetTokenHash String?
+  passwordResetExpiresAt DateTime?
   addressLine1  String?
   addressLine2  String?
   suburb        String?

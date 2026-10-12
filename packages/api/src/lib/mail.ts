@@ -112,6 +112,41 @@ export async function sendSupportTicketNotificationEmail(input: {
   }
 }
 
+export async function sendPasswordResetEmail(input: {
+  to: string;
+  name: string;
+  resetUrl: string;
+}): Promise<void> {
+  const resend = getResendClient();
+  const subject = "Reset your TIBOSX.AI password";
+  const greeting = input.name.trim() ? `Hello ${input.name.trim()},` : "Hello,";
+  const text = `${greeting}
+
+We received a request to reset the password for your TechBubble Business Operating System (TIBOSX.AI) account.
+
+Reset your password here (link expires in 1 hour):
+${input.resetUrl}
+
+If you did not request this, you can ignore this email. Your password will not change until you use the link above.
+
+If you need help, contact your administrator.`;
+
+  if (!resend) {
+    console.info("[password-reset-email] RESEND not configured; would send to", input.to, subject, input.resetUrl);
+    return;
+  }
+
+  const { error } = await resend.emails.send({
+    from: getMailFrom(),
+    to: [input.to],
+    subject,
+    text,
+  });
+  if (error) {
+    throw new Error(error.message || "Failed to send password reset email");
+  }
+}
+
 export async function sendUserInviteEmail(input: {
   to: string;
   name: string;

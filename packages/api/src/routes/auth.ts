@@ -24,6 +24,13 @@ import {
 } from "../lib/member-profile";
 import { logAdminUserFieldChange } from "../lib/admin-user-activity";
 import { effectiveRoleList, effectiveRolesForUser, hasEffectiveRole } from "../lib/admin-roles";
+import {
+  generatePasswordResetToken,
+  hashPasswordResetToken,
+  PASSWORD_RESET_TTL_MS,
+} from "../lib/password-reset";
+import { sendPasswordResetEmail } from "../lib/mail";
+import { tbosLoginUrl } from "../lib/user-invite";
 
 const router: IRouter = Router();
 
@@ -46,6 +53,15 @@ const mfaDisableSchema = mfaCodeSchema.extend({
 
 const passwordChangeSchema = z.object({
   currentPassword: z.string().min(1),
+  newPassword: z.string().min(8),
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+const resetPasswordWithTokenSchema = z.object({
+  token: z.string().min(16),
   newPassword: z.string().min(8),
 });
 
@@ -655,6 +671,92 @@ router.post("/mfa/confirm", authMiddleware, async (req: AuthRequest, res) => {
     }
     console.error("MFA confirm error:", error);
     res.status(500).json({ error: "Failed to enable MFA" });
+  }
+});
+
+router.post("/password/forgot", async (req, res) => {
+  try {
+    const { email } = forgotPasswordSchema.parse(req.body);
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const user = await prisma.adminUser.findFirst({
+      where: { email: { equals: normalizedEmail, mode: "insensitive" } },
+      select: { id: true, email: true, name: true, active: true, passwordHash: true },
+    });
+
+    if (user?.active !== false && user?.passwordHash) {
+      const rawToken = generatePasswordResetToken();
+      const tokenHash = hashPasswordResetToken(rawToken);
+      const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+
+      const resetUrl = `${tbosLoginUrl()}/reset-password?token=${encodeURIComponent(rawToken)}`;
+      try {
+        await sendPasswordResetEmail({
+          to: user.email,
+          name: user.name?.trim() || "",
+          resetUrl,
+        });
+      } catch (emailErr) {
+        console.error("Password reset email failed:", emailErr);
+        return res.status(503).json({ error: "Could not send reset email. Try again later." });
+      }
+
+      await prisma.adminUser.update({
+        where: { id: user.id },
+        data: {
+          passwordResetTokenHash: tokenHash,
+          passwordResetExpiresAt: expiresAt,
+        },
+      });
+    }
+
+    res.json({
+      message: "If an account exists for that email, we sent password reset instructions.",
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Forgot password error:", error);
+    res.status(500).json({ error: "Failed to process request" });
+  }
+});
+
+router.post("/password/reset", async (req, res) => {
+  try {
+    const { token, newPassword } = resetPasswordWithTokenSchema.parse(req.body);
+    const tokenHash = hashPasswordResetToken(token.trim());
+
+    const user = await prisma.adminUser.findFirst({
+      where: {
+        passwordResetTokenHash: tokenHash,
+        passwordResetExpiresAt: { gt: new Date() },
+      },
+      select: { id: true, active: true },
+    });
+
+    if (!user || user.active === false) {
+      return res.status(400).json({ error: "This reset link is invalid or has expired." });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await prisma.adminUser.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordNeedsReset: false,
+        passwordResetTokenHash: null,
+        passwordResetExpiresAt: null,
+      },
+    });
+
+    res.json({ message: "Password updated. You can sign in with your new password." });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Password reset error:", error);
+    res.status(500).json({ error: "Failed to reset password" });
   }
 });
 
