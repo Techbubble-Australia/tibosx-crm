@@ -95,10 +95,10 @@ export default function DashboardPage() {
         {isConsultant ? (
           <Link
             href="/timesheets"
-            className="rounded-xl border border-gray-200 bg-white p-4 transition hover:border-sky-200 hover:bg-sky-50/50 sm:col-span-2"
+            className="rounded-xl border border-gray-200 bg-white p-4 transition hover:border-sky-200 hover:bg-sky-50/50"
           >
-            <p className="text-sm text-gray-500">Timesheets</p>
-            <p className="text-lg font-semibold">Log time on projects & cases</p>
+            <p className="text-sm text-gray-500">Timesheets awaiting approval</p>
+            <p className="text-3xl font-semibold">{timesheets.pendingApproval}</p>
           </Link>
         ) : null}
       </div>

@@ -20,6 +20,8 @@ export async function getMemberOnboardingStatus(userId: string): Promise<MemberO
         profileDetailsCompletedAt: true,
         addressLine1: true,
         city: true,
+        state: true,
+        postcode: true,
         country: true,
         bankDetails: true,
         idProofUrl: true,

@@ -932,6 +932,7 @@ model AdminUser {
   suburb        String?
   city          String?
   state         String?
+  postcode      String?
   country       String?
   profileDetailsCompletedAt DateTime?
   agreementDocumentUrl      String?  @db.Text

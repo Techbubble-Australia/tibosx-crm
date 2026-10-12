@@ -36,16 +36,25 @@ export function bankDetailsComplete(value: unknown): boolean {
     bank.bankName?.trim() &&
       bank.accountName?.trim() &&
       bank.accountNumber?.trim() &&
-      bank.country?.trim(),
+      bank.country?.trim() &&
+      bank.bsb?.trim(),
   );
 }
 
 export function addressComplete(user: {
   addressLine1?: string | null;
   city?: string | null;
+  state?: string | null;
+  postcode?: string | null;
   country?: string | null;
 }): boolean {
-  return Boolean(user.addressLine1?.trim() && user.city?.trim() && user.country?.trim());
+  return Boolean(
+    user.addressLine1?.trim() &&
+      user.city?.trim() &&
+      user.state?.trim() &&
+      user.postcode?.trim() &&
+      user.country?.trim(),
+  );
 }
 
 export function emergencyContactsComplete(value: unknown): boolean {

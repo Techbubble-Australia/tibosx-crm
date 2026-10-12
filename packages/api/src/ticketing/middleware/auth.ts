@@ -25,6 +25,7 @@ export type TicketingAuthUser = {
   organizationId: string | null;
   consultantVerified: boolean;
   tbosRole?: string | null;
+  tbosAdminUserId?: string | null;
 };
 
 export interface TicketingRequest extends Request {
@@ -59,7 +60,14 @@ export async function authMiddleware(req: TicketingRequest, res: Response, next:
     }
     const dbUser = await prisma.ticketingUser.findUnique({
       where: { id: decoded.id },
-      select: { tbosRole: true, consultantVerified: true, role: true, organizationId: true, active: true },
+      select: {
+        tbosRole: true,
+        tbosAdminUserId: true,
+        consultantVerified: true,
+        role: true,
+        organizationId: true,
+        active: true,
+      },
     });
     if (!dbUser?.active) {
       return res.status(401).json({ error: "Unauthorized: User not found" });
@@ -72,6 +80,7 @@ export async function authMiddleware(req: TicketingRequest, res: Response, next:
       consultantVerified: dbUser.consultantVerified,
       // Prefer DB (SSO updates) over stale JWT claims — fixes empty ticket lists for TBOS admin.
       tbosRole: dbUser.tbosRole ?? decoded.tbosRole ?? null,
+      tbosAdminUserId: dbUser.tbosAdminUserId ?? null,
     };
     next();
   } catch {

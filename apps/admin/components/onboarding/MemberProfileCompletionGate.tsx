@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { COUNTRY_OPTIONS } from "@/lib/country-options";
+import { readUploadImageUrlFromJson } from "@/lib/upload-response";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm dark:border-gray-600 dark:bg-gray-800";
@@ -17,7 +18,10 @@ export function MemberProfileCompletionGate() {
   const [saving, setSaving] = useState(false);
   const [addressLine1, setAddressLine1] = useState("");
   const [city, setCity] = useState("");
+  const [stateRegion, setStateRegion] = useState("");
+  const [postcode, setPostcode] = useState("");
   const [country, setCountry] = useState("");
+  const [uploadingProof, setUploadingProof] = useState<"id" | "address" | null>(null);
   const [bankName, setBankName] = useState("");
   const [accountName, setAccountName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
@@ -44,6 +48,8 @@ export function MemberProfileCompletionGate() {
         const user = data?.data?.user as Record<string, unknown>;
         setAddressLine1(String(user.addressLine1 ?? ""));
         setCity(String(user.city ?? ""));
+        setStateRegion(String(user.state ?? ""));
+        setPostcode(String(user.postcode ?? ""));
         setCountry(String(user.country ?? ""));
         const bank = user.bankDetails as Record<string, string> | null;
         if (bank) {
@@ -66,29 +72,35 @@ export function MemberProfileCompletionGate() {
       .catch(() => undefined);
   }, [sessionLoading, isEffectiveProjectMember]);
 
-  async function uploadProof(file: File | undefined, setter: (url: string) => void) {
+  async function uploadProof(
+    file: File | undefined,
+    kind: "id" | "address",
+    setter: (url: string) => void,
+  ) {
     if (!file) return;
-    const formData = new FormData();
-    formData.append("document", file);
-    const res = await adminFetch("/api/upload/document", { method: "POST", body: formData });
-    const json = await res.json();
-    if (!res.ok) throw new Error((json as { error?: string }).error || "Upload failed");
-    const url =
-      (json as { url?: string }).url ||
-      (json as { data?: { url?: string } }).data?.url ||
-      "";
-    if (!url) throw new Error("Upload failed");
-    setter(url);
+    setUploadingProof(kind);
+    try {
+      const formData = new FormData();
+      formData.append("document", file);
+      const res = await adminFetch("/api/upload/document", { method: "POST", body: formData });
+      const json = await res.json();
+      if (!res.ok) throw new Error((json as { error?: string }).error || "Upload failed");
+      const url = readUploadImageUrlFromJson(json);
+      if (!url) throw new Error("Upload failed");
+      setter(url);
+    } finally {
+      setUploadingProof(null);
+    }
   }
 
   async function handleSave() {
     const filled = emergencyContacts.filter((row) => row.name.trim());
-    if (!addressLine1.trim() || !city.trim() || !country.trim()) {
-      alert("Address line 1, city, and country are required.");
+    if (!addressLine1.trim() || !city.trim() || !stateRegion.trim() || !postcode.trim() || !country.trim()) {
+      alert("Address line 1, city, state, postcode, and country are required.");
       return;
     }
-    if (!bankName.trim() || !accountName.trim() || !accountNumber.trim() || !bankCountry.trim()) {
-      alert("Complete all required bank details.");
+    if (!bankName.trim() || !accountName.trim() || !accountNumber.trim() || !bankCountry.trim() || !bsb.trim()) {
+      alert("Complete all required bank details (including BSB/Routing/IFSC).");
       return;
     }
     if (!filled.length) {
@@ -114,6 +126,8 @@ export function MemberProfileCompletionGate() {
         body: JSON.stringify({
           addressLine1: addressLine1.trim(),
           city: city.trim(),
+          state: stateRegion.trim(),
+          postcode: postcode.trim(),
           country: country.trim(),
           bankDetails: {
             bankName: bankName.trim(),
@@ -121,7 +135,7 @@ export function MemberProfileCompletionGate() {
             accountNumber: accountNumber.trim(),
             country: bankCountry.trim(),
             swiftCode: swiftCode.trim() || undefined,
-            bsb: bsb.trim() || undefined,
+            bsb: bsb.trim(),
             notes: bankNotes.trim() || undefined,
           },
           idProofUrl,
@@ -163,7 +177,7 @@ export function MemberProfileCompletionGate() {
                 ))}
               </select>
               <input className={inputClass} placeholder="SWIFT / BIC" value={swiftCode} onChange={(e) => setSwiftCode(e.target.value)} />
-              <input className={inputClass} placeholder="BSB / routing" value={bsb} onChange={(e) => setBsb(e.target.value)} />
+              <input className={inputClass} placeholder="BSB/Routing/IFSC etc. *" required value={bsb} onChange={(e) => setBsb(e.target.value)} />
               <textarea className={`${inputClass} sm:col-span-2`} rows={2} placeholder="Other bank details" value={bankNotes} onChange={(e) => setBankNotes(e.target.value)} />
             </div>
           </section>
@@ -173,6 +187,8 @@ export function MemberProfileCompletionGate() {
             <div className="grid gap-3 sm:grid-cols-2">
               <input className={`${inputClass} sm:col-span-2`} placeholder="Address line 1 *" value={addressLine1} onChange={(e) => setAddressLine1(e.target.value)} />
               <input className={inputClass} placeholder="City *" value={city} onChange={(e) => setCity(e.target.value)} />
+              <input className={inputClass} placeholder="State *" value={stateRegion} onChange={(e) => setStateRegion(e.target.value)} />
+              <input className={inputClass} placeholder="Postcode *" value={postcode} onChange={(e) => setPostcode(e.target.value)} />
               <select className={inputClass} value={country} onChange={(e) => setCountry(e.target.value)}>
                 <option value="">Country *</option>
                 {COUNTRY_OPTIONS.map((c) => (
@@ -197,12 +213,32 @@ export function MemberProfileCompletionGate() {
           <section className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium">ID proof *</label>
-              <input type="file" accept=".pdf,image/*" onChange={(e) => void uploadProof(e.target.files?.[0], setIdProofUrl).catch((err) => alert(err instanceof Error ? err.message : "Upload failed"))} />
+              <input
+                type="file"
+                accept=".pdf,image/*"
+                disabled={uploadingProof === "id"}
+                onChange={(e) =>
+                  void uploadProof(e.target.files?.[0], "id", setIdProofUrl).catch((err) =>
+                    alert(err instanceof Error ? err.message : "Upload failed"),
+                  )
+                }
+              />
+              {uploadingProof === "id" ? <p className="mt-1 text-xs text-gray-500">Uploading…</p> : null}
               {idProofUrl ? <p className="mt-1 text-xs text-green-600">Uploaded</p> : null}
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Address proof *</label>
-              <input type="file" accept=".pdf,image/*" onChange={(e) => void uploadProof(e.target.files?.[0], setAddressProofUrl).catch((err) => alert(err instanceof Error ? err.message : "Upload failed"))} />
+              <input
+                type="file"
+                accept=".pdf,image/*"
+                disabled={uploadingProof === "address"}
+                onChange={(e) =>
+                  void uploadProof(e.target.files?.[0], "address", setAddressProofUrl).catch((err) =>
+                    alert(err instanceof Error ? err.message : "Upload failed"),
+                  )
+                }
+              />
+              {uploadingProof === "address" ? <p className="mt-1 text-xs text-gray-500">Uploading…</p> : null}
               {addressProofUrl ? <p className="mt-1 text-xs text-green-600">Uploaded</p> : null}
             </div>
           </section>

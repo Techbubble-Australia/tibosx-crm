@@ -172,7 +172,13 @@ app.use("/api/ticketing/organizations", ticketingOrgRoutes);
 app.use("/api/ticketing/timesheets", ticketingTimesheetRoutes);
 app.use("/api/ticketing/profile", ticketingProfilePhotoRoutes);
 app.use("/api/ticketing/member-timesheets", memberTimesheetRoutes);
-app.use("/api/upload", ...websiteWrite, uploadRoutes);
+app.use(
+  "/api/upload",
+  authMiddleware,
+  requireMfaEnrolled,
+  requireAnyModule("website", "recruitment", "sales", "project_management"),
+  uploadRoutes,
+);
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

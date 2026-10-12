@@ -23,7 +23,7 @@ import {
   emergencyContactsComplete,
 } from "../lib/member-profile";
 import { logAdminUserFieldChange } from "../lib/admin-user-activity";
-import { effectiveRoleList } from "../lib/admin-roles";
+import { effectiveRoleList, effectiveRolesForUser, hasEffectiveRole } from "../lib/admin-roles";
 
 const router: IRouter = Router();
 
@@ -192,7 +192,7 @@ const bankDetailsSchema = z.object({
   accountNumber: z.string().min(1).max(100),
   country: z.string().min(1).max(100),
   swiftCode: z.string().max(50).optional(),
-  bsb: z.string().max(50).optional(),
+  bsb: z.string().min(1).max(50),
   notes: z.string().max(2000).optional(),
 });
 
@@ -206,6 +206,7 @@ const profileUpdateSchema = z.object({
   suburb: z.string().max(100).optional().nullable(),
   city: z.string().max(100).optional().nullable(),
   state: z.string().max(100).optional().nullable(),
+  postcode: z.string().max(20).optional().nullable(),
   country: z.string().max(100).optional().nullable(),
   bankDetails: bankDetailsSchema.optional(),
   idProofUrl: z.string().max(2000).optional().nullable(),
@@ -236,6 +237,7 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
       suburb: true,
       city: true,
       state: true,
+      postcode: true,
       country: true,
       emergencyContacts: true,
       profileDetailsCompletedAt: true,
@@ -266,6 +268,7 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
         suburb: user.suburb,
         city: user.city,
         state: user.state,
+        postcode: user.postcode,
         country: user.country,
         emergencyContacts: user.emergencyContacts ?? [],
         profileDetailsCompletedAt: user.profileDetailsCompletedAt?.toISOString() ?? null,
@@ -316,6 +319,9 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
     const existing = await prisma.adminUser.findUnique({ where: { id: u.id } });
     if (!existing) return res.status(404).json({ error: "User not found" });
 
+    const roles = await effectiveRolesForUser(u.id, existing.role);
+    const isProjectMemberUser = hasEffectiveRole(roles, "project_member");
+
     const patch: Record<string, unknown> = {};
     const addressFields = [
       "addressLine1",
@@ -323,6 +329,7 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
       "suburb",
       "city",
       "state",
+      "postcode",
       "country",
     ] as const;
 
@@ -332,7 +339,7 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
       if (input.email !== undefined) patch.email = input.email.trim().toLowerCase();
     }
 
-    if (existing.role === "project_member") {
+    if (isProjectMemberUser) {
       for (const field of addressFields) {
         if (input[field] !== undefined) {
           patch[field] = input[field] as string | null;
@@ -352,6 +359,8 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
     const mergedForComplete = {
       addressLine1: (input.addressLine1 ?? existing.addressLine1) as string | null,
       city: (input.city ?? existing.city) as string | null,
+      state: (input.state ?? existing.state) as string | null,
+      postcode: (input.postcode ?? existing.postcode) as string | null,
       country: (input.country ?? existing.country) as string | null,
       bankDetails: input.bankDetails ?? existing.bankDetails,
       idProofUrl: (input.idProofUrl ?? existing.idProofUrl) as string | null,
@@ -379,7 +388,7 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
         }
       }
       for (const field of addressFields) {
-        if (existing.role !== "project_member" || input[field] === undefined) continue;
+        if (!isProjectMemberUser || input[field] === undefined) continue;
         const oldVal = (existing[field] as string | null) ?? null;
         const newVal = (input[field] as string | null) ?? null;
         await logAdminUserFieldChange(tx, u.id, u.id, field, oldVal, newVal);

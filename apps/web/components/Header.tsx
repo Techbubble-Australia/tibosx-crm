@@ -70,6 +70,8 @@ export function Header() {
             </Link>
             <a
               href="https://tibosx.ai.techbubble.com.au"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-[14px] bg-[#111111] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-neutral-800"
             >
               Login to TIBOSX.AI
@@ -108,6 +110,8 @@ export function Header() {
             })}
             <a
               href="https://tibosx.ai.techbubble.com.au"
+              target="_blank"
+              rel="noopener noreferrer"
               onClick={() => setIsMenuOpen(false)}
               className="mt-4 inline-flex items-center justify-center gap-2 rounded-full bg-black px-4 py-3 text-sm font-semibold text-white"
             >

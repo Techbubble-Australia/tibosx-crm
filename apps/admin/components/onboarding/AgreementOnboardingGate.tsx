@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
-import { AgreementSigningDocument } from "@/components/agreements/AgreementSigningDocument";
+import {
+  AgreementSigningDocument,
+  type AgreementSigningDocumentHandle,
+} from "@/components/agreements/AgreementSigningDocument";
 
 type AgreementData = {
   templateName: string;
@@ -27,6 +30,7 @@ export function AgreementOnboardingGate() {
   const [signatures, setSignatures] = useState<Record<string, string>>({});
   const [signedCaptureIds, setSignedCaptureIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const signDocRef = useRef<AgreementSigningDocumentHandle>(null);
 
   const captureIds = useMemo(() => agreement?.signatureCaptureIds ?? [], [agreement?.signatureCaptureIds]);
   const bodyHtml = useMemo(() => (agreement ? extractAgreementBody(agreement.html) : ""), [agreement]);
@@ -80,16 +84,27 @@ export function AgreementOnboardingGate() {
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4">
       <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
         <div className="border-b border-gray-100 px-6 py-4 dark:border-gray-800">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{agreement.templateName}</h2>
-          <p className="text-sm text-gray-500">
-            {agreement.projectNumber} · {agreement.projectTitle}
-          </p>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Sign your agreement before using TIBOSX.AI. Click each highlighted signature field.
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{agreement.templateName}</h2>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                Sign your agreement before using TIBOSX.AI. Click each highlighted signature field.
+              </p>
+            </div>
+            {captureIds.some((id) => !signedCaptureIds.includes(id)) ? (
+              <button
+                type="button"
+                onClick={() => signDocRef.current?.signNext()}
+                className="shrink-0 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600"
+              >
+                Sign next →
+              </button>
+            ) : null}
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto px-6 py-4">
           <AgreementSigningDocument
+            ref={signDocRef}
             html={bodyHtml}
             captureIds={captureIds}
             signedCaptureIds={signedCaptureIds}

@@ -10,6 +10,26 @@ router.use(authMiddleware);
 
 router.get("/summary", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
+
+  if (user.role === "CONSULTANT" && user.tbosAdminUserId) {
+    const managerId = user.tbosAdminUserId;
+    const [total, pendingApproval] = await Promise.all([
+      prisma.timesheet.count({
+        where: {
+          project: { projectManagerId: managerId },
+        },
+      }),
+      prisma.timesheet.count({
+        where: {
+          status: "SUBMITTED",
+          OR: [{ approverKind: "PM" }, { approverKind: null }],
+          project: { projectManagerId: managerId },
+        },
+      }),
+    ]);
+    return res.json({ data: { total, pendingApproval } });
+  }
+
   if (user.role !== "CLIENT") {
     return res.json({ data: { total: 0, pendingApproval: 0 } });
   }
