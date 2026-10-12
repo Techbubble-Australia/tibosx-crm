@@ -52,12 +52,12 @@ export default function LoginPage() {
       }
 
       if (data.requiresPasswordReset) {
-        window.location.assign("/settings/security?reset=required");
+        window.location.assign("/change-password");
         return;
       }
 
       if (data.requiresMfaSetup) {
-        window.location.assign("/settings/security?mfa=required");
+        window.location.assign("/mfa-setup");
         return;
       }
 
@@ -92,11 +92,11 @@ export default function LoginPage() {
       }
 
       if (data.requiresPasswordReset) {
-        window.location.assign("/settings/security?reset=required");
+        window.location.assign("/change-password");
         return;
       }
       if (data.requiresMfaSetup) {
-        window.location.assign("/settings/security?mfa=required");
+        window.location.assign("/mfa-setup");
         return;
       }
       window.location.assign(defaultLandingPath(data?.user?.role ?? "website"));

@@ -1,35 +1,43 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
-
-const MFA_SETUP_PATH = "/settings/security";
 
 export function MfaEnrollmentGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [allowed, setAllowed] = useState(false);
 
   useEffect(() => {
-    if (pathname === MFA_SETUP_PATH || pathname.startsWith(`${MFA_SETUP_PATH}/`)) {
-      return;
-    }
-
+    setAllowed(false);
     void adminFetch("/api/auth/me")
       .then((res) => res.json())
       .then((data) => {
-        const passwordNeedsReset = data?.data?.user?.passwordNeedsReset;
-        if (passwordNeedsReset === true) {
-          router.replace("/settings/security?reset=required");
+        const user = data?.data?.user;
+        if (user?.passwordNeedsReset === true) {
+          router.replace("/change-password");
           return;
         }
-        const mfaEnabled = data?.data?.user?.mfaEnabled;
-        if (mfaEnabled === false) {
-          router.replace(`${MFA_SETUP_PATH}?mfa=required`);
+        if (user?.mfaEnabled === false) {
+          router.replace("/mfa-setup");
+          return;
         }
+        setAllowed(true);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        router.replace("/login");
+      });
   }, [pathname, router]);
+
+  if (!allowed) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-neutral-950">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" aria-label="Loading" />
+      </div>
+    );
+  }
 
   return children;
 }

@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { ADMIN_SESSION_COOKIE } from "@/lib/auth-cookie";
-import { MFA_SETUP_REQUIRED_PURPOSE } from "@/lib/auth-constants";
+import {
+  MFA_SETUP_REQUIRED_PURPOSE,
+  PASSWORD_RESET_REQUIRED_PURPOSE,
+} from "@/lib/auth-constants";
 import { defaultLandingPath } from "@/lib/admin-roles";
 
 function jwtSecretKey() {
@@ -11,49 +14,111 @@ function jwtSecretKey() {
   );
 }
 
-const MFA_SETUP_PATH = "/settings/security";
+const LOGIN_PATH = "/login";
+const CHANGE_PASSWORD_PATH = "/change-password";
+const MFA_SETUP_PATH = "/mfa-setup";
 
-function isMfaSetupPath(pathname: string): boolean {
-  return pathname === MFA_SETUP_PATH || pathname.startsWith(`${MFA_SETUP_PATH}/`);
+const PUBLIC_AUTH_PATHS = [LOGIN_PATH, CHANGE_PASSWORD_PATH, MFA_SETUP_PATH];
+
+function isPublicAuthPath(pathname: string): boolean {
+  return PUBLIC_AUTH_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
+
+function redirectTo(request: NextRequest, pathname: string) {
+  return NextResponse.redirect(new URL(pathname, request.url));
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
 
-  if (pathname.startsWith("/login")) {
-    const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-    if (token) {
-      try {
-        const { payload } = await jwtVerify(token, jwtSecretKey());
-        const purpose = typeof payload.purpose === "string" ? payload.purpose : undefined;
-        if (purpose === MFA_SETUP_REQUIRED_PURPOSE) {
-          return NextResponse.redirect(new URL(`${MFA_SETUP_PATH}?mfa=required`, request.url));
-        }
-        const role = typeof payload.role === "string" ? payload.role : "website";
-        return NextResponse.redirect(new URL(defaultLandingPath(role), request.url));
-      } catch {
-        const res = NextResponse.next();
-        res.cookies.delete(ADMIN_SESSION_COOKIE);
-        return res;
-      }
+  if (pathname.startsWith(LOGIN_PATH)) {
+    if (!token) {
+      return NextResponse.next();
     }
-    return NextResponse.next();
+    try {
+      const { payload } = await jwtVerify(token, jwtSecretKey());
+      const purpose = typeof payload.purpose === "string" ? payload.purpose : undefined;
+      if (purpose === PASSWORD_RESET_REQUIRED_PURPOSE) {
+        return redirectTo(request, CHANGE_PASSWORD_PATH);
+      }
+      if (purpose === MFA_SETUP_REQUIRED_PURPOSE) {
+        return redirectTo(request, MFA_SETUP_PATH);
+      }
+      const role = typeof payload.role === "string" ? payload.role : "website";
+      return redirectTo(request, defaultLandingPath(role));
+    } catch {
+      const res = NextResponse.next();
+      res.cookies.delete(ADMIN_SESSION_COOKIE);
+      return res;
+    }
   }
 
-  const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+  if (isPublicAuthPath(pathname)) {
+    if (!token) {
+      return redirectTo(request, LOGIN_PATH);
+    }
+    try {
+      const { payload } = await jwtVerify(token, jwtSecretKey());
+      const purpose = typeof payload.purpose === "string" ? payload.purpose : undefined;
+
+      if (pathname.startsWith(CHANGE_PASSWORD_PATH)) {
+        if (purpose === PASSWORD_RESET_REQUIRED_PURPOSE) {
+          return NextResponse.next();
+        }
+        if (purpose === MFA_SETUP_REQUIRED_PURPOSE) {
+          return redirectTo(request, MFA_SETUP_PATH);
+        }
+        const role = typeof payload.role === "string" ? payload.role : "website";
+        return redirectTo(request, defaultLandingPath(role));
+      }
+
+      if (pathname.startsWith(MFA_SETUP_PATH)) {
+        if (purpose === MFA_SETUP_REQUIRED_PURPOSE) {
+          return NextResponse.next();
+        }
+        if (purpose === PASSWORD_RESET_REQUIRED_PURPOSE) {
+          return redirectTo(request, CHANGE_PASSWORD_PATH);
+        }
+        const role = typeof payload.role === "string" ? payload.role : "website";
+        return redirectTo(request, defaultLandingPath(role));
+      }
+
+      return NextResponse.next();
+    } catch {
+      return redirectTo(request, LOGIN_PATH);
+    }
+  }
+
   if (!token) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return redirectTo(request, LOGIN_PATH);
   }
 
   try {
     const { payload } = await jwtVerify(token, jwtSecretKey());
     const purpose = typeof payload.purpose === "string" ? payload.purpose : undefined;
-    if (purpose === MFA_SETUP_REQUIRED_PURPOSE && !isMfaSetupPath(pathname)) {
-      return NextResponse.redirect(new URL(`${MFA_SETUP_PATH}?mfa=required`, request.url));
+
+    if (purpose === PASSWORD_RESET_REQUIRED_PURPOSE) {
+      return redirectTo(request, CHANGE_PASSWORD_PATH);
     }
+    if (purpose === MFA_SETUP_REQUIRED_PURPOSE) {
+      return redirectTo(request, MFA_SETUP_PATH);
+    }
+
+    if (pathname.startsWith("/settings/security")) {
+      const mfa = request.nextUrl.searchParams.get("mfa");
+      const reset = request.nextUrl.searchParams.get("reset");
+      if (mfa === "required") {
+        return redirectTo(request, MFA_SETUP_PATH);
+      }
+      if (reset === "required") {
+        return redirectTo(request, CHANGE_PASSWORD_PATH);
+      }
+    }
+
     return NextResponse.next();
   } catch {
-    const res = NextResponse.redirect(new URL("/login", request.url));
+    const res = redirectTo(request, LOGIN_PATH);
     res.cookies.delete(ADMIN_SESSION_COOKIE);
     return res;
   }
@@ -61,10 +126,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Skip static assets, API routes, and uploaded files (filenames almost always contain a dot).
-     * Also skip `/uploads/...` without an extension so those requests never hit auth middleware.
-     */
     "/((?!api|_next/static|_next/image|favicon.ico|uploads|.*\\..*).*)",
   ],
 };
