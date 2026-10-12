@@ -297,6 +297,10 @@ export function isProjectMember(role: string): boolean {
   return role === "project_member";
 }
 
+export function isEffectiveProjectMember(primary: string, additional?: string[] | null): boolean {
+  return anyEffectiveRole(primary, additional, ["project_member"]);
+}
+
 export function roleLabel(role: string): string {
   if (isAdminRole(role)) {
     return ROLE_META[role].label;

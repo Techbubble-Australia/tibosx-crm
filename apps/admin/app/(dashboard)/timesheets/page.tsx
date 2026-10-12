@@ -26,7 +26,7 @@ function formatDate(value: string) {
 }
 
 export default function TimesheetsPage() {
-  const { isProjectMember, canManageProjects } = useAdminSession();
+  const { isEffectiveProjectMember, canManageProjects } = useAdminSession();
   const [rows, setRows] = useState<TimesheetRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -111,7 +111,7 @@ export default function TimesheetsPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            {isProjectMember && selected.size > 0 ? (
+            {isEffectiveProjectMember && selected.size > 0 ? (
               <button
                 type="button"
                 onClick={() => void submitSelected()}
@@ -121,7 +121,7 @@ export default function TimesheetsPage() {
                 <Send className="h-4 w-4" /> Submit selected
               </button>
             ) : null}
-            {isProjectMember ? (
+            {isEffectiveProjectMember ? (
               <Link
                 href="/timesheets/new"
                 className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
@@ -135,13 +135,27 @@ export default function TimesheetsPage() {
         {isLoading ? (
           <p className="text-sm text-gray-400">Loading…</p>
         ) : rows.length === 0 ? (
-          <p className="text-sm text-gray-400">No timesheets yet.</p>
+          <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/50 px-6 py-10 text-center dark:border-gray-700 dark:bg-gray-900/50">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {canManageProjects
+                ? "No timesheets to review yet. Team members submit timesheets from their project member accounts."
+                : "No timesheets yet."}
+            </p>
+            {isEffectiveProjectMember ? (
+              <Link
+                href="/timesheets/new"
+                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
+              >
+                <Plus className="h-4 w-4" /> Create timesheet
+              </Link>
+            ) : null}
+          </div>
         ) : (
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
             <table className="min-w-full text-sm">
               <thead className="border-b border-gray-100 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
                 <tr>
-                  {isProjectMember ? <th className="w-10 px-4 py-3" /> : null}
+                  {isEffectiveProjectMember ? <th className="w-10 px-4 py-3" aria-label="Select drafts" /> : null}
                   <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Project</th>
                   {canManageProjects ? (
                     <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Member</th>
@@ -154,7 +168,7 @@ export default function TimesheetsPage() {
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id} className="border-b border-gray-50 dark:border-gray-800">
-                    {isProjectMember ? (
+                    {isEffectiveProjectMember ? (
                       <td className="px-4 py-3">
                         {row.status === "DRAFT" ? (
                           <input
@@ -193,7 +207,7 @@ export default function TimesheetsPage() {
                         <Link href={`/timesheets/${row.id}`} className="rounded-lg border border-gray-200 p-2 hover:bg-gray-50 dark:border-gray-600">
                           <Edit className="h-4 w-4" />
                         </Link>
-                        {isProjectMember && row.status === "DRAFT" ? (
+                        {isEffectiveProjectMember && row.status === "DRAFT" ? (
                           <button
                             type="button"
                             onClick={() => void submitOne(row.id)}

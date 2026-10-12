@@ -10,6 +10,7 @@ import {
   canAccessWebsite,
   canManageProjects,
   isProjectMember,
+  isEffectiveProjectMember,
   canDeleteProfiles,
   canEditProfiles,
   canManageClients,
@@ -34,6 +35,7 @@ type AdminSession = {
   canAccessProjectManagement: boolean;
   canManageProjects: boolean;
   isProjectMember: boolean;
+  isEffectiveProjectMember: boolean;
   canManageUsers: boolean;
   canManageClients: boolean;
   canManageJobs: boolean;
@@ -104,6 +106,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       canAccessProjectManagement: canAccessProjectManagement(role),
       canManageProjects: canManageProjects(role),
       isProjectMember: isProjectMember(role),
+      isEffectiveProjectMember: isEffectiveProjectMember(role, additionalRoles),
       canManageUsers: canManageUsers(role),
       canManageClients: canManageClients(role),
       canManageJobs: canManageJobs(role),

@@ -1,16 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
+import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
 import { TimesheetForm } from "@/components/timesheets/TimesheetForm";
 
 export default function NewTimesheetPage() {
   const router = useRouter();
+  const { isEffectiveProjectMember, loading: sessionLoading } = useAdminSession();
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!sessionLoading && !isEffectiveProjectMember) {
+      router.replace("/timesheets");
+    }
+  }, [sessionLoading, isEffectiveProjectMember, router]);
 
   async function handleSubmit(payload: Record<string, unknown>) {
     setIsSaving(true);
@@ -29,6 +37,14 @@ export default function NewTimesheetPage() {
     } finally {
       setIsSaving(false);
     }
+  }
+
+  if (sessionLoading || !isEffectiveProjectMember) {
+    return (
+      <ProjectManagementGuard>
+        <p className="text-sm text-gray-400">Loading…</p>
+      </ProjectManagementGuard>
+    );
   }
 
   return (

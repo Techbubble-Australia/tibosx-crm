@@ -67,6 +67,18 @@ export function canAccessModuleForUser(primary: string, additional: unknown, mod
   return effectiveRoleList(primary, additional).some((role) => canAccessModule(role, module));
 }
 
+export async function effectiveRolesForUser(userId: string, primary: string): Promise<string[]> {
+  const row = await prisma.adminUser.findUnique({
+    where: { id: userId },
+    select: { additionalRoles: true },
+  });
+  return effectiveRoleList(primary, row?.additionalRoles);
+}
+
+export function hasEffectiveRole(roles: string[], role: string): boolean {
+  return roles.includes(role);
+}
+
 export function canMutateContent(role: string): boolean {
   return isAdminRole(role);
 }

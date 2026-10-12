@@ -6,8 +6,8 @@ import {
   canManageAllTimesheets,
   getActorId,
   isProjectManagerRole,
-  isProjectMemberRole,
 } from "../lib/project-access";
+import { effectiveRolesForUser, hasEffectiveRole } from "../lib/admin-roles";
 import { getMemberOnboardingStatus } from "../lib/member-onboarding";
 import { notifyClientApproverOfSubmittedTimesheet } from "../lib/timesheet-client-approval";
 import { mondayOfWeek, sundayOfWeek, TIMESHEET_STATUSES, TIMESHEET_STATUS_LABELS } from "../lib/project-types";
@@ -138,7 +138,7 @@ async function timesheetAccessWhere(req: AuthRequest): Promise<Prisma.TimesheetW
   if (canManageAllTimesheets(role) && role === "admin") {
     return {};
   }
-  if (isProjectManagerRole(role)) {
+  if (isProjectManagerRole(role) && role !== "admin") {
     return {
       OR: [
         { project: { projectManagerId: actorId } },
@@ -149,8 +149,8 @@ async function timesheetAccessWhere(req: AuthRequest): Promise<Prisma.TimesheetW
   return { memberUserId: actorId };
 }
 
-async function assertMemberCanSubmitTimesheets(actorId: string, role: string) {
-  if (!isProjectMemberRole(role)) return;
+async function assertMemberCanSubmitTimesheets(actorId: string, roles: string[]) {
+  if (!hasEffectiveRole(roles, "project_member")) return;
   const onboarding = await getMemberOnboardingStatus(actorId);
   if (!onboarding.agreementSigned) {
     throw new Error("AGREEMENT_REQUIRED");
@@ -184,7 +184,6 @@ router.get("/active-projects", async (req: AuthRequest, res) => {
 router.get("/active-targets", async (req: AuthRequest, res) => {
   try {
     const actorId = getActorId(req);
-    const role = req.user?.role ?? "";
 
     const projectMemberships = await prisma.projectMember.findMany({
       where: { adminUserId: actorId, project: { status: "ACTIVE" } },
@@ -203,12 +202,8 @@ router.get("/active-targets", async (req: AuthRequest, res) => {
     const opportunityWhere: Prisma.OpportunityWhereInput = {
       active: true,
       status: { in: ["IN_PROGRESS", "ACCEPTED", "PROPOSAL"] },
+      ownerId: actorId,
     };
-    if (isProjectMemberRole(role)) {
-      opportunityWhere.ownerId = actorId;
-    } else if (isProjectManagerRole(role) && role !== "admin") {
-      opportunityWhere.ownerId = actorId;
-    }
 
     const opportunities = await prisma.opportunity.findMany({
       where: opportunityWhere,
@@ -386,18 +381,19 @@ router.get("/:id", async (req: AuthRequest, res) => {
 router.post("/", async (req: AuthRequest, res) => {
   try {
     const role = req.user?.role ?? "";
-    if (!isProjectMemberRole(role) && !isProjectManagerRole(role)) {
-      return res.status(403).json({ error: "Forbidden" });
+    const actorId = getActorId(req);
+    const roles = await effectiveRolesForUser(actorId, role);
+    if (!hasEffectiveRole(roles, "project_member")) {
+      return res.status(403).json({ error: "Only project members can create timesheets" });
     }
     const data = timesheetSchema.parse(req.body);
-    const actorId = getActorId(req);
-    await assertMemberCanSubmitTimesheets(actorId, role);
+    await assertMemberCanSubmitTimesheets(actorId, roles);
 
     if (data.projectId) {
       const membership = await prisma.projectMember.findFirst({
         where: { adminUserId: actorId, projectId: data.projectId, project: { status: "ACTIVE" } },
       });
-      if (!membership && !isProjectManagerRole(role)) {
+      if (!membership) {
         return res.status(400).json({ error: "You are not assigned to this active project" });
       }
     } else if (data.opportunityId) {
@@ -405,10 +401,7 @@ router.post("/", async (req: AuthRequest, res) => {
       if (!opportunity || !opportunity.active) {
         return res.status(400).json({ error: "Invalid case" });
       }
-      if (isProjectMemberRole(role) && opportunity.ownerId !== actorId) {
-        return res.status(400).json({ error: "You can only log time on cases you own" });
-      }
-      if (isProjectManagerRole(role) && role === "project_manager" && opportunity.ownerId !== actorId) {
+      if (opportunity.ownerId !== actorId) {
         return res.status(400).json({ error: "You can only log time on cases you own" });
       }
     } else if (data.ticketId) {
@@ -417,7 +410,7 @@ router.post("/", async (req: AuthRequest, res) => {
       const inGroup = await prisma.projectSupportGroupMember.findFirst({
         where: { adminUserId: actorId, group: { projectId: ticket.projectId } },
       });
-      if (!inGroup && !isProjectManagerRole(role)) {
+      if (!inGroup) {
         return res.status(400).json({ error: "You are not on the support team for this case" });
       }
     }
@@ -470,7 +463,11 @@ router.put("/:id", async (req: AuthRequest, res) => {
     const data = timesheetSchema.parse(req.body);
     const actorId = getActorId(req);
     const role = req.user?.role ?? "";
-    await assertMemberCanSubmitTimesheets(actorId, role);
+    const roles = await effectiveRolesForUser(actorId, role);
+    if (!hasEffectiveRole(roles, "project_member")) {
+      return res.status(403).json({ error: "Only project members can edit timesheets" });
+    }
+    await assertMemberCanSubmitTimesheets(actorId, roles);
     const existing = await prisma.timesheet.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: "Not found" });
     if (existing.memberUserId !== actorId) return res.status(403).json({ error: "Forbidden" });
@@ -546,7 +543,11 @@ router.post("/submit", async (req: AuthRequest, res) => {
     if (!items) return res.status(400).json({ error: "No timesheets to submit" });
     const actorId = getActorId(req);
     const role = req.user?.role ?? "";
-    await assertMemberCanSubmitTimesheets(actorId, role);
+    const roles = await effectiveRolesForUser(actorId, role);
+    if (!hasEffectiveRole(roles, "project_member")) {
+      return res.status(403).json({ error: "Only project members can submit timesheets" });
+    }
+    await assertMemberCanSubmitTimesheets(actorId, roles);
     const ids = items.map((i) => i.id);
     const rows = await prisma.timesheet.findMany({
       where: { id: { in: ids }, memberUserId: actorId, status: "DRAFT" },

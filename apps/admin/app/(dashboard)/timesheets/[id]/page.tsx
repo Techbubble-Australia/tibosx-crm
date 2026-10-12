@@ -60,7 +60,7 @@ function RejectDialog({
 
 export default function TimesheetDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { isProjectMember, canManageProjects } = useAdminSession();
+  const { isEffectiveProjectMember, canManageProjects } = useAdminSession();
   const [timesheet, setTimesheet] = useState<TimesheetFormValues | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -169,7 +169,7 @@ export default function TimesheetDetailPage() {
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Timesheet</h2>
           <div className="flex gap-2">
-            {isProjectMember && status === "DRAFT" ? (
+            {isEffectiveProjectMember && status === "DRAFT" ? (
               <button
                 type="button"
                 onClick={() => void submitForApproval()}
