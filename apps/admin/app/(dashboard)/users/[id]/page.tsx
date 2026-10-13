@@ -5,9 +5,10 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
-import { resolveDocumentHref } from "@/lib/media-url";
 import { formatRolesLabel } from "@/lib/admin-roles";
 import { AdminRolesMultiSelect, rolesFromApi, rolesToApi } from "@/components/users/AdminRolesMultiSelect";
+import { MappedClientContactSelect } from "@/components/users/MappedClientContactSelect";
+import { UserFilesSection } from "@/components/users/UserFilesSection";
 import { UserPhotoField } from "@/components/users/UserPhotoField";
 import { UserAssignCredentialsModal } from "@/components/users/UserAssignCredentialsModal";
 import type { AdminRole } from "@/lib/admin-roles";
@@ -46,6 +47,10 @@ type UserDetail = {
   country: string | null;
   emergencyContacts: EmergencyContact[];
   agreementDocumentUrl: string | null;
+  mappedClientContactId: string | null;
+  idProofUrl: string | null;
+  addressProofUrl: string | null;
+  userFiles: { name?: string; url?: string }[];
   projectMembership: {
     memberId: string;
     projectId: string;
@@ -67,6 +72,7 @@ export default function EditUserPage() {
   const [activity, setActivity] = useState<ActivityRow[]>([]);
   const [assignOpen, setAssignOpen] = useState(false);
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([{ name: "", email: "", phone: "" }]);
+  const [mappedClientContactId, setMappedClientContactId] = useState("");
 
   async function load() {
     try {
@@ -78,6 +84,7 @@ export default function EditUserPage() {
       const row = data.data as UserDetail;
       setDefaults(row);
       setRoles(rolesFromApi(row.role, row.additionalRoles));
+      setMappedClientContactId(row.mappedClientContactId ?? "");
       setPhotoUrl(row.profilePhotoUrl);
       if (Array.isArray(row.emergencyContacts) && row.emergencyContacts.length) {
         setEmergencyContacts(row.emergencyContacts);
@@ -117,6 +124,7 @@ export default function EditUserPage() {
       state: String(formData.get("state") ?? "").trim() || null,
       country: String(formData.get("country") ?? "").trim() || null,
       emergencyContacts: emergencyContacts.filter((row) => row.name.trim()),
+      mappedClientContactId: roles.includes("client") ? mappedClientContactId || null : null,
     };
     if (password) body.password = password;
 
@@ -210,6 +218,14 @@ export default function EditUserPage() {
             <AdminRolesMultiSelect value={roles} onChange={setRoles} />
             <p className="mt-2 text-xs text-gray-500">Effective access: {formatRolesLabel(roles[0] ?? defaults.role, roles.slice(1))}</p>
           </div>
+          {roles.includes("client") ? (
+            <MappedClientContactSelect
+              value={mappedClientContactId}
+              onChange={setMappedClientContactId}
+              currentUserId={id}
+              required
+            />
+          ) : null}
           <div>
             <label className="mb-1 block text-sm font-medium">New password</label>
             <input name="password" type="password" minLength={8} className={inputClass} placeholder="Leave blank to keep current" />
@@ -320,21 +336,12 @@ export default function EditUserPage() {
           </button>
         </section>
 
-        <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-          <h3 className="mb-2 font-semibold">Files</h3>
-          {defaults.agreementDocumentUrl ? (
-            <a
-              href={resolveDocumentHref(defaults.agreementDocumentUrl)}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm text-blue-600 hover:underline dark:text-blue-400"
-            >
-              Signed contract / agreement
-            </a>
-          ) : (
-            <p className="text-sm text-gray-500">No signed contract on file yet.</p>
-          )}
-        </section>
+        <UserFilesSection
+          agreementDocumentUrl={defaults.agreementDocumentUrl}
+          idProofUrl={defaults.idProofUrl}
+          addressProofUrl={defaults.addressProofUrl}
+          userFiles={defaults.userFiles}
+        />
 
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
           <h3 className="mb-4 font-semibold">Activity log</h3>

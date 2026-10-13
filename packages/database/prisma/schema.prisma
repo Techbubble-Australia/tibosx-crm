@@ -558,6 +558,7 @@ model ClientContact {
   order            Int           @default(0)
   opportunities    Opportunity[]
   projectLinks     ProjectClientContact[]
+  mappedAdminUser  AdminUser? @relation("AdminUserMappedContact")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -930,6 +931,9 @@ model AdminUser {
   /// SHA-256 hash of one-time email password reset token.
   passwordResetTokenHash String?
   passwordResetExpiresAt DateTime?
+  /// CRM client contact linked when this user has the Client role.
+  mappedClientContactId String?       @unique
+  mappedClientContact   ClientContact? @relation("AdminUserMappedContact", fields: [mappedClientContactId], references: [id], onDelete: SetNull)
   addressLine1  String?
   addressLine2  String?
   suburb        String?

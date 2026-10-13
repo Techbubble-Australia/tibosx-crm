@@ -133,7 +133,7 @@ export default function NewTicketPage() {
             </select>
             {orgs.length === 0 && me ? (
               <p className="mt-1 text-xs text-amber-700">
-                No projects available. TBOS admin: add projects under Sales → Support tickets → Support projects, then assign consultants under Consultant access.
+                No active projects are available
               </p>
             ) : null}
           </div>

@@ -5,6 +5,10 @@ import { prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth";
 import { ADMIN_ROLES_LIST, assertCanModifyAdminUser, isAdminRole } from "../lib/admin-roles";
 import { logAdminUserFieldChange } from "../lib/admin-user-activity";
+import {
+  assertMappedContactAvailable,
+  rolesIncludeClient,
+} from "../lib/admin-user-contact-map";
 
 const router: IRouter = Router();
 
@@ -25,6 +29,7 @@ const createSchema = z.object({
   profilePhotoUrl: z.string().max(2000).optional().nullable(),
   active: z.boolean().default(true),
   passwordNeedsReset: z.boolean().default(false),
+  mappedClientContactId: z.string().min(1).optional().nullable(),
 });
 
 const updateSchema = z.object({
@@ -44,6 +49,7 @@ const updateSchema = z.object({
   state: z.string().max(100).optional().nullable(),
   country: z.string().max(100).optional().nullable(),
   emergencyContacts: z.array(emergencyContactSchema).max(5).optional(),
+  mappedClientContactId: z.string().min(1).optional().nullable(),
 });
 
 const listSelect = {
@@ -110,6 +116,10 @@ const detailSelect = {
   emergencyContacts: true,
   agreementDocumentUrl: true,
   profileDetailsCompletedAt: true,
+  mappedClientContactId: true,
+  idProofUrl: true,
+  addressProofUrl: true,
+  userFiles: true,
 } as const;
 
 function sanitizeDetail(row: {
@@ -133,11 +143,19 @@ function sanitizeDetail(row: {
   emergencyContacts: unknown;
   agreementDocumentUrl: string | null;
   profileDetailsCompletedAt: Date | null;
+  mappedClientContactId: string | null;
+  idProofUrl: string | null;
+  addressProofUrl: string | null;
+  userFiles: unknown;
   createdAt: Date;
   updatedAt: Date;
 }) {
   return {
     ...sanitizeUser(row),
+    mappedClientContactId: row.mappedClientContactId,
+    idProofUrl: row.idProofUrl,
+    addressProofUrl: row.addressProofUrl,
+    userFiles: Array.isArray(row.userFiles) ? row.userFiles : [],
     addressLine1: row.addressLine1,
     addressLine2: row.addressLine2,
     suburb: row.suburb,
@@ -160,6 +178,32 @@ router.get("/", async (_req, res) => {
   } catch (error) {
     console.error("Error fetching admin users:", error);
     res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
+router.get("/contact-map-options", async (_req, res) => {
+  try {
+    const rows = await prisma.clientContact.findMany({
+      orderBy: [{ client: { name: "asc" } }, { name: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        client: { select: { name: true } },
+        mappedAdminUser: { select: { id: true, email: true } },
+      },
+    });
+    res.json({
+      data: rows.map((row) => ({
+        id: row.id,
+        label: `${row.client.name} — ${row.name} (${row.email})`,
+        mappedUserId: row.mappedAdminUser?.id ?? null,
+        mappedUserEmail: row.mappedAdminUser?.email ?? null,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching contact map options:", error);
+    res.status(500).json({ error: "Failed to fetch contacts" });
   }
 });
 
@@ -229,6 +273,21 @@ router.get("/:id", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const data = createSchema.parse(req.body);
+    const additionalRoles = data.additionalRoles?.length ? data.additionalRoles : [];
+    const needsContact = rolesIncludeClient(data.role, additionalRoles);
+    const mappedId = data.mappedClientContactId?.trim() || null;
+
+    if (needsContact && !mappedId) {
+      return res.status(400).json({ error: "Map to contact record is required when the Client role is selected" });
+    }
+    if (!needsContact && mappedId) {
+      return res.status(400).json({ error: "Remove the contact mapping when the Client role is not selected" });
+    }
+    if (mappedId) {
+      const mapError = await assertMappedContactAvailable(mappedId);
+      if (mapError) return res.status(409).json({ error: mapError });
+    }
+
     const passwordHash = await bcrypt.hash(data.password, 10);
     const row = await prisma.adminUser.create({
       data: {
@@ -237,10 +296,11 @@ router.post("/", async (req, res) => {
         phone: data.phone.trim(),
         passwordHash,
         role: data.role,
-        additionalRoles: data.additionalRoles?.length ? data.additionalRoles : undefined,
+        additionalRoles: additionalRoles.length ? additionalRoles : undefined,
         profilePhotoUrl: data.profilePhotoUrl ?? null,
         active: data.active,
         passwordNeedsReset: data.passwordNeedsReset,
+        mappedClientContactId: mappedId,
       },
       select: listSelect,
     });
@@ -269,6 +329,28 @@ router.put("/:id", async (req: AuthRequest, res) => {
     }
 
     const actorId = req.user?.id ?? "";
+
+    const nextRole = data.role ?? existing.role;
+    const nextAdditional =
+      data.additionalRoles !== undefined
+        ? data.additionalRoles
+        : parseAdditionalRoles(existing.additionalRoles);
+    const needsContact = rolesIncludeClient(nextRole, nextAdditional);
+    const mappedId =
+      data.mappedClientContactId !== undefined
+        ? data.mappedClientContactId?.trim() || null
+        : existing.mappedClientContactId;
+
+    if (needsContact && !mappedId) {
+      return res.status(400).json({ error: "Map to contact record is required when the Client role is selected" });
+    }
+    if (!needsContact && mappedId) {
+      return res.status(400).json({ error: "Remove the contact mapping when the Client role is not selected" });
+    }
+    if (mappedId && mappedId !== existing.mappedClientContactId) {
+      const mapError = await assertMappedContactAvailable(mappedId, existing.id);
+      if (mapError) return res.status(409).json({ error: mapError });
+    }
 
     const row = await prisma.$transaction(async (tx) => {
       const updateData: Record<string, unknown> = {};
@@ -344,6 +426,21 @@ router.put("/:id", async (req: AuthRequest, res) => {
       if (data.password) {
         updateData.passwordHash = await bcrypt.hash(data.password, 10);
         await logField("password", "(hidden)", "(updated)");
+      }
+      if (
+        data.mappedClientContactId !== undefined ||
+        data.role !== undefined ||
+        data.additionalRoles !== undefined
+      ) {
+        const newMapped = needsContact ? mappedId : null;
+        if (newMapped !== existing.mappedClientContactId) {
+          updateData.mappedClientContactId = newMapped;
+          await logField(
+            "mappedClientContactId",
+            existing.mappedClientContactId,
+            newMapped,
+          );
+        }
       }
 
       return tx.adminUser.update({

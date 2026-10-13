@@ -1,25 +1,41 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
-import { AdminRoleSelect } from "@/components/users/AdminRoleSelect";
+import { AdminRolesMultiSelect, rolesToApi } from "@/components/users/AdminRolesMultiSelect";
+import { MappedClientContactSelect } from "@/components/users/MappedClientContactSelect";
 import { type AdminRole, isAdminRole } from "@/lib/admin-roles";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
 
-export default function NewUserPage() {
+function NewUserPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
-  const [role, setRole] = useState<AdminRole>("website");
+  const [roles, setRoles] = useState<AdminRole[]>(["website"]);
+  const [mappedClientContactId, setMappedClientContactId] = useState("");
+
+  useEffect(() => {
+    const fromContact = searchParams.get("mappedClientContactId")?.trim();
+    if (fromContact) {
+      setMappedClientContactId(fromContact);
+      setRoles(["client"]);
+    }
+  }, [searchParams]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (roles.includes("client") && !mappedClientContactId) {
+      alert("Map to contact record is required when the Client role is selected.");
+      return;
+    }
     setIsLoading(true);
     const formData = new FormData(e.currentTarget);
+    const { role, additionalRoles } = rolesToApi(roles);
     try {
       const res = await adminFetch("/api/admin/users", {
         method: "POST",
@@ -30,8 +46,10 @@ export default function NewUserPage() {
           phone: formData.get("phone"),
           password: formData.get("password"),
           role,
+          additionalRoles,
           active: formData.get("active") === "on",
           passwordNeedsReset: formData.get("passwordNeedsReset") === "on",
+          mappedClientContactId: roles.includes("client") ? mappedClientContactId : null,
         }),
       });
       if (!res.ok) {
@@ -76,14 +94,21 @@ export default function NewUserPage() {
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Minimum 8 characters.</p>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Role *</label>
-          <AdminRoleSelect
-            value={role}
+          <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">Roles *</label>
+          <AdminRolesMultiSelect
+            value={roles}
             onChange={(next) => {
-              if (isAdminRole(next)) setRole(next);
+              setRoles(next.filter(isAdminRole));
             }}
           />
         </div>
+        {roles.includes("client") ? (
+          <MappedClientContactSelect
+            value={mappedClientContactId}
+            onChange={setMappedClientContactId}
+            required
+          />
+        ) : null}
         <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
           <input name="passwordNeedsReset" type="checkbox" defaultChecked className="h-4 w-4 rounded" />
           Password needs reset (user must change password on first login)
@@ -102,5 +127,13 @@ export default function NewUserPage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function NewUserPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-sm text-gray-500">Loading…</div>}>
+      <NewUserPageInner />
+    </Suspense>
   );
 }

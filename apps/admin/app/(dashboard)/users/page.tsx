@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { formatRolesLabel, roleLabel } from "@/lib/admin-roles";
 import { RolePermissionsCard } from "@/components/users/RolePermissionsCard";
@@ -21,9 +21,62 @@ interface UserRow {
   mfaEnabled: boolean;
 }
 
+type SortKey = "name" | "email" | "role" | "mfaEnabled" | "active";
+type SortDir = "asc" | "desc";
+
+function SortHeader({
+  label,
+  sortKey,
+  activeKey,
+  dir,
+  onSort,
+}: {
+  label: string;
+  sortKey: SortKey;
+  activeKey: SortKey;
+  dir: SortDir;
+  onSort: (key: SortKey) => void;
+}) {
+  const active = activeKey === sortKey;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(sortKey)}
+      className="inline-flex items-center gap-1 font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
+    >
+      {label}
+      {active ? (dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />) : null}
+    </button>
+  );
+}
+
+function compareUsers(a: UserRow, b: UserRow, key: SortKey): number {
+  switch (key) {
+    case "name":
+      return (a.name ?? "").localeCompare(b.name ?? "", undefined, { sensitivity: "base" });
+    case "email":
+      return a.email.localeCompare(b.email, undefined, { sensitivity: "base" });
+    case "role":
+      return formatRolesLabel(a.role, a.additionalRoles).localeCompare(
+        formatRolesLabel(b.role, b.additionalRoles),
+        undefined,
+        { sensitivity: "base" },
+      );
+    case "mfaEnabled":
+      return Number(a.mfaEnabled) - Number(b.mfaEnabled);
+    case "active":
+      return Number(a.active) - Number(b.active);
+    default:
+      return 0;
+  }
+}
+
 export default function UsersPage() {
   const [rows, setRows] = useState<UserRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
   const {
     search,
     setSearch,
@@ -31,16 +84,40 @@ export default function UsersPage() {
     setPage,
     pageSize,
     setPageSize,
-    paginated,
+    filtered,
     totalItems,
     totalSourceItems,
   } = useListView(rows, (row) =>
     buildSearchHaystack([row.email, row.name, row.role, roleLabel(row.role), row.mfaEnabled ? "mfa" : ""]),
+    { initialPageSize: 100, pageSizeStorageKey: "admin-users-page-size" },
   );
+
+  const sorted = useMemo(() => {
+    const list = [...filtered];
+    list.sort((a, b) => {
+      const cmp = compareUsers(a, b, sortKey);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return list;
+  }, [filtered, sortKey, sortDir]);
+
+  const paginated = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return sorted.slice(start, start + pageSize);
+  }, [sorted, page, pageSize]);
 
   useEffect(() => {
     void fetchRows();
   }, []);
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
   async function fetchRows() {
     try {
@@ -107,11 +184,21 @@ export default function UsersPage() {
         <table className="w-full min-w-[720px] text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
             <tr>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Email</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Name</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Role</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">MFA</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Name" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Email" sortKey="email" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Role" sortKey="role" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="MFA" sortKey="mfaEnabled" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
+              <th className="px-4 py-3 text-left">
+                <SortHeader label="Status" sortKey="active" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              </th>
               <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
             </tr>
           </thead>
@@ -131,10 +218,10 @@ export default function UsersPage() {
                 <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                   <td className="px-4 py-3 font-medium">
                     <Link href={`/users/${row.id}`} className="text-gray-900 hover:underline dark:text-gray-100">
-                      {row.email}
+                      {row.name || "—"}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.name || "—"}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.email}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                     {formatRolesLabel(row.role, row.additionalRoles)}
                   </td>

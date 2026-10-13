@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Info, Loader2, Plus, Trash2 } from "lucide-react";
 import { UserPhotoField } from "@/components/users/UserPhotoField";
 import { adminFetch } from "@/lib/admin-api";
-import { resolveDocumentHref } from "@/lib/media-url";
+import { UserFilesSection } from "@/components/users/UserFilesSection";
 import { roleLabel, type AdminRole, isAdminRole } from "@/lib/admin-roles";
 import { COUNTRY_OPTIONS } from "@/lib/country-options";
 
@@ -49,6 +49,9 @@ export default function ProfileSettingsPageInner() {
   const [country, setCountry] = useState("");
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([{ name: "", email: "", phone: "" }]);
   const [agreementDocumentUrl, setAgreementDocumentUrl] = useState<string | null>(null);
+  const [idProofUrl, setIdProofUrl] = useState<string | null>(null);
+  const [addressProofUrl, setAddressProofUrl] = useState<string | null>(null);
+  const [userFiles, setUserFiles] = useState<{ name?: string; url?: string }[]>([]);
   const [activity, setActivity] = useState<ActivityRow[]>([]);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -85,6 +88,10 @@ export default function ProfileSettingsPageInner() {
         setAgreementDocumentUrl(
           typeof user.agreementDocumentUrl === "string" ? user.agreementDocumentUrl : null,
         );
+        setIdProofUrl(typeof user.idProofUrl === "string" ? user.idProofUrl : null);
+        setAddressProofUrl(typeof user.addressProofUrl === "string" ? user.addressProofUrl : null);
+        const files = user.userFiles;
+        setUserFiles(Array.isArray(files) ? (files as { name?: string; url?: string }[]) : []);
         setProfilePhotoUrl(
           typeof user.profilePhotoUrl === "string" && user.profilePhotoUrl.trim()
             ? user.profilePhotoUrl.trim()
@@ -461,20 +468,12 @@ export default function ProfileSettingsPageInner() {
         </section>
       </form>
 
-      {agreementDocumentUrl ? (
-        <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-          <h3 className="mb-2 font-semibold text-gray-900 dark:text-gray-100">Files</h3>
-          <a
-            href={resolveDocumentHref(agreementDocumentUrl)}
-            target="_blank"
-            rel="noreferrer"
-            download
-            className="text-sm text-blue-600 hover:underline dark:text-blue-400"
-          >
-            Download signed agreement
-          </a>
-        </section>
-      ) : null}
+      <UserFilesSection
+        agreementDocumentUrl={agreementDocumentUrl}
+        idProofUrl={idProofUrl}
+        addressProofUrl={addressProofUrl}
+        userFiles={userFiles}
+      />
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
         <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Activity log</h3>

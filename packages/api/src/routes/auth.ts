@@ -262,6 +262,7 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
       bankDetails: true,
       idProofUrl: true,
       addressProofUrl: true,
+      userFiles: true,
       additionalRoles: true,
     },
   });
@@ -292,6 +293,7 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
         bankDetails: user.bankDetails ?? null,
         idProofUrl: user.idProofUrl,
         addressProofUrl: user.addressProofUrl,
+        userFiles: Array.isArray(user.userFiles) ? user.userFiles : [],
         profilePhotoUrl: user.profilePhotoUrl ?? null,
         additionalRoles: Array.isArray(user.additionalRoles)
           ? (user.additionalRoles as string[]).filter((r) => typeof r === "string")

@@ -66,8 +66,42 @@ router.post("/contacts/:contactId/create-user", async (req: AuthRequest, res) =>
     if (!contact) return res.status(404).json({ error: "Contact not found" });
 
     const email = contact.email.trim().toLowerCase();
+    const mappedUser = await prisma.adminUser.findFirst({
+      where: { mappedClientContactId: contact.id },
+      select: { id: true, email: true },
+    });
+    if (mappedUser) {
+      return res.json({
+        data: {
+          adminUserId: mappedUser.id,
+          email: mappedUser.email,
+          alreadyExists: true,
+        },
+      });
+    }
+
     const existing = await prisma.adminUser.findUnique({ where: { email } });
     if (existing) {
+      if (existing.mappedClientContactId && existing.mappedClientContactId !== contact.id) {
+        return res.status(409).json({
+          error: "A user with this email exists but is mapped to a different contact",
+        });
+      }
+      if (!existing.mappedClientContactId) {
+        const updated = await prisma.adminUser.update({
+          where: { id: existing.id },
+          data: { mappedClientContactId: contact.id, role: "client" },
+          select: { id: true, email: true },
+        });
+        return res.json({
+          data: {
+            adminUserId: updated.id,
+            email: updated.email,
+            alreadyExists: true,
+            linkedContact: true,
+          },
+        });
+      }
       return res.json({
         data: {
           adminUserId: existing.id,
@@ -91,6 +125,7 @@ router.post("/contacts/:contactId/create-user", async (req: AuthRequest, res) =>
         passwordHash,
         passwordNeedsReset: true,
         mfaEnabled: false,
+        mappedClientContactId: contact.id,
       },
     });
 
@@ -211,14 +246,18 @@ router.get("/:id", async (req, res) => {
     });
     if (!row) return res.status(404).json({ error: "Not found" });
 
-    const emails = row.contacts.map((c) => c.email.trim().toLowerCase());
-    const users = emails.length
+    const contactIds = row.contacts.map((c) => c.id);
+    const users = contactIds.length
       ? await prisma.adminUser.findMany({
-          where: { email: { in: emails } },
-          select: { id: true, email: true },
+          where: { mappedClientContactId: { in: contactIds } },
+          select: { id: true, mappedClientContactId: true },
         })
       : [];
-    const userByEmail = new Map(users.map((u) => [u.email.toLowerCase(), u.id]));
+    const userByContactId = new Map(
+      users
+        .filter((u) => u.mappedClientContactId)
+        .map((u) => [u.mappedClientContactId as string, u.id]),
+    );
 
     const data = serializeClient(row);
     const contacts = (row.contacts as Array<{
@@ -237,7 +276,7 @@ router.get("/:id", async (req, res) => {
       phoneCountryCode: c.phoneCountryCode,
       phoneNumber: c.phoneNumber,
       order: c.order,
-      adminUserId: userByEmail.get(c.email.trim().toLowerCase()) ?? null,
+      adminUserId: userByContactId.get(c.id) ?? null,
     }));
 
     res.json({ data: { ...data, contacts } });
