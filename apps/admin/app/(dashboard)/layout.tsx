@@ -202,12 +202,14 @@ function groupIsActive(group: NavGroup, pathname: string): boolean {
     group.id === "project_management" &&
     (pathname.startsWith("/projects") ||
       pathname.startsWith("/timesheets") ||
-      pathname.startsWith("/agreement") ||
-      pathname.startsWith("/support-tickets"))
+      pathname.startsWith("/agreement"))
   ) {
     return true;
   }
-  if (group.id === "workspace" && pathname.startsWith("/workspace")) {
+  if (
+    group.id === "workspace" &&
+    (pathname.startsWith("/workspace") || pathname.startsWith("/support-tickets"))
+  ) {
     return true;
   }
   return group.items.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
