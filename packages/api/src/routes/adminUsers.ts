@@ -50,6 +50,10 @@ const updateSchema = z.object({
   country: z.string().max(100).optional().nullable(),
   emergencyContacts: z.array(emergencyContactSchema).max(5).optional(),
   mappedClientContactId: z.string().min(1).optional().nullable(),
+  userFiles: z
+    .array(z.object({ name: z.string().min(1).max(500), url: z.string().min(1).max(2000) }))
+    .max(50)
+    .optional(),
 });
 
 const listSelect = {
@@ -426,6 +430,14 @@ router.put("/:id", async (req: AuthRequest, res) => {
       if (data.password) {
         updateData.passwordHash = await bcrypt.hash(data.password, 10);
         await logField("password", "(hidden)", "(updated)");
+      }
+      if (data.userFiles !== undefined) {
+        const oldJson = JSON.stringify(existing.userFiles ?? []);
+        const newJson = JSON.stringify(data.userFiles);
+        if (oldJson !== newJson) {
+          updateData.userFiles = data.userFiles;
+          await logField("userFiles", oldJson, newJson);
+        }
       }
       if (
         data.mappedClientContactId !== undefined ||

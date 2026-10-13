@@ -245,7 +245,7 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
                   if (!e.target.checked) setRequireStartDate(false);
                 }}
               />
-              Collect start date when generating credentials
+              Collect start date
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <input
@@ -265,7 +265,7 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
                   if (!e.target.checked) setRequireEndDate(false);
                 }}
               />
-              Collect end date when generating credentials
+              Collect end date
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <input

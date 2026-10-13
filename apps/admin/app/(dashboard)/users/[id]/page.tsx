@@ -8,7 +8,7 @@ import { adminFetch } from "@/lib/admin-api";
 import { formatRolesLabel } from "@/lib/admin-roles";
 import { AdminRolesMultiSelect, rolesFromApi, rolesToApi } from "@/components/users/AdminRolesMultiSelect";
 import { MappedClientContactSelect } from "@/components/users/MappedClientContactSelect";
-import { UserFilesSection } from "@/components/users/UserFilesSection";
+import { AdminUserFilesField, type UserFileRow } from "@/components/users/AdminUserFilesField";
 import { UserPhotoField } from "@/components/users/UserPhotoField";
 import { UserAssignCredentialsModal } from "@/components/users/UserAssignCredentialsModal";
 import type { AdminRole } from "@/lib/admin-roles";
@@ -73,6 +73,7 @@ export default function EditUserPage() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([{ name: "", email: "", phone: "" }]);
   const [mappedClientContactId, setMappedClientContactId] = useState("");
+  const [userFiles, setUserFiles] = useState<UserFileRow[]>([]);
 
   async function load() {
     try {
@@ -85,6 +86,16 @@ export default function EditUserPage() {
       setDefaults(row);
       setRoles(rolesFromApi(row.role, row.additionalRoles));
       setMappedClientContactId(row.mappedClientContactId ?? "");
+      setUserFiles(
+        Array.isArray(row.userFiles)
+          ? row.userFiles
+              .filter((f) => f && typeof f.url === "string" && f.url.trim())
+              .map((f) => ({
+                name: typeof f.name === "string" && f.name.trim() ? f.name.trim() : "File",
+                url: f.url!.trim(),
+              }))
+          : [],
+      );
       setPhotoUrl(row.profilePhotoUrl);
       if (Array.isArray(row.emergencyContacts) && row.emergencyContacts.length) {
         setEmergencyContacts(row.emergencyContacts);
@@ -125,6 +136,7 @@ export default function EditUserPage() {
       country: String(formData.get("country") ?? "").trim() || null,
       emergencyContacts: emergencyContacts.filter((row) => row.name.trim()),
       mappedClientContactId: roles.includes("client") ? mappedClientContactId || null : null,
+      userFiles,
     };
     if (password) body.password = password;
 
@@ -336,12 +348,7 @@ export default function EditUserPage() {
           </button>
         </section>
 
-        <UserFilesSection
-          agreementDocumentUrl={defaults.agreementDocumentUrl}
-          idProofUrl={defaults.idProofUrl}
-          addressProofUrl={defaults.addressProofUrl}
-          userFiles={defaults.userFiles}
-        />
+        <AdminUserFilesField files={userFiles} onChange={setUserFiles} />
 
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
           <h3 className="mb-4 font-semibold">Activity log</h3>

@@ -127,7 +127,7 @@ export async function logProjectFieldChanges(
       data: {
         projectId,
         action: "FIELD_UPDATED",
-        fieldName: field,
+        fieldName: PROJECT_FIELD_LABELS[field] ?? field,
         oldValue: formatFieldValue(field, oldRaw, context),
         newValue: formatFieldValue(field, newRaw, context),
         performedById,

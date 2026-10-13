@@ -21,18 +21,45 @@ function formatActivityDate(value: string) {
   });
 }
 
+const LEGACY_FIELD_LABELS: Record<string, string> = {
+  title: "Title",
+  description: "Description",
+  clientId: "Client",
+  kind: "Project type",
+  status: "Status",
+  projectManagerId: "Project manager",
+  contractId: "Contract",
+  startDate: "Start date",
+  endDate: "End date",
+};
+
+function humanizeFieldName(fieldName: string | null): string | null {
+  if (!fieldName) return null;
+  if (LEGACY_FIELD_LABELS[fieldName]) return LEGACY_FIELD_LABELS[fieldName];
+  if (/^[a-z]+([A-Z][a-z]*)*$/.test(fieldName) || fieldName === fieldName.toLowerCase()) {
+    return LEGACY_FIELD_LABELS[fieldName] ?? fieldName;
+  }
+  return fieldName;
+}
+
 function formatAction(log: ActivityLog): string {
   switch (log.action) {
     case "CREATED":
       return "Project created";
     case "UPDATED":
       return "Project updated";
-    case "FIELD_UPDATED":
-      return log.fieldName ? `${log.fieldName} updated` : "Field updated";
+    case "FIELD_UPDATED": {
+      const label = humanizeFieldName(log.fieldName);
+      return label ? `${label} updated` : "Field updated";
+    }
+    case "MEMBER_ADDED":
+      return log.newValue ? `Member added (${log.newValue})` : "Member added";
     case "CREDENTIALS_GENERATED":
       return `Credentials generated for ${log.newValue ?? "member"}`;
-    default:
-      return log.action.replaceAll("_", " ");
+    default: {
+      const text = log.action.replaceAll("_", " ").toLowerCase();
+      return text.charAt(0).toUpperCase() + text.slice(1);
+    }
   }
 }
 

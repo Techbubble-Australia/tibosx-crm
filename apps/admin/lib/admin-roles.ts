@@ -313,14 +313,23 @@ export function formatRolesLabel(primary: string, additional?: string[] | null):
   return labels.length ? labels.join(", ") : roleLabel(primary);
 }
 
+/** Post-login landing route (relative TBOS path or absolute support portal URL for clients). */
 export function defaultLandingPath(role: string): string {
-  if (role === "client") return "/settings/security";
-  if (canAccessWorkspace(role)) return "/support-tickets";
-  if (canAccessRecruitment(role)) return "/database/dashboard";
-  if (canAccessProjectManagement(role)) {
-    return canManageProjects(role) ? "/projects" : "/timesheets";
+  if (role === "client") {
+    const base = (process.env.NEXT_PUBLIC_TICKETING_PORTAL_URL || "http://localhost:3004").replace(
+      /\/$/,
+      "",
+    );
+    return `${base.replace(/\/login$/i, "")}/login`;
   }
-  if (canAccessWebsite(role)) return "/pages";
-  if (canAccessSales(role)) return "/clients/active";
-  return "/settings/security";
+  if (role === "customer_support") return "/support-tickets";
+  if (role === "admin" || role === "sales") return "/sales/dashboard";
+  if (role === "recruiter_admin" || role === "recruiter") return "/database/dashboard";
+  if (role === "website") return "/pages";
+  if (role === "project_manager" || role === "project_member") return "/projects";
+  return "/sales/dashboard";
+}
+
+export function isExternalLandingPath(path: string): boolean {
+  return /^https?:\/\//i.test(path);
 }

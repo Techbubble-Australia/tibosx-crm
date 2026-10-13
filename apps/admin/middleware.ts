@@ -6,7 +6,7 @@ import {
   MFA_SETUP_REQUIRED_PURPOSE,
   PASSWORD_RESET_REQUIRED_PURPOSE,
 } from "@/lib/auth-constants";
-import { defaultLandingPath } from "@/lib/admin-roles";
+import { defaultLandingPath, isExternalLandingPath } from "@/lib/admin-roles";
 
 function jwtSecretKey() {
   return new TextEncoder().encode(
@@ -33,6 +33,9 @@ function isSessionAuthPath(pathname: string): boolean {
 }
 
 function redirectTo(request: NextRequest, pathname: string) {
+  if (isExternalLandingPath(pathname)) {
+    return NextResponse.redirect(pathname);
+  }
   return NextResponse.redirect(new URL(pathname, request.url));
 }
 
