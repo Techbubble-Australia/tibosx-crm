@@ -36,6 +36,7 @@ import {
   syncProfileAvailableFlag,
 } from "../lib/contract-profiles";
 import { createProjectFromContract } from "../lib/create-project-from-contract";
+import { toNumber, toNumberOrNull } from "../lib/decimal";
 
 const router: IRouter = Router();
 
@@ -138,10 +139,6 @@ const moveToDraftSchema = z
       });
     }
   });
-
-function toNumber(value: { toString(): string } | number): number {
-  return typeof value === "number" ? value : Number(value.toString());
-}
 
 function computeRemaining(contractValue: number, totalVariation: number, consumed: number): number {
   return contractValue + totalVariation - consumed;
@@ -609,7 +606,7 @@ function serializeContract(row: {
   startDate: Date;
   endDate: Date | null;
   unit: string | null;
-  numberOfUnits: number | null;
+  numberOfUnits: { toString(): string } | number | null;
   currency: string;
   rate: { toString(): string } | number;
   contractValue: { toString(): string } | number;
@@ -628,7 +625,7 @@ function serializeContract(row: {
     variationDate: Date;
     variationEndDate: Date | null;
     comments: string;
-    qty?: number | null;
+    qty?: { toString(): string } | number | null;
     unit: string | null;
     rate: { toString(): string } | number | null;
     variationValue: { toString(): string } | number;
@@ -652,7 +649,7 @@ function serializeContract(row: {
     status: string;
     currency: string;
     description: string;
-    qty: number;
+    qty: { toString(): string } | number;
     rate: { toString(): string } | number;
     amount: { toString(): string } | number;
     taxRate: { toString(): string } | number;
@@ -678,7 +675,7 @@ function serializeContract(row: {
     segmentKey: string;
     year: number;
     month: number;
-    workUnits: number;
+    workUnits: { toString(): string } | number;
   }>;
   contractProfiles?: Array<{
     id: string;
@@ -1251,7 +1248,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
     const financials = resolveContractFinancials(nextType, {
       unit: mergedUnit,
       numberOfUnits:
-        data.numberOfUnits !== undefined ? data.numberOfUnits : existing.numberOfUnits,
+        data.numberOfUnits !== undefined ? data.numberOfUnits : toNumberOrNull(existing.numberOfUnits),
       rate: data.rate !== undefined ? data.rate : toNumber(existing.rate),
       contractValue:
         data.contractValue !== undefined ? data.contractValue : toNumber(existing.contractValue),
@@ -1370,7 +1367,7 @@ router.post("/:id/activate", async (req: AuthRequest, res) => {
 
     resolveContractFinancials(existing.type as ContractType, {
       unit: existing.unit,
-      numberOfUnits: existing.numberOfUnits,
+      numberOfUnits: toNumberOrNull(existing.numberOfUnits),
       rate: toNumber(existing.rate),
       contractValue: toNumber(existing.contractValue),
     });
@@ -1973,7 +1970,7 @@ router.patch("/:id/invoices/:invoiceId", async (req, res) => {
       return res.json({ data: serializeInvoice(row) });
     }
 
-    const qty = body.qty ?? invoice.qty;
+    const qty = body.qty ?? toNumber(invoice.qty);
     const rate = body.rate != null ? body.rate : toNumber(invoice.rate);
     const taxRate = body.taxRate != null ? body.taxRate : toNumber(invoice.taxRate);
     const { amount, taxAmount, totalAmount } = computeInvoiceAmounts(qty, rate, taxRate);

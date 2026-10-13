@@ -1,5 +1,6 @@
 import { prisma, type Prisma } from "@techbubble/database";
 import { ensureSupportOrganizationForProject } from "./support-organization";
+import { toNumber } from "./decimal";
 
 type WorkUnitRow = { year: number; month: number; workUnits: number };
 type MilestoneRow = { milestoneDate: Date; amount: Prisma.Decimal | number };
@@ -110,7 +111,7 @@ export async function createProjectFromContract(
   const segmentKey = variationId ?? "base";
   const workUnitMonths = contract.workUnitMonths
     .filter((row) => row.segmentKey === segmentKey)
-    .map((row) => ({ year: row.year, month: row.month, workUnits: row.workUnits }));
+    .map((row) => ({ year: row.year, month: row.month, workUnits: toNumber(row.workUnits) }));
 
   const rateOverride = variation?.rate
     ? Number(variation.rate.toString())

@@ -183,14 +183,14 @@ router.get("/stats", async (req, res) => {
       clientCountry: row.client.country,
       workUnitMonths: row.workUnitMonths
         .filter((w) => w.segmentKey === "base")
-        .map((w) => ({ year: w.year, month: w.month, workUnits: w.workUnits })),
+        .map((w) => ({ year: w.year, month: w.month, workUnits: toNumber(w.workUnits) })),
       variations: row.variations.map((v) => ({
         variationDate: v.variationDate,
         variationEndDate: v.variationEndDate,
         rate: v.rate == null ? null : toNumber(v.rate),
         workUnitMonths: row.workUnitMonths
           .filter((w) => w.segmentKey === v.id)
-          .map((w) => ({ year: w.year, month: w.month, workUnits: w.workUnits })),
+          .map((w) => ({ year: w.year, month: w.month, workUnits: toNumber(w.workUnits) })),
       })),
       milestones: row.milestones.map((m) => ({
         milestoneDate: m.milestoneDate,

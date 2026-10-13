@@ -6,5 +6,6 @@ export function formatZodError(error: z.ZodError): string {
     const path = e.path.length > 0 ? `${e.path.join(".")}: ` : "";
     return `${path}${e.message}`;
   });
-  return parts.length === 1 ? parts[0] : parts.join(" · ");
+  if (parts.length === 0) return "Validation error";
+  return parts.length === 1 ? parts[0]! : parts.join(" · ");
 }

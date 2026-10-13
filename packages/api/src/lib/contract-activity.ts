@@ -231,7 +231,7 @@ export function contractSnapshotFromRow(row: {
   startDate: Date;
   endDate: Date | null;
   unit: string | null;
-  numberOfUnits: number | null;
+  numberOfUnits: { toString(): string } | number | null;
   currency: string;
   rate: { toString(): string } | number;
   contractValue: { toString(): string } | number;
@@ -246,7 +246,7 @@ export function contractSnapshotFromRow(row: {
     startDate: row.startDate,
     endDate: row.endDate,
     unit: row.unit,
-    numberOfUnits: row.numberOfUnits,
+    numberOfUnits: row.numberOfUnits == null ? null : toNumber(row.numberOfUnits),
     currency: row.currency,
     rate: row.rate,
     contractValue: row.contractValue,
