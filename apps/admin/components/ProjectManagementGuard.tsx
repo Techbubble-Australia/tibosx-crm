@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { defaultLandingPath } from "@/lib/admin-roles";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 
 type Props = {
@@ -10,19 +11,19 @@ type Props = {
 };
 
 export function ProjectManagementGuard({ children, requireManageProjects = false }: Props) {
-  const { canAccessProjectManagement, canManageProjects, loading } = useAdminSession();
+  const { canAccessProjectManagement, canManageProjects, loading, role } = useAdminSession();
   const router = useRouter();
 
   useEffect(() => {
     if (loading) return;
     if (!canAccessProjectManagement) {
-      router.replace("/settings/security");
+      router.replace(defaultLandingPath(role));
       return;
     }
     if (requireManageProjects && !canManageProjects) {
       router.replace("/timesheets");
     }
-  }, [canAccessProjectManagement, canManageProjects, loading, requireManageProjects, router]);
+  }, [canAccessProjectManagement, canManageProjects, loading, requireManageProjects, role, router]);
 
   if (loading) {
     return (

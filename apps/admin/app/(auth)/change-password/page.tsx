@@ -41,7 +41,7 @@ export default function ChangePasswordPage() {
   return (
     <AuthPageShell
       title="Change your password"
-      subtitle="Choose a new password before you continue to TIBOSX.AI."
+      subtitle="Choose a new password before you continue."
     >
       {error ? (
         <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-950/40 dark:text-red-300">

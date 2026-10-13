@@ -19,9 +19,23 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     void ticketingFetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data) => setUser(data.data as Me))
-      .catch(() => setUser(null));
+      .then((res) => {
+        if (!res.ok) {
+          window.location.assign("/login");
+          return null;
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (!data?.data) {
+          window.location.assign("/login");
+          return;
+        }
+        setUser(data.data as Me);
+      })
+      .catch(() => {
+        window.location.assign("/login");
+      });
   }, []);
 
   if (!user) {

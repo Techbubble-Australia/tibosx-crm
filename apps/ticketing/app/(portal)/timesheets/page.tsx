@@ -185,14 +185,10 @@ export default function ClientTimesheetsPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold text-slate-900">Timesheets</h1>
-            <p className="mt-1 text-sm text-slate-500">Log time against projects and support cases assigned to you.</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Approve timesheets against projects and support cases.
+            </p>
           </div>
-          <Link
-            href="/timesheets/new"
-            className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
-          >
-            New timesheet
-          </Link>
         </div>
         {memberRows.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-200 bg-white p-10 text-center text-slate-500">

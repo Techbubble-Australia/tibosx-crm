@@ -70,6 +70,13 @@ function SecuritySettingsPage() {
     void loadStatus();
   }, []);
 
+  useEffect(() => {
+    if (isLoading || !status) return;
+    if (!status.mfaEnabled) {
+      window.location.assign("/mfa-setup");
+    }
+  }, [isLoading, status]);
+
   async function disableMfa(e: React.FormEvent) {
     e.preventDefault();
     setIsSubmitting(true);

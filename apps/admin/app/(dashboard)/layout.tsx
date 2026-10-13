@@ -124,7 +124,7 @@ const navGroups: NavGroup[] = [
     id: "settings",
     label: "Settings",
     icon: Settings,
-    roles: ["admin", "recruiter_admin", "recruiter", "sales", "website", "customer_support", "client", "project_manager", "project_member"],
+    roles: ["admin"],
     items: [
       { href: "/settings/categories", label: "Category", icon: Layers, roles: ["admin", "website"] },
       { href: "/settings/technologies", label: "Technology", icon: Cpu, roles: ["admin", "website"] },
@@ -132,7 +132,7 @@ const navGroups: NavGroup[] = [
       { href: "/settings/levels", label: "Level", icon: Target, roles: ["admin", "website"] },
       { href: "/settings/templates", label: "Templates", icon: FileCode, roles: ["admin"] },
       { href: "/settings/groups", label: "Groups", icon: Users, roles: ["admin"] },
-      { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin", "recruiter_admin", "recruiter", "sales", "website", "project_manager", "project_member", "customer_support", "client"] },
+      { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin"] },
       { href: "/users", label: "Users", icon: UserCircle, roles: ["admin"] },
     ],
   },

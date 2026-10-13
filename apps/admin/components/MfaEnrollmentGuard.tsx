@@ -17,11 +17,11 @@ export function MfaEnrollmentGuard({ children }: { children: React.ReactNode }) 
       .then((data) => {
         const user = data?.data?.user;
         if (user?.passwordNeedsReset === true) {
-          router.replace("/change-password");
+          window.location.assign("/change-password");
           return;
         }
         if (user?.mfaEnabled === false) {
-          router.replace("/mfa-setup");
+          window.location.assign("/mfa-setup");
           return;
         }
         setAllowed(true);

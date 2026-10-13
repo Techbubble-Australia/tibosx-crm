@@ -120,6 +120,12 @@ export async function middleware(request: NextRequest) {
       return redirectTo(request, MFA_SETUP_PATH);
     }
 
+    const role = typeof payload.role === "string" ? payload.role : "website";
+
+    if (role === "client" && !purpose) {
+      return redirectTo(request, defaultLandingPath("client"));
+    }
+
     if (pathname.startsWith("/settings/security")) {
       const mfa = request.nextUrl.searchParams.get("mfa");
       const reset = request.nextUrl.searchParams.get("reset");
@@ -129,6 +135,14 @@ export async function middleware(request: NextRequest) {
       if (reset === "required") {
         return redirectTo(request, CHANGE_PASSWORD_PATH);
       }
+    }
+
+    if (
+      pathname.startsWith("/settings") &&
+      !pathname.startsWith("/settings/profile") &&
+      role !== "admin"
+    ) {
+      return redirectTo(request, defaultLandingPath(role));
     }
 
     return NextResponse.next();

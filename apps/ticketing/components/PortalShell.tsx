@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { ClipboardCheck, LayoutDashboard, LifeBuoy, Plus, Ticket } from "lucide-react";
 import { UserAccountMenu } from "@/components/UserAccountMenu";
 
@@ -45,13 +45,12 @@ export function PortalShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const isConsultant = user.role === "CONSULTANT";
   const nav = isConsultant ? consultantNav : clientNav;
 
   async function logout() {
-    await fetch("/api/auth/session", { method: "DELETE" });
-    router.push("/login");
+    await fetch("/api/auth/session", { method: "DELETE", credentials: "include" });
+    window.location.assign("/login");
   }
 
   return (

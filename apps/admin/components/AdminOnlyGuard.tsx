@@ -2,17 +2,18 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { defaultLandingPath } from "@/lib/admin-roles";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 
 export function AdminOnlyGuard({ children }: { children: React.ReactNode }) {
-  const { canManageUsers, loading } = useAdminSession();
+  const { canManageUsers, loading, role } = useAdminSession();
   const router = useRouter();
 
   useEffect(() => {
     if (!loading && !canManageUsers) {
-      router.replace("/settings/security");
+      router.replace(defaultLandingPath(role));
     }
-  }, [canManageUsers, loading, router]);
+  }, [canManageUsers, loading, role, router]);
 
   if (loading) {
     return (
