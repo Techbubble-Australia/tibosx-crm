@@ -249,7 +249,7 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
                 ))}
               </select>
               <p className="mt-1 text-xs text-gray-500">
-                Client approvers act in the support portal, not TBOS.
+                Client approvers act in the TBOS workspace, not project-management timesheets.
               </p>
             </div>
           ) : null}

@@ -73,7 +73,7 @@ export async function sendTimesheetApprovalRequestEmail(input: {
 }): Promise<void> {
   const resend = getResendClient();
   const subject = `Timesheet awaiting your approval — ${input.memberName}`;
-  const body = `${input.memberName} submitted a timesheet for ${input.targetLabel || "a support project"}.\n\nSign in to the client support portal to approve or reject:\n${input.portalUrl}/timesheets\n`;
+  const body = `${input.memberName} submitted a timesheet for ${input.targetLabel || "a support project"}.\n\nSign in to TBOS to approve or reject:\n${input.portalUrl}\n`;
   if (!resend) {
     console.info("[timesheet-approval-email] RESEND not configured; would send to", input.to, subject);
     return;

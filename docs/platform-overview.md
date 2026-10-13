@@ -4,18 +4,17 @@ This document describes the **public TechBubble website** and **TBOS** (TechBubb
 
 ## Architecture
 
-One product, four user-facing apps sharing a **PostgreSQL** database and **Express API**:
+One product, three user-facing apps sharing a **PostgreSQL** database and **Express API**:
 
 | Piece | Role |
 |--------|------|
 | `apps/web` | Public **TechBubble** marketing site (port 3000) |
-| `apps/admin` | **TBOS** — internal business operating system (port 3002) |
-| `apps/ticketing` | **Client support portal** — tickets for clients and consultants (port 3004) |
-| `packages/api` | REST API, auth, uploads, business logic, support ticketing routes (port 3001) |
+| `apps/admin` | **TBOS** — business operating system (port 3002), including **Support workspace** (`/workspace`) for clients and customer support |
+| `packages/api` | REST API, auth, uploads, business logic, ticketing routes (port 3001) |
 
-TBOS, the support portal, and the website call the API. Staff work in TBOS; visitors use the public site; clients and consultants use the support portal.
+TBOS and the website call the API. Staff and most roles work in TBOS; visitors use the public site; **client** and **customer_support** users use the embedded workspace in TBOS.
 
-See [ticketing-portal.md](./ticketing-portal.md) for support portal setup and deployment.
+See [ticketing-portal.md](./ticketing-portal.md) for support workspace setup and deployment.
 
 ```mermaid
 flowchart LR
@@ -78,7 +77,7 @@ flowchart LR
 ### Project management module
 
 - **Projects** — Linked to contracts/clients; estimates vs actuals; members.
-- **Timesheets** — Entry and approval workflows (by role). Support-project timesheets assigned to a **client contact** are approved in the **client support portal**, not in TBOS.
+- **Timesheets** — Entry and approval workflows (by role). Support-project timesheets assigned to a **client contact** are approved in the TBOS **workspace** (`/workspace/timesheets`), not in project-management timesheets.
 - **Agreement** (project members) — Sign agreements (e.g. contractor templates with signature capture).
 
 ### Recruitment module

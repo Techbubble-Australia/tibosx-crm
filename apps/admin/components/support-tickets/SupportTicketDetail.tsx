@@ -140,27 +140,17 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
         ← All tickets
       </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm text-gray-500">{ticket.ticketNumber}</p>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{ticket.subject}</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {ticket.organization?.name ?? "—"}
-            {ticket.createdBy ? ` · opened by ${ticket.createdBy.name}` : ""}
-          </p>
-          <p className="text-xs text-gray-400">
-            Created {new Date(ticket.createdAt).toLocaleString()} · Updated {new Date(ticket.updatedAt).toLocaleString()}
-            {ticket.closedAt ? ` · Closed ${new Date(ticket.closedAt).toLocaleString()}` : ""}
-          </p>
-        </div>
-        <a
-          href="/api/ticketing/launch"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
-        >
-          Open in portal
-        </a>
+      <div>
+        <p className="text-sm text-gray-500">{ticket.ticketNumber}</p>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{ticket.subject}</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          {ticket.organization?.name ?? "—"}
+          {ticket.createdBy ? ` · opened by ${ticket.createdBy.name}` : ""}
+        </p>
+        <p className="text-xs text-gray-400">
+          Created {new Date(ticket.createdAt).toLocaleString()} · Updated {new Date(ticket.updatedAt).toLocaleString()}
+          {ticket.closedAt ? ` · Closed ${new Date(ticket.closedAt).toLocaleString()}` : ""}
+        </p>
       </div>
 
       <section className="grid gap-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 sm:grid-cols-2 lg:grid-cols-4">

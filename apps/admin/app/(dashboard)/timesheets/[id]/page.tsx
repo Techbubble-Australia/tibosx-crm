@@ -207,7 +207,7 @@ export default function TimesheetDetailPage() {
           <div className="mb-6 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">
             Waiting for client approval
             {timesheet.approverLabel ? ` (${timesheet.approverLabel})` : ""} in the{" "}
-            <strong>client support portal</strong> (Timesheet approvals). PM approve/reject is disabled for this submission.
+            <strong>TBOS workspace</strong> (Timesheet approvals). PM approve/reject is disabled for this submission.
           </div>
         ) : null}
 

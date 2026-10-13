@@ -1,13 +1,6 @@
 import { prisma } from "@techbubble/database";
 import { sendTimesheetApprovalRequestEmail } from "./mail";
-
-function portalBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_TICKETING_PORTAL_URL ||
-    process.env.TICKETING_PUBLIC_URL ||
-    "http://localhost:3004"
-  ).replace(/\/$/, "");
-}
+import { workspaceTimesheetsUrl } from "./tbos-public-url";
 
 /** Notify client contact approver after a timesheet is submitted for their review. */
 export async function notifyClientApproverOfSubmittedTimesheet(timesheetId: string) {
@@ -51,7 +44,7 @@ export async function notifyClientApproverOfSubmittedTimesheet(timesheetId: stri
       to,
       memberName,
       targetLabel,
-      portalUrl: portalBaseUrl(),
+      portalUrl: workspaceTimesheetsUrl(),
     });
   } catch (err) {
     console.error("Timesheet approval request email failed:", to, err);

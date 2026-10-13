@@ -43,7 +43,7 @@ export function ProjectSupportPortalCard({
     <section className="mb-6 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
       <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Support portal</h3>
       <p className="mt-1 text-sm text-gray-500">
-        Link this delivery project to a support portal project so clients and consultants can open tickets.
+        Link this delivery project to a support organization so clients and consultants can open tickets in TBOS workspace.
       </p>
       {supportOrganizationId ? (
         <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
