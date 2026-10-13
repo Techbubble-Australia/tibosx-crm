@@ -59,11 +59,11 @@ export const ROLE_META: Record<AdminRole, { label: string; description: string }
   },
   customer_support: {
     label: "Customer support",
-    description: "Workspace module — support tickets and client case management.",
+    description: "TBOS workspace — dashboard, tickets, and consultant timesheets.",
   },
   client: {
     label: "Client",
-    description: "Support portal access for end clients (no TBOS modules).",
+    description: "Workspace in TBOS — tickets and timesheet approvals (no other TBOS modules).",
   },
 };
 
@@ -73,7 +73,7 @@ const MODULE_ROLE_MAP: Record<TbModule, readonly AdminRole[]> = {
   sales: ["admin", "sales"],
   users: ["admin"],
   project_management: ["admin", "project_manager", "project_member"],
-  workspace: ["admin", "customer_support"],
+  workspace: ["admin", "customer_support", "client"],
 };
 
 const denyAllExceptSecurity: Record<AdminRole, boolean> = {
@@ -85,7 +85,7 @@ const denyAllExceptSecurity: Record<AdminRole, boolean> = {
   project_manager: true,
   project_member: true,
   customer_support: true,
-  client: false,
+  client: true,
 };
 
 export const ROLE_PERMISSIONS: RolePermission[] = [
@@ -152,7 +152,7 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
     project_manager: false,
     project_member: false,
     customer_support: true,
-    client: false,
+    client: true,
   },
   {
     id: "users",
@@ -169,7 +169,7 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
   },
   {
     id: "support_portal",
-    label: "Support portal (client ticketing)",
+    label: "Workspace (dashboard, tickets, timesheets)",
     admin: true,
     recruiter_admin: false,
     recruiter: false,
@@ -220,7 +220,7 @@ export function anyEffectiveRole(
 
 export function canAccessModule(role: string, module: TbModule): boolean {
   if (!isAdminRole(role)) return false;
-  if (role === "client") return false;
+  if (role === "client") return module === "workspace";
   return MODULE_ROLE_MAP[module].includes(role);
 }
 
@@ -313,16 +313,9 @@ export function formatRolesLabel(primary: string, additional?: string[] | null):
   return labels.length ? labels.join(", ") : roleLabel(primary);
 }
 
-/** Post-login landing route (relative TBOS path or absolute support portal URL for clients). */
+/** Post-login landing route (relative TBOS path). */
 export function defaultLandingPath(role: string): string {
-  if (role === "client") {
-    const base = (process.env.NEXT_PUBLIC_TICKETING_PORTAL_URL || "http://localhost:3004").replace(
-      /\/$/,
-      "",
-    );
-    return `${base.replace(/\/login$/i, "")}/login`;
-  }
-  if (role === "customer_support") return "/support-tickets";
+  if (role === "client" || role === "customer_support") return "/workspace/dashboard";
   if (role === "admin" || role === "sales") return "/sales/dashboard";
   if (role === "recruiter_admin" || role === "recruiter") return "/database/dashboard";
   if (role === "website") return "/pages";

@@ -12,6 +12,7 @@ import { effectiveRolesForUser, hasEffectiveRole } from "../lib/admin-roles";
 import { getMemberOnboardingStatus } from "../lib/member-onboarding";
 import { notifyClientApproverOfSubmittedTimesheet } from "../lib/timesheet-client-approval";
 import { mondayOfWeek, sundayOfWeek, TIMESHEET_STATUSES, TIMESHEET_STATUS_LABELS } from "../lib/project-types";
+import { formatZodError } from "../lib/zod-error";
 
 const router: IRouter = Router();
 
@@ -472,7 +473,7 @@ router.post("/", async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Complete your profile before creating timesheets" });
     }
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: "Validation error", details: error.errors });
+      return res.status(400).json({ error: formatZodError(error), details: error.errors });
     }
     console.error("Error creating timesheet:", error);
     res.status(500).json({ error: "Failed to create timesheet" });
@@ -527,7 +528,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Complete your profile before editing timesheets" });
     }
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: "Validation error", details: error.errors });
+      return res.status(400).json({ error: formatZodError(error), details: error.errors });
     }
     console.error("Error updating timesheet:", error);
     res.status(500).json({ error: "Failed to update timesheet" });
@@ -658,7 +659,7 @@ router.post("/submit", async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Complete your profile before submitting timesheets" });
     }
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: "Validation error", details: error.errors });
+      return res.status(400).json({ error: formatZodError(error), details: error.errors });
     }
     console.error("Error submitting timesheets:", error);
     res.status(500).json({ error: "Failed to submit timesheets" });
@@ -759,7 +760,7 @@ router.post("/:id/reject", async (req: AuthRequest, res) => {
     res.json({ data: detail ? mapDetail(detail) : null });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: "Validation error", details: error.errors });
+      return res.status(400).json({ error: formatZodError(error), details: error.errors });
     }
     console.error("Error rejecting timesheet:", error);
     res.status(500).json({ error: "Failed to reject timesheet" });

@@ -122,8 +122,21 @@ export async function middleware(request: NextRequest) {
 
     const role = typeof payload.role === "string" ? payload.role : "website";
 
-    if (role === "client" && !purpose) {
-      return redirectTo(request, defaultLandingPath("client"));
+    if (
+      (role === "client" || role === "customer_support") &&
+      !purpose &&
+      pathname === "/"
+    ) {
+      return redirectTo(request, defaultLandingPath(role));
+    }
+
+    if (
+      (role === "client" || role === "customer_support") &&
+      !purpose &&
+      !pathname.startsWith("/workspace") &&
+      !pathname.startsWith("/settings/profile")
+    ) {
+      return redirectTo(request, defaultLandingPath(role));
     }
 
     if (pathname.startsWith("/settings/security")) {

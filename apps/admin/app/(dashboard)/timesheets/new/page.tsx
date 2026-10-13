@@ -8,6 +8,7 @@ import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
 import { TimesheetForm } from "@/components/timesheets/TimesheetForm";
+import { messageFromApiError } from "@/lib/api-error";
 
 export default function NewTimesheetPage() {
   const router = useRouter();
@@ -29,7 +30,7 @@ export default function NewTimesheetPage() {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to create timesheet");
+      if (!res.ok) throw new Error(messageFromApiError(data, "Failed to create timesheet"));
       const created = data.data as { id: string };
       router.push(`/timesheets/${created.id}`);
     } catch (error) {

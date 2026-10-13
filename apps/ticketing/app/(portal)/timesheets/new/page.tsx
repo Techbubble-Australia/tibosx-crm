@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { ticketingFetch } from "@/lib/ticketing-fetch";
+import { messageFromApiError } from "@/lib/api-error";
 
 type Target = { kind: "project" | "ticket"; id: string; label: string };
 
@@ -71,7 +72,7 @@ export default function NewMemberTimesheetPage() {
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save");
+      if (!res.ok) throw new Error(messageFromApiError(data, "Failed to save"));
       router.push("/timesheets");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");

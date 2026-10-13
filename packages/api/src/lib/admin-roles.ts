@@ -24,7 +24,7 @@ const MODULE_ROLE_MAP: Record<TbModule, readonly AdminRole[]> = {
   sales: ["admin", "sales"],
   users: ["admin"],
   project_management: ["admin", "project_manager", "project_member"],
-  workspace: ["admin", "customer_support"],
+  workspace: ["admin", "customer_support", "client"],
 };
 
 export function isAdminRole(value: string): value is AdminRole {

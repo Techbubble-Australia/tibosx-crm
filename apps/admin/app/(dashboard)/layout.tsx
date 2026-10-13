@@ -32,9 +32,10 @@ import {
   FolderKanban,
   FileCode,
   ClipboardCheck,
+  Ticket,
 } from "lucide-react";
 import { UserAccountMenu } from "@/components/UserAccountMenu";
-import { anyEffectiveRole } from "@/lib/admin-roles";
+import { anyEffectiveRole, defaultLandingPath } from "@/lib/admin-roles";
 import { AdminSessionProvider, useAdminSession } from "@/contexts/AdminSessionContext";
 import { MfaEnrollmentGuard } from "@/components/MfaEnrollmentGuard";
 import { MemberOnboardingGuard } from "@/components/MemberOnboardingGuard";
@@ -87,11 +88,14 @@ const navGroups: NavGroup[] = [
   },
   {
     id: "workspace",
-    label: "Workspace",
+    label: "Support",
     icon: ClipboardList,
-    roles: ["admin", "customer_support"],
+    roles: ["admin", "customer_support", "client"],
     items: [
-      { href: "/support-tickets", label: "Support tickets", icon: ClipboardList, roles: ["admin", "customer_support"] },
+      { href: "/workspace/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["customer_support", "client"] },
+      { href: "/workspace/tickets", label: "Tickets", icon: Ticket, roles: ["customer_support", "client"] },
+      { href: "/workspace/timesheets", label: "Timesheets", icon: ClipboardCheck, roles: ["customer_support", "client"] },
+      { href: "/support-tickets", label: "Support tickets", icon: ClipboardList, roles: ["admin"] },
     ],
   },
   {
@@ -141,6 +145,13 @@ const navGroups: NavGroup[] = [
 function headerTitle(pathname: string): string {
   if (pathname.startsWith("/settings/profile")) {
     return "My profile";
+  }
+  if (pathname.startsWith("/workspace")) {
+    if (pathname.startsWith("/workspace/tickets/new")) return "New ticket";
+    if (pathname.startsWith("/workspace/tickets/")) return "Ticket";
+    if (pathname.startsWith("/workspace/tickets")) return "Tickets";
+    if (pathname.startsWith("/workspace/timesheets")) return "Timesheets";
+    return "Dashboard";
   }
   if (pathname.startsWith("/users")) {
     return "Users";
@@ -194,6 +205,9 @@ function groupIsActive(group: NavGroup, pathname: string): boolean {
       pathname.startsWith("/agreement") ||
       pathname.startsWith("/support-tickets"))
   ) {
+    return true;
+  }
+  if (group.id === "workspace" && pathname.startsWith("/workspace")) {
     return true;
   }
   return group.items.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
@@ -260,7 +274,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
       >
         <div className={`min-w-0 p-4 ${sidebarCollapsed ? "px-2" : "p-6"}`}>
           <div className="flex items-center justify-between gap-2">
-            <Link href="/database/dashboard" className="flex min-w-0 items-center gap-2">
+            <Link href={defaultLandingPath(role)} className="flex min-w-0 items-center gap-2">
               <TechBubbleLogo variant="sidebar" compact={sidebarCollapsed} />
             </Link>
             <button

@@ -49,6 +49,9 @@ function extractToken(req: Request): string | undefined {
 }
 
 export async function authMiddleware(req: TicketingRequest, res: Response, next: NextFunction) {
+  if (req.ticketingUser) {
+    return next();
+  }
   const token = extractToken(req);
   if (!token) {
     return res.status(401).json({ error: "Unauthorized: No token provided" });

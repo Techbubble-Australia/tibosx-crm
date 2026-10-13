@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ClipboardCheck, Loader2 } from "lucide-react";
 import { ticketingFetch } from "@/lib/ticketing-fetch";
+import { messageFromApiError } from "@/lib/api-error";
 
 type PendingRow = {
   id: string;
@@ -143,7 +144,7 @@ export default function ClientTimesheetsPage() {
     try {
       const res = await ticketingFetch(`/api/timesheets/${id}/approve`, { method: "POST" });
       const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to approve");
+      if (!res.ok) throw new Error(messageFromApiError(data, "Failed to approve"));
       load();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Failed to approve");
@@ -161,7 +162,7 @@ export default function ClientTimesheetsPage() {
         body: JSON.stringify({ reason }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to reject");
+      if (!res.ok) throw new Error(messageFromApiError(data, "Failed to reject"));
       setRejectId(null);
       load();
     } catch (e) {

@@ -26,3 +26,10 @@ export const TICKET_TYPE_LABELS: Record<string, string> = {
 export const TICKET_STATUSES = Object.keys(TICKET_STATUS_LABELS);
 export const TICKET_PRIORITIES = Object.keys(TICKET_PRIORITY_LABELS);
 export const TICKET_TYPES = Object.keys(TICKET_TYPE_LABELS);
+
+export const CLIENT_REQUEST_TYPES = [
+  { value: "TECHNICAL", label: "Product/Technical issue" },
+  { value: "BUG", label: "New bug" },
+  { value: "ENHANCEMENT", label: "New enhancement" },
+  { value: "OTHER", label: "Other" },
+] as const;

@@ -42,6 +42,8 @@ import { ticketingTimesheetRoutes } from "./ticketing/routes/timesheets";
 import { ticketingProfilePhotoRoutes } from "./ticketing/routes/profilePhoto";
 import { memberTimesheetRoutes } from "./ticketing/routes/member-timesheets";
 import { tbosRoutes as ticketingAdminRoutes } from "./ticketing/routes/tbos";
+import { workspaceAuthRoutes } from "./ticketing/routes/workspace-auth";
+import { tbosWorkspaceTicketingMiddleware } from "./ticketing/middleware/tbos-workspace";
 import { workspaceGroupRoutes } from "./routes/workspaceGroups";
 import { createTicketUploadsMiddleware } from "./ticketing/middleware/serve-ticket-uploads";
 import { uploadDir as ticketUploadDir } from "./ticketing/lib/upload-storage";
@@ -166,6 +168,18 @@ app.use(
   requireAnyModule("sales", "workspace"),
   ticketingAdminRoutes,
 );
+app.use(
+  "/api/admin/workspace",
+  authMiddleware,
+  requireMfaEnrolled,
+  requireModule("workspace"),
+  tbosWorkspaceTicketingMiddleware,
+);
+app.use("/api/admin/workspace/auth", workspaceAuthRoutes);
+app.use("/api/admin/workspace/tickets", ticketingTicketRoutes);
+app.use("/api/admin/workspace/organizations", ticketingOrgRoutes);
+app.use("/api/admin/workspace/timesheets", ticketingTimesheetRoutes);
+app.use("/api/admin/workspace/member-timesheets", memberTimesheetRoutes);
 app.use("/api/ticketing/auth", ticketingPortalAuthRoutes);
 app.use("/api/ticketing/tickets", ticketingTicketRoutes);
 app.use("/api/ticketing/organizations", ticketingOrgRoutes);

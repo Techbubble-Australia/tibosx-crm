@@ -8,6 +8,7 @@ import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
 import { TimesheetForm, type TimesheetFormValues } from "@/components/timesheets/TimesheetForm";
+import { messageFromApiError } from "@/lib/api-error";
 
 function RejectDialog({
   onCancel,
@@ -83,7 +84,7 @@ export default function TimesheetDetailPage() {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save timesheet");
+      if (!res.ok) throw new Error(messageFromApiError(data, "Failed to save timesheet"));
       setTimesheet(data.data as TimesheetFormValues);
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to save timesheet");
@@ -111,7 +112,7 @@ export default function TimesheetDetailPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to submit");
+      if (!res.ok) throw new Error(messageFromApiError(data, "Failed to submit"));
       const detail = await adminFetch(`/api/admin/timesheets/${id}`).then((r) => r.json());
       setTimesheet(detail.data as TimesheetFormValues);
     } catch (error) {
@@ -126,7 +127,7 @@ export default function TimesheetDetailPage() {
     try {
       const res = await adminFetch(`/api/admin/timesheets/${id}/approve`, { method: "POST" });
       const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to approve");
+      if (!res.ok) throw new Error(messageFromApiError(data, "Failed to approve"));
       setTimesheet(data.data as TimesheetFormValues);
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to approve");
@@ -144,7 +145,7 @@ export default function TimesheetDetailPage() {
         body: JSON.stringify({ reason }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to reject");
+      if (!res.ok) throw new Error(messageFromApiError(data, "Failed to reject"));
       setTimesheet(data.data as TimesheetFormValues);
       setShowReject(false);
     } catch (error) {

@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { prisma } from "@techbubble/database";
 import { authMiddleware, type TicketingRequest } from "../middleware/auth.js";
+import { formatZodError } from "../../lib/zod-error.js";
 
 const router: IRouter = Router();
 
@@ -135,7 +136,11 @@ router.post("/", async (req: TicketingRequest, res) => {
   const memberUserId = await resolveMemberAdminUserId(req);
   if (!memberUserId) return res.status(403).json({ error: "Forbidden" });
 
-  const input = createSchema.parse(req.body);
+  const parsed = createSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: formatZodError(parsed.error), details: parsed.error.errors });
+  }
+  const input = parsed.data;
   if (!input.projectId && !input.ticketId) {
     return res.status(400).json({ error: "Select a project or case" });
   }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@techbubble/database";
 import { authMiddleware, type TicketingRequest } from "../middleware/auth.js";
 import { resolveClientTimesheetProjectIds } from "../lib/client-timesheet-projects.js";
+import { formatZodError } from "../../lib/zod-error.js";
 
 const router: IRouter = Router();
 
@@ -172,7 +173,9 @@ router.post("/:id/reject", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
   if (user.role !== "CLIENT") return res.status(403).json({ error: "Forbidden" });
   const parsed = decisionSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+  if (!parsed.success) {
+    return res.status(400).json({ error: formatZodError(parsed.error), details: parsed.error.errors });
+  }
 
   const timesheet = await prisma.timesheet.findUnique({ where: { id: req.params.id } });
   if (!timesheet || timesheet.status !== "SUBMITTED" || timesheet.approverKind !== "CLIENT_CONTACT") {

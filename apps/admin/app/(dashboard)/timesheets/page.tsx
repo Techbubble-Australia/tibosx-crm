@@ -6,6 +6,7 @@ import { Plus, Edit, Send } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
+import { messageFromApiError } from "@/lib/api-error";
 import { TIMESHEET_STATUS_LABELS, type TimesheetStatus } from "@/lib/project-types";
 
 type TimesheetRow = {
@@ -72,7 +73,7 @@ export default function TimesheetsPage() {
         body: JSON.stringify({ ids }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to submit");
+      if (!res.ok) throw new Error(messageFromApiError(data, "Failed to submit"));
       setSelected(new Set());
       await fetchRows();
     } catch (error) {
@@ -91,7 +92,7 @@ export default function TimesheetsPage() {
         body: JSON.stringify({ ids: [id] }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to submit");
+      if (!res.ok) throw new Error(messageFromApiError(data, "Failed to submit"));
       await fetchRows();
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to submit");
