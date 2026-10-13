@@ -440,7 +440,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                     <tr key={`${row.year}-${row.month}`} className="border-b border-gray-50 dark:border-gray-800">
                       <td className="py-2 pr-3">{formatProjectMonth(row.year, row.month)}</td>
                       <td className="py-2 pr-3">
-                        <input type="number" min={0} className={inputClass} value={row.qty} onChange={(e) => updateActual(index, { qty: Number(e.target.value) })} />
+                        <input type="number" min={0} step="0.01" className={inputClass} value={row.qty} onChange={(e) => updateActual(index, { qty: Number(e.target.value) })} />
                       </td>
                       <td className="py-2 pr-3">
                         <select className={inputClass} value={row.currency} onChange={(e) => updateActual(index, { currency: e.target.value })}>

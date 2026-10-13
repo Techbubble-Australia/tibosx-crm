@@ -51,10 +51,13 @@ router.use(async (_req, _res, next) => {
 const decimalField = z.coerce.number().nonnegative();
 const optionalDecimalField = z.coerce.number().nonnegative().optional();
 
+const qtyField = z.coerce.number().positive();
+const qtyFieldOptional = z.coerce.number().positive().optional();
+
 const workUnitMonthSchema = z.object({
   year: z.coerce.number().int(),
   month: z.coerce.number().int().min(0).max(11),
-  workUnits: z.coerce.number().int().positive(),
+  workUnits: qtyField,
 });
 
 const contractCreateSchema = z.object({
@@ -70,7 +73,7 @@ const contractBaseSchema = z.object({
     .preprocess((val) => (val === "" || val === null || val === undefined ? null : val), z.union([z.coerce.date(), z.null()]))
     .optional(),
   unit: z.enum(CONTRACT_UNITS).optional().nullable(),
-  numberOfUnits: z.coerce.number().int().positive().optional().nullable(),
+  numberOfUnits: qtyFieldOptional.nullable(),
   workUnitMonths: z.array(workUnitMonthSchema).optional(),
   currency: z.string().min(1).max(8),
   rate: optionalDecimalField,
@@ -86,7 +89,7 @@ const variationSchema = z.object({
     .preprocess((val) => (val === "" || val === null || val === undefined ? null : val), z.union([z.coerce.date(), z.null()]))
     .optional(),
   variationValue: optionalDecimalField,
-  qty: z.coerce.number().int().positive().optional(),
+  qty: qtyFieldOptional,
   rate: optionalDecimalField,
   workUnitMonths: z.array(workUnitMonthSchema).optional(),
   comments: z.string().max(5000).optional().default(""),
@@ -105,7 +108,7 @@ const invoiceSchema = z.object({
   status: z.enum(CONTRACT_INVOICE_STATUSES).default("DRAFT"),
   currency: z.string().min(1).max(8).optional(),
   description: z.string().min(1).max(10000),
-  qty: z.coerce.number().int().positive(),
+  qty: qtyField,
   rate: decimalField,
   taxRate: z.coerce.number().nonnegative().default(10),
   fileUrl: z.string().min(1).optional().nullable(),
@@ -406,10 +409,14 @@ async function allocateInvoiceNumber(): Promise<string> {
   return `INV-${String(max + 1).padStart(4, "0")}`;
 }
 
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 function computeInvoiceAmounts(qty: number, rate: number, taxRate: number) {
-  const amount = qty * rate;
-  const taxAmount = amount * (taxRate / 100);
-  const totalAmount = amount + taxAmount;
+  const amount = roundMoney(qty * rate);
+  const taxAmount = roundMoney(amount * (taxRate / 100));
+  const totalAmount = roundMoney(amount + taxAmount);
   return { amount, taxAmount, totalAmount };
 }
 
@@ -490,11 +497,15 @@ function serializeContractProfile(row: {
   };
 }
 
-function serializeWorkUnitMonth(row: { year: number; month: number; workUnits: number }) {
+function serializeWorkUnitMonth(row: {
+  year: number;
+  month: number;
+  workUnits: { toString(): string } | number;
+}) {
   return {
     year: row.year,
     month: row.month,
-    workUnits: row.workUnits,
+    workUnits: toNumber(row.workUnits),
   };
 }
 
@@ -505,13 +516,13 @@ function serializeVariation(
     variationDate: Date;
     variationEndDate: Date | null;
     comments: string;
-    qty?: number | null;
+    qty?: { toString(): string } | number | null;
     unit: string | null;
     rate: { toString(): string } | number | null;
     variationValue: { toString(): string } | number;
     createdAt: Date;
   },
-  workUnitMonths?: Array<{ year: number; month: number; workUnits: number }>,
+  workUnitMonths?: Array<{ year: number; month: number; workUnits: { toString(): string } | number }>,
 ) {
   return {
     id: row.id,
@@ -519,7 +530,7 @@ function serializeVariation(
     variationDate: row.variationDate.toISOString(),
     variationEndDate: row.variationEndDate?.toISOString() ?? null,
     comments: row.comments,
-    qty: row.qty ?? null,
+    qty: row.qty == null ? null : toNumber(row.qty),
     unit: row.unit,
     rate: row.rate == null ? null : toNumber(row.rate),
     variationValue: toNumber(row.variationValue),
@@ -556,7 +567,7 @@ function serializeInvoice(row: {
   status: string;
   currency: string;
   description: string;
-  qty: number;
+  qty: { toString(): string } | number;
   rate: { toString(): string } | number;
   amount: { toString(): string } | number;
   taxRate: { toString(): string } | number;
@@ -576,7 +587,7 @@ function serializeInvoice(row: {
     status: row.status,
     currency: row.currency,
     description: row.description,
-    qty: row.qty,
+    qty: toNumber(row.qty),
     rate: toNumber(row.rate),
     amount: toNumber(row.amount),
     taxRate: toNumber(row.taxRate),
@@ -713,7 +724,7 @@ function serializeContract(row: {
     startDate: row.startDate.toISOString(),
     endDate: normalizeEndDate(row.endDate)?.toISOString() ?? null,
     unit: row.unit,
-    numberOfUnits: row.numberOfUnits,
+    numberOfUnits: row.numberOfUnits == null ? null : toNumber(row.numberOfUnits),
     currency: row.currency,
     rate: toNumber(row.rate),
     contractValue,

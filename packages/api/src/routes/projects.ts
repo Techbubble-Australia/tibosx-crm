@@ -45,7 +45,7 @@ const estimateSchema = z.object({
   id: z.string().optional(),
   year: z.coerce.number().int(),
   month: z.coerce.number().int().min(0).max(11),
-  qty: z.coerce.number().int().nonnegative(),
+  qty: z.coerce.number().nonnegative(),
   currency: z.string().min(1).max(8),
   estimatedCost: z.coerce.number().nonnegative(),
   costType: z.enum(PROJECT_COST_TYPES),
@@ -55,7 +55,7 @@ const actualSchema = z.object({
   id: z.string().optional(),
   year: z.coerce.number().int(),
   month: z.coerce.number().int().min(0).max(11),
-  qty: z.coerce.number().int().nonnegative(),
+  qty: z.coerce.number().nonnegative(),
   currency: z.string().min(1).max(8),
   actualCost: z.coerce.number().nonnegative(),
   costType: z.enum(PROJECT_COST_TYPES),
@@ -103,7 +103,7 @@ function serializeEstimate(row: {
   id: string;
   year: number;
   month: number;
-  qty: number;
+  qty: { toString(): string } | number;
   currency: string;
   estimatedCost: { toString(): string } | number;
   costType: string;
@@ -112,7 +112,7 @@ function serializeEstimate(row: {
     id: row.id,
     year: row.year,
     month: row.month,
-    qty: row.qty,
+    qty: toNumber(row.qty),
     currency: row.currency,
     estimatedCost: toNumber(row.estimatedCost),
     costType: row.costType,
@@ -123,7 +123,7 @@ function serializeActual(row: {
   id: string;
   year: number;
   month: number;
-  qty: number;
+  qty: { toString(): string } | number;
   currency: string;
   actualCost: { toString(): string } | number;
   costType: string;
@@ -132,7 +132,7 @@ function serializeActual(row: {
     id: row.id,
     year: row.year,
     month: row.month,
-    qty: row.qty,
+    qty: toNumber(row.qty),
     currency: row.currency,
     actualCost: toNumber(row.actualCost),
     costType: row.costType,

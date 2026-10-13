@@ -410,7 +410,7 @@ model Contract {
   /// HOUR | DAY — only for T&M contracts
   unit           String?
   /// Number of units — only for T&M contracts
-  numberOfUnits  Int?
+  numberOfUnits  Decimal?            @db.Decimal(14, 4)
   currency       String
   rate           Decimal             @db.Decimal(14, 2)
   contractValue  Decimal             @db.Decimal(14, 2)
@@ -478,7 +478,7 @@ model ContractVariation {
   variationEndDate DateTime?
   comments         String    @default("") @db.Text
   /// Qty for T&M variations
-  qty              Int?
+  qty              Decimal?          @db.Decimal(14, 4)
   /// HOUR | DAY for T&M variations (legacy)
   unit             String?
   rate             Decimal?  @db.Decimal(14, 2)
@@ -499,7 +499,7 @@ model ContractWorkUnitMonth {
   year       Int
   /// 0–11 (Jan–Dec)
   month      Int
-  workUnits  Int
+  workUnits  Decimal  @db.Decimal(14, 4)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -532,7 +532,7 @@ model ContractInvoice {
   status        String   @default("DRAFT")
   currency      String   @default("AUD")
   description   String   @db.Text
-  qty           Int
+  qty           Decimal  @db.Decimal(14, 4)
   rate          Decimal  @db.Decimal(14, 2)
   amount        Decimal  @db.Decimal(14, 2)
   taxRate       Decimal  @default(10) @db.Decimal(5, 2)
@@ -824,7 +824,7 @@ model ProjectEstimate {
   project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   year          Int
   month         Int
-  qty           Int
+  qty           Decimal  @db.Decimal(14, 4)
   currency      String
   estimatedCost Decimal  @db.Decimal(14, 2)
   /// personnel | one-time | other
@@ -841,7 +841,7 @@ model ProjectActual {
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   year        Int
   month       Int
-  qty         Int
+  qty         Decimal  @db.Decimal(14, 4)
   currency    String
   actualCost  Decimal  @db.Decimal(14, 2)
   costType    String

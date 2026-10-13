@@ -80,7 +80,7 @@ export default function NewInvoicePage() {
           status,
           currency: selectedContract?.currency,
           description: description.trim(),
-          qty: Number.parseInt(qty, 10) || 0,
+          qty: Number.parseFloat(qty) || 0,
           rate: Number.parseFloat(rate) || 0,
           taxRate: Number.parseFloat(taxRate) || 0,
         }),
@@ -149,7 +149,7 @@ export default function NewInvoicePage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Qty *</label>
-              <input type="number" min="0" step="1" value={qty} onChange={(e) => setQty(e.target.value)} required className={inputClass} />
+              <input type="number" min="0" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} required className={inputClass} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Rate *</label>

@@ -199,13 +199,13 @@ function WorkUnitMonthsEditor({
               <td className="px-3 py-2">
                 <input
                   type="number"
-                  min="1"
-                  step="1"
+                  min="0.0001"
+                  step="0.01"
                   value={row.workUnits}
                   readOnly={!editable}
                   onChange={(e) => {
-                    const workUnits = Number.parseInt(e.target.value, 10);
-                    if (!workUnits || workUnits <= 0) return;
+                    const workUnits = Number.parseFloat(e.target.value);
+                    if (!Number.isFinite(workUnits) || workUnits <= 0) return;
                     onChange(
                       rows.map((item) =>
                         item.year === row.year && item.month === row.month
@@ -321,9 +321,9 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const showMilestones = type !== "T_AND_M";
 
   const invoicePreviewAmount = useMemo(() => {
-    const qty = Number.parseInt(invoiceQty, 10) || 0;
+    const qty = Number.parseFloat(invoiceQty) || 0;
     const rate = Number.parseFloat(invoiceRate) || 0;
-    return qty * rate;
+    return Math.round(qty * rate * 100) / 100;
   }, [invoiceQty, invoiceRate]);
 
   const invoicePreviewTaxAmount = useMemo(() => {
@@ -335,9 +335,9 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const invoiceFieldsEditable = !editingInvoiceId || invoiceStatus === "DRAFT";
 
   const variationQtyTotal = useMemo(() => {
-    if (type !== "T_AND_M") return Number.parseInt(variationQty, 10) || 0;
+    if (type !== "T_AND_M") return Number.parseFloat(variationQty) || 0;
     if (variationWorkUnitMonths.length) return sumWorkUnits(variationWorkUnitMonths);
-    return Number.parseInt(variationQty, 10) || 0;
+    return Number.parseFloat(variationQty) || 0;
   }, [type, variationQty, variationWorkUnitMonths]);
 
   const variationPreviewValue = useMemo(() => {
@@ -435,7 +435,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
 
   useEffect(() => {
     if (type === "T_AND_M") {
-      const units = workUnitMonths.length ? sumWorkUnits(workUnitMonths) : Number.parseInt(numberOfUnits, 10) || 0;
+      const units = workUnitMonths.length ? sumWorkUnits(workUnitMonths) : Number.parseFloat(numberOfUnits) || 0;
       setNumberOfUnits(String(units));
       const rateValue = Number.parseFloat(rate) || 0;
       setContractValue(String(units * rateValue));
@@ -890,7 +890,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
 
   async function saveInvoice() {
     if (!defaults.id || !canAddInvoices) return;
-    const qty = Number.parseInt(invoiceQty, 10);
+    const qty = Number.parseFloat(invoiceQty);
     const rateVal = Number.parseFloat(invoiceRate);
     const taxRate = Number.parseFloat(invoiceTaxRate);
     if (!invoiceIssueDate || !invoiceDueDate) {
@@ -1858,8 +1858,8 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                   <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Qty *</label>
                   <input
                     type="number"
-                    min="1"
-                    step="1"
+                    min="0.0001"
+                    step="0.01"
                     value={invoiceQty}
                     onChange={(e) => setInvoiceQty(e.target.value)}
                     placeholder="Qty"
