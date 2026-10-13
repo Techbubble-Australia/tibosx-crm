@@ -184,6 +184,26 @@ function headerTitle(pathname: string): string {
   return "TIBOSX.AI";
 }
 
+function pathUnder(prefix: string, pathname: string): boolean {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+/** PM timesheets live at /timesheets — never treat /support-tickets or /workspace as PM. */
+function isProjectManagementPath(pathname: string): boolean {
+  if (pathUnder("/support-tickets", pathname) || pathUnder("/workspace", pathname)) {
+    return false;
+  }
+  return (
+    pathUnder("/projects", pathname) ||
+    pathUnder("/timesheets", pathname) ||
+    pathUnder("/agreement", pathname)
+  );
+}
+
+function isWorkspacePath(pathname: string): boolean {
+  return pathUnder("/workspace", pathname) || pathUnder("/support-tickets", pathname);
+}
+
 function groupIsActive(group: NavGroup, pathname: string): boolean {
   if (group.id === "recruitment" && (isJobListingsPath(pathname) || isCareerApplicationsPath(pathname))) {
     return true;
@@ -198,21 +218,13 @@ function groupIsActive(group: NavGroup, pathname: string): boolean {
   ) {
     return true;
   }
-  if (
-    group.id === "project_management" &&
-    (pathname.startsWith("/projects") ||
-      pathname.startsWith("/timesheets") ||
-      pathname.startsWith("/agreement"))
-  ) {
-    return true;
+  if (group.id === "project_management") {
+    return isProjectManagementPath(pathname);
   }
-  if (
-    group.id === "workspace" &&
-    (pathname.startsWith("/workspace") || pathname.startsWith("/support-tickets"))
-  ) {
-    return true;
+  if (group.id === "workspace") {
+    return isWorkspacePath(pathname);
   }
-  return group.items.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
+  return group.items.some((item) => navItemIsActive(item, pathname));
 }
 
 function navItemIsActive(item: NavItem, pathname: string): boolean {
@@ -231,6 +243,15 @@ function navItemIsActive(item: NavItem, pathname: string): boolean {
   if (item.href === "/contracts") {
     return pathname === "/contracts" || pathname.startsWith("/contracts/");
   }
+  if (item.href === "/timesheets") {
+    return pathUnder("/timesheets", pathname) && !pathUnder("/support-tickets", pathname);
+  }
+  if (item.href === "/support-tickets") {
+    return pathUnder("/support-tickets", pathname);
+  }
+  if (item.href.startsWith("/workspace")) {
+    return pathUnder(item.href, pathname);
+  }
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
@@ -244,8 +265,11 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
     setOpenGroups((prev) => {
       const next = { ...prev };
       for (const group of navGroups) {
-        if (groupIsActive(group, pathname)) {
+        const active = groupIsActive(group, pathname);
+        if (active) {
           next[group.id] = true;
+        } else if (group.id === "project_management" || group.id === "workspace") {
+          next[group.id] = false;
         }
       }
       return next;
