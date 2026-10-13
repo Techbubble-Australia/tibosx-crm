@@ -35,24 +35,28 @@ export default function NewTicketPage() {
     void ticketingFetch("/api/auth/me")
       .then((res) => res.json())
       .then((data) => {
-        const payload = data.data as Me;
-        setMe(payload);
-        if (payload.role === "CLIENT" && payload.organization?.id) {
-          setOrganizationId(payload.organization.id);
-        }
+        setMe(data.data as Me);
       });
   }, []);
 
   useEffect(() => {
-    if (!isConsultant) return;
+    if (!me) return;
+    if (me.role !== "CLIENT" && me.role !== "CONSULTANT") return;
     void ticketingFetch("/api/organizations")
       .then((res) => res.json())
       .then((data) => {
         const list = (data.data as Org[]) ?? [];
         setOrgs(list);
-        if (list.length === 1) setOrganizationId(list[0].id);
+        if (list.length === 1) {
+          setOrganizationId(list[0].id);
+        } else if (me.role === "CLIENT" && me.organization?.id) {
+          const defaultId = list.some((o) => o.id === me.organization?.id)
+            ? me.organization.id
+            : list[0]?.id ?? "";
+          if (defaultId) setOrganizationId(defaultId);
+        }
       });
-  }, [isConsultant]);
+  }, [me]);
 
   async function uploadFiles(ticketId: string) {
     for (const file of files) {
@@ -74,8 +78,8 @@ export default function NewTicketPage() {
     setLoading(true);
     setError("");
     try {
-      if (isConsultant && !organizationId) {
-        throw new Error("Select the client project this ticket is for.");
+      if (!organizationId) {
+        throw new Error("Select the project this ticket is for.");
       }
       const res = await ticketingFetch("/api/tickets", {
         method: "POST",
@@ -85,7 +89,7 @@ export default function NewTicketPage() {
           priority,
           subject,
           description,
-          ...(isConsultant ? { organizationId } : {}),
+          organizationId,
         }),
       });
       const data = await res.json();
@@ -105,7 +109,7 @@ export default function NewTicketPage() {
       <div>
         <Link href="/tickets" className="text-sm text-sky-600 hover:underline">← Back to tickets</Link>
         <h1 className="mt-2 text-2xl font-semibold text-slate-900">
-          {isConsultant ? "Create ticket for client" : "New support request"}
+          {isConsultant ? "Create ticket" : "New support request"}
         </h1>
         <p className="text-sm text-slate-500">
           {isConsultant
@@ -117,9 +121,15 @@ export default function NewTicketPage() {
       </div>
       {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
       <form onSubmit={onSubmit} className="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        {isConsultant ? (
-          <div>
-            <label className="mb-1 block text-sm font-medium">Project *</label>
+        <div>
+          <label className="mb-1 block text-sm font-medium">Project *</label>
+          {orgs.length <= 1 && orgs.length > 0 ? (
+            <input
+              readOnly
+              value={orgs[0]?.name ?? me?.organization?.name ?? ""}
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+            />
+          ) : (
             <select
               required
               value={organizationId}
@@ -131,22 +141,11 @@ export default function NewTicketPage() {
                 <option key={o.id} value={o.id}>{o.name}</option>
               ))}
             </select>
-            {orgs.length === 0 && me ? (
-              <p className="mt-1 text-xs text-amber-700">
-                No active projects are available
-              </p>
-            ) : null}
-          </div>
-        ) : (
-          <div>
-            <label className="mb-1 block text-sm font-medium">Project *</label>
-            <input
-              readOnly
-              value={me?.organization?.name ?? ""}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-            />
-          </div>
-        )}
+          )}
+          {orgs.length === 0 && me ? (
+            <p className="mt-1 text-xs text-amber-700">No active projects are available</p>
+          ) : null}
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium">Request type *</label>

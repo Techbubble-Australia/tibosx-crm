@@ -10,7 +10,11 @@ import {
 import { authMiddleware, type TicketingRequest } from "../middleware/auth.js";
 import { logTicketAudit } from "../lib/ticket-audit.js";
 import { nextTicketNumber } from "../lib/ticket-number.js";
-import { canAccessTicketOrganization, ticketOrganizationFilter } from "../lib/ticket-access.js";
+import {
+  canAccessTicketOrganization,
+  canSelectOrganizationForNewTicket,
+  ticketOrganizationFilter,
+} from "../lib/ticket-access.js";
 import { saveTicketUpload } from "../lib/upload-storage.js";
 import { streamTicketAttachmentFile } from "../lib/serve-ticket-attachment.js";
 
@@ -172,9 +176,13 @@ router.post("/", async (req: TicketingRequest, res) => {
   let organizationId = parsed.data.organizationId;
   if (user.role === "CLIENT") {
     if (!user.organizationId) return res.status(403).json({ error: "No organization linked" });
-    organizationId = user.organizationId;
+    organizationId = organizationId ?? user.organizationId;
   } else {
     if (!organizationId) return res.status(400).json({ error: "organizationId is required for consultants" });
+  }
+
+  if (!(await canSelectOrganizationForNewTicket(user, organizationId))) {
+    return res.status(400).json({ error: "Invalid organization" });
   }
 
   const org = await prisma.organization.findFirst({

@@ -172,7 +172,17 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
     [contracts, clientId],
   );
 
-  const pmOptions = useMemo(() => users.filter((row) => row.id), [users]);
+  const pmOptions = useMemo(() => {
+    const eligible = users.filter((row) => {
+      const roles = getEffectiveRoles(row.role, row.additionalRoles ?? []);
+      return roles.some((r) => r === "admin" || r === "project_manager");
+    });
+    if (defaults.projectManagerId && !eligible.some((row) => row.id === defaults.projectManagerId)) {
+      const current = users.find((row) => row.id === defaults.projectManagerId);
+      if (current) return [...eligible, current];
+    }
+    return eligible;
+  }, [users, defaults.projectManagerId]);
 
   const timesheetApproverOptions = useMemo(
     () =>

@@ -84,7 +84,7 @@ export default function ProjectsPage() {
                   <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Title</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Client</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">PM</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Project Manager</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Dates</th>
                   {canManageProjects ? (
                     <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
@@ -113,7 +113,14 @@ export default function ProjectsPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-500">{row.clientName}</td>
-                    <td className="px-4 py-3">{PROJECT_STATUS_LABELS[row.status]}</td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-2">
+                        {row.status === "ACTIVE" ? (
+                          <span className="h-2 w-2 shrink-0 rounded-full bg-green-500" aria-hidden />
+                        ) : null}
+                        {PROJECT_STATUS_LABELS[row.status]}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-gray-500">{row.projectManagerName}</td>
                     <td className="px-4 py-3 text-gray-500">{formatDate(row.startDate)} – {formatDate(row.endDate)}</td>
                     {canManageProjects ? (

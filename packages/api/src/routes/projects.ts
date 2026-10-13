@@ -17,7 +17,7 @@ import {
 import { saveUploadBuffer } from "../lib/save-upload-buffer";
 import { readUploadTextByUrl } from "../lib/read-upload-buffer";
 import { canManageProjects, getActorId, isProjectManagerRole, isProjectMemberRole } from "../lib/project-access";
-import { isValidTimesheetApproverUserId } from "../lib/timesheet-approver";
+import { isValidProjectManagerUserId, isValidTimesheetApproverUserId } from "../lib/timesheet-approver";
 import { emailTbosUserInvite } from "../lib/user-invite.js";
 import { logProjectFieldChanges, type ProjectSnapshot } from "../lib/project-activity";
 import {
@@ -699,6 +699,11 @@ router.post("/", async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
     const data = projectSchema.parse(req.body);
+    if (!(await isValidProjectManagerUserId(data.projectManagerId))) {
+      return res.status(400).json({
+        error: "Project manager must be a user with Administrator or Project manager role",
+      });
+    }
     if (!(await isValidTimesheetApproverUserId(data.timesheetApproverUserId))) {
       return res.status(400).json({
         error: "Timesheet approver must be a user with Administrator, Project manager, or Client role",
@@ -770,6 +775,11 @@ router.put("/:id", async (req: AuthRequest, res) => {
     const data = projectSchema.parse(req.body);
     const existing = await prisma.project.findUnique({ where: { id: projectId } });
     if (!existing) return res.status(404).json({ error: "Not found" });
+    if (!(await isValidProjectManagerUserId(data.projectManagerId))) {
+      return res.status(400).json({
+        error: "Project manager must be a user with Administrator or Project manager role",
+      });
+    }
     if (!(await isValidTimesheetApproverUserId(data.timesheetApproverUserId))) {
       return res.status(400).json({
         error: "Timesheet approver must be a user with Administrator, Project manager, or Client role",
