@@ -274,12 +274,9 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
             </button>
           </div>
           {!sidebarCollapsed ? (
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">AI-powered Business Operating System</p>
-          ) : null}
-          {!loading && email && !sidebarCollapsed ? (
-            <div className="mt-3 min-w-0 border-t border-gray-100 pt-3 dark:border-gray-800">
-              <p className="truncate text-xs text-gray-500 dark:text-gray-400" title={email}>{email}</p>
-            </div>
+            <p className="mt-1 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
+              AI-powered Business Operating System
+            </p>
           ) : null}
         </div>
 

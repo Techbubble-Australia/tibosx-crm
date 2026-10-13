@@ -723,6 +723,8 @@ model Project {
   status           String              @default("DRAFT")
   projectManagerId String
   projectManager   AdminUser           @relation("ProjectManager", fields: [projectManagerId], references: [id], onDelete: Restrict)
+  timesheetApproverUserId String
+  timesheetApprover       AdminUser    @relation("ProjectTimesheetApprover", fields: [timesheetApproverUserId], references: [id], onDelete: Restrict)
   contractId           String?
   contract             Contract?           @relation(fields: [contractId], references: [id], onDelete: SetNull)
   contractVariationId  String?             @unique
@@ -953,6 +955,7 @@ model AdminUser {
   ownedOpportunities Opportunity[] @relation("OpportunityOwner")
   contractActivities ContractActivityLog[] @relation("ContractActivityPerformer")
   managedProjects Project[] @relation("ProjectManager")
+  timesheetApproverProjects Project[] @relation("ProjectTimesheetApprover")
   projectMembership ProjectMember? @relation("ProjectMemberUser")
   timesheets Timesheet[] @relation("TimesheetMember")
   projectActivities ProjectActivityLog[] @relation("ProjectActivityPerformer")

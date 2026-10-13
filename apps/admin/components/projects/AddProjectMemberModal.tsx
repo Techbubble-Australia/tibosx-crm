@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 
@@ -18,6 +18,10 @@ type Props = {
   onAdded: () => void;
 };
 
+function profileLabel(row: ProfileOption) {
+  return `${row.firstName} ${row.lastName}`.trim();
+}
+
 export function AddProjectMemberModal({ projectId, onClose, onAdded }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -25,6 +29,7 @@ export function AddProjectMemberModal({ projectId, onClose, onAdded }: Props) {
   const [databaseProfiles, setDatabaseProfiles] = useState<ProfileOption[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [source, setSource] = useState<"contract" | "database">("contract");
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     void adminFetch(`/api/admin/projects/${projectId}/member-options`)
@@ -40,16 +45,33 @@ export function AddProjectMemberModal({ projectId, onClose, onAdded }: Props) {
         setDatabaseProfiles(database);
         if (contract.length) {
           setSource("contract");
-          setSelectedId(contract[0]!.profileId);
         } else if (database.length) {
           setSource("database");
-          setSelectedId(database[0]!.profileId);
         }
       })
       .finally(() => setLoading(false));
   }, [projectId]);
 
   const options = source === "contract" ? contractProfiles : databaseProfiles;
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((row) => {
+      const haystack = [profileLabel(row), row.email, row.phone].join(" ").toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [options, query]);
+
+  useEffect(() => {
+    if (!filtered.length) {
+      setSelectedId("");
+      return;
+    }
+    if (!filtered.some((row) => row.profileId === selectedId)) {
+      setSelectedId(filtered[0]!.profileId);
+    }
+  }, [filtered, selectedId]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -79,7 +101,7 @@ export function AddProjectMemberModal({ projectId, onClose, onAdded }: Props) {
         className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900"
       >
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Add member</h3>
-        <p className="mt-1 text-sm text-gray-500">Choose someone from the linked contract or the profile database.</p>
+        <p className="mt-1 text-sm text-gray-500">Search by name or email, then add to this project.</p>
 
         {loading ? (
           <div className="flex h-32 items-center justify-center">
@@ -93,7 +115,7 @@ export function AddProjectMemberModal({ projectId, onClose, onAdded }: Props) {
                 disabled={!contractProfiles.length}
                 onClick={() => {
                   setSource("contract");
-                  setSelectedId(contractProfiles[0]?.profileId ?? "");
+                  setQuery("");
                 }}
                 className={`rounded-lg px-3 py-1.5 text-sm ${
                   source === "contract" ? "bg-black text-white dark:bg-white dark:text-black" : "border border-gray-200"
@@ -105,7 +127,7 @@ export function AddProjectMemberModal({ projectId, onClose, onAdded }: Props) {
                 type="button"
                 onClick={() => {
                   setSource("database");
-                  setSelectedId(databaseProfiles[0]?.profileId ?? "");
+                  setQuery("");
                 }}
                 className={`rounded-lg px-3 py-1.5 text-sm ${
                   source === "database" ? "bg-black text-white dark:bg-white dark:text-black" : "border border-gray-200"
@@ -117,18 +139,48 @@ export function AddProjectMemberModal({ projectId, onClose, onAdded }: Props) {
             {options.length === 0 ? (
               <p className="text-sm text-gray-500">No profiles available to add.</p>
             ) : (
-              <select
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
-                value={selectedId}
-                onChange={(e) => setSelectedId(e.target.value)}
-                required
-              >
-                {options.map((row) => (
-                  <option key={row.profileId} value={row.profileId}>
-                    {row.firstName} {row.lastName} — {row.email}
-                  </option>
-                ))}
-              </select>
+              <>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Search profile *
+                  </label>
+                  <input
+                    type="search"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Type a name or email…"
+                    autoFocus
+                  />
+                </div>
+                <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-600">
+                  {filtered.length === 0 ? (
+                    <p className="p-3 text-sm text-gray-500">No profiles match your search.</p>
+                  ) : (
+                    <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {filtered.map((row) => {
+                        const selected = row.profileId === selectedId;
+                        return (
+                          <li key={row.profileId}>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedId(row.profileId)}
+                              className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                                selected ? "bg-gray-100 dark:bg-gray-800" : ""
+                              }`}
+                            >
+                              <span className="font-medium text-gray-900 dark:text-gray-100">
+                                {profileLabel(row)}
+                              </span>
+                              <span className="block text-xs text-gray-500">{row.email}</span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </>
             )}
           </div>
         )}

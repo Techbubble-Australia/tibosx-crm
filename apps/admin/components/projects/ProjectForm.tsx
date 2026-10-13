@@ -22,6 +22,8 @@ import {
 import { GenerateCredentialsModal } from "@/components/projects/GenerateCredentialsModal";
 import { AddProjectMemberModal } from "@/components/projects/AddProjectMemberModal";
 import { ProjectActivityLogSection } from "@/components/projects/ProjectActivityLogSection";
+import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { getEffectiveRoles } from "@/lib/admin-roles";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
@@ -67,6 +69,7 @@ export type ProjectFormValues = {
   kind?: ProjectKind;
   status: ProjectStatus;
   projectManagerId: string;
+  timesheetApproverUserId?: string;
   contractId: string | null;
   contractNumber?: string | null;
   startDate: string;
@@ -108,7 +111,7 @@ export type ProjectFormValues = {
 
 type ClientOption = { id: string; name: string };
 type ContractOption = { id: string; contractNumber: string; title: string; clientId: string };
-type UserOption = { id: string; name: string | null; email: string };
+type UserOption = { id: string; name: string | null; email: string; role: string; additionalRoles?: string[] };
 
 type Props = {
   defaults: Partial<ProjectFormValues>;
@@ -126,6 +129,7 @@ function toDateInput(value?: string | null) {
 }
 
 export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSaving, onMembersRefresh }: Props) {
+  const { role: sessionRole, userId: sessionUserId } = useAdminSession();
   const [title, setTitle] = useState(defaults.title ?? "");
   const [description, setDescription] = useState(defaults.description ?? "");
   const [clientId, setClientId] = useState(defaults.clientId ?? "");
@@ -133,6 +137,9 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
   const [status, setStatus] = useState<ProjectStatus>(defaults.status ?? "DRAFT");
   const [projectManagerId, setProjectManagerId] = useState(
     defaults.projectManagerId ?? defaultProjectManagerId ?? "",
+  );
+  const [timesheetApproverUserId, setTimesheetApproverUserId] = useState(
+    defaults.timesheetApproverUserId ?? defaults.projectManagerId ?? defaultProjectManagerId ?? "",
   );
   const [contractId, setContractId] = useState(defaults.contractId ?? "");
   const [startDate, setStartDate] = useState(toDateInput(defaults.startDate) || new Date().toISOString().slice(0, 10));
@@ -165,10 +172,26 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
     [contracts, clientId],
   );
 
-  const pmOptions = useMemo(
-    () => users.filter((row) => row.id),
+  const pmOptions = useMemo(() => users.filter((row) => row.id), [users]);
+
+  const timesheetApproverOptions = useMemo(
+    () =>
+      users.filter((row) => {
+        const roles = getEffectiveRoles(row.role, row.additionalRoles ?? []);
+        return roles.some((r) => r === "admin" || r === "project_manager" || r === "client");
+      }),
     [users],
   );
+
+  const canRemoveMembers =
+    sessionRole === "admin" ||
+    (sessionRole === "project_manager" && defaults.projectManagerId === sessionUserId);
+
+  useEffect(() => {
+    if (!defaults.id && projectManagerId && !defaults.timesheetApproverUserId) {
+      setTimesheetApproverUserId(projectManagerId);
+    }
+  }, [projectManagerId, defaults.id, defaults.timesheetApproverUserId]);
 
   function updateEstimate(index: number, patch: Partial<ProjectEstimateRow>) {
     setEstimates((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -176,6 +199,22 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
 
   function updateActual(index: number, patch: Partial<ProjectActualRow>) {
     setActuals((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  }
+
+  async function removeMember(memberId: string) {
+    if (!defaults.id) return;
+    if (!confirm("Remove this member from the project?")) return;
+    try {
+      const res = await adminFetch(`/api/admin/projects/${defaults.id}/members/${memberId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to remove member");
+      setMembers((prev) => prev.filter((m) => m.id !== memberId));
+      onMembersRefresh?.();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to remove member");
+    }
   }
 
   async function uploadFiles(files: FileList | null) {
@@ -208,6 +247,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
       kind,
       status,
       projectManagerId,
+      timesheetApproverUserId,
       contractId: contractId || null,
       startDate,
       endDate,
@@ -264,9 +304,34 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Project manager *</label>
-              <select className={inputClass} value={projectManagerId} onChange={(e) => setProjectManagerId(e.target.value)} required>
+              <select
+                className={inputClass}
+                value={projectManagerId}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setProjectManagerId(next);
+                  if (!timesheetApproverUserId || timesheetApproverUserId === projectManagerId) {
+                    setTimesheetApproverUserId(next);
+                  }
+                }}
+                required
+              >
                 <option value="">Select…</option>
                 {pmOptions.map((row) => (
+                  <option key={row.id} value={row.id}>{row.name || row.email}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Timesheet approver *</label>
+              <select
+                className={inputClass}
+                value={timesheetApproverUserId}
+                onChange={(e) => setTimesheetApproverUserId(e.target.value)}
+                required
+              >
+                <option value="">Select…</option>
+                {timesheetApproverOptions.map((row) => (
                   <option key={row.id} value={row.id}>{row.name || row.email}</option>
                 ))}
               </select>
@@ -429,15 +494,26 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                         )}
                       </td>
                       <td className="py-2 text-right">
-                        {!member.hasCredentials ? (
-                          <button
-                            type="button"
-                            onClick={() => setCredentialMember(member)}
-                            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-600"
-                          >
-                            Create user
-                          </button>
-                        ) : null}
+                        <div className="flex justify-end gap-2">
+                          {!member.hasCredentials ? (
+                            <button
+                              type="button"
+                              onClick={() => setCredentialMember(member)}
+                              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-600"
+                            >
+                              Create user
+                            </button>
+                          ) : null}
+                          {canRemoveMembers ? (
+                            <button
+                              type="button"
+                              onClick={() => void removeMember(member.id)}
+                              className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400"
+                            >
+                              Remove
+                            </button>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}

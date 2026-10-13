@@ -31,6 +31,7 @@ const LEGACY_FIELD_LABELS: Record<string, string> = {
   contractId: "Contract",
   startDate: "Start date",
   endDate: "End date",
+  timesheetApproverUserId: "Timesheet approver",
 };
 
 function humanizeFieldName(fieldName: string | null): string | null {
@@ -54,6 +55,8 @@ function formatAction(log: ActivityLog): string {
     }
     case "MEMBER_ADDED":
       return log.newValue ? `Member added (${log.newValue})` : "Member added";
+    case "MEMBER_REMOVED":
+      return "Member removed";
     case "CREDENTIALS_GENERATED":
       return `Credentials generated for ${log.newValue ?? "member"}`;
     default: {

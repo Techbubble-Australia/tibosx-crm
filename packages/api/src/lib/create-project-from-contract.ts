@@ -140,6 +140,7 @@ export async function createProjectFromContract(
         clientId: contract.clientId,
         status: "DRAFT",
         projectManagerId,
+        timesheetApproverUserId: projectManagerId,
         contractId,
         contractVariationId: variationId ?? null,
         startDate,

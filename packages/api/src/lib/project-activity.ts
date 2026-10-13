@@ -8,6 +8,7 @@ export const PROJECT_FIELD_LABELS: Record<string, string> = {
   kind: "Project type",
   status: "Status",
   projectManagerId: "Project manager",
+  timesheetApproverUserId: "Timesheet approver",
   contractId: "Contract",
   startDate: "Start date",
   endDate: "End date",
@@ -20,6 +21,7 @@ const TRACKED_FIELDS = [
   "kind",
   "status",
   "projectManagerId",
+  "timesheetApproverUserId",
   "contractId",
   "startDate",
   "endDate",
@@ -34,6 +36,7 @@ export type ProjectSnapshot = {
   kind: string;
   status: string;
   projectManagerId: string;
+  timesheetApproverUserId: string;
   contractId: string | null;
   startDate: Date;
   endDate: Date;
@@ -56,6 +59,7 @@ function formatFieldValue(field: TrackedField, value: unknown, context: Activity
     case "clientId":
       return context.clientNames.get(String(value)) ?? String(value);
     case "projectManagerId":
+    case "timesheetApproverUserId":
       return context.managerNames.get(String(value)) ?? String(value);
     case "contractId":
       return context.contractNumbers.get(String(value)) ?? String(value);
@@ -77,7 +81,7 @@ export async function buildProjectActivityContext(
   after: ProjectSnapshot,
 ): Promise<ActivityContext> {
   const clientIds = [before.clientId, after.clientId];
-  const managerIds = [before.projectManagerId, after.projectManagerId];
+  const managerIds = [before.projectManagerId, after.projectManagerId, before.timesheetApproverUserId, after.timesheetApproverUserId];
   const contractIds = [before.contractId, after.contractId].filter(Boolean) as string[];
 
   const [clients, managers, contracts] = await Promise.all([

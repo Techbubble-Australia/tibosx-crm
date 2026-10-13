@@ -7,6 +7,7 @@ import {
   getActorId,
   isProjectManagerRole,
 } from "../lib/project-access";
+import { canActAsTimesheetApprover } from "../lib/timesheet-approver";
 import { effectiveRolesForUser, hasEffectiveRole } from "../lib/admin-roles";
 import { getMemberOnboardingStatus } from "../lib/member-onboarding";
 import { notifyClientApproverOfSubmittedTimesheet } from "../lib/timesheet-client-approval";
@@ -110,7 +111,15 @@ function serializeTimesheet(row: {
 }
 
 const detailInclude = {
-  project: { select: { id: true, title: true, projectNumber: true, projectManagerId: true } },
+  project: {
+    select: {
+      id: true,
+      title: true,
+      projectNumber: true,
+      projectManagerId: true,
+      timesheetApproverUserId: true,
+    },
+  },
   opportunity: { select: { id: true, name: true, ownerId: true } },
   ticket: { select: { id: true, ticketNumber: true, subject: true, projectId: true } },
   projectClientContact: { include: { contact: { select: { name: true, email: true } } } },
@@ -141,10 +150,14 @@ async function timesheetAccessWhere(req: AuthRequest): Promise<Prisma.TimesheetW
   if (isProjectManagerRole(role) && role !== "admin") {
     return {
       OR: [
+        { project: { timesheetApproverUserId: actorId } },
         { project: { projectManagerId: actorId } },
         { opportunity: { ownerId: actorId } },
       ],
     };
+  }
+  if (role === "client") {
+    return { project: { timesheetApproverUserId: actorId } };
   }
   return { memberUserId: actorId };
 }
@@ -349,7 +362,15 @@ router.get("/", async (req: AuthRequest, res) => {
     const rows = await prisma.timesheet.findMany({
       where,
       include: {
-        project: { select: { id: true, title: true, projectNumber: true, projectManagerId: true } },
+        project: {
+    select: {
+      id: true,
+      title: true,
+      projectNumber: true,
+      projectManagerId: true,
+      timesheetApproverUserId: true,
+    },
+  },
         opportunity: { select: { id: true, name: true } },
         memberUser: { select: { id: true, name: true, email: true } },
       },
@@ -650,22 +671,19 @@ router.post("/:id/approve", async (req: AuthRequest, res) => {
     if (!timesheetId) return res.status(400).json({ error: "Invalid id" });
     const actorId = getActorId(req);
     const role = req.user?.role ?? "";
-    if (!isProjectManagerRole(role)) return res.status(403).json({ error: "Forbidden" });
-
     const existing = await prisma.timesheet.findUnique({
       where: { id: timesheetId },
       include: {
-        project: { select: { projectManagerId: true } },
+        project: { select: { projectManagerId: true, timesheetApproverUserId: true } },
         opportunity: { select: { ownerId: true } },
       },
     });
     if (!existing) return res.status(404).json({ error: "Not found" });
-    if (role === "project_manager") {
-      const managesProject = existing.project?.projectManagerId === actorId;
-      const ownsOpportunity = existing.opportunity?.ownerId === actorId;
-      if (!managesProject && !ownsOpportunity) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
+    const canApproveProject =
+      existing.project && canActAsTimesheetApprover(actorId, role, existing.project);
+    const ownsOpportunity = existing.opportunity?.ownerId === actorId;
+    if (!canApproveProject && !ownsOpportunity) {
+      return res.status(403).json({ error: "Forbidden" });
     }
     if (existing.status !== "SUBMITTED") {
       return res.status(400).json({ error: "Only submitted timesheets can be approved" });
@@ -699,23 +717,21 @@ router.post("/:id/reject", async (req: AuthRequest, res) => {
     if (!timesheetId) return res.status(400).json({ error: "Invalid id" });
     const actorId = getActorId(req);
     const role = req.user?.role ?? "";
-    if (!isProjectManagerRole(role)) return res.status(403).json({ error: "Forbidden" });
     const { reason } = rejectSchema.parse(req.body);
 
     const existing = await prisma.timesheet.findUnique({
       where: { id: timesheetId },
       include: {
-        project: { select: { projectManagerId: true } },
+        project: { select: { projectManagerId: true, timesheetApproverUserId: true } },
         opportunity: { select: { ownerId: true } },
       },
     });
     if (!existing) return res.status(404).json({ error: "Not found" });
-    if (role === "project_manager") {
-      const managesProject = existing.project?.projectManagerId === actorId;
-      const ownsOpportunity = existing.opportunity?.ownerId === actorId;
-      if (!managesProject && !ownsOpportunity) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
+    const canRejectProject =
+      existing.project && canActAsTimesheetApprover(actorId, role, existing.project);
+    const ownsOpportunity = existing.opportunity?.ownerId === actorId;
+    if (!canRejectProject && !ownsOpportunity) {
+      return res.status(403).json({ error: "Forbidden" });
     }
     if (existing.status !== "SUBMITTED") {
       return res.status(400).json({ error: "Only submitted timesheets can be rejected" });

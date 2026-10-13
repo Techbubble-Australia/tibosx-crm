@@ -17,6 +17,7 @@ import {
 import { saveUploadBuffer } from "../lib/save-upload-buffer";
 import { readUploadTextByUrl } from "../lib/read-upload-buffer";
 import { canManageProjects, getActorId, isProjectManagerRole, isProjectMemberRole } from "../lib/project-access";
+import { isValidTimesheetApproverUserId } from "../lib/timesheet-approver";
 import { emailTbosUserInvite } from "../lib/user-invite.js";
 import { logProjectFieldChanges, type ProjectSnapshot } from "../lib/project-activity";
 import {
@@ -67,6 +68,7 @@ const projectSchema = z.object({
   kind: z.enum(PROJECT_KINDS).optional(),
   status: z.enum(PROJECT_STATUSES).optional(),
   projectManagerId: z.string().min(1),
+  timesheetApproverUserId: z.string().min(1),
   contractId: z.string().optional().nullable(),
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
@@ -207,6 +209,7 @@ function serializeProject(row: {
   kind: string;
   status: string;
   projectManagerId: string;
+  timesheetApproverUserId: string;
   contractId: string | null;
   startDate: Date;
   endDate: Date;
@@ -215,6 +218,7 @@ function serializeProject(row: {
   updatedAt: Date;
   client?: { id: string; name: string };
   projectManager?: { id: string; name: string | null; email: string };
+  timesheetApprover?: { id: string; name: string | null; email: string };
   contract?: { id: string; contractNumber: string; title: string; type: string; unit: string | null; currency: string } | null;
   members?: unknown;
   estimates?: unknown;
@@ -240,6 +244,9 @@ function serializeProject(row: {
     statusLabel: PROJECT_STATUS_LABELS[status] ?? row.status,
     projectManagerId: row.projectManagerId,
     projectManagerName: row.projectManager?.name || row.projectManager?.email || "",
+    timesheetApproverUserId: row.timesheetApproverUserId,
+    timesheetApproverName:
+      row.timesheetApprover?.name || row.timesheetApprover?.email || row.projectManager?.name || "",
     contractId: row.contractId,
     contractNumber: row.contract?.contractNumber ?? null,
     contractTitle: row.contract?.title ?? null,
@@ -263,6 +270,7 @@ function serializeProject(row: {
 const detailInclude = {
   client: { select: { id: true, name: true } },
   projectManager: { select: { id: true, name: true, email: true } },
+  timesheetApprover: { select: { id: true, name: true, email: true } },
   contract: { select: { id: true, contractNumber: true, title: true, type: true, unit: true, currency: true } },
   members: {
     orderBy: { createdAt: "asc" as const },
@@ -691,6 +699,11 @@ router.post("/", async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
     const data = projectSchema.parse(req.body);
+    if (!(await isValidTimesheetApproverUserId(data.timesheetApproverUserId))) {
+      return res.status(400).json({
+        error: "Timesheet approver must be a user with Administrator, Project manager, or Client role",
+      });
+    }
     const projectNumber = await allocateProjectNumber();
     const contract = data.contractId
       ? await prisma.contract.findUnique({
@@ -714,6 +727,7 @@ router.post("/", async (req: AuthRequest, res) => {
           kind: data.kind ?? "DELIVERY",
           status: data.status ?? "DRAFT",
           projectManagerId: data.projectManagerId,
+          timesheetApproverUserId: data.timesheetApproverUserId,
           contractId: data.contractId ?? null,
           startDate: data.startDate,
           endDate: data.endDate,
@@ -756,6 +770,11 @@ router.put("/:id", async (req: AuthRequest, res) => {
     const data = projectSchema.parse(req.body);
     const existing = await prisma.project.findUnique({ where: { id: projectId } });
     if (!existing) return res.status(404).json({ error: "Not found" });
+    if (!(await isValidTimesheetApproverUserId(data.timesheetApproverUserId))) {
+      return res.status(400).json({
+        error: "Timesheet approver must be a user with Administrator, Project manager, or Client role",
+      });
+    }
 
     const contract = data.contractId
       ? await prisma.contract.findUnique({
@@ -771,6 +790,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
       kind: existing.kind,
       status: existing.status,
       projectManagerId: existing.projectManagerId,
+      timesheetApproverUserId: existing.timesheetApproverUserId,
       contractId: existing.contractId,
       startDate: existing.startDate,
       endDate: existing.endDate,
@@ -782,6 +802,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
       kind: data.kind ?? existing.kind,
       status: data.status ?? existing.status,
       projectManagerId: data.projectManagerId,
+      timesheetApproverUserId: data.timesheetApproverUserId,
       contractId: data.contractId ?? null,
       startDate: data.startDate,
       endDate: data.endDate,
@@ -797,6 +818,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
           kind: afterSnapshot.kind,
           status: afterSnapshot.status,
           projectManagerId: afterSnapshot.projectManagerId,
+          timesheetApproverUserId: afterSnapshot.timesheetApproverUserId,
           contractId: afterSnapshot.contractId,
           startDate: afterSnapshot.startDate,
           endDate: afterSnapshot.endDate,
@@ -952,6 +974,49 @@ router.get("/:id/member-options", async (req: AuthRequest, res) => {
 
 const addMemberSchema = z.object({
   profileId: z.string().min(1),
+});
+
+async function canRemoveProjectMember(req: AuthRequest, projectId: string): Promise<boolean> {
+  const role = req.user?.role ?? "";
+  const actorId = getActorId(req);
+  if (role === "admin") return true;
+  if (role !== "project_manager") return false;
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { projectManagerId: true },
+  });
+  return project?.projectManagerId === actorId;
+}
+
+router.delete("/:id/members/:memberId", async (req: AuthRequest, res) => {
+  try {
+    const projectId = req.params.id;
+    const memberId = req.params.memberId;
+    if (!projectId || !memberId) return res.status(400).json({ error: "Invalid id" });
+    if (!(await canRemoveProjectMember(req, projectId))) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const member = await prisma.projectMember.findFirst({
+      where: { id: memberId, projectId },
+    });
+    if (!member) return res.status(404).json({ error: "Member not found" });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.projectMember.delete({ where: { id: memberId } });
+      await tx.projectActivityLog.create({
+        data: {
+          projectId,
+          action: "MEMBER_REMOVED",
+          newValue: member.profileId,
+          performedById: getActorId(req) || null,
+        },
+      });
+    });
+    res.json({ message: "Member removed" });
+  } catch (error) {
+    console.error("Error removing project member:", error);
+    res.status(500).json({ error: "Failed to remove member" });
+  }
 });
 
 router.post("/:id/members", async (req: AuthRequest, res) => {
