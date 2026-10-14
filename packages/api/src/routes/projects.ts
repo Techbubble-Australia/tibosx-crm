@@ -1119,7 +1119,7 @@ router.post("/:id/members", async (req: AuthRequest, res) => {
       data: {
         projectId,
         action: "MEMBER_ADDED",
-        newValue: profile.email,
+        newValue: member.profile.email,
         performedById: getActorId(req) || null,
       },
     });
