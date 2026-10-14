@@ -6,6 +6,7 @@ import { tbosAuthMiddleware, requireTbosAdmin, type TbosRequest } from "../middl
 import { assignedOrganizationIds } from "../lib/ticket-access.js";
 import { resolveTbosActorUserId } from "../lib/tbos-actor.js";
 import { logTicketAudit } from "../lib/ticket-audit.js";
+import { nextTicketNumber } from "../lib/ticket-number.js";
 import { saveTicketUpload } from "../lib/upload-storage.js";
 import { streamTicketAttachmentFile } from "../lib/serve-ticket-attachment.js";
 import {
@@ -31,6 +32,14 @@ const messageSchema = z.object({
   isInternal: z.boolean().optional(),
 });
 
+const ticketCreateSchema = z.object({
+  type: z.nativeEnum(TicketType),
+  priority: z.nativeEnum(TicketPriority).optional(),
+  subject: z.string().min(1).max(300),
+  description: z.string().min(1).max(20000),
+  organizationId: z.string().min(1),
+});
+
 const router: IRouter = Router();
 
 router.use(tbosAuthMiddleware);
@@ -48,6 +57,40 @@ async function orgFilterForTbos(tbosUser: { id: string; role: string }) {
   const orgIds = await assignedOrganizationIds(consultant.id);
   return { organizationId: { in: orgIds } };
 }
+
+async function supportLinkedProjectIds(tbosUser: { id: string; role: string }): Promise<string[]> {
+  if (isTbosAdminRole(tbosUser.role)) {
+    const orgs = await prisma.organization.findMany({
+      where: { active: true, projectId: { not: null } },
+      select: { projectId: true },
+    });
+    return orgs.map((o) => o.projectId).filter((id): id is string => Boolean(id));
+  }
+  const orgScope = await orgFilterForTbos(tbosUser);
+  if (!orgScope.organizationId || typeof orgScope.organizationId !== "object") {
+    return [];
+  }
+  const orgs = await prisma.organization.findMany({
+    where: { id: { in: orgScope.organizationId.in }, projectId: { not: null } },
+    select: { projectId: true },
+  });
+  return orgs.map((o) => o.projectId).filter((id): id is string => Boolean(id));
+}
+
+router.get("/timesheets/summary", async (req: TbosRequest, res) => {
+  const tbosUser = req.tbosUser!;
+  const projectIds = await supportLinkedProjectIds(tbosUser);
+  if (!projectIds.length) {
+    return res.json({ data: { total: 0, pendingApproval: 0 } });
+  }
+  const [total, pendingApproval] = await Promise.all([
+    prisma.timesheet.count({ where: { projectId: { in: projectIds } } }),
+    prisma.timesheet.count({
+      where: { projectId: { in: projectIds }, status: "SUBMITTED" },
+    }),
+  ]);
+  res.json({ data: { total, pendingApproval } });
+});
 
 router.get("/tickets", async (req: TbosRequest, res) => {
   const tbosUser = req.tbosUser!;
@@ -102,6 +145,123 @@ router.get("/tickets", async (req: TbosRequest, res) => {
       updatedAt: row.updatedAt.toISOString(),
       closedAt: row.closedAt?.toISOString() ?? null,
     })),
+  });
+});
+
+router.get("/tickets/activity/recent", async (req: TbosRequest, res) => {
+  const tbosUser = req.tbosUser!;
+  const orgScope = await orgFilterForTbos(tbosUser);
+  const tickets = await prisma.ticket.findMany({
+    where: orgScope,
+    select: { id: true, ticketNumber: true, subject: true },
+    take: 50,
+  });
+  const ticketIds = tickets.map((t) => t.id);
+  if (!ticketIds.length) return res.json({ data: [] });
+
+  const logs = await prisma.ticketAuditLog.findMany({
+    where: { ticketId: { in: ticketIds } },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+    include: {
+      ticket: { select: { id: true, ticketNumber: true, subject: true } },
+      actor: { select: { name: true, email: true } },
+    },
+  });
+
+  res.json({
+    data: logs.map((row) => ({
+      id: row.ticket.id,
+      action: row.action,
+      ticketNumber: row.ticket.ticketNumber,
+      subject: row.ticket.subject,
+      createdAt: row.createdAt.toISOString(),
+      actorName: row.actor?.name || row.actor?.email || "",
+    })),
+  });
+});
+
+router.post("/tickets", async (req: TbosRequest, res) => {
+  const tbosUser = req.tbosUser!;
+  const parsed = ticketCreateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  const orgScope = await orgFilterForTbos(tbosUser);
+  const orgWhere: { id: string; active: boolean; projectId?: string | null } = {
+    id: parsed.data.organizationId,
+    active: true,
+  };
+  if (orgScope.organizationId && typeof orgScope.organizationId === "object") {
+    if (!orgScope.organizationId.in.includes(parsed.data.organizationId)) {
+      return res.status(400).json({ error: "Invalid organization" });
+    }
+  }
+
+  const org = await prisma.organization.findFirst({
+    where: orgWhere,
+    select: { id: true, projectId: true },
+  });
+  if (!org) return res.status(400).json({ error: "Invalid organization" });
+
+  const actorId = await resolveTbosActorUserId(tbosUser);
+  const ticketNumber = await nextTicketNumber();
+  const projectId = org.projectId ?? null;
+  const ticket = await prisma.ticket.create({
+    data: {
+      ticketNumber,
+      organizationId: org.id,
+      projectId,
+      type: parsed.data.type,
+      priority: parsed.data.priority ?? TicketPriority.MEDIUM,
+      status: TicketStatus.OPEN,
+      subject: parsed.data.subject.trim(),
+      description: parsed.data.description.trim(),
+      createdById: actorId,
+    },
+    include: {
+      organization: { select: { id: true, name: true, slug: true } },
+      createdBy: { select: { id: true, name: true, email: true } },
+      assignedTo: { select: { id: true, name: true, email: true } },
+    },
+  });
+
+  await logTicketAudit(ticket.id, actorId, "CREATED", {
+    metadata: { type: ticket.type, priority: ticket.priority },
+  });
+
+  if (projectId) {
+    const { assignTicketToSupportGroup, notifySupportGroupOfTicket } = await import(
+      "../../lib/support-project.js"
+    );
+    await assignTicketToSupportGroup(ticket.id, projectId);
+    void notifySupportGroupOfTicket(ticket.id);
+    const refreshed = await prisma.ticket.findUnique({
+      where: { id: ticket.id },
+      include: {
+        organization: { select: { id: true, name: true, slug: true } },
+        createdBy: { select: { id: true, name: true, email: true } },
+        assignedTo: { select: { id: true, name: true, email: true } },
+      },
+    });
+    if (refreshed) {
+      return res.status(201).json({
+        data: {
+          ...refreshed,
+          createdAt: refreshed.createdAt.toISOString(),
+          updatedAt: refreshed.updatedAt.toISOString(),
+          closedAt: refreshed.closedAt?.toISOString() ?? null,
+        },
+      });
+    }
+  }
+
+  res.status(201).json({
+    data: {
+      ...ticket,
+      createdAt: ticket.createdAt.toISOString(),
+      updatedAt: ticket.updatedAt.toISOString(),
+      closedAt: ticket.closedAt?.toISOString() ?? null,
+    },
   });
 });
 

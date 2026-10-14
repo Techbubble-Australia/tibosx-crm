@@ -40,7 +40,7 @@ export default function TicketsPage() {
           href="/workspace/tickets/new"
           className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
         >
-          New ticket
+          Create ticket
         </Link>
         <input
           value={q}

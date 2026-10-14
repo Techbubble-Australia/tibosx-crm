@@ -49,7 +49,7 @@ export default function SupportAssignmentsPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/support-tickets" className="text-sm text-blue-600 hover:underline">← Support tickets</Link>
+      <Link href="/support-tickets" className="text-sm text-blue-600 hover:underline">← Tickets</Link>
       <h1 className="text-2xl font-semibold">Consultant project access</h1>
       <p className="text-sm text-gray-500">Sales consultants only see tickets for assigned projects. Admins see all tickets.</p>
       <ul className="space-y-4">

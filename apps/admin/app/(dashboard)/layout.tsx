@@ -88,14 +88,15 @@ const navGroups: NavGroup[] = [
   },
   {
     id: "workspace",
-    label: "Support",
+    label: "Customer support",
     icon: ClipboardList,
     roles: ["admin", "customer_support", "client"],
     items: [
       { href: "/workspace/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["customer_support", "client"] },
       { href: "/workspace/tickets", label: "Tickets", icon: Ticket, roles: ["customer_support", "client"] },
       { href: "/workspace/timesheets", label: "Timesheets", icon: ClipboardCheck, roles: ["customer_support", "client"] },
-      { href: "/support-tickets", label: "Support tickets", icon: ClipboardList, roles: ["admin"] },
+      { href: "/support-tickets/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin"] },
+      { href: "/support-tickets", label: "Tickets", icon: Ticket, roles: ["admin"] },
     ],
   },
   {
@@ -147,11 +148,19 @@ function headerTitle(pathname: string): string {
     return "My profile";
   }
   if (pathname.startsWith("/workspace")) {
-    if (pathname.startsWith("/workspace/tickets/new")) return "New ticket";
+    if (pathname.startsWith("/workspace/tickets/new")) return "Create ticket";
     if (pathname.startsWith("/workspace/tickets/")) return "Ticket";
     if (pathname.startsWith("/workspace/tickets")) return "Tickets";
     if (pathname.startsWith("/workspace/timesheets")) return "Timesheets";
     return "Dashboard";
+  }
+  if (pathname.startsWith("/support-tickets")) {
+    if (pathname.startsWith("/support-tickets/new")) return "Create ticket";
+    if (pathname.startsWith("/support-tickets/dashboard")) return "Dashboard";
+    if (pathname.match(/^\/support-tickets\/[^/]+$/)) return "Ticket";
+    if (pathname.startsWith("/support-tickets/projects")) return "Support projects";
+    if (pathname.startsWith("/support-tickets/assignments")) return "Consultant access";
+    return "Tickets";
   }
   if (pathname.startsWith("/users")) {
     return "Users";
@@ -246,8 +255,17 @@ function navItemIsActive(item: NavItem, pathname: string): boolean {
   if (item.href === "/timesheets") {
     return pathUnder("/timesheets", pathname) && !pathUnder("/support-tickets", pathname);
   }
+  if (item.href === "/support-tickets/dashboard") {
+    return pathUnder("/support-tickets/dashboard", pathname);
+  }
   if (item.href === "/support-tickets") {
-    return pathUnder("/support-tickets", pathname);
+    return (
+      pathUnder("/support-tickets", pathname) &&
+      !pathUnder("/support-tickets/dashboard", pathname) &&
+      !pathUnder("/support-tickets/new", pathname) &&
+      !pathUnder("/support-tickets/projects", pathname) &&
+      !pathUnder("/support-tickets/assignments", pathname)
+    );
   }
   if (item.href.startsWith("/workspace")) {
     return pathUnder(item.href, pathname);

@@ -49,11 +49,17 @@ export default function SupportTicketsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Support tickets</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Tickets</h1>
           <p className="text-sm text-gray-500">
-            {role === "admin" ? "All client projects" : "Projects assigned to you"}
+            {role === "admin" ? "All client support projects" : "Projects assigned to you"}
           </p>
         </div>
+        <Link
+          href="/support-tickets/new"
+          className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+        >
+          Create ticket
+        </Link>
       </div>
 
       {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
