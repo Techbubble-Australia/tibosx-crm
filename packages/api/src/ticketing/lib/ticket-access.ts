@@ -39,7 +39,7 @@ export async function organizationIdsForClientPortal(
   const rows = await prisma.organization.findMany({
     where: {
       active: true,
-      project: { status: "ACTIVE", kind: "SUPPORT", clientId },
+      project: { status: "ACTIVE", clientId },
     },
     select: { id: true },
   });
@@ -76,7 +76,7 @@ export async function organizationIdsForTbosProjectMember(
     where: {
       active: true,
       projectId: { in: [...projectIds] },
-      project: { status: "ACTIVE", kind: "SUPPORT" },
+      project: { status: "ACTIVE" },
     },
     select: { id: true },
   });
@@ -95,9 +95,7 @@ export async function scopeOrganizationIdsForPortal(
   }
   if (user.role === "CONSULTANT" && user.consultantVerified) {
     if (isTbosAdmin(user)) return null;
-    if (isCustomerSupportTbos(user) && user.tbosAdminUserId) {
-      return organizationIdsForTbosProjectMember(user.tbosAdminUserId, user.id);
-    }
+    if (isCustomerSupportTbos(user)) return null;
     return assignedOrganizationIds(user.id);
   }
   return [];
@@ -113,7 +111,7 @@ export async function canSelectOrganizationForNewTicket(
       where: {
         id: organizationId,
         active: true,
-        project: { status: "ACTIVE", kind: "SUPPORT" },
+        OR: [{ projectId: null }, { project: { status: "ACTIVE" } }],
       },
       select: { id: true },
     });
@@ -133,11 +131,7 @@ export async function ticketOrganizationFilter(
   }
   if (user.role === "CONSULTANT" && user.consultantVerified) {
     if (isTbosAdmin(user)) return {};
-    if (isCustomerSupportTbos(user) && user.tbosAdminUserId) {
-      const orgIds = await organizationIdsForTbosProjectMember(user.tbosAdminUserId, user.id);
-      if (orgIds.length === 0) return { organizationId: { in: [] } };
-      return { organizationId: { in: orgIds } };
-    }
+    if (isCustomerSupportTbos(user)) return {};
     const orgIds = await assignedOrganizationIds(user.id);
     if (orgIds.length === 0) return { organizationId: { in: [] } };
     return { organizationId: { in: orgIds } };

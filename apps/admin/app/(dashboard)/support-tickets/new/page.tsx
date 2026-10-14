@@ -27,11 +27,17 @@ export default function AdminNewTicketPage() {
 
   useEffect(() => {
     void adminFetch("/api/admin/ticketing/organizations")
-      .then((res) => res.json())
-      .then((data) => {
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(typeof data.error === "string" ? data.error : "Failed to load projects");
+        }
         const list = (data.data as Org[]) ?? [];
         setOrgs(list);
         if (list.length === 1) setOrganizationId(list[0]!.id);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Failed to load projects");
       });
   }, []);
 
@@ -105,6 +111,12 @@ export default function AdminNewTicketPage() {
               ))}
             </select>
           )}
+          {orgs.length === 0 ? (
+            <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+              No support projects are available. On each TBOS project, use <strong>Enable support portal</strong> (project
+              record) and ensure the project status is <strong>Active</strong>.
+            </p>
+          ) : null}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
