@@ -1,4 +1,4 @@
-import { prisma, type Prisma } from "@techbubble/database";
+import { prisma } from "@techbubble/database";
 
 export type PortalOrganizationRow = {
   id: string;
@@ -9,62 +9,48 @@ export type PortalOrganizationRow = {
   projectTitle: string | null;
 };
 
-/** Active portal orgs: standalone orgs or orgs linked to an ACTIVE TBOS project. */
-export function supportPortalOrganizationWhere(
-  scopeOrganizationIds?: string[],
-): Prisma.OrganizationWhereInput {
-  const where: Prisma.OrganizationWhereInput = {
-    active: true,
-    OR: [{ projectId: null }, { project: { status: "ACTIVE" } }],
-  };
-  if (scopeOrganizationIds) {
-    if (!scopeOrganizationIds.length) {
-      return { id: { in: [] } };
-    }
-    where.id = { in: scopeOrganizationIds };
-  }
-  return where;
-}
-
+/**
+ * One row per ACTIVE TBOS project that has an enabled support portal org.
+ * Orphan orgs (no project / deleted project) are excluded so the create-ticket list
+ * matches the Projects module.
+ */
 export async function listSupportPortalOrganizations(
   scopeOrganizationIds: string[] | null,
 ): Promise<PortalOrganizationRow[]> {
-  const where = supportPortalOrganizationWhere(
-    scopeOrganizationIds === null ? undefined : scopeOrganizationIds,
-  );
+  const orgScope =
+    scopeOrganizationIds === null
+      ? {}
+      : scopeOrganizationIds.length
+        ? { id: { in: scopeOrganizationIds } }
+        : { id: { in: [] as string[] } };
 
-  const rows = await prisma.organization.findMany({
-    where,
-    orderBy: { name: "asc" },
+  const rows = await prisma.project.findMany({
+    where: {
+      status: "ACTIVE",
+      supportOrganization: {
+        active: true,
+        ...orgScope,
+      },
+    },
+    orderBy: { projectNumber: "asc" },
     select: {
       id: true,
-      name: true,
-      slug: true,
-      projectId: true,
-      project: { select: { id: true, projectNumber: true, title: true, status: true } },
+      projectNumber: true,
+      title: true,
+      supportOrganization: {
+        select: { id: true, name: true, slug: true },
+      },
     },
   });
 
-  const byProject = new Map<string, PortalOrganizationRow>();
-  const standalone: PortalOrganizationRow[] = [];
-
-  for (const row of rows) {
-    const projectId = row.projectId ?? row.project?.id;
-    const entry: PortalOrganizationRow = {
-      id: row.id,
-      name: row.name,
-      slug: row.slug,
-      projectId: projectId ?? null,
-      projectNumber: row.project?.projectNumber ?? null,
-      projectTitle: row.project?.title ?? null,
-    };
-    if (!projectId) {
-      standalone.push(entry);
-      continue;
-    }
-    if (byProject.has(projectId)) continue;
-    byProject.set(projectId, entry);
-  }
-
-  return [...standalone, ...byProject.values()].sort((a, b) => a.name.localeCompare(b.name));
+  return rows
+    .filter((row) => row.supportOrganization)
+    .map((row) => ({
+      id: row.supportOrganization!.id,
+      name: `${row.projectNumber} — ${row.title}`,
+      slug: row.supportOrganization!.slug,
+      projectId: row.id,
+      projectNumber: row.projectNumber,
+      projectTitle: row.title,
+    }));
 }

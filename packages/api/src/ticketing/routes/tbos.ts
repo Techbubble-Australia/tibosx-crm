@@ -198,7 +198,11 @@ router.post("/tickets", async (req: TbosRequest, res) => {
   }
 
   const org = await prisma.organization.findFirst({
-    where: orgWhere,
+    where: {
+      ...orgWhere,
+      projectId: { not: null },
+      project: { status: "ACTIVE" },
+    },
     select: { id: true, projectId: true },
   });
   if (!org) return res.status(400).json({ error: "Invalid organization" });

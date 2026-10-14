@@ -111,7 +111,8 @@ export async function canSelectOrganizationForNewTicket(
       where: {
         id: organizationId,
         active: true,
-        OR: [{ projectId: null }, { project: { status: "ACTIVE" } }],
+        projectId: { not: null },
+        project: { status: "ACTIVE" },
       },
       select: { id: true },
     });
