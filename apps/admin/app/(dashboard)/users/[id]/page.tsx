@@ -14,6 +14,13 @@ import { UserPhotoField } from "@/components/users/UserPhotoField";
 import { UserAssignCredentialsModal } from "@/components/users/UserAssignCredentialsModal";
 import type { AdminRole } from "@/lib/admin-roles";
 import { COUNTRY_OPTIONS } from "@/lib/country-options";
+import {
+  BankDetailsFields,
+  bankDetailsFromApi,
+  bankDetailsToApi,
+  type BankDetailsFormValue,
+} from "@/components/users/BankDetailsFields";
+import { COUNTRY_OTHER } from "@/lib/country-form";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
@@ -47,6 +54,7 @@ type UserDetail = {
   city: string | null;
   state: string | null;
   country: string | null;
+  bankDetails: unknown;
   emergencyContacts: EmergencyContact[];
   agreementDocumentUrl: string | null;
   mappedClientContactId: string | null;
@@ -80,6 +88,7 @@ export default function EditUserPage() {
   const [mappedProfileId, setMappedProfileId] = useState("");
   const [mappedProfileOption, setMappedProfileOption] = useState<ProfileMapOption | null>(null);
   const [userFiles, setUserFiles] = useState<UserFileRow[]>([]);
+  const [bankDetails, setBankDetails] = useState<BankDetailsFormValue>(bankDetailsFromApi(null));
 
   async function load() {
     try {
@@ -114,6 +123,7 @@ export default function EditUserPage() {
           : [],
       );
       setPhotoUrl(row.profilePhotoUrl);
+      setBankDetails(bankDetailsFromApi(row.bankDetails));
       if (Array.isArray(row.emergencyContacts) && row.emergencyContacts.length) {
         setEmergencyContacts(row.emergencyContacts);
       }
@@ -146,6 +156,10 @@ export default function EditUserPage() {
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!validateEmergencyContacts(emergencyContacts)) return;
+    if (bankDetails.countrySelect === COUNTRY_OTHER && !bankDetails.countryOther.trim()) {
+      alert("Enter bank country name when Other is selected.");
+      return;
+    }
     setIsLoading(true);
     const formData = new FormData(e.currentTarget);
     const password = String(formData.get("password") ?? "").trim();
@@ -171,6 +185,7 @@ export default function EditUserPage() {
       mappedClientContactId: roles.includes("client") ? mappedClientContactId || null : null,
       mappedProfileId: mappedProfileId.trim() || null,
       userFiles,
+      bankDetails: bankDetailsToApi(bankDetails),
     };
     if (password) body.password = password;
 
@@ -333,6 +348,11 @@ export default function EditUserPage() {
               </select>
             </div>
           </div>
+        </section>
+
+        <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+          <h3 className="mb-4 font-semibold">Bank details</h3>
+          <BankDetailsFields value={bankDetails} onChange={setBankDetails} />
         </section>
 
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">

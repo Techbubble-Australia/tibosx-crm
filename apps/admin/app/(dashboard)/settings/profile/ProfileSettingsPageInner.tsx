@@ -9,7 +9,14 @@ import { AdminUserFilesField, type UserFileRow } from "@/components/users/AdminU
 import { resolveDocumentHref } from "@/lib/media-url";
 import { roleLabel, type AdminRole, isAdminRole } from "@/lib/admin-roles";
 import { COUNTRY_OPTIONS } from "@/lib/country-options";
+import { COUNTRY_OTHER, mergeCountryValue, splitCountryValue } from "@/lib/country-form";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
+import {
+  BankDetailsFields,
+  bankDetailsFromApi,
+  bankDetailsToApi,
+  type BankDetailsFormValue,
+} from "@/components/users/BankDetailsFields";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
@@ -49,7 +56,10 @@ export default function ProfileSettingsPageInner() {
   const [postcode, setPostcode] = useState("");
   const [city, setCity] = useState("");
   const [stateRegion, setStateRegion] = useState("");
-  const [country, setCountry] = useState("");
+  const [countrySelect, setCountrySelect] = useState("");
+  const [countryOther, setCountryOther] = useState("");
+  const [bankDetails, setBankDetails] = useState<BankDetailsFormValue>(bankDetailsFromApi(null));
+  const [savingBank, setSavingBank] = useState(false);
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([{ name: "", email: "", phone: "" }]);
   const [agreementDocumentUrl, setAgreementDocumentUrl] = useState<string | null>(null);
   const [idProofUrl, setIdProofUrl] = useState<string | null>(null);
@@ -83,7 +93,10 @@ export default function ProfileSettingsPageInner() {
         setPostcode(String(user.postcode ?? user.suburb ?? ""));
         setCity(String(user.city ?? ""));
         setStateRegion(String(user.state ?? ""));
-        setCountry(String(user.country ?? ""));
+        const addressCountry = splitCountryValue(String(user.country ?? ""));
+        setCountrySelect(addressCountry.select);
+        setCountryOther(addressCountry.other);
+        setBankDetails(bankDetailsFromApi(user.bankDetails));
         const contacts = user.emergencyContacts;
         if (Array.isArray(contacts) && contacts.length) {
           setEmergencyContacts(contacts as EmergencyContact[]);
@@ -141,9 +154,14 @@ export default function ProfileSettingsPageInner() {
     e.preventDefault();
     if (!validateEmergencyContacts(emergencyContacts)) return;
 
+    const country = mergeCountryValue(countrySelect, countryOther);
     if (isProjectMemberOnboarding) {
-      if (!addressLine1.trim() || !city.trim() || !stateRegion.trim() || !postcode.trim() || !country.trim()) {
+      if (!addressLine1.trim() || !city.trim() || !stateRegion.trim() || !postcode.trim() || !country) {
         alert("Address line 1, city, state, postcode, and country are required.");
+        return;
+      }
+      if (countrySelect === COUNTRY_OTHER && !countryOther.trim()) {
+        alert("Enter your country name when Other is selected.");
         return;
       }
     }
@@ -168,7 +186,7 @@ export default function ProfileSettingsPageInner() {
         body.postcode = postcode.trim();
         body.city = city.trim();
         body.state = stateRegion.trim();
-        body.country = country.trim();
+        body.country = country;
         body.markProfileComplete = true;
       }
 
@@ -395,6 +413,47 @@ export default function ProfileSettingsPageInner() {
         </div>
       </form>
 
+      <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+        <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Bank details</h3>
+        <BankDetailsFields value={bankDetails} onChange={setBankDetails} />
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            disabled={savingBank}
+            onClick={() => {
+              void (async () => {
+                const payload = bankDetailsToApi(bankDetails);
+                if (
+                  bankDetails.countrySelect === COUNTRY_OTHER &&
+                  !bankDetails.countryOther.trim()
+                ) {
+                  alert("Enter bank country name when Other is selected.");
+                  return;
+                }
+                setSavingBank(true);
+                try {
+                  const res = await adminFetch("/api/auth/profile", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ bankDetails: payload }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save");
+                } catch (error) {
+                  alert(error instanceof Error ? error.message : "Failed to save bank details");
+                } finally {
+                  setSavingBank(false);
+                }
+              })();
+            }}
+            className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+          >
+            {savingBank ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Save bank details
+          </button>
+        </div>
+      </section>
+
       <form onSubmit={(e) => void handleProfileSubmit(e)} className="space-y-6">
         {isProjectMemberOnboarding ? (
           <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
@@ -422,12 +481,26 @@ export default function ProfileSettingsPageInner() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium">Country *</label>
-                <select className={inputClass} value={country} onChange={(e) => setCountry(e.target.value)} required>
+                <select
+                  className={inputClass}
+                  value={countrySelect}
+                  onChange={(e) => setCountrySelect(e.target.value)}
+                  required
+                >
                   <option value="">Select country…</option>
                   {COUNTRY_OPTIONS.map((option) => (
                     <option key={option} value={option}>{option}</option>
                   ))}
                 </select>
+                {countrySelect === COUNTRY_OTHER ? (
+                  <input
+                    className={`${inputClass} mt-2`}
+                    placeholder="Enter country name *"
+                    value={countryOther}
+                    onChange={(e) => setCountryOther(e.target.value)}
+                    required
+                  />
+                ) : null}
               </div>
             </div>
           </section>
@@ -528,8 +601,11 @@ export default function ProfileSettingsPageInner() {
 
       <AdminUserFilesField
         files={userFiles}
+        allowUpload={role === "admin"}
+        allowRemove={role === "admin"}
         onChange={(next) => {
           setUserFiles(next);
+          if (role !== "admin") return;
           void adminFetch("/api/auth/profile", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },

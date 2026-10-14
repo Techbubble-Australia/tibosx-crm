@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { readUploadImageUrlFromJson } from "@/lib/upload-response";
 import { resolveDocumentHref } from "@/lib/media-url";
@@ -193,6 +193,8 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
     sessionRole === "admin" ||
     (sessionRole === "project_manager" && defaults.projectManagerId === sessionUserId);
 
+  const canEditEstimates = sessionRole === "admin" || sessionRole === "project_manager";
+
   useEffect(() => {
     if (!defaults.id && projectManagerId && !defaults.timesheetApproverUserId) {
       setTimesheetApproverUserId(projectManagerId);
@@ -201,6 +203,39 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
 
   function updateEstimate(index: number, patch: Partial<ProjectEstimateRow>) {
     setEstimates((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  }
+
+  function estimateMonthInputValue(row: ProjectEstimateRow) {
+    const m = String(row.month + 1).padStart(2, "0");
+    return `${row.year}-${m}`;
+  }
+
+  function parseEstimateMonthInput(value: string): { year: number; month: number } | null {
+    const match = /^(\d{4})-(\d{2})$/.exec(value);
+    if (!match) return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]) - 1;
+    if (month < 0 || month > 11) return null;
+    return { year, month };
+  }
+
+  function addEstimateRow() {
+    const now = new Date();
+    setEstimates((prev) => [
+      ...prev,
+      {
+        year: now.getFullYear(),
+        month: now.getMonth(),
+        qty: 0,
+        currency: prev[0]?.currency ?? "AUD",
+        estimatedCost: 0,
+        costType: prev[0]?.costType ?? "personnel",
+      },
+    ]);
+  }
+
+  function removeEstimateRow(index: number) {
+    setEstimates((prev) => prev.filter((_, i) => i !== index));
   }
 
   function updateActual(index: number, patch: Partial<ProjectActualRow>) {
@@ -376,9 +411,24 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
 
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
           <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Financials</h3>
-          <h4 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Estimates</h4>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Estimates</h4>
+            {canEditEstimates && defaults.id ? (
+              <button
+                type="button"
+                onClick={addEstimateRow}
+                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium dark:border-gray-600"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add row
+              </button>
+            ) : null}
+          </div>
           {estimates.length === 0 ? (
-            <p className="mb-4 text-sm text-gray-400">Save the project to generate monthly estimate rows.</p>
+            <p className="mb-4 text-sm text-gray-400">
+              {defaults.id
+                ? "No estimate rows yet. Add a row or save scheduling dates to generate monthly rows."
+                : "Save the project to generate monthly estimate rows."}
+            </p>
           ) : (
             <div className="mb-6 overflow-x-auto">
               <table className="min-w-full text-sm">
@@ -388,14 +438,42 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                     <th className="py-2 pr-3">Qty</th>
                     <th className="py-2 pr-3">Currency</th>
                     <th className="py-2 pr-3">Estimated cost</th>
-                    <th className="py-2">Cost type</th>
+                    <th className="py-2 pr-3">Cost type</th>
+                    {canEditEstimates ? <th className="py-2 w-10" /> : null}
                   </tr>
                 </thead>
                 <tbody>
                   {estimates.map((row, index) => (
-                    <tr key={`${row.year}-${row.month}`} className="border-b border-gray-50 dark:border-gray-800">
-                      <td className="py-2 pr-3">{formatProjectMonth(row.year, row.month)}</td>
-                      <td className="py-2 pr-3">{row.qty}</td>
+                    <tr key={`${row.year}-${row.month}-${index}`} className="border-b border-gray-50 dark:border-gray-800">
+                      <td className="py-2 pr-3">
+                        {canEditEstimates ? (
+                          <input
+                            type="month"
+                            className={inputClass}
+                            value={estimateMonthInputValue(row)}
+                            onChange={(e) => {
+                              const parsed = parseEstimateMonthInput(e.target.value);
+                              if (parsed) updateEstimate(index, parsed);
+                            }}
+                          />
+                        ) : (
+                          formatProjectMonth(row.year, row.month)
+                        )}
+                      </td>
+                      <td className="py-2 pr-3">
+                        {canEditEstimates ? (
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            className={inputClass}
+                            value={row.qty}
+                            onChange={(e) => updateEstimate(index, { qty: Number(e.target.value) })}
+                          />
+                        ) : (
+                          row.qty
+                        )}
+                      </td>
                       <td className="py-2 pr-3">
                         <select className={inputClass} value={row.currency} onChange={(e) => updateEstimate(index, { currency: e.target.value })}>
                           {SALES_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
@@ -404,11 +482,23 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                       <td className="py-2 pr-3">
                         <input type="number" min={0} step="0.01" className={inputClass} value={row.estimatedCost} onChange={(e) => updateEstimate(index, { estimatedCost: Number(e.target.value) })} />
                       </td>
-                      <td className="py-2">
+                      <td className="py-2 pr-3">
                         <select className={inputClass} value={row.costType} onChange={(e) => updateEstimate(index, { costType: e.target.value as ProjectCostType })}>
                           {PROJECT_COST_TYPES.map((t) => <option key={t} value={t}>{PROJECT_COST_TYPE_LABELS[t]}</option>)}
                         </select>
                       </td>
+                      {canEditEstimates ? (
+                        <td className="py-2">
+                          <button
+                            type="button"
+                            onClick={() => removeEstimateRow(index)}
+                            className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
+                            aria-label="Remove estimate row"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>

@@ -29,6 +29,12 @@ export function parseBankDetails(value: unknown): BankDetails | null {
   };
 }
 
+function countryValueComplete(country: string | undefined): boolean {
+  const c = country?.trim() ?? "";
+  if (!c || c === "Other") return false;
+  return true;
+}
+
 export function bankDetailsComplete(value: unknown): boolean {
   const bank = parseBankDetails(value);
   if (!bank) return false;
@@ -36,7 +42,7 @@ export function bankDetailsComplete(value: unknown): boolean {
     bank.bankName?.trim() &&
       bank.accountName?.trim() &&
       bank.accountNumber?.trim() &&
-      bank.country?.trim() &&
+      countryValueComplete(bank.country) &&
       bank.bsb?.trim(),
   );
 }
@@ -53,7 +59,7 @@ export function addressComplete(user: {
       user.city?.trim() &&
       user.state?.trim() &&
       user.postcode?.trim() &&
-      user.country?.trim(),
+      countryValueComplete(user.country ?? undefined),
   );
 }
 

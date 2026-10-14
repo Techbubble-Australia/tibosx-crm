@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { COUNTRY_OPTIONS } from "@/lib/country-options";
+import { COUNTRY_OTHER, mergeCountryValue, splitCountryValue } from "@/lib/country-form";
 import { readUploadImageUrlFromJson } from "@/lib/upload-response";
 
 const inputClass =
@@ -20,12 +21,14 @@ export function MemberProfileCompletionGate() {
   const [city, setCity] = useState("");
   const [stateRegion, setStateRegion] = useState("");
   const [postcode, setPostcode] = useState("");
-  const [country, setCountry] = useState("");
+  const [countrySelect, setCountrySelect] = useState("");
+  const [countryOther, setCountryOther] = useState("");
   const [uploadingProof, setUploadingProof] = useState<"id" | "address" | null>(null);
   const [bankName, setBankName] = useState("");
   const [accountName, setAccountName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
-  const [bankCountry, setBankCountry] = useState("");
+  const [bankCountrySelect, setBankCountrySelect] = useState("");
+  const [bankCountryOther, setBankCountryOther] = useState("");
   const [swiftCode, setSwiftCode] = useState("");
   const [bsb, setBsb] = useState("");
   const [bankNotes, setBankNotes] = useState("");
@@ -50,13 +53,17 @@ export function MemberProfileCompletionGate() {
         setCity(String(user.city ?? ""));
         setStateRegion(String(user.state ?? ""));
         setPostcode(String(user.postcode ?? ""));
-        setCountry(String(user.country ?? ""));
+        const addressCountry = splitCountryValue(String(user.country ?? ""));
+        setCountrySelect(addressCountry.select);
+        setCountryOther(addressCountry.other);
         const bank = user.bankDetails as Record<string, string> | null;
         if (bank) {
           setBankName(bank.bankName ?? "");
           setAccountName(bank.accountName ?? "");
           setAccountNumber(bank.accountNumber ?? "");
-          setBankCountry(bank.country ?? "");
+          const bankCountry = splitCountryValue(bank.country ?? "");
+          setBankCountrySelect(bankCountry.select);
+          setBankCountryOther(bankCountry.other);
           setSwiftCode(bank.swiftCode ?? "");
           setBsb(bank.bsb ?? "");
           setBankNotes(bank.notes ?? "");
@@ -95,12 +102,22 @@ export function MemberProfileCompletionGate() {
 
   async function handleSave() {
     const filled = emergencyContacts.filter((row) => row.name.trim());
-    if (!addressLine1.trim() || !city.trim() || !stateRegion.trim() || !postcode.trim() || !country.trim()) {
+    const country = mergeCountryValue(countrySelect, countryOther);
+    const bankCountry = mergeCountryValue(bankCountrySelect, bankCountryOther);
+    if (!addressLine1.trim() || !city.trim() || !stateRegion.trim() || !postcode.trim() || !country) {
       alert("Address line 1, city, state, postcode, and country are required.");
       return;
     }
-    if (!bankName.trim() || !accountName.trim() || !accountNumber.trim() || !bankCountry.trim() || !bsb.trim()) {
+    if (countrySelect === COUNTRY_OTHER && !countryOther.trim()) {
+      alert("Enter your country name when Other is selected.");
+      return;
+    }
+    if (!bankName.trim() || !accountName.trim() || !accountNumber.trim() || !bankCountry || !bsb.trim()) {
       alert("Complete all required bank details (including BSB/Routing/IFSC).");
+      return;
+    }
+    if (bankCountrySelect === COUNTRY_OTHER && !bankCountryOther.trim()) {
+      alert("Enter bank country name when Other is selected.");
       return;
     }
     if (!filled.length) {
@@ -128,12 +145,12 @@ export function MemberProfileCompletionGate() {
           city: city.trim(),
           state: stateRegion.trim(),
           postcode: postcode.trim(),
-          country: country.trim(),
+          country,
           bankDetails: {
             bankName: bankName.trim(),
             accountName: accountName.trim(),
             accountNumber: accountNumber.trim(),
-            country: bankCountry.trim(),
+            country: bankCountry,
             swiftCode: swiftCode.trim() || undefined,
             bsb: bsb.trim(),
             notes: bankNotes.trim() || undefined,
@@ -170,12 +187,21 @@ export function MemberProfileCompletionGate() {
               <input className={inputClass} placeholder="Bank name *" value={bankName} onChange={(e) => setBankName(e.target.value)} />
               <input className={inputClass} placeholder="Account name *" value={accountName} onChange={(e) => setAccountName(e.target.value)} />
               <input className={inputClass} placeholder="Account number *" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
-              <select className={inputClass} value={bankCountry} onChange={(e) => setBankCountry(e.target.value)}>
+              <select className={inputClass} value={bankCountrySelect} onChange={(e) => setBankCountrySelect(e.target.value)}>
                 <option value="">Bank country *</option>
                 {COUNTRY_OPTIONS.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
+              {bankCountrySelect === COUNTRY_OTHER ? (
+                <input
+                  className={`${inputClass} mt-2 sm:col-span-2`}
+                  placeholder="Enter country name *"
+                  value={bankCountryOther}
+                  onChange={(e) => setBankCountryOther(e.target.value)}
+                  required
+                />
+              ) : null}
               <input className={inputClass} placeholder="SWIFT / BIC" value={swiftCode} onChange={(e) => setSwiftCode(e.target.value)} />
               <input className={inputClass} placeholder="BSB/Routing/IFSC etc. *" required value={bsb} onChange={(e) => setBsb(e.target.value)} />
               <textarea className={`${inputClass} sm:col-span-2`} rows={2} placeholder="Other bank details" value={bankNotes} onChange={(e) => setBankNotes(e.target.value)} />
@@ -189,12 +215,21 @@ export function MemberProfileCompletionGate() {
               <input className={inputClass} placeholder="City *" value={city} onChange={(e) => setCity(e.target.value)} />
               <input className={inputClass} placeholder="State *" value={stateRegion} onChange={(e) => setStateRegion(e.target.value)} />
               <input className={inputClass} placeholder="Postcode *" value={postcode} onChange={(e) => setPostcode(e.target.value)} />
-              <select className={inputClass} value={country} onChange={(e) => setCountry(e.target.value)}>
+              <select className={inputClass} value={countrySelect} onChange={(e) => setCountrySelect(e.target.value)}>
                 <option value="">Country *</option>
                 {COUNTRY_OPTIONS.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
+              {countrySelect === COUNTRY_OTHER ? (
+                <input
+                  className={`${inputClass} sm:col-span-2`}
+                  placeholder="Enter country name *"
+                  value={countryOther}
+                  onChange={(e) => setCountryOther(e.target.value)}
+                  required
+                />
+              ) : null}
             </div>
           </section>
 

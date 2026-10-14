@@ -32,12 +32,12 @@ export async function getMemberOnboardingStatus(userId: string): Promise<MemberO
     prisma.projectMember.findFirst({
       where: { adminUserId: userId, credentialTemplateId: { not: null } },
       orderBy: { updatedAt: "desc" },
-      select: { agreementSignedAt: true },
+      select: { agreementSignedAt: true, credentialTemplateId: true },
     }),
   ]);
 
-  const hasAgreementAssignment = Boolean(member);
-  const agreementSigned = !member || Boolean(member.agreementSignedAt);
+  const hasAgreementAssignment = Boolean(member?.credentialTemplateId);
+  const agreementSigned = !hasAgreementAssignment || Boolean(member?.agreementSignedAt);
   const profileComplete = Boolean(
     user &&
       addressComplete(user) &&

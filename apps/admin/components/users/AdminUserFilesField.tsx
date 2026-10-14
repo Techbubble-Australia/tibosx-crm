@@ -11,9 +11,16 @@ export type UserFileRow = { name: string; url: string };
 type Props = {
   files: UserFileRow[];
   onChange: (files: UserFileRow[]) => void;
+  allowUpload?: boolean;
+  allowRemove?: boolean;
 };
 
-export function AdminUserFilesField({ files, onChange }: Props) {
+export function AdminUserFilesField({
+  files,
+  onChange,
+  allowUpload = true,
+  allowRemove = true,
+}: Props) {
   const [uploading, setUploading] = useState(false);
 
   async function onUpload(fileList: FileList | null) {
@@ -40,19 +47,21 @@ export function AdminUserFilesField({ files, onChange }: Props) {
     <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h3 className="font-semibold text-gray-900 dark:text-gray-100">Files</h3>
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800">
-          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-          Upload file
-          <input
-            type="file"
-            className="hidden"
-            disabled={uploading}
-            onChange={(e) => {
-              void onUpload(e.target.files);
-              e.target.value = "";
-            }}
-          />
-        </label>
+        {allowUpload ? (
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800">
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            Upload file
+            <input
+              type="file"
+              className="hidden"
+              disabled={uploading}
+              onChange={(e) => {
+                void onUpload(e.target.files);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        ) : null}
       </div>
       {files.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">No files uploaded yet.</p>
@@ -68,14 +77,16 @@ export function AdminUserFilesField({ files, onChange }: Props) {
               >
                 {file.name || `File ${index + 1}`}
               </a>
-              <button
-                type="button"
-                onClick={() => onChange(files.filter((_, i) => i !== index))}
-                className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
-                aria-label="Remove file"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              {allowRemove ? (
+                <button
+                  type="button"
+                  onClick={() => onChange(files.filter((_, i) => i !== index))}
+                  className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
+                  aria-label="Remove file"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>

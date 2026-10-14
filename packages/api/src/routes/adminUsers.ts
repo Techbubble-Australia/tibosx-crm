@@ -23,6 +23,16 @@ const emergencyContactSchema = z.object({
   relation: z.string().max(100).optional(),
 });
 
+const bankDetailsSchema = z.object({
+  bankName: z.string().min(1).max(200),
+  accountName: z.string().min(1).max(200),
+  accountNumber: z.string().min(1).max(100),
+  country: z.string().min(1).max(100),
+  swiftCode: z.string().max(50).optional(),
+  bsb: z.string().min(1).max(50),
+  notes: z.string().max(2000).optional(),
+});
+
 const createSchema = z.object({
   email: z.string().email(),
   name: z.string().max(200).optional(),
@@ -54,6 +64,7 @@ const updateSchema = z.object({
   city: z.string().max(100).optional().nullable(),
   state: z.string().min(1).max(100).optional().nullable(),
   country: z.string().max(100).optional().nullable(),
+  bankDetails: bankDetailsSchema.optional().nullable(),
   emergencyContacts: z.array(emergencyContactSchema).max(5).optional(),
   mappedClientContactId: z.string().min(1).optional().nullable(),
   mappedProfileId: z.string().min(1).optional().nullable(),
@@ -125,6 +136,7 @@ const detailSelect = {
   city: true,
   state: true,
   country: true,
+  bankDetails: true,
   emergencyContacts: true,
   agreementDocumentUrl: true,
   profileDetailsCompletedAt: true,
@@ -155,6 +167,7 @@ function sanitizeDetail(row: {
   city: string | null;
   state: string | null;
   country: string | null;
+  bankDetails: unknown;
   emergencyContacts: unknown;
   agreementDocumentUrl: string | null;
   profileDetailsCompletedAt: Date | null;
@@ -190,6 +203,7 @@ function sanitizeDetail(row: {
     city: row.city,
     state: row.state,
     country: row.country,
+    bankDetails: row.bankDetails ?? null,
     emergencyContacts: Array.isArray(row.emergencyContacts) ? row.emergencyContacts : [],
     agreementDocumentUrl: row.agreementDocumentUrl,
     profileDetailsCompletedAt: row.profileDetailsCompletedAt?.toISOString() ?? null,
@@ -512,6 +526,14 @@ router.put("/:id", async (req: AuthRequest, res) => {
         if (oldJson !== newJson) {
           updateData.emergencyContacts = data.emergencyContacts;
           await logField("emergencyContacts", oldJson, newJson);
+        }
+      }
+      if (data.bankDetails !== undefined) {
+        const oldJson = JSON.stringify(existing.bankDetails ?? null);
+        const newJson = JSON.stringify(data.bankDetails);
+        if (oldJson !== newJson) {
+          updateData.bankDetails = data.bankDetails;
+          await logField("bankDetails", oldJson, newJson);
         }
       }
       if (data.password) {
