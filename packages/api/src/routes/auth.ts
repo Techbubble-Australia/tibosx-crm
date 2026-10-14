@@ -278,6 +278,13 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
     ? await getMemberOnboardingStatus(user.id)
     : null;
 
+  const { getTimesheetAccessForUser } = await import("../lib/timesheet-access.js");
+  const timesheetAccess = await getTimesheetAccessForUser(
+    user.id,
+    user.role,
+    user.additionalRoles,
+  );
+
   res.json({
     data: {
       user: {
@@ -303,6 +310,7 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
           ? (user.additionalRoles as string[]).filter((r) => typeof r === "string")
           : [],
         onboarding,
+        timesheetAccess,
       },
     },
   });

@@ -39,6 +39,9 @@ type AdminSession = {
   canManageProjects: boolean;
   isProjectMember: boolean;
   isEffectiveProjectMember: boolean;
+  canAccessProjectManagementTimesheets: boolean;
+  canAccessWorkspaceTimesheets: boolean;
+  canCreateTimesheets: boolean;
   canManageUsers: boolean;
   canManageClients: boolean;
   canManageJobs: boolean;
@@ -59,6 +62,8 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sessionLoaded, setSessionLoaded] = useState(false);
+  const [canAccessProjectManagementTimesheets, setCanAccessProjectManagementTimesheets] = useState(false);
+  const [canAccessWorkspaceTimesheets, setCanAccessWorkspaceTimesheets] = useState(false);
 
   const refreshSession = useCallback(async () => {
     try {
@@ -90,6 +95,12 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       }
       const photo = data?.data?.user?.profilePhotoUrl;
       setProfilePhotoUrl(typeof photo === "string" && photo.trim() ? photo.trim() : null);
+      const access = data?.data?.user?.timesheetAccess as {
+        projectManagementTimesheets?: boolean;
+        workspaceTimesheets?: boolean;
+      } | null;
+      setCanAccessProjectManagementTimesheets(Boolean(access?.projectManagementTimesheets));
+      setCanAccessWorkspaceTimesheets(Boolean(access?.workspaceTimesheets));
     } catch {
       // ignore
     }
@@ -119,6 +130,10 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       canManageProjects: canManageProjects(role),
       isProjectMember: isProjectMember(role),
       isEffectiveProjectMember: isEffectiveProjectMember(role, additionalRoles),
+      canAccessProjectManagementTimesheets,
+      canAccessWorkspaceTimesheets,
+      canCreateTimesheets:
+        isEffectiveProjectMember(role, additionalRoles) || canAccessProjectManagementTimesheets,
       canManageUsers: canManageUsers(role),
       canManageClients: canManageClients(role),
       canManageJobs: canManageJobs(role),
@@ -128,7 +143,19 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       canManageProfileOwnership: canManageProfileOwnership(role),
       refreshSession,
     }),
-    [role, additionalRoles, email, userId, userName, profilePhotoUrl, loading, sessionLoaded, refreshSession],
+    [
+      role,
+      additionalRoles,
+      email,
+      userId,
+      userName,
+      profilePhotoUrl,
+      loading,
+      sessionLoaded,
+      canAccessProjectManagementTimesheets,
+      canAccessWorkspaceTimesheets,
+      refreshSession,
+    ],
   );
 
   return <AdminSessionContext.Provider value={value}>{children}</AdminSessionContext.Provider>;

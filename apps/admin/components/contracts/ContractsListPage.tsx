@@ -75,7 +75,10 @@ function SortHeader({
 }
 
 function formatMoney(currency: string, amount: number) {
-  return `${currency} ${new Intl.NumberFormat("en-US").format(amount)}`;
+  return `${currency} ${new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)}`;
 }
 
 function formatDate(value: string | null) {
@@ -315,7 +318,9 @@ export function ContractsListPage({ activeFilter }: Props) {
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatDate(row.startDate)}</td>
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatDate(row.endDate)}</td>
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.contractValue)}</td>
+        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.totalVariation)}</td>
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.consumed)}</td>
+        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.remaining)}</td>
         <td className="px-4 py-3 text-right">
           <div className="inline-flex items-center gap-2">
             <button type="button" onClick={() => void deleteRow(row.id)} className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20">
@@ -455,20 +460,22 @@ export function ContractsListPage({ activeFilter }: Props) {
                 <th className="px-4 py-3 text-left">
                   <SortHeader label="Contract value" sortKey="contractValue" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                 </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Total variation</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Consumed</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Remaining</th>
                 <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={13} className="px-4 py-8 text-center text-gray-400">
                     No {activeFilter ? "active" : "inactive"} contracts yet.
                   </td>
                 </tr>
               ) : totalItems === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-gray-400">No contracts match your search.</td>
+                  <td colSpan={13} className="px-4 py-8 text-center text-gray-400">No contracts match your search.</td>
                 </tr>
               ) : (
                 paginated.map((row) => renderTableRow(row))

@@ -12,14 +12,14 @@ import { messageFromApiError } from "@/lib/api-error";
 
 export default function NewTimesheetPage() {
   const router = useRouter();
-  const { isEffectiveProjectMember, loading: sessionLoading } = useAdminSession();
+  const { canCreateTimesheets, loading: sessionLoading } = useAdminSession();
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (!sessionLoading && !isEffectiveProjectMember) {
+    if (!sessionLoading && !canCreateTimesheets) {
       router.replace("/timesheets");
     }
-  }, [sessionLoading, isEffectiveProjectMember, router]);
+  }, [sessionLoading, canCreateTimesheets, router]);
 
   async function handleSubmit(payload: Record<string, unknown>) {
     setIsSaving(true);
@@ -40,7 +40,7 @@ export default function NewTimesheetPage() {
     }
   }
 
-  if (sessionLoading || !isEffectiveProjectMember) {
+  if (sessionLoading || !canCreateTimesheets) {
     return (
       <ProjectManagementGuard>
         <p className="text-sm text-gray-400">Loading…</p>

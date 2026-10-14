@@ -157,7 +157,10 @@ function defaultDueDateInput() {
 }
 
 function formatMoney(currency: string, amount: number) {
-  return `${currency} ${new Intl.NumberFormat("en-US").format(amount)}`;
+  return `${currency} ${new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)}`;
 }
 
 function fieldClass(editable: boolean) {

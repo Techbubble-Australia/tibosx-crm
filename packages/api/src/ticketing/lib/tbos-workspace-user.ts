@@ -20,36 +20,46 @@ async function resolveClientTicketingUser(
     select: { mappedClientContactId: true, name: true, email: true },
   });
 
-  if (admin?.mappedClientContactId) {
-    const link = await prisma.projectClientContact.findFirst({
-      where: {
-        contactId: admin.mappedClientContactId,
-        portalAccess: true,
-      },
-      include: { ticketingUser: true, project: { select: { supportOrganization: { select: { id: true } } } } },
-      orderBy: { updatedAt: "desc" },
-    });
-    if (link?.portalAccess) {
-      let tu = link.ticketingUser;
-      if ((!tu || tu.role !== "CLIENT" || !tu.active) && link.project.supportOrganization?.id) {
-        await provisionClientPortalUser(link.id, link.project.supportOrganization.id);
-        const refreshed = await prisma.projectClientContact.findUnique({
-          where: { id: link.id },
-          include: { ticketingUser: true },
-        });
-        tu = refreshed?.ticketingUser ?? null;
-      }
-      if (tu?.active && tu.role === "CLIENT") {
-        return {
-          id: tu.id,
-          email: tu.email,
-          role: "CLIENT",
-          organizationId: tu.organizationId,
-          consultantVerified: tu.consultantVerified,
-          tbosRole: "client",
-          tbosAdminUserId: adminUserId,
-        };
-      }
+  const emailLower = email.trim().toLowerCase();
+  const link = await prisma.projectClientContact.findFirst({
+    where: {
+      portalAccess: true,
+      project: { status: "ACTIVE" },
+      OR: [
+        ...(admin?.mappedClientContactId ? [{ contactId: admin.mappedClientContactId }] : []),
+        { contact: { email: { equals: emailLower, mode: "insensitive" } } },
+      ],
+    },
+    include: { ticketingUser: true, project: { select: { supportOrganization: { select: { id: true } } } } },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  if (link) {
+    let tu = link.ticketingUser;
+    let orgId = link.project.supportOrganization?.id;
+    if (!orgId) {
+      const { ensureSupportOrganizationForProject } = await import("../../lib/support-organization.js");
+      const org = await ensureSupportOrganizationForProject(link.projectId);
+      orgId = org.id;
+    }
+    if ((!tu || tu.role !== "CLIENT" || !tu.active) && orgId) {
+      await provisionClientPortalUser(link.id, orgId);
+      const refreshed = await prisma.projectClientContact.findUnique({
+        where: { id: link.id },
+        include: { ticketingUser: true },
+      });
+      tu = refreshed?.ticketingUser ?? null;
+    }
+    if (tu?.active && tu.role === "CLIENT") {
+      return {
+        id: tu.id,
+        email: tu.email,
+        role: "CLIENT",
+        organizationId: tu.organizationId,
+        consultantVerified: tu.consultantVerified,
+        tbosRole: "client",
+        tbosAdminUserId: adminUserId,
+      };
     }
   }
 

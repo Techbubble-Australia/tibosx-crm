@@ -27,7 +27,8 @@ function formatDate(value: string) {
 }
 
 export default function TimesheetsPage() {
-  const { isEffectiveProjectMember, canManageProjects } = useAdminSession();
+  const { isEffectiveProjectMember, canManageProjects, canCreateTimesheets } = useAdminSession();
+  const showCreateTimesheet = canCreateTimesheets;
   const [rows, setRows] = useState<TimesheetRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -122,12 +123,14 @@ export default function TimesheetsPage() {
                 <Send className="h-4 w-4" /> Submit selected
               </button>
             ) : null}
-            <Link
-              href="/timesheets/new"
-              className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
-            >
-              <Plus className="h-4 w-4" /> New Timesheet
-            </Link>
+            {showCreateTimesheet ? (
+              <Link
+                href="/timesheets/new"
+                className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
+              >
+                <Plus className="h-4 w-4" /> Create timesheet
+              </Link>
+            ) : null}
           </div>
         </div>
 
@@ -140,12 +143,12 @@ export default function TimesheetsPage() {
                 ? "No timesheets to review yet. Team members submit timesheets from their project member accounts."
                 : "No timesheets yet."}
             </p>
-            {isEffectiveProjectMember ? (
+            {showCreateTimesheet ? (
               <Link
                 href="/timesheets/new"
                 className="mt-4 inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
               >
-                <Plus className="h-4 w-4" /> New Timesheet
+                <Plus className="h-4 w-4" /> Create timesheet
               </Link>
             ) : null}
           </div>

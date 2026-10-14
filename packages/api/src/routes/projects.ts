@@ -38,6 +38,7 @@ import {
   setProjectSupportGroupMembers,
   syncProjectClientContacts,
 } from "../lib/support-project";
+import { applyProjectCustomerSupportSettings } from "../lib/project-customer-support";
 
 const router: IRouter = Router();
 
@@ -68,7 +69,17 @@ const projectSchema = z.object({
   kind: z.enum(PROJECT_KINDS).optional(),
   status: z.enum(PROJECT_STATUSES).optional(),
   projectManagerId: z.string().min(1),
-  timesheetApproverUserId: z.string().min(1),
+  timesheetApproverUserId: z.string().min(1).optional(),
+  forCustomerSupport: z.boolean().optional(),
+  supportClientContacts: z
+    .array(
+      z.object({
+        contactId: z.string().min(1),
+        portalAccess: z.boolean(),
+        canApproveTimesheets: z.boolean(),
+      }),
+    )
+    .optional(),
   contractId: z.string().optional().nullable(),
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
@@ -704,7 +715,8 @@ router.post("/", async (req: AuthRequest, res) => {
         error: "Project manager must be a user with Administrator or Project manager role",
       });
     }
-    if (!(await isValidTimesheetApproverUserId(data.timesheetApproverUserId))) {
+    const timesheetApproverUserId = data.timesheetApproverUserId ?? data.projectManagerId;
+    if (!(await isValidTimesheetApproverUserId(timesheetApproverUserId))) {
       return res.status(400).json({
         error: "Timesheet approver must be a user with Administrator, Project manager, or Client role",
       });
@@ -732,7 +744,7 @@ router.post("/", async (req: AuthRequest, res) => {
           kind: data.kind ?? "DELIVERY",
           status: data.status ?? "DRAFT",
           projectManagerId: data.projectManagerId,
-          timesheetApproverUserId: data.timesheetApproverUserId,
+          timesheetApproverUserId,
           contractId: data.contractId ?? null,
           startDate: data.startDate,
           endDate: data.endDate,
@@ -754,6 +766,21 @@ router.post("/", async (req: AuthRequest, res) => {
     if ((data.kind ?? "DELIVERY") === "SUPPORT" && (data.status ?? "DRAFT") === "ACTIVE") {
       await activateSupportProject(row.id);
     }
+    if (data.forCustomerSupport) {
+      try {
+        await applyProjectCustomerSupportSettings(
+          row.id,
+          true,
+          data.supportClientContacts ?? [],
+        );
+      } catch (error) {
+        if (error instanceof Error && error.message === "CLIENT_ACCESS_REQUIRED") {
+          return res.status(400).json({ error: "Select at least one client contact for customer support access." });
+        }
+        throw error;
+      }
+    }
+
     const detail = await fetchProject(row.id);
     res.status(201).json({ data: detail ? mapDetail(detail) : null });
   } catch (error) {
@@ -780,7 +807,8 @@ router.put("/:id", async (req: AuthRequest, res) => {
         error: "Project manager must be a user with Administrator or Project manager role",
       });
     }
-    if (!(await isValidTimesheetApproverUserId(data.timesheetApproverUserId))) {
+    const timesheetApproverUserId = data.timesheetApproverUserId ?? data.projectManagerId;
+    if (!(await isValidTimesheetApproverUserId(timesheetApproverUserId))) {
       return res.status(400).json({
         error: "Timesheet approver must be a user with Administrator, Project manager, or Client role",
       });
@@ -809,10 +837,15 @@ router.put("/:id", async (req: AuthRequest, res) => {
       title: data.title.trim(),
       description: data.description.trim(),
       clientId: data.clientId,
-      kind: data.kind ?? existing.kind,
+      kind:
+        data.forCustomerSupport !== undefined
+          ? data.forCustomerSupport
+            ? "SUPPORT"
+            : "DELIVERY"
+          : (data.kind ?? existing.kind),
       status: data.status ?? existing.status,
       projectManagerId: data.projectManagerId,
-      timesheetApproverUserId: data.timesheetApproverUserId,
+      timesheetApproverUserId,
       contractId: data.contractId ?? null,
       startDate: data.startDate,
       endDate: data.endDate,
@@ -845,8 +878,23 @@ router.put("/:id", async (req: AuthRequest, res) => {
       await logProjectFieldChanges(tx, projectId, beforeSnapshot, afterSnapshot, getActorId(req) || null);
     });
 
+    if (data.forCustomerSupport !== undefined) {
+      try {
+        await applyProjectCustomerSupportSettings(
+          projectId,
+          data.forCustomerSupport,
+          data.supportClientContacts ?? [],
+        );
+      } catch (error) {
+        if (error instanceof Error && error.message === "CLIENT_ACCESS_REQUIRED") {
+          return res.status(400).json({ error: "Select at least one client contact for customer support access." });
+        }
+        throw error;
+      }
+    }
+
     const nextStatus = data.status ?? existing.status;
-    const nextKind = data.kind ?? existing.kind;
+    const nextKind = afterSnapshot.kind;
     if (nextKind === "SUPPORT" && nextStatus === "ACTIVE") {
       await activateSupportProject(projectId);
     }
@@ -1352,7 +1400,19 @@ router.get("/:id/support/available-contacts", async (req: AuthRequest, res) => {
       orderBy: { order: "asc" },
       select: { id: true, name: true, email: true, position: true },
     });
-    res.json({ data: contacts });
+    const mappedUsers = await prisma.adminUser.findMany({
+      where: { mappedClientContactId: { in: contacts.map((c) => c.id) } },
+      select: { id: true, email: true, mappedClientContactId: true },
+    });
+    const userByContact = new Map(
+      mappedUsers.map((u) => [u.mappedClientContactId!, { id: u.id, email: u.email }]),
+    );
+    res.json({
+      data: contacts.map((c) => ({
+        ...c,
+        userRecord: userByContact.get(c.id) ?? null,
+      })),
+    });
   } catch (error) {
     console.error("Error fetching client contacts:", error);
     res.status(500).json({ error: "Failed to fetch contacts" });

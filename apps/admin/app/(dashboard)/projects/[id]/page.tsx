@@ -8,8 +8,6 @@ import { adminFetch } from "@/lib/admin-api";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { ProjectForm, type ProjectFormValues } from "@/components/projects/ProjectForm";
-import { ProjectSupportPortalCard } from "@/components/projects/ProjectSupportPortalCard";
-import { ProjectSupportSetup } from "@/components/projects/ProjectSupportSetup";
 
 export default function EditProjectPage() {
   const { id } = useParams<{ id: string }>();
@@ -65,14 +63,6 @@ export default function EditProjectPage() {
           <p className="text-sm text-gray-400">Loading…</p>
         ) : (
           <>
-          <ProjectSupportPortalCard
-            projectId={id}
-            supportOrganizationId={project.supportOrganizationId}
-            supportOrganizationName={project.supportOrganizationName}
-            supportOrganizationSlug={project.supportOrganizationSlug}
-            onEnabled={() => void loadProject()}
-          />
-          <ProjectSupportSetup projectId={id} project={project} onUpdated={() => void loadProject()} />
           <ProjectForm
             defaults={project}
             onSubmit={handleSubmit}

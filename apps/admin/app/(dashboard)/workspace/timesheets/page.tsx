@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ClipboardCheck, Loader2 } from "lucide-react";
+import { ClipboardCheck, Loader2, Plus } from "lucide-react";
 import { workspaceFetch } from "@/lib/workspace-fetch";
 import { messageFromApiError } from "@/lib/api-error";
 
@@ -118,7 +118,16 @@ export default function ClientTimesheetsPage() {
     setError("");
     const params = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : "";
     void Promise.all([
-      workspaceFetch("/auth/me").then((r) => r.json()),
+      workspaceFetch("/auth/me").then(async (r) => {
+        const body = await r.json();
+        if (!r.ok) {
+          throw new Error(
+            (body as { error?: string }).error ||
+              "Could not load workspace session. Ensure your contact has client access on an active customer-support project.",
+          );
+        }
+        return body;
+      }),
       fetchJson<PendingRow[]>("/timesheets/pending-approval", []),
       fetchJson<AllRow[]>(`/timesheets${params}`, []),
       fetchJson<MemberRow[]>("/member-timesheets", []),
@@ -190,6 +199,12 @@ export default function ClientTimesheetsPage() {
               Approve timesheets against projects and support cases.
             </p>
           </div>
+          <Link
+            href="/workspace/timesheets/new"
+            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+          >
+            <Plus className="h-4 w-4" /> Create timesheet
+          </Link>
         </div>
         {memberRows.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-200 bg-white p-10 text-center text-slate-500">

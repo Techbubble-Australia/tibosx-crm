@@ -1262,7 +1262,6 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
             items: appsByJobId.get(job.id) ?? [],
           },
         }))
-        .filter(({ group }) => group.items.length > 0)
         .filter(({ group }) => {
           if (!q) return true;
           const haystack = buildSearchHaystack([

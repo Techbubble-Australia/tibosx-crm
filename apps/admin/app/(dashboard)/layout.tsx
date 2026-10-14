@@ -275,7 +275,17 @@ function navItemIsActive(item: NavItem, pathname: string): boolean {
 
 function DashboardChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { role, additionalRoles, email, userName, profilePhotoUrl, userId, loading } = useAdminSession();
+  const {
+    role,
+    additionalRoles,
+    email,
+    userName,
+    profilePhotoUrl,
+    userId,
+    loading,
+    canAccessProjectManagementTimesheets,
+    canAccessWorkspaceTimesheets,
+  } = useAdminSession();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const { collapsed: sidebarCollapsed, toggle: toggleSidebar } = useSidebarCollapsed();
 
@@ -294,16 +304,30 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
     });
   }, [pathname]);
 
-  const visibleGroups = useMemo(
-    () =>
-      navGroups
-        .map((group) => ({
-          ...group,
-          items: group.items.filter((item) => anyEffectiveRole(role, additionalRoles, item.roles)),
-        }))
-        .filter((group) => anyEffectiveRole(role, additionalRoles, group.roles) && group.items.length > 0),
-    [role, additionalRoles],
-  );
+  const visibleGroups = useMemo(() => {
+    function itemVisible(item: NavItem): boolean {
+      if (item.href === "/timesheets") {
+        return anyEffectiveRole(role, additionalRoles, item.roles) || canAccessProjectManagementTimesheets;
+      }
+      if (item.href === "/workspace/timesheets") {
+        if (anyEffectiveRole(role, additionalRoles, ["admin"])) return true;
+        return canAccessWorkspaceTimesheets;
+      }
+      return anyEffectiveRole(role, additionalRoles, item.roles);
+    }
+    return navGroups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter(itemVisible),
+      }))
+      .filter((group) => {
+        const groupAllowed =
+          anyEffectiveRole(role, additionalRoles, group.roles) ||
+          (group.id === "project_management" && canAccessProjectManagementTimesheets) ||
+          (group.id === "workspace" && canAccessWorkspaceTimesheets);
+        return groupAllowed && group.items.length > 0;
+      });
+  }, [role, additionalRoles, canAccessProjectManagementTimesheets, canAccessWorkspaceTimesheets]);
 
   function toggleGroup(id: string) {
     setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));

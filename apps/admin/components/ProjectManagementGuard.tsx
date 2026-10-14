@@ -11,19 +11,26 @@ type Props = {
 };
 
 export function ProjectManagementGuard({ children, requireManageProjects = false }: Props) {
-  const { canAccessProjectManagement, canManageProjects, loading, role } = useAdminSession();
+  const {
+    canAccessProjectManagement,
+    canAccessProjectManagementTimesheets,
+    canManageProjects,
+    loading,
+    role,
+  } = useAdminSession();
+  const canAccess = canAccessProjectManagement || canAccessProjectManagementTimesheets;
   const router = useRouter();
 
   useEffect(() => {
     if (loading) return;
-    if (!canAccessProjectManagement) {
+    if (!canAccess) {
       router.replace(defaultLandingPath(role));
       return;
     }
     if (requireManageProjects && !canManageProjects) {
       router.replace("/timesheets");
     }
-  }, [canAccessProjectManagement, canManageProjects, loading, requireManageProjects, role, router]);
+  }, [canAccess, canManageProjects, loading, requireManageProjects, role, router]);
 
   if (loading) {
     return (
@@ -33,7 +40,7 @@ export function ProjectManagementGuard({ children, requireManageProjects = false
     );
   }
 
-  if (!canAccessProjectManagement) return null;
+  if (!canAccess) return null;
   if (requireManageProjects && !canManageProjects) return null;
 
   return children;

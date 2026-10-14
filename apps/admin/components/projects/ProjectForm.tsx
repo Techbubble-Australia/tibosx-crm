@@ -20,6 +20,10 @@ import {
   type ProjectStatus,
 } from "@/lib/project-types";
 import { ProjectActivityLogSection } from "@/components/projects/ProjectActivityLogSection";
+import {
+  ProjectCustomerSupportSettings,
+  type SupportClientContactRow,
+} from "@/components/projects/ProjectCustomerSupportSettings";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { getEffectiveRoles } from "@/lib/admin-roles";
 
@@ -136,8 +140,17 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
   const [projectManagerId, setProjectManagerId] = useState(
     defaults.projectManagerId ?? defaultProjectManagerId ?? "",
   );
-  const [timesheetApproverUserId, setTimesheetApproverUserId] = useState(
-    defaults.timesheetApproverUserId ?? defaults.projectManagerId ?? defaultProjectManagerId ?? "",
+  const [forCustomerSupport, setForCustomerSupport] = useState(defaults.kind === "SUPPORT");
+  const [supportClientContacts, setSupportClientContacts] = useState<SupportClientContactRow[]>(
+    ((defaults.clientContacts as Array<{
+      contactId: string;
+      portalAccess: boolean;
+      canApproveTimesheets: boolean;
+    }>) ?? []).map((c) => ({
+      contactId: c.contactId,
+      portalAccess: c.portalAccess,
+      canApproveTimesheets: c.canApproveTimesheets,
+    })),
   );
   const [contractId, setContractId] = useState(defaults.contractId ?? "");
   const [startDate, setStartDate] = useState(toDateInput(defaults.startDate) || new Date().toISOString().slice(0, 10));
@@ -180,26 +193,11 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
     return eligible;
   }, [users, defaults.projectManagerId]);
 
-  const timesheetApproverOptions = useMemo(
-    () =>
-      users.filter((row) => {
-        const roles = getEffectiveRoles(row.role, row.additionalRoles ?? []);
-        return roles.some((r) => r === "admin" || r === "project_manager" || r === "client");
-      }),
-    [users],
-  );
-
   const canRemoveMembers =
     sessionRole === "admin" ||
     (sessionRole === "project_manager" && defaults.projectManagerId === sessionUserId);
 
   const canEditEstimates = sessionRole === "admin" || sessionRole === "project_manager";
-
-  useEffect(() => {
-    if (!defaults.id && projectManagerId && !defaults.timesheetApproverUserId) {
-      setTimesheetApproverUserId(projectManagerId);
-    }
-  }, [projectManagerId, defaults.id, defaults.timesheetApproverUserId]);
 
   function updateEstimate(index: number, patch: Partial<ProjectEstimateRow>) {
     setEstimates((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -281,20 +279,25 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (forCustomerSupport && !supportClientContacts.some((c) => c.portalAccess)) {
+      alert("Select at least one client contact when Customer Support is enabled.");
+      return;
+    }
     await onSubmit({
       title: title.trim(),
       description: description.trim(),
       clientId,
-      kind,
+      kind: forCustomerSupport ? "SUPPORT" : kind,
       status,
       projectManagerId,
-      timesheetApproverUserId,
       contractId: contractId || null,
       startDate,
       endDate,
       fileUrls,
       estimates,
       actuals,
+      forCustomerSupport,
+      supportClientContacts: forCustomerSupport ? supportClientContacts : [],
     });
   }
 
@@ -348,31 +351,11 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
               <select
                 className={inputClass}
                 value={projectManagerId}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setProjectManagerId(next);
-                  if (!timesheetApproverUserId || timesheetApproverUserId === projectManagerId) {
-                    setTimesheetApproverUserId(next);
-                  }
-                }}
+                onChange={(e) => setProjectManagerId(e.target.value)}
                 required
               >
                 <option value="">Select…</option>
                 {pmOptions.map((row) => (
-                  <option key={row.id} value={row.id}>{row.name || row.email}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Timesheet approver *</label>
-              <select
-                className={inputClass}
-                value={timesheetApproverUserId}
-                onChange={(e) => setTimesheetApproverUserId(e.target.value)}
-                required
-              >
-                <option value="">Select…</option>
-                {timesheetApproverOptions.map((row) => (
                   <option key={row.id} value={row.id}>{row.name || row.email}</option>
                 ))}
               </select>
@@ -627,6 +610,15 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
             </ul>
           ) : null}
         </section>
+
+        <ProjectCustomerSupportSettings
+          projectId={defaults.id}
+          clientId={clientId}
+          enabled={forCustomerSupport}
+          onEnabledChange={setForCustomerSupport}
+          rows={supportClientContacts}
+          onRowsChange={setSupportClientContacts}
+        />
 
         {defaults.activityLogs ? <ProjectActivityLogSection logs={defaults.activityLogs} /> : null}
 
