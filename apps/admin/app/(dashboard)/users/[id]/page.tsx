@@ -8,6 +8,7 @@ import { adminFetch } from "@/lib/admin-api";
 import { formatRolesLabel } from "@/lib/admin-roles";
 import { AdminRolesMultiSelect, rolesFromApi, rolesToApi } from "@/components/users/AdminRolesMultiSelect";
 import { MappedClientContactSelect } from "@/components/users/MappedClientContactSelect";
+import { MappedProfileSelect, type ProfileMapOption } from "@/components/users/MappedProfileSelect";
 import { AdminUserFilesField, type UserFileRow } from "@/components/users/AdminUserFilesField";
 import { UserPhotoField } from "@/components/users/UserPhotoField";
 import { UserAssignCredentialsModal } from "@/components/users/UserAssignCredentialsModal";
@@ -49,6 +50,8 @@ type UserDetail = {
   emergencyContacts: EmergencyContact[];
   agreementDocumentUrl: string | null;
   mappedClientContactId: string | null;
+  mappedProfileId: string | null;
+  mappedProfileLabel: string | null;
   idProofUrl: string | null;
   addressProofUrl: string | null;
   userFiles: { name?: string; url?: string }[];
@@ -74,6 +77,8 @@ export default function EditUserPage() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([{ name: "", email: "", phone: "" }]);
   const [mappedClientContactId, setMappedClientContactId] = useState("");
+  const [mappedProfileId, setMappedProfileId] = useState("");
+  const [mappedProfileOption, setMappedProfileOption] = useState<ProfileMapOption | null>(null);
   const [userFiles, setUserFiles] = useState<UserFileRow[]>([]);
 
   async function load() {
@@ -87,6 +92,17 @@ export default function EditUserPage() {
       setDefaults(row);
       setRoles(rolesFromApi(row.role, row.additionalRoles));
       setMappedClientContactId(row.mappedClientContactId ?? "");
+      setMappedProfileId(row.mappedProfileId ?? "");
+      setMappedProfileOption(
+        row.mappedProfileId && row.mappedProfileLabel
+          ? {
+              id: row.mappedProfileId,
+              label: row.mappedProfileLabel,
+              mappedUserId: id,
+              mappedUserEmail: row.email,
+            }
+          : null,
+      );
       setUserFiles(
         Array.isArray(row.userFiles)
           ? row.userFiles
@@ -153,6 +169,7 @@ export default function EditUserPage() {
         (row) => row.name.trim() && row.email?.trim() && row.phone?.trim(),
       ),
       mappedClientContactId: roles.includes("client") ? mappedClientContactId || null : null,
+      mappedProfileId: mappedProfileId.trim() || null,
       userFiles,
     };
     if (password) body.password = password;
@@ -255,6 +272,12 @@ export default function EditUserPage() {
               required
             />
           ) : null}
+          <MappedProfileSelect
+            value={mappedProfileId}
+            onChange={setMappedProfileId}
+            currentUserId={id}
+            initialOption={mappedProfileOption}
+          />
           <div>
             <label className="mb-1 block text-sm font-medium">New password</label>
             <input name="password" type="password" minLength={8} className={inputClass} placeholder="Leave blank to keep current" />

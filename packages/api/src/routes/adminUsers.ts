@@ -9,6 +9,10 @@ import {
   assertMappedContactAvailable,
   rolesIncludeClient,
 } from "../lib/admin-user-contact-map";
+import {
+  applyMappedProfile,
+  assertMappedProfileAvailable,
+} from "../lib/admin-user-profile-map";
 
 const router: IRouter = Router();
 
@@ -30,6 +34,7 @@ const createSchema = z.object({
   active: z.boolean().default(true),
   passwordNeedsReset: z.boolean().default(false),
   mappedClientContactId: z.string().min(1).optional().nullable(),
+  mappedProfileId: z.string().min(1).optional().nullable(),
 });
 
 const updateSchema = z.object({
@@ -51,6 +56,7 @@ const updateSchema = z.object({
   country: z.string().max(100).optional().nullable(),
   emergencyContacts: z.array(emergencyContactSchema).max(5).optional(),
   mappedClientContactId: z.string().min(1).optional().nullable(),
+  mappedProfileId: z.string().min(1).optional().nullable(),
   userFiles: z
     .array(z.object({ name: z.string().min(1).max(500), url: z.string().min(1).max(2000) }))
     .max(50)
@@ -123,6 +129,8 @@ const detailSelect = {
   agreementDocumentUrl: true,
   profileDetailsCompletedAt: true,
   mappedClientContactId: true,
+  mappedProfileId: true,
+  mappedProfile: { select: { id: true, firstName: true, lastName: true, email: true } },
   idProofUrl: true,
   addressProofUrl: true,
   userFiles: true,
@@ -151,6 +159,13 @@ function sanitizeDetail(row: {
   agreementDocumentUrl: string | null;
   profileDetailsCompletedAt: Date | null;
   mappedClientContactId: string | null;
+  mappedProfileId: string | null;
+  mappedProfile?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
   idProofUrl: string | null;
   addressProofUrl: string | null;
   userFiles: unknown;
@@ -160,6 +175,11 @@ function sanitizeDetail(row: {
   return {
     ...sanitizeUser(row),
     mappedClientContactId: row.mappedClientContactId,
+    mappedProfileId: row.mappedProfileId,
+    mappedProfileLabel: row.mappedProfile
+      ? `${row.mappedProfile.firstName} ${row.mappedProfile.lastName}`.trim() +
+        ` (${row.mappedProfile.email})`
+      : null,
     idProofUrl: row.idProofUrl,
     addressProofUrl: row.addressProofUrl,
     userFiles: Array.isArray(row.userFiles) ? row.userFiles : [],
@@ -186,6 +206,46 @@ router.get("/", async (_req, res) => {
   } catch (error) {
     console.error("Error fetching admin users:", error);
     res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
+router.get("/profile-map-options", async (req, res) => {
+  try {
+    const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    const where =
+      q.length >= 2
+        ? {
+            OR: [
+              { firstName: { contains: q, mode: "insensitive" as const } },
+              { lastName: { contains: q, mode: "insensitive" as const } },
+              { email: { contains: q, mode: "insensitive" as const } },
+            ],
+          }
+        : {};
+
+    const rows = await prisma.candidateProfile.findMany({
+      where,
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+      take: 50,
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        mappedAdminUser: { select: { id: true, email: true } },
+      },
+    });
+    res.json({
+      data: rows.map((row) => ({
+        id: row.id,
+        label: `${row.firstName} ${row.lastName}`.trim() + ` (${row.email})`,
+        mappedUserId: row.mappedAdminUser?.id ?? null,
+        mappedUserEmail: row.mappedAdminUser?.email ?? null,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching profile map options:", error);
+    res.status(500).json({ error: "Failed to fetch profiles" });
   }
 });
 
@@ -284,6 +344,11 @@ router.post("/", async (req, res) => {
     const additionalRoles = data.additionalRoles?.length ? data.additionalRoles : [];
     const needsContact = rolesIncludeClient(data.role, additionalRoles);
     const mappedId = data.mappedClientContactId?.trim() || null;
+    const mappedProfileId = data.mappedProfileId?.trim() || null;
+    if (mappedProfileId) {
+      const mapError = await assertMappedProfileAvailable(mappedProfileId);
+      if (mapError) return res.status(409).json({ error: mapError });
+    }
 
     if (needsContact && !mappedId) {
       return res.status(400).json({ error: "Map to contact record is required when the Client role is selected" });
@@ -297,21 +362,28 @@ router.post("/", async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(data.password, 10);
-    const row = await prisma.adminUser.create({
-      data: {
-        email: data.email,
-        name: data.name ?? null,
-        phone: data.phone.trim(),
-        passwordHash,
-        role: data.role,
-        additionalRoles: additionalRoles.length ? additionalRoles : undefined,
-        profilePhotoUrl: data.profilePhotoUrl ?? null,
-        active: data.active,
-        passwordNeedsReset: data.passwordNeedsReset,
-        mappedClientContactId: mappedId,
-        mfaEnabled: true,
-      },
-      select: listSelect,
+    const row = await prisma.$transaction(async (tx) => {
+      const created = await tx.adminUser.create({
+        data: {
+          email: data.email,
+          name: data.name ?? null,
+          phone: data.phone.trim(),
+          passwordHash,
+          role: data.role,
+          additionalRoles: additionalRoles.length ? additionalRoles : undefined,
+          profilePhotoUrl: data.profilePhotoUrl ?? null,
+          active: data.active,
+          passwordNeedsReset: data.passwordNeedsReset,
+          mappedClientContactId: mappedId,
+          mappedProfileId,
+          mfaEnabled: true,
+        },
+        select: listSelect,
+      });
+      if (mappedProfileId) {
+        await applyMappedProfile(tx, created.id, mappedProfileId);
+      }
+      return created;
     });
     res.status(201).json({ data: sanitizeUser(row) });
   } catch (error) {
@@ -358,6 +430,15 @@ router.put("/:id", async (req: AuthRequest, res) => {
     }
     if (mappedId && mappedId !== existing.mappedClientContactId) {
       const mapError = await assertMappedContactAvailable(mappedId, existing.id);
+      if (mapError) return res.status(409).json({ error: mapError });
+    }
+
+    const nextMappedProfileId =
+      data.mappedProfileId !== undefined
+        ? data.mappedProfileId?.trim() || null
+        : existing.mappedProfileId;
+    if (nextMappedProfileId && nextMappedProfileId !== existing.mappedProfileId) {
+      const mapError = await assertMappedProfileAvailable(nextMappedProfileId, existing.id);
       if (mapError) return res.status(409).json({ error: mapError });
     }
 
@@ -460,12 +541,22 @@ router.put("/:id", async (req: AuthRequest, res) => {
           );
         }
       }
+      if (data.mappedProfileId !== undefined && nextMappedProfileId !== existing.mappedProfileId) {
+        updateData.mappedProfileId = nextMappedProfileId;
+        await logField("mappedProfileId", existing.mappedProfileId, nextMappedProfileId);
+      }
 
-      return tx.adminUser.update({
+      const updated = await tx.adminUser.update({
         where: { id: existing.id },
         data: updateData,
         select: detailSelect,
       });
+
+      if (data.mappedProfileId !== undefined && nextMappedProfileId !== existing.mappedProfileId) {
+        await applyMappedProfile(tx, existing.id, nextMappedProfileId);
+      }
+
+      return updated;
     });
 
     res.json({ data: sanitizeDetail(row) });

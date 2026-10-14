@@ -111,12 +111,6 @@ export default function AdminNewTicketPage() {
               ))}
             </select>
           )}
-          {orgs.length === 0 ? (
-            <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-              No support projects are available. On each TBOS project, use <strong>Enable support portal</strong> (project
-              record) and ensure the project status is <strong>Active</strong>.
-            </p>
-          ) : null}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>

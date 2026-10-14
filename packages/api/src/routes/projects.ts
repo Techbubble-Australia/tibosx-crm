@@ -1040,13 +1040,18 @@ router.post("/:id/members", async (req: AuthRequest, res) => {
     const project = await prisma.project.findUnique({ where: { id: projectId }, select: { id: true } });
     if (!project) return res.status(404).json({ error: "Not found" });
 
-    const profile = await prisma.candidateProfile.findUnique({ where: { id: profileId } });
+    const profile = await prisma.candidateProfile.findUnique({
+      where: { id: profileId },
+      select: { mappedAdminUser: { select: { id: true } } },
+    });
     if (!profile) return res.status(404).json({ error: "Profile not found" });
+
+    const linkedUserId = profile.mappedAdminUser?.id ?? null;
 
     const member = await prisma.projectMember.upsert({
       where: { projectId_profileId: { projectId, profileId } },
-      create: { projectId, profileId },
-      update: {},
+      create: { projectId, profileId, adminUserId: linkedUserId },
+      update: linkedUserId ? { adminUserId: linkedUserId } : {},
       include: {
         profile: {
           select: {

@@ -1,6 +1,7 @@
 import { prisma, type Prisma } from "@techbubble/database";
 import { ensureSupportOrganizationForProject } from "./support-organization";
 import { toNumber } from "./decimal";
+import { addContractProfilesAsProjectMembers } from "./project-members-from-contract";
 
 type WorkUnitRow = { year: number; month: number; workUnits: number };
 type MilestoneRow = { milestoneDate: Date; amount: Prisma.Decimal | number };
@@ -162,6 +163,8 @@ export async function createProjectFromContract(
         newValue: contract.contractNumber,
       },
     });
+
+    await addContractProfilesAsProjectMembers(tx, created.id, contractId);
 
     return created;
   });

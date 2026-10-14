@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { AdminRolesMultiSelect, rolesToApi } from "@/components/users/AdminRolesMultiSelect";
 import { MappedClientContactSelect } from "@/components/users/MappedClientContactSelect";
+import { MappedProfileSelect } from "@/components/users/MappedProfileSelect";
 import { type AdminRole, isAdminRole } from "@/lib/admin-roles";
 
 const inputClass =
@@ -18,6 +19,7 @@ function NewUserPageInner() {
   const [isLoading, setIsLoading] = useState(false);
   const [roles, setRoles] = useState<AdminRole[]>(["website"]);
   const [mappedClientContactId, setMappedClientContactId] = useState("");
+  const [mappedProfileId, setMappedProfileId] = useState("");
 
   useEffect(() => {
     const fromContact = searchParams.get("mappedClientContactId")?.trim();
@@ -50,6 +52,7 @@ function NewUserPageInner() {
           active: formData.get("active") === "on",
           passwordNeedsReset: formData.get("passwordNeedsReset") === "on",
           mappedClientContactId: roles.includes("client") ? mappedClientContactId : null,
+          mappedProfileId: mappedProfileId.trim() || null,
         }),
       });
       if (!res.ok) {
@@ -109,6 +112,7 @@ function NewUserPageInner() {
             required
           />
         ) : null}
+        <MappedProfileSelect value={mappedProfileId} onChange={setMappedProfileId} />
         <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
           <input name="passwordNeedsReset" type="checkbox" defaultChecked className="h-4 w-4 rounded" />
           Password needs reset (user must change password on first login)

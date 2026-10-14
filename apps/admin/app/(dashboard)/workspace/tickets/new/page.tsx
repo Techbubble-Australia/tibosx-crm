@@ -142,12 +142,6 @@ export default function NewTicketPage() {
               ))}
             </select>
           )}
-          {orgs.length === 0 && me ? (
-            <p className="mt-1 text-xs text-amber-700">
-              No support projects are available. Ask an administrator to enable the support portal on active TBOS
-              projects.
-            </p>
-          ) : null}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
