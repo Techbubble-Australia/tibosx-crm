@@ -104,7 +104,7 @@ export function ProjectSupportSetup({ projectId, project, onUpdated }: Props) {
     }
   }
 
-  if (project.kind !== "SUPPORT") return null;
+  if (project.kind !== "SUPPORT" && !project.supportOrganizationId) return null;
 
   return (
     <div className="mb-6 space-y-6">

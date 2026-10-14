@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { prisma } from "@techbubble/database";
 import type { TicketingAuthUser } from "../middleware/auth.js";
 import { syncConsultantOrganizationsForTbosUser } from "../../lib/support-organization.js";
+import { provisionClientPortalUser } from "../../lib/support-project.js";
 
 const WORKSPACE_TBOS_ROLES = new Set(["client", "customer_support"]);
 
@@ -24,21 +25,31 @@ async function resolveClientTicketingUser(
       where: {
         contactId: admin.mappedClientContactId,
         portalAccess: true,
-        ticketingUserId: { not: null },
       },
-      include: { ticketingUser: true },
+      include: { ticketingUser: true, project: { select: { supportOrganization: { select: { id: true } } } } },
+      orderBy: { updatedAt: "desc" },
     });
-    const tu = link?.ticketingUser;
-    if (tu?.active && tu.role === "CLIENT") {
-      return {
-        id: tu.id,
-        email: tu.email,
-        role: "CLIENT",
-        organizationId: tu.organizationId,
-        consultantVerified: tu.consultantVerified,
-        tbosRole: "client",
-        tbosAdminUserId: adminUserId,
-      };
+    if (link?.portalAccess) {
+      let tu = link.ticketingUser;
+      if ((!tu || tu.role !== "CLIENT" || !tu.active) && link.project.supportOrganization?.id) {
+        await provisionClientPortalUser(link.id, link.project.supportOrganization.id);
+        const refreshed = await prisma.projectClientContact.findUnique({
+          where: { id: link.id },
+          include: { ticketingUser: true },
+        });
+        tu = refreshed?.ticketingUser ?? null;
+      }
+      if (tu?.active && tu.role === "CLIENT") {
+        return {
+          id: tu.id,
+          email: tu.email,
+          role: "CLIENT",
+          organizationId: tu.organizationId,
+          consultantVerified: tu.consultantVerified,
+          tbosRole: "client",
+          tbosAdminUserId: adminUserId,
+        };
+      }
     }
   }
 

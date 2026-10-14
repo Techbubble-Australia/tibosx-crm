@@ -24,8 +24,8 @@ export async function syncProjectClientContacts(
     where: { id: projectId },
     select: { id: true, kind: true, clientId: true, supportOrganization: { select: { id: true } } },
   });
-  if (!project || project.kind !== "SUPPORT") {
-    throw new Error("NOT_SUPPORT_PROJECT");
+  if (!project) {
+    throw new Error("PROJECT_NOT_FOUND");
   }
 
   const contactIds = rows.map((r) => r.contactId);
@@ -76,7 +76,7 @@ export async function syncProjectClientContacts(
   }
 }
 
-async function provisionClientPortalUser(projectClientContactId: string, organizationId: string) {
+export async function provisionClientPortalUser(projectClientContactId: string, organizationId: string) {
   const link = await prisma.projectClientContact.findUnique({
     where: { id: projectClientContactId },
     include: { contact: true },

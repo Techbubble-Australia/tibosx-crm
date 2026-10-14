@@ -65,15 +65,13 @@ export default function EditProjectPage() {
           <p className="text-sm text-gray-400">Loading…</p>
         ) : (
           <>
-          {project.kind === "SUPPORT" ? (
-            <ProjectSupportPortalCard
-              projectId={id}
-              supportOrganizationId={project.supportOrganizationId}
-              supportOrganizationName={project.supportOrganizationName}
-              supportOrganizationSlug={project.supportOrganizationSlug}
-              onEnabled={() => void loadProject()}
-            />
-          ) : null}
+          <ProjectSupportPortalCard
+            projectId={id}
+            supportOrganizationId={project.supportOrganizationId}
+            supportOrganizationName={project.supportOrganizationName}
+            supportOrganizationSlug={project.supportOrganizationSlug}
+            onEnabled={() => void loadProject()}
+          />
           <ProjectSupportSetup projectId={id} project={project} onUpdated={() => void loadProject()} />
           <ProjectForm
             defaults={project}

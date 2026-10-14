@@ -25,25 +25,77 @@ export function isCustomerSupportTbos(
   return role === "customer_support";
 }
 
-/** Active support portal orgs for the client's CRM client (from linked org). */
+/** Support portal org ids a workspace client may create tickets against. */
 export async function organizationIdsForClientPortal(
-  clientOrganizationId: string | null,
+  ticketingUserId: string,
+  tbosAdminUserId: string | null,
 ): Promise<string[]> {
-  if (!clientOrganizationId) return [];
-  const anchor = await prisma.organization.findUnique({
-    where: { id: clientOrganizationId },
-    select: { project: { select: { clientId: true } } },
-  });
-  const clientId = anchor?.project?.clientId;
-  if (!clientId) return [clientOrganizationId];
-  const rows = await prisma.organization.findMany({
+  const projectIds = new Set<string>();
+  const contactIds = new Set<string>();
+
+  if (tbosAdminUserId) {
+    const admin = await prisma.adminUser.findUnique({
+      where: { id: tbosAdminUserId },
+      select: { mappedClientContactId: true },
+    });
+    if (admin?.mappedClientContactId) {
+      contactIds.add(admin.mappedClientContactId);
+    }
+  }
+
+  const portalLinks = await prisma.projectClientContact.findMany({
     where: {
-      active: true,
-      project: { status: "ACTIVE", clientId },
+      OR: [
+        { ticketingUserId, portalAccess: true },
+        ...(contactIds.size
+          ? [{ contactId: { in: [...contactIds] }, portalAccess: true }]
+          : []),
+      ],
+      project: { status: "ACTIVE" },
     },
-    select: { id: true },
+    select: { projectId: true },
   });
-  return rows.map((r) => r.id);
+  for (const link of portalLinks) {
+    projectIds.add(link.projectId);
+  }
+
+  let clientId: string | null = null;
+  for (const contactId of contactIds) {
+    const contact = await prisma.clientContact.findUnique({
+      where: { id: contactId },
+      select: { clientId: true },
+    });
+    if (contact?.clientId) {
+      clientId = contact.clientId;
+      break;
+    }
+  }
+
+  if (clientId) {
+    const clientProjects = await prisma.project.findMany({
+      where: {
+        clientId,
+        status: "ACTIVE",
+        supportOrganization: { active: true },
+      },
+      select: { id: true },
+    });
+    for (const row of clientProjects) {
+      projectIds.add(row.id);
+    }
+  }
+
+  if (projectIds.size === 0) return [];
+
+  const rows = await prisma.project.findMany({
+    where: {
+      id: { in: [...projectIds] },
+      status: "ACTIVE",
+      supportOrganization: { active: true },
+    },
+    select: { supportOrganization: { select: { id: true } } },
+  });
+  return rows.map((row) => row.supportOrganization!.id);
 }
 
 /** Orgs for ACTIVE SUPPORT projects where the TBOS user is a project or support-group member. */
@@ -91,7 +143,7 @@ export async function scopeOrganizationIdsForPortal(
   user: TicketingAuthUser & { tbosRole?: string | null; tbosAdminUserId?: string | null },
 ): Promise<string[] | null> {
   if (user.role === "CLIENT") {
-    return organizationIdsForClientPortal(user.organizationId);
+    return organizationIdsForClientPortal(user.id, user.tbosAdminUserId ?? null);
   }
   if (user.role === "CONSULTANT" && user.consultantVerified) {
     if (isTbosAdmin(user)) return null;
@@ -125,7 +177,7 @@ export async function ticketOrganizationFilter(
   user: TicketingAuthUser & { tbosRole?: string | null; tbosAdminUserId?: string | null },
 ): Promise<{ organizationId?: string | { in: string[] } } | "deny"> {
   if (user.role === "CLIENT") {
-    const orgIds = await organizationIdsForClientPortal(user.organizationId);
+    const orgIds = await organizationIdsForClientPortal(user.id, user.tbosAdminUserId ?? null);
     if (orgIds.length === 0) return "deny";
     if (orgIds.length === 1) return { organizationId: orgIds[0] };
     return { organizationId: { in: orgIds } };

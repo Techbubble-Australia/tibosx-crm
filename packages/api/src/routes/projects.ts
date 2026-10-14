@@ -1295,8 +1295,8 @@ router.put("/:id/support/client-contacts", async (req: AuthRequest, res) => {
     const detail = await fetchProject(projectId);
     res.json({ data: detail ? mapDetail(detail) : null });
   } catch (error) {
-    if (error instanceof Error && error.message === "NOT_SUPPORT_PROJECT") {
-      return res.status(400).json({ error: "Only support projects can have client contacts" });
+    if (error instanceof Error && error.message === "PROJECT_NOT_FOUND") {
+      return res.status(404).json({ error: "Project not found" });
     }
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
