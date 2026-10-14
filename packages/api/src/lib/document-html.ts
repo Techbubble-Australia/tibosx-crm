@@ -9,7 +9,6 @@ const MAMMOTH_STYLE_MAP = [
   "p[style-name='Heading 2'] => h2.docx-section-title:fresh",
   "p[style-name='Heading 3'] => h3.docx-subsection-title:fresh",
   "p[style-name='Heading 4'] => h4:fresh",
-  "p[style-name='List Paragraph'] => p:fresh",
   "r[style-name='Strong'] => strong",
   "table => table.docx-table:fresh",
   "tr => tr:fresh",
@@ -67,6 +66,40 @@ function enhanceImportedHtml(html: string): string {
   next = styleItemDetailsTables(next);
   next = fixCommonTemplateTypos(next);
   next = reconstructSectionTables(next);
+  next = normalizeBulletParagraphs(next);
+  return next;
+}
+
+/** Word list items often import as plain paragraphs; restore visible bullets in the editor. */
+function normalizeBulletParagraphs(html: string): string {
+  const bulletLead =
+    /^(?:&bull;|&#8226;|&#9679;|•|\u2022|\u00b7)\s+|<span[^>]*>\s*(?:&bull;|&#8226;|•|\u2022)\s*<\/span>\s*/i;
+  const numberedLead = /^(\d+\.)\s+/;
+
+  let next = html.replace(/<p([^>]*)>([\s\S]*?)<\/p>/gi, (full, _attrs, inner) => {
+    const trimmed = inner.trim();
+    if (bulletLead.test(trimmed)) {
+      const text = trimmed.replace(bulletLead, "").trim();
+      if (!text) return full;
+      return `<li class="docx-list-item">${text}</li>`;
+    }
+    if (numberedLead.test(trimmed)) {
+      const text = trimmed.replace(numberedLead, "").trim();
+      if (!text) return full;
+      return `<li class="docx-list-item docx-list-item--numbered">${text}</li>`;
+    }
+    return full;
+  });
+
+  next = next.replace(
+    /(?:<li class="docx-list-item(?! docx-list-item--numbered)[^>]*>[\s\S]*?<\/li>\s*)+/gi,
+    (block) => `<ul class="docx-bullet-list">${block}</ul>`,
+  );
+  next = next.replace(
+    /(?:<li class="docx-list-item docx-list-item--numbered"[^>]*>[\s\S]*?<\/li>\s*)+/gi,
+    (block) => `<ol class="docx-numbered-list">${block.replace(/ docx-list-item--numbered/g, "")}</ol>`,
+  );
+
   return next;
 }
 

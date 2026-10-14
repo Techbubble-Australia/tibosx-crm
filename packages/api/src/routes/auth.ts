@@ -197,8 +197,8 @@ router.post("/mfa/verify", async (req, res) => {
 
 const emergencyContactSchema = z.object({
   name: z.string().min(1).max(200),
-  email: z.string().email().optional().or(z.literal("")),
-  phone: z.string().max(50).optional(),
+  email: z.string().email(),
+  phone: z.string().min(1).max(50),
   relation: z.string().max(100).optional(),
 });
 
@@ -221,7 +221,7 @@ const profileUpdateSchema = z.object({
   addressLine2: z.string().max(300).optional().nullable(),
   suburb: z.string().max(100).optional().nullable(),
   city: z.string().max(100).optional().nullable(),
-  state: z.string().max(100).optional().nullable(),
+  state: z.string().min(1).max(100).optional().nullable(),
   postcode: z.string().max(20).optional().nullable(),
   country: z.string().max(100).optional().nullable(),
   bankDetails: bankDetailsSchema.optional(),
@@ -229,6 +229,10 @@ const profileUpdateSchema = z.object({
   addressProofUrl: z.string().max(2000).optional().nullable(),
   emergencyContacts: z.array(emergencyContactSchema).max(5).optional(),
   markProfileComplete: z.boolean().optional(),
+  userFiles: z
+    .array(z.object({ name: z.string().max(500), url: z.string().min(1).max(2000) }))
+    .max(50)
+    .optional(),
 });
 
 router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
@@ -372,6 +376,9 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
     }
     if (input.profilePhotoUrl !== undefined) {
       patch.profilePhotoUrl = input.profilePhotoUrl;
+    }
+    if (input.userFiles !== undefined) {
+      patch.userFiles = input.userFiles;
     }
 
     const mergedForComplete = {

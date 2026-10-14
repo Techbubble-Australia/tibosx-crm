@@ -94,6 +94,12 @@ export default function NewMemberTimesheetPage() {
       <Link href="/workspace/timesheets" className="text-sm text-sky-600 hover:underline">← Timesheets</Link>
       <h1 className="text-2xl font-semibold text-slate-900">New timesheet</h1>
       <p className="text-sm text-slate-500">Select a project or support case assigned to you.</p>
+      {targets.length === 0 ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          No active project or support case is assigned to you yet. An administrator must add you as a project member or
+          support consultant before you can create a timesheet.
+        </p>
+      ) : null}
       {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
       <form onSubmit={(e) => void onSubmit(e)} className="space-y-4 rounded-xl border border-slate-200 bg-white p-6">
         <div>

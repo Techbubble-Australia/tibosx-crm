@@ -4,7 +4,13 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { adminFetch } from "@/lib/admin-api";
 
-const ALLOWED_PREFIXES = ["/settings/profile", "/login", "/change-password", "/mfa-setup"];
+const ALLOWED_PREFIXES = [
+  "/settings/profile",
+  "/login",
+  "/change-password",
+  "/mfa-setup",
+  "/workspace",
+];
 
 function pathAllowed(pathname: string) {
   return ALLOWED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));

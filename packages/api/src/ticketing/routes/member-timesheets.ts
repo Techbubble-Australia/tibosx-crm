@@ -68,7 +68,12 @@ router.get("/targets", async (req: TicketingRequest, res) => {
 
 router.get("/target-meta", async (req: TicketingRequest, res) => {
   const memberUserId = await resolveMemberAdminUserId(req);
-  if (!memberUserId) return res.status(403).json({ error: "Forbidden" });
+  if (!memberUserId) {
+    return res.status(403).json({
+      error:
+        "Your account is not set up for consultant timesheets. Ensure you are on the project team or support group in TBOS.",
+    });
+  }
 
   const projectId = typeof req.query.projectId === "string" ? req.query.projectId : "";
   const ticketId = typeof req.query.ticketId === "string" ? req.query.ticketId : "";
@@ -134,7 +139,12 @@ const createSchema = z.object({
 
 router.post("/", async (req: TicketingRequest, res) => {
   const memberUserId = await resolveMemberAdminUserId(req);
-  if (!memberUserId) return res.status(403).json({ error: "Forbidden" });
+  if (!memberUserId) {
+    return res.status(403).json({
+      error:
+        "Your account is not set up for consultant timesheets. Ensure you are on the project team or support group in TBOS.",
+    });
+  }
 
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {

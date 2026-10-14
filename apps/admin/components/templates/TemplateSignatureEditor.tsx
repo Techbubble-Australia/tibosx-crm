@@ -97,6 +97,28 @@ export function TemplateSignatureEditor({
     syncHtmlFromCanvas();
   }
 
+  function applyFontSize(sizePt: string) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.focus();
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    if (range.collapsed) return;
+    const span = document.createElement("span");
+    span.style.fontSize = sizePt;
+    try {
+      range.surroundContents(span);
+    } catch {
+      document.execCommand("styleWithCSS", false, "true");
+      document.execCommand("fontSize", false, "4");
+      syncHtmlFromCanvas();
+      return;
+    }
+    selection.removeAllRanges();
+    syncHtmlFromCanvas();
+  }
+
   return (
     <div
       className={`relative overflow-hidden rounded-lg border bg-white dark:border-gray-700 ${
@@ -141,6 +163,28 @@ export function TemplateSignatureEditor({
         <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => runFormat("insertOrderedList")}>
           Numbered list
         </button>
+        <label className="inline-flex items-center gap-1 text-xs text-gray-600">
+          Size
+          <select
+            className="rounded border border-gray-300 bg-white px-1.5 py-0.5 text-xs dark:border-gray-600 dark:bg-gray-800"
+            defaultValue=""
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v) applyFontSize(v);
+              e.target.value = "";
+            }}
+          >
+            <option value="" disabled>—</option>
+            <option value="9pt">9</option>
+            <option value="10pt">10</option>
+            <option value="11pt">11</option>
+            <option value="12pt">12</option>
+            <option value="14pt">14</option>
+            <option value="16pt">16</option>
+            <option value="18pt">18</option>
+            <option value="22pt">22</option>
+          </select>
+        </label>
         <span className="self-center text-xs text-gray-500">Click in the document to edit text, tables, and cells like Word.</span>
       </div>
       <div

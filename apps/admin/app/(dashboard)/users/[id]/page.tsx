@@ -42,6 +42,7 @@ type UserDetail = {
   addressLine1: string | null;
   addressLine2: string | null;
   suburb: string | null;
+  postcode: string | null;
   city: string | null;
   state: string | null;
   country: string | null;
@@ -113,8 +114,22 @@ export default function EditUserPage() {
     void load();
   }, [id]);
 
+  function validateEmergencyContacts(rows: EmergencyContact[]) {
+    const filled = rows.filter(
+      (row) => row.name.trim() || row.email?.trim() || row.phone?.trim(),
+    );
+    for (const row of filled) {
+      if (!row.name.trim() || !row.email?.trim() || !row.phone?.trim()) {
+        alert("Each emergency contact needs a name, email, and phone.");
+        return false;
+      }
+    }
+    return true;
+  }
+
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!validateEmergencyContacts(emergencyContacts)) return;
     setIsLoading(true);
     const formData = new FormData(e.currentTarget);
     const password = String(formData.get("password") ?? "").trim();
@@ -130,11 +145,13 @@ export default function EditUserPage() {
       passwordNeedsReset: formData.get("passwordNeedsReset") === "on",
       addressLine1: String(formData.get("addressLine1") ?? "").trim() || null,
       addressLine2: String(formData.get("addressLine2") ?? "").trim() || null,
-      suburb: String(formData.get("suburb") ?? "").trim() || null,
+      postcode: String(formData.get("postcode") ?? "").trim() || null,
       city: String(formData.get("city") ?? "").trim() || null,
       state: String(formData.get("state") ?? "").trim() || null,
       country: String(formData.get("country") ?? "").trim() || null,
-      emergencyContacts: emergencyContacts.filter((row) => row.name.trim()),
+      emergencyContacts: emergencyContacts.filter(
+        (row) => row.name.trim() && row.email?.trim() && row.phone?.trim(),
+      ),
       mappedClientContactId: roles.includes("client") ? mappedClientContactId || null : null,
       userFiles,
     };
@@ -268,16 +285,20 @@ export default function EditUserPage() {
               <input name="addressLine2" defaultValue={defaults.addressLine2 ?? ""} className={inputClass} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Suburb</label>
-              <input name="suburb" defaultValue={defaults.suburb ?? ""} className={inputClass} />
+              <label className="mb-1 block text-sm font-medium">Postcode</label>
+              <input
+                name="postcode"
+                defaultValue={defaults.postcode ?? defaults.suburb ?? ""}
+                className={inputClass}
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">City *</label>
               <input name="city" required defaultValue={defaults.city ?? ""} className={inputClass} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">State</label>
-              <input name="state" defaultValue={defaults.state ?? ""} className={inputClass} />
+              <label className="mb-1 block text-sm font-medium">State *</label>
+              <input name="state" required defaultValue={defaults.state ?? ""} className={inputClass} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Country *</label>
@@ -298,7 +319,7 @@ export default function EditUserPage() {
               <div key={index} className="grid gap-3 rounded-lg border border-gray-100 p-4 dark:border-gray-800 sm:grid-cols-2">
                 <input
                   className={inputClass}
-                  placeholder="Name"
+                  placeholder="Name *"
                   value={contact.name}
                   onChange={(e) =>
                     setEmergencyContacts((prev) =>
@@ -318,7 +339,8 @@ export default function EditUserPage() {
                 />
                 <input
                   className={inputClass}
-                  placeholder="Email"
+                  placeholder="Email *"
+                  type="email"
                   value={contact.email ?? ""}
                   onChange={(e) =>
                     setEmergencyContacts((prev) =>
@@ -328,7 +350,7 @@ export default function EditUserPage() {
                 />
                 <input
                   className={inputClass}
-                  placeholder="Phone"
+                  placeholder="Phone *"
                   value={contact.phone ?? ""}
                   onChange={(e) =>
                     setEmergencyContacts((prev) =>

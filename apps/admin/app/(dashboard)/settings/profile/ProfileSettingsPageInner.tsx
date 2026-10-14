@@ -5,9 +5,11 @@ import { useSearchParams } from "next/navigation";
 import { Info, Loader2, Plus, Trash2 } from "lucide-react";
 import { UserPhotoField } from "@/components/users/UserPhotoField";
 import { adminFetch } from "@/lib/admin-api";
-import { UserFilesSection } from "@/components/users/UserFilesSection";
+import { AdminUserFilesField, type UserFileRow } from "@/components/users/AdminUserFilesField";
+import { resolveDocumentHref } from "@/lib/media-url";
 import { roleLabel, type AdminRole, isAdminRole } from "@/lib/admin-roles";
 import { COUNTRY_OPTIONS } from "@/lib/country-options";
+import { useAdminSession } from "@/contexts/AdminSessionContext";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
@@ -32,6 +34,7 @@ type ActivityRow = {
 };
 
 export default function ProfileSettingsPageInner() {
+  const { refreshSession } = useAdminSession();
   const searchParams = useSearchParams();
   const onboarding = searchParams.get("onboarding") === "1";
   const [loading, setLoading] = useState(true);
@@ -43,7 +46,7 @@ export default function ProfileSettingsPageInner() {
   const [role, setRole] = useState<AdminRole>("website");
   const [addressLine1, setAddressLine1] = useState("");
   const [addressLine2, setAddressLine2] = useState("");
-  const [suburb, setSuburb] = useState("");
+  const [postcode, setPostcode] = useState("");
   const [city, setCity] = useState("");
   const [stateRegion, setStateRegion] = useState("");
   const [country, setCountry] = useState("");
@@ -51,7 +54,7 @@ export default function ProfileSettingsPageInner() {
   const [agreementDocumentUrl, setAgreementDocumentUrl] = useState<string | null>(null);
   const [idProofUrl, setIdProofUrl] = useState<string | null>(null);
   const [addressProofUrl, setAddressProofUrl] = useState<string | null>(null);
-  const [userFiles, setUserFiles] = useState<{ name?: string; url?: string }[]>([]);
+  const [userFiles, setUserFiles] = useState<UserFileRow[]>([]);
   const [activity, setActivity] = useState<ActivityRow[]>([]);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -77,7 +80,7 @@ export default function ProfileSettingsPageInner() {
         if (typeof userRole === "string" && isAdminRole(userRole)) setRole(userRole);
         setAddressLine1(String(user.addressLine1 ?? ""));
         setAddressLine2(String(user.addressLine2 ?? ""));
-        setSuburb(String(user.suburb ?? ""));
+        setPostcode(String(user.postcode ?? user.suburb ?? ""));
         setCity(String(user.city ?? ""));
         setStateRegion(String(user.state ?? ""));
         setCountry(String(user.country ?? ""));
@@ -91,7 +94,14 @@ export default function ProfileSettingsPageInner() {
         setIdProofUrl(typeof user.idProofUrl === "string" ? user.idProofUrl : null);
         setAddressProofUrl(typeof user.addressProofUrl === "string" ? user.addressProofUrl : null);
         const files = user.userFiles;
-        setUserFiles(Array.isArray(files) ? (files as { name?: string; url?: string }[]) : []);
+        setUserFiles(
+          Array.isArray(files)
+            ? files
+                .filter((f): f is { name?: string; url?: string } => f && typeof f === "object")
+                .map((f) => ({ name: String(f.name ?? "File"), url: String(f.url ?? "") }))
+                .filter((f) => f.url.trim())
+            : [],
+        );
         setProfilePhotoUrl(
           typeof user.profilePhotoUrl === "string" && user.profilePhotoUrl.trim()
             ? user.profilePhotoUrl.trim()
@@ -111,13 +121,15 @@ export default function ProfileSettingsPageInner() {
   }
 
   function validateEmergencyContacts(rows: EmergencyContact[]) {
-    const filled = rows.filter((row) => row.name.trim());
-    if (!filled.length) {
+    const touched = rows.filter(
+      (row) => row.name.trim() || row.email?.trim() || row.phone?.trim(),
+    );
+    if (!touched.length) {
       alert("Add at least one emergency contact.");
       return false;
     }
-    for (const row of filled) {
-      if (!row.email?.trim() || !row.phone?.trim()) {
+    for (const row of touched) {
+      if (!row.name.trim() || !row.email?.trim() || !row.phone?.trim()) {
         alert("Each emergency contact needs a name, email, and phone.");
         return false;
       }
@@ -130,8 +142,8 @@ export default function ProfileSettingsPageInner() {
     if (!validateEmergencyContacts(emergencyContacts)) return;
 
     if (isProjectMemberOnboarding) {
-      if (!addressLine1.trim() || !city.trim() || !country.trim()) {
-        alert("Address line 1, city, and country are required.");
+      if (!addressLine1.trim() || !city.trim() || !stateRegion.trim() || !postcode.trim() || !country.trim()) {
+        alert("Address line 1, city, state, postcode, and country are required.");
         return;
       }
     }
@@ -139,8 +151,11 @@ export default function ProfileSettingsPageInner() {
     setSaving(true);
     try {
       const body: Record<string, unknown> = {
-        emergencyContacts: emergencyContacts.filter((row) => row.name.trim()),
+        emergencyContacts: emergencyContacts.filter(
+          (row) => row.name.trim() && row.email?.trim() && row.phone?.trim(),
+        ),
         profilePhotoUrl,
+        userFiles,
       };
       if (canEditAccountFields) {
         body.name = name.trim();
@@ -150,9 +165,9 @@ export default function ProfileSettingsPageInner() {
       if (isProjectMemberOnboarding) {
         body.addressLine1 = addressLine1.trim();
         body.addressLine2 = addressLine2.trim() || null;
-        body.suburb = suburb.trim() || null;
+        body.postcode = postcode.trim();
         body.city = city.trim();
-        body.state = stateRegion.trim() || null;
+        body.state = stateRegion.trim();
         body.country = country.trim();
         body.markProfileComplete = true;
       }
@@ -164,6 +179,7 @@ export default function ProfileSettingsPageInner() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save profile");
+      await refreshSession();
       if (onboarding) {
         window.location.href = "/timesheets";
       }
@@ -247,6 +263,7 @@ export default function ProfileSettingsPageInner() {
               });
               const data = await res.json();
               if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save");
+              await refreshSession();
               alert("Account saved.");
             } catch (error) {
               alert(error instanceof Error ? error.message : "Failed to save");
@@ -263,7 +280,21 @@ export default function ProfileSettingsPageInner() {
             name={name}
             email={email}
             photoUrl={profilePhotoUrl}
-            onChange={setProfilePhotoUrl}
+            onChange={(url) => {
+              setProfilePhotoUrl(url);
+              void (async () => {
+                try {
+                  const res = await adminFetch("/api/auth/profile", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ profilePhotoUrl: url }),
+                  });
+                  if (res.ok) await refreshSession();
+                } catch {
+                  // save via form if auto-save fails
+                }
+              })();
+            }}
           />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -378,16 +409,16 @@ export default function ProfileSettingsPageInner() {
                 <input className={inputClass} value={addressLine2} onChange={(e) => setAddressLine2(e.target.value)} />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium">Suburb</label>
-                <input className={inputClass} value={suburb} onChange={(e) => setSuburb(e.target.value)} />
+                <label className="mb-1 block text-sm font-medium">Postcode *</label>
+                <input className={inputClass} value={postcode} onChange={(e) => setPostcode(e.target.value)} required />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium">City *</label>
                 <input className={inputClass} value={city} onChange={(e) => setCity(e.target.value)} required />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium">State</label>
-                <input className={inputClass} value={stateRegion} onChange={(e) => setStateRegion(e.target.value)} />
+                <label className="mb-1 block text-sm font-medium">State *</label>
+                <input className={inputClass} value={stateRegion} onChange={(e) => setStateRegion(e.target.value)} required />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium">Country *</label>
@@ -468,11 +499,43 @@ export default function ProfileSettingsPageInner() {
         </section>
       </form>
 
-      <UserFilesSection
-        agreementDocumentUrl={agreementDocumentUrl}
-        idProofUrl={idProofUrl}
-        addressProofUrl={addressProofUrl}
-        userFiles={userFiles}
+      {(agreementDocumentUrl || idProofUrl || addressProofUrl) ? (
+        <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+          <h3 className="mb-3 font-semibold text-gray-900 dark:text-gray-100">Agreement &amp; verification files</h3>
+          <ul className="list-inside list-disc space-y-1 text-sm text-blue-600 dark:text-blue-400">
+            {agreementDocumentUrl ? (
+              <li>
+                <a href={resolveDocumentHref(agreementDocumentUrl)} target="_blank" rel="noreferrer" className="hover:underline">
+                  Signed contract / agreement
+                </a>
+              </li>
+            ) : null}
+            {idProofUrl ? (
+              <li>
+                <a href={resolveDocumentHref(idProofUrl)} target="_blank" rel="noreferrer" className="hover:underline">ID proof</a>
+              </li>
+            ) : null}
+            {addressProofUrl ? (
+              <li>
+                <a href={resolveDocumentHref(addressProofUrl)} target="_blank" rel="noreferrer" className="hover:underline">
+                  Address proof
+                </a>
+              </li>
+            ) : null}
+          </ul>
+        </section>
+      ) : null}
+
+      <AdminUserFilesField
+        files={userFiles}
+        onChange={(next) => {
+          setUserFiles(next);
+          void adminFetch("/api/auth/profile", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userFiles: next }),
+          }).catch(() => undefined);
+        }}
       />
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">

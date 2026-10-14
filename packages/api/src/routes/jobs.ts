@@ -17,6 +17,16 @@ import { createCareerApplicationForProfile } from "../lib/profile-to-application
 
 const router: IRouter = Router();
 
+async function cancelCareerApplicationsForJobListing(jobListingId: string) {
+  await prisma.careerApplication.updateMany({
+    where: {
+      jobListingId,
+      status: { notIn: ["CANCELLED", "REJECTED"] },
+    },
+    data: { status: "CANCELLED" },
+  });
+}
+
 const jobSchema = z.object({
   slug: z.string().min(1),
   title: z.string().min(1),
@@ -120,6 +130,9 @@ router.patch("/admin/:id/published", async (req, res) => {
       data: { published: body.published },
       include: { client: { select: { name: true } } },
     });
+    if (!body.published && existing.published) {
+      await cancelCareerApplicationsForJobListing(jobId);
+    }
     res.json({ data: serializeAdminJob(job) });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -735,6 +748,9 @@ router.put("/:id", async (req, res) => {
         opportunity: { select: { id: true, name: true } },
       },
     });
+    if (!job.published && existing.published) {
+      await cancelCareerApplicationsForJobListing(req.params.id);
+    }
     res.json({ data: serializeAdminJob(job) });
   } catch (error) {
     if (error instanceof z.ZodError) {

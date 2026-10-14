@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { adminFetch } from "@/lib/admin-api";
 import {
   type AdminRole,
@@ -29,6 +29,9 @@ type AdminSession = {
   userName: string | null;
   profilePhotoUrl: string | null;
   loading: boolean;
+  /** False until the first /api/auth/me request has finished (avoids role flash redirects). */
+  sessionLoaded: boolean;
+  refreshSession: () => Promise<void>;
   canAccessRecruitment: boolean;
   canAccessWebsite: boolean;
   canAccessSales: boolean;
@@ -55,41 +58,49 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
   const [additionalRoles, setAdditionalRoles] = useState<AdminRole[]>([]);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+
+  const refreshSession = useCallback(async () => {
+    try {
+      const res = await adminFetch("/api/auth/me");
+      const data = await res.json();
+      const userRole = data?.data?.user?.role;
+      if (typeof userRole === "string" && isAdminRole(userRole)) {
+        setRole(userRole);
+      }
+      const userEmail = data?.data?.user?.email;
+      if (typeof userEmail === "string") {
+        setEmail(userEmail);
+      }
+      const id = data?.data?.user?.id;
+      if (typeof id === "string") {
+        setUserId(id);
+      }
+      const name = data?.data?.user?.name;
+      if (typeof name === "string" && name.trim()) {
+        setUserName(name.trim());
+      } else {
+        setUserName(null);
+      }
+      const extra = data?.data?.user?.additionalRoles;
+      if (Array.isArray(extra)) {
+        setAdditionalRoles(extra.filter((r): r is AdminRole => typeof r === "string" && isAdminRole(r)));
+      } else {
+        setAdditionalRoles([]);
+      }
+      const photo = data?.data?.user?.profilePhotoUrl;
+      setProfilePhotoUrl(typeof photo === "string" && photo.trim() ? photo.trim() : null);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   useEffect(() => {
-    void adminFetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data) => {
-        const userRole = data?.data?.user?.role;
-        if (typeof userRole === "string" && isAdminRole(userRole)) {
-          setRole(userRole);
-        }
-        const userEmail = data?.data?.user?.email;
-        if (typeof userEmail === "string") {
-          setEmail(userEmail);
-        }
-        const id = data?.data?.user?.id;
-        if (typeof id === "string") {
-          setUserId(id);
-        }
-        const name = data?.data?.user?.name;
-        if (typeof name === "string" && name.trim()) {
-          setUserName(name.trim());
-        } else {
-          setUserName(null);
-        }
-        const extra = data?.data?.user?.additionalRoles;
-        if (Array.isArray(extra)) {
-          setAdditionalRoles(extra.filter((r): r is AdminRole => typeof r === "string" && isAdminRole(r)));
-        } else {
-          setAdditionalRoles([]);
-        }
-        const photo = data?.data?.user?.profilePhotoUrl;
-        setProfilePhotoUrl(typeof photo === "string" && photo.trim() ? photo.trim() : null);
-      })
-      .catch(() => undefined)
-      .finally(() => setLoading(false));
-  }, []);
+    void refreshSession().finally(() => {
+      setLoading(false);
+      setSessionLoaded(true);
+    });
+  }, [refreshSession]);
 
   const value = useMemo(
     () => ({
@@ -100,6 +111,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       userName,
       profilePhotoUrl,
       loading,
+      sessionLoaded,
       canAccessRecruitment: canAccessRecruitment(role),
       canAccessWebsite: canAccessWebsite(role),
       canAccessSales: canAccessSales(role),
@@ -114,8 +126,9 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       canEditProfiles: canEditProfiles(role),
       canDeleteProfiles: canDeleteProfiles(role),
       canManageProfileOwnership: canManageProfileOwnership(role),
+      refreshSession,
     }),
-    [role, additionalRoles, email, userId, userName, profilePhotoUrl, loading],
+    [role, additionalRoles, email, userId, userName, profilePhotoUrl, loading, sessionLoaded, refreshSession],
   );
 
   return <AdminSessionContext.Provider value={value}>{children}</AdminSessionContext.Provider>;

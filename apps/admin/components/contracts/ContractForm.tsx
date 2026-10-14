@@ -1254,8 +1254,8 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
             <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">No. of units *</label>
             <input
               type="number"
-              min="1"
-              step="1"
+              min="0.0001"
+              step="0.01"
               value={numberOfUnits}
               required
               readOnly={numberOfUnitsReadOnly}
@@ -1511,8 +1511,8 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                       <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Qty *</label>
                       <input
                         type="number"
-                        min="1"
-                        step="1"
+                        min="0.0001"
+                        step="0.01"
                         value={variationQtyTotal}
                         readOnly
                         className={fieldClass(false)}

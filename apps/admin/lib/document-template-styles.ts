@@ -79,7 +79,18 @@ table.docx-table td p,
 table.docx-table th p { margin: 0; }
 .template-table-host { position: relative; max-width: 100%; margin: 12px 0; }
 .template-table-host > table { margin: 0; }
-ul, ol { margin: 0.5em 0 0.5em 1.25em; }
+.template-canvas ul,
+.template-canvas ol,
+ul.docx-bullet-list {
+  margin: 0.5em 0 0.75em;
+  padding-left: 1.75em;
+  list-style-position: outside;
+}
+.template-canvas ul,
+ul.docx-bullet-list { list-style-type: disc; }
+.template-canvas ol { list-style-type: decimal; }
+.template-canvas li,
+li.docx-list-item { display: list-item; margin: 0.2em 0; }
 .signature-block { border: 2px dashed #6b7280; padding: 14px 16px 28px; background: #fafafa; position: relative; }
 .signature-block--flow { margin: 8px 0; z-index: auto; }
 td.signature-host-cell, th.signature-host-cell { padding: 14px 16px !important; overflow: visible; vertical-align: top; }

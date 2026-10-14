@@ -14,8 +14,8 @@ const router: IRouter = Router();
 
 const emergencyContactSchema = z.object({
   name: z.string().min(1).max(200),
-  email: z.string().email().optional().or(z.literal("")),
-  phone: z.string().max(50).optional(),
+  email: z.string().email(),
+  phone: z.string().min(1).max(50),
   relation: z.string().max(100).optional(),
 });
 
@@ -45,8 +45,9 @@ const updateSchema = z.object({
   addressLine1: z.string().max(300).optional().nullable(),
   addressLine2: z.string().max(300).optional().nullable(),
   suburb: z.string().max(100).optional().nullable(),
+  postcode: z.string().max(20).optional().nullable(),
   city: z.string().max(100).optional().nullable(),
-  state: z.string().max(100).optional().nullable(),
+  state: z.string().min(1).max(100).optional().nullable(),
   country: z.string().max(100).optional().nullable(),
   emergencyContacts: z.array(emergencyContactSchema).max(5).optional(),
   mappedClientContactId: z.string().min(1).optional().nullable(),
@@ -114,6 +115,7 @@ const detailSelect = {
   addressLine1: true,
   addressLine2: true,
   suburb: true,
+  postcode: true,
   city: true,
   state: true,
   country: true,
@@ -141,6 +143,7 @@ function sanitizeDetail(row: {
   addressLine1: string | null;
   addressLine2: string | null;
   suburb: string | null;
+  postcode: string | null;
   city: string | null;
   state: string | null;
   country: string | null;
@@ -163,6 +166,7 @@ function sanitizeDetail(row: {
     addressLine1: row.addressLine1,
     addressLine2: row.addressLine2,
     suburb: row.suburb,
+    postcode: row.postcode,
     city: row.city,
     state: row.state,
     country: row.country,
@@ -305,6 +309,7 @@ router.post("/", async (req, res) => {
         active: data.active,
         passwordNeedsReset: data.passwordNeedsReset,
         mappedClientContactId: mappedId,
+        mfaEnabled: true,
       },
       select: listSelect,
     });
@@ -406,6 +411,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
         "addressLine1",
         "addressLine2",
         "suburb",
+        "postcode",
         "city",
         "state",
         "country",

@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:
 import { generateSecret, generateURI, verify } from "otplib";
 
 const ALGO = "aes-256-gcm";
-const MFA_ISSUER = "TBOS";
+const MFA_ISSUER = process.env.MFA_ISSUER_NAME?.trim() || "TIBOSX.AI";
 
 function deriveEncryptionKey(): Buffer {
   const material = process.env.MFA_ENCRYPTION_KEY || process.env.JWT_SECRET || "dev-only-mfa-key";

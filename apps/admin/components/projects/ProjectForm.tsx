@@ -518,9 +518,11 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                             <button
                               type="button"
                               onClick={() => void removeMember(member.id)}
-                              className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400"
+                              className="rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400"
+                              aria-label="Remove member"
+                              title="Remove member"
                             >
-                              Remove
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           ) : null}
                         </div>
