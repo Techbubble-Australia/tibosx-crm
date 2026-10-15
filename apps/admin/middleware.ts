@@ -48,6 +48,12 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next();
     }
 
+    if (pathname.startsWith(LOGIN_PATH) && request.nextUrl.searchParams.get("signin") === "1") {
+      const res = NextResponse.next();
+      res.cookies.delete(ADMIN_SESSION_COOKIE);
+      return res;
+    }
+
     if (!token) {
       return NextResponse.next();
     }

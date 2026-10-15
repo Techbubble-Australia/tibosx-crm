@@ -1339,6 +1339,146 @@ router.post("/:id/members/:memberId/generate-credentials", async (req: AuthReque
   }
 });
 
+const assignTemplateSchema = z.object({
+  templateId: z.string().min(1),
+  values: z.record(z.string(), z.string()),
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+});
+
+router.post("/:id/members/:memberId/assign-template", async (req: AuthRequest, res) => {
+  try {
+    const projectId = req.params.id;
+    const memberId = req.params.memberId;
+    if (!projectId || !memberId) return res.status(400).json({ error: "Invalid id" });
+    const role = req.user?.role ?? "";
+    if (!isProjectManagerRole(role) && !canManageProjects(role)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const input = assignTemplateSchema.parse(req.body);
+    const member = await prisma.projectMember.findFirst({
+      where: { id: memberId, projectId },
+      include: {
+        profile: true,
+        project: { select: { projectManagerId: true } },
+        adminUser: { select: { id: true, email: true, name: true, phone: true, active: true } },
+      },
+    });
+    if (!member) return res.status(404).json({ error: "Member not found" });
+
+    if (!member.adminUserId) {
+      const linkedUser = await prisma.adminUser.findFirst({
+        where: { mappedProfileId: member.profileId },
+        select: { id: true, email: true, name: true, phone: true, active: true },
+      });
+      if (linkedUser) {
+        await prisma.projectMember.update({
+          where: { id: member.id },
+          data: { adminUserId: linkedUser.id },
+        });
+        member.adminUserId = linkedUser.id;
+        member.adminUser = linkedUser;
+      }
+    }
+
+    if (!member.adminUserId || !member.adminUser) {
+      return res.status(400).json({ error: "Create the user record before assigning a template" });
+    }
+    if (member.agreementSignedAt) {
+      return res.status(400).json({ error: "Template has already been signed" });
+    }
+    if (role === "project_manager" && member.project.projectManagerId !== getActorId(req)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const template = await prisma.credentialTemplate.findUnique({ where: { id: input.templateId } });
+    if (!template) return res.status(404).json({ error: "Template not found" });
+    if (template.addStartDate && template.requireStartDate && !input.startDate) {
+      return res.status(400).json({ error: "Start date is required for this template" });
+    }
+    if (template.addEndDate && template.requireEndDate && !input.endDate) {
+      return res.status(400).json({ error: "End date is required for this template" });
+    }
+    if (input.startDate && input.endDate && input.endDate < input.startDate) {
+      return res.status(400).json({ error: "End date must be on or after start date" });
+    }
+    const variables = Array.isArray(template.variables)
+      ? (template.variables as CredentialTemplateVariable[])
+      : [];
+    for (const variable of variables) {
+      if (variable.required && !input.values[variable.key]?.trim()) {
+        return res.status(400).json({ error: `${variable.label} is required` });
+      }
+      const value = input.values[variable.key];
+      if (variable.type === "select" && value) {
+        if (!variable.options.includes(value)) {
+          return res.status(400).json({ error: `Invalid value for ${variable.label}` });
+        }
+      }
+    }
+
+    const defaults = defaultCredentialValuesForProfile(member.profile);
+    const formatCredentialDate = (value: Date) =>
+      value.toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" });
+    const dateValues: Record<string, string> = {};
+    if (input.startDate) {
+      const formatted = formatCredentialDate(input.startDate);
+      dateValues.start_date = formatted;
+      dateValues.startDate = formatted;
+      dateValues.Start_Date = formatted;
+    }
+    if (input.endDate) {
+      const formatted = formatCredentialDate(input.endDate);
+      dateValues.end_date = formatted;
+      dateValues.endDate = formatted;
+      dateValues.End_Date = formatted;
+    }
+    const email = member.adminUser.email.trim().toLowerCase();
+    const mergedValues: Record<string, string> = {
+      ...defaults,
+      ...dateValues,
+      ...input.values,
+      email,
+      Email: email,
+    };
+
+    await prisma.$transaction(async (tx) => {
+      await tx.projectMember.update({
+        where: { id: member.id },
+        data: {
+          credentialTemplateId: template.id,
+          credentialData: mergedValues,
+          agreementSignedAt: null,
+        },
+      });
+      await tx.projectActivityLog.create({
+        data: {
+          projectId,
+          action: "TEMPLATE_ASSIGNED",
+          newValue: template.name,
+          performedById: getActorId(req) || null,
+        },
+      });
+    });
+
+    const detail = await fetchProject(projectId);
+    res.json({
+      data: {
+        memberId: member.id,
+        adminUserId: member.adminUserId,
+        templateAssigned: true,
+        project: detail ? mapDetail(detail) : null,
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error assigning template:", error);
+    res.status(500).json({ error: "Failed to assign template" });
+  }
+});
+
 const supportClientContactsSchema = z.object({
   contacts: z.array(
     z.object({

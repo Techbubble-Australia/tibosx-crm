@@ -29,7 +29,9 @@ export default function MfaSetupPage() {
         const role =
           typeof meData?.data?.user?.role === "string" ? meData.data.user.role : "website";
 
-        if (meRes.ok && meData?.data?.user?.mfaEnabled) {
+        const requiresMfaEnrollment = Boolean(meData?.data?.user?.requiresMfaEnrollment);
+
+        if (meRes.ok && meData?.data?.user?.mfaEnabled && !requiresMfaEnrollment) {
           const resumeRes = await fetch("/api/auth/mfa/resume-session", {
             method: "POST",
             credentials: "include",
@@ -39,12 +41,18 @@ export default function MfaSetupPage() {
             window.location.assign(defaultLandingPath(role));
             return;
           }
-          const resumeErr = await resumeRes.json().catch(() => ({}));
-          throw new Error(
-            typeof (resumeErr as { error?: string }).error === "string"
-              ? (resumeErr as { error: string }).error
-              : "MFA is already enabled but your session could not be updated. Sign out and sign in again.",
-          );
+        }
+
+        if (meRes.ok && requiresMfaEnrollment && meData?.data?.user?.mfaEnabled) {
+          const restartRes = await adminFetch("/api/auth/mfa/restart-enrollment", { method: "POST" });
+          if (!restartRes.ok) {
+            const restartErr = await restartRes.json().catch(() => ({}));
+            throw new Error(
+              typeof (restartErr as { error?: string }).error === "string"
+                ? (restartErr as { error: string }).error
+                : "Could not start MFA setup. Sign out and sign in again.",
+            );
+          }
         }
 
         const res = await adminFetch("/api/auth/mfa/setup", { method: "POST" });

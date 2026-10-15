@@ -471,7 +471,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
                 profileHref="/settings/profile"
                 onSignOut={() => {
                   void fetch("/api/auth/logout", { method: "POST", credentials: "include" }).finally(() => {
-                    window.location.href = "/login";
+                    window.location.href = "/login?signin=1";
                   });
                 }}
               />

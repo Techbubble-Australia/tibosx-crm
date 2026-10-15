@@ -8,6 +8,7 @@ import {
   generateMfaPendingToken,
   generateMfaSetupRequiredToken,
   generatePasswordResetRequiredToken,
+  MFA_SETUP_REQUIRED_PURPOSE,
   verifyMfaPendingToken,
   type AuthRequest,
 } from "../middleware/auth";
@@ -307,6 +308,7 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
     data: {
       user: {
         ...publicUser(user),
+        requiresMfaEnrollment: req.sessionPurpose === MFA_SETUP_REQUIRED_PURPOSE,
         mfaEnrolledAt: user.mfaEnrolledAt?.toISOString() ?? null,
         phone: user.phone,
         addressLine1: user.addressLine1,
@@ -598,21 +600,41 @@ router.post("/password/change-required", authMiddleware, async (req: AuthRequest
     const updated = await prisma.adminUser.update({
       where: { id: user.id },
       data: { passwordHash, passwordNeedsReset: false },
-      select: { id: true, email: true, role: true, mfaEnabled: true, passwordNeedsReset: true },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        mfaEnabled: true,
+        passwordNeedsReset: true,
+        totpSecretEnc: true,
+      },
     });
 
-    const setupToken = generateMfaSetupRequiredToken({
-      id: updated.id,
-      email: updated.email,
-      role: updated.role,
-    });
+    const mfaFullyEnrolled = Boolean(updated.mfaEnabled && updated.totpSecretEnc);
+    if (!mfaFullyEnrolled) {
+      await prisma.adminUser.update({
+        where: { id: user.id },
+        data: { mfaEnabled: false, totpSecretEnc: null, mfaEnrolledAt: null },
+      });
+    }
+    const token = mfaFullyEnrolled
+      ? generateToken({
+          id: updated.id,
+          email: updated.email,
+          role: updated.role,
+        })
+      : generateMfaSetupRequiredToken({
+          id: updated.id,
+          email: updated.email,
+          role: updated.role,
+        });
 
     res.json({
       message: "Password updated",
       data: {
-        token: setupToken,
+        token,
         user: publicUser(updated),
-        requiresMfaSetup: !updated.mfaEnabled,
+        requiresMfaSetup: !mfaFullyEnrolled,
       },
     });
   } catch (error) {
@@ -662,6 +684,33 @@ router.post("/mfa/resume-session", authMiddleware, async (req: AuthRequest, res)
       user: publicUser(user),
     },
   });
+});
+
+/** Clear incomplete MFA so the user can scan a new QR code (e.g. after password reset). */
+router.post("/mfa/restart-enrollment", authMiddleware, async (req: AuthRequest, res) => {
+  const u = req.user;
+  if (!u) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const user = await prisma.adminUser.findUnique({
+    where: { id: u.id },
+    select: { mfaEnabled: true, totpSecretEnc: true, active: true },
+  });
+  if (!user || user.active === false) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  const forceReEnroll = req.sessionPurpose === MFA_SETUP_REQUIRED_PURPOSE;
+  if (user.mfaEnabled && user.totpSecretEnc && !forceReEnroll) {
+    return res.status(400).json({ error: "MFA is already enabled" });
+  }
+
+  await prisma.adminUser.update({
+    where: { id: u.id },
+    data: { mfaEnabled: false, totpSecretEnc: null, mfaEnrolledAt: null },
+  });
+
+  res.json({ data: { ok: true } });
 });
 
 router.post("/mfa/setup", authMiddleware, async (req: AuthRequest, res) => {

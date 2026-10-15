@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Loader2, Lock } from "lucide-react";
 import { AuthPageShell } from "@/components/AuthPageShell";
+import { defaultLandingPath } from "@/lib/admin-roles";
 
 export default function ChangePasswordPage() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -30,7 +31,12 @@ export default function ChangePasswordPage() {
       if (!res.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "Failed to update password");
       }
-      window.location.assign("/mfa-setup");
+      if (data.requiresMfaSetup) {
+        window.location.assign("/mfa-setup");
+        return;
+      }
+      const role = typeof data?.user?.role === "string" ? data.user.role : "website";
+      window.location.assign(defaultLandingPath(role));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to update password");
     } finally {

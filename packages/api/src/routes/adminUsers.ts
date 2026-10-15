@@ -317,15 +317,32 @@ router.get("/:id", async (req, res) => {
     });
     if (!row) return res.status(404).json({ error: "Not found" });
 
-    const membership = await prisma.projectMember.findFirst({
+    let membership = await prisma.projectMember.findFirst({
       where: { adminUserId: row.id },
+      orderBy: { updatedAt: "desc" },
       select: {
         id: true,
         projectId: true,
+        credentialTemplateId: true,
+        agreementSignedAt: true,
         project: { select: { projectNumber: true, title: true } },
         profile: { select: { firstName: true, lastName: true, email: true } },
       },
     });
+    if (!membership && row.mappedProfileId) {
+      membership = await prisma.projectMember.findFirst({
+        where: { profileId: row.mappedProfileId },
+        orderBy: { updatedAt: "desc" },
+        select: {
+          id: true,
+          projectId: true,
+          credentialTemplateId: true,
+          agreementSignedAt: true,
+          project: { select: { projectNumber: true, title: true } },
+          profile: { select: { firstName: true, lastName: true, email: true } },
+        },
+      });
+    }
 
     res.json({
       data: {
@@ -337,6 +354,8 @@ router.get("/:id", async (req, res) => {
               projectLabel: `${membership.project.projectNumber} — ${membership.project.title}`,
               profileName: `${membership.profile.firstName} ${membership.profile.lastName}`.trim(),
               profileEmail: membership.profile.email,
+              templateAssigned: Boolean(membership.credentialTemplateId),
+              templateSigned: Boolean(membership.agreementSignedAt),
             }
           : null,
       },

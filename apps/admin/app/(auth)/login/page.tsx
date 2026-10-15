@@ -22,6 +22,10 @@ export default function LoginPage() {
     }
   }, [step]);
 
+  function goAfterAuth(path: string) {
+    window.location.assign(path);
+  }
+
   async function onCredentialsSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setIsLoading(true);
@@ -53,16 +57,16 @@ export default function LoginPage() {
       }
 
       if (data.requiresPasswordReset) {
-        window.location.assign("/change-password");
+        goAfterAuth("/change-password");
         return;
       }
 
       if (data.requiresMfaSetup) {
-        window.location.assign("/mfa-setup");
+        goAfterAuth("/mfa-setup");
         return;
       }
 
-      window.location.assign(defaultLandingPath(data?.user?.role ?? "website"));
+      goAfterAuth(defaultLandingPath(data?.user?.role ?? "website"));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -93,14 +97,14 @@ export default function LoginPage() {
       }
 
       if (data.requiresPasswordReset) {
-        window.location.assign("/change-password");
+        goAfterAuth("/change-password");
         return;
       }
       if (data.requiresMfaSetup) {
-        window.location.assign("/mfa-setup");
+        goAfterAuth("/mfa-setup");
         return;
       }
-      window.location.assign(defaultLandingPath(data?.user?.role ?? "website"));
+      goAfterAuth(defaultLandingPath(data?.user?.role ?? "website"));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "MFA verification failed");
     } finally {

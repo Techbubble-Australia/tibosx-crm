@@ -20,6 +20,7 @@ export interface AuthUser {
 export interface AuthRequest extends Request {
   user?: AuthUser;
   mfaSetupRequired?: boolean;
+  sessionPurpose?: string;
 }
 
 interface JwtPayload extends AuthUser {
@@ -63,6 +64,7 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
       return res.status(401).json({ error: "Unauthorized: MFA verification required" });
     }
     req.user = { id: decoded.id, email: decoded.email, role: decoded.role };
+    req.sessionPurpose = decoded.purpose;
     req.mfaSetupRequired =
       decoded.purpose === MFA_SETUP_REQUIRED_PURPOSE ||
       decoded.purpose === PASSWORD_RESET_REQUIRED_PURPOSE;

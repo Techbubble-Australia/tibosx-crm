@@ -30,12 +30,23 @@ type Props = {
   member: MemberInfo;
   onClose: () => void;
   onSuccess: () => void;
+  /** `assign` — existing TBOS user; `invite` — create user from project member (default). */
+  mode?: "invite" | "assign";
+  userEmail?: string;
 };
 
-export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess }: Props) {
+export function GenerateCredentialsModal({
+  projectId,
+  member,
+  onClose,
+  onSuccess,
+  mode = "invite",
+  userEmail,
+}: Props) {
+  const isAssign = mode === "assign";
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [templateId, setTemplateId] = useState("");
-  const [inviteEmail, setInviteEmail] = useState(member.email);
+  const [inviteEmail, setInviteEmail] = useState(userEmail?.trim() || member.email);
   const [values, setValues] = useState<Record<string, string>>({});
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -48,8 +59,8 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
   const selectedTemplate = templates.find((row) => row.id === templateId);
 
   useEffect(() => {
-    setInviteEmail(member.email);
-  }, [member.email]);
+    setInviteEmail(userEmail?.trim() || member.email);
+  }, [member.email, userEmail]);
 
   useEffect(() => {
     async function load() {
@@ -118,16 +129,27 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
       };
       if (startDate) body.startDate = startDate;
       if (endDate) body.endDate = endDate;
-      const res = await adminFetch(
-        `/api/admin/projects/${projectId}/members/${member.id}/generate-credentials`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        },
-      );
+      const endpoint = isAssign
+        ? `/api/admin/projects/${projectId}/members/${member.id}/assign-template`
+        : `/api/admin/projects/${projectId}/members/${member.id}/generate-credentials`;
+      const assignBody = {
+        templateId,
+        values,
+        ...(startDate ? { startDate } : {}),
+        ...(endDate ? { endDate } : {}),
+      };
+      const res = await adminFetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(isAssign ? assignBody : body),
+      });
       const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to invite user");
+      if (!res.ok) {
+        throw new Error(
+          (data as { error?: string }).error ||
+            (isAssign ? "Failed to assign template" : "Failed to invite user"),
+        );
+      }
       const result = data.data as {
         email?: string;
         inviteEmailSent?: boolean;
@@ -150,27 +172,37 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 sm:p-6">
       <div className="flex max-h-[min(85vh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
         <div className="shrink-0 border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Create user</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {isAssign ? "Assign template" : "Create user"}
+          </h3>
           <p className="mt-1 text-sm text-gray-500">
             {member.firstName} {member.lastName}
           </p>
           {!done && !loading ? (
             <div className="mt-4 space-y-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Email <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  className={inputClass}
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  required
-                  form="credential-vars-form"
-                  placeholder="company.email@client.com"
-                />
-                <p className="mt-1 text-xs text-gray-500">Use the company email for the TBOS user record when possible.</p>
-              </div>
+              {!isAssign ? (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    className={inputClass}
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    required
+                    form="credential-vars-form"
+                    placeholder="company.email@client.com"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Use the company email for the TBOS user record when possible.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  User account: <strong>{inviteEmail}</strong>
+                </p>
+              )}
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Agreement template <span className="text-red-500">*</span>
@@ -196,9 +228,11 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
           {done ? (
             <div className="space-y-3 text-sm">
               <p className="text-green-700 dark:text-green-400">
-                {done.inviteEmailSent
-                  ? `Invitation email sent to ${done.email} with sign-in details. MFA enrollment is required on first sign-in.`
-                  : "User created. Email could not be sent — share the temporary password securely."}
+                {isAssign
+                  ? "Agreement template assigned. The user will sign it after they sign in."
+                  : done.inviteEmailSent
+                    ? `Invitation email sent to ${done.email} with sign-in details. MFA enrollment is required on first sign-in.`
+                    : "User created. Email could not be sent — share the temporary password securely."}
               </p>
               {!done.inviteEmailSent && done.temporaryPassword ? (
                 <div className="rounded-lg bg-gray-50 p-4 font-mono dark:bg-gray-800">
@@ -300,7 +334,7 @@ export function GenerateCredentialsModal({ projectId, member, onClose, onSuccess
                 className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Invite user
+                {isAssign ? "Assign template" : "Invite user"}
               </button>
             </>
           )}

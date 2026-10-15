@@ -69,6 +69,8 @@ type UserDetail = {
     projectLabel: string;
     profileName: string;
     profileEmail: string;
+    templateAssigned: boolean;
+    templateSigned: boolean;
   } | null;
 };
 
@@ -218,14 +220,6 @@ export default function EditUserPage() {
   if (!defaults) return <p className="text-gray-500">User not found.</p>;
 
   const membership = defaults.projectMembership;
-  const memberForModal = membership
-    ? {
-        id: membership.memberId,
-        firstName: membership.profileName.split(" ")[0] ?? membership.profileName,
-        lastName: membership.profileName.split(" ").slice(1).join(" ") || "—",
-        email: membership.profileEmail,
-      }
-    : null;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -236,19 +230,6 @@ export default function EditUserPage() {
           </Link>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Edit user</h2>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            if (!membership) {
-              alert("Link this user to a project member before assigning a template.");
-              return;
-            }
-            setAssignOpen(true);
-          }}
-          className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium dark:border-gray-600"
-        >
-          Assign template
-        </button>
       </div>
 
       <form onSubmit={onSubmit} className="space-y-6">
@@ -319,6 +300,47 @@ export default function EditUserPage() {
           {defaults.mfaEnabled ? (
             <p className="text-xs text-gray-500">MFA is enabled. User manages it under Settings → Security.</p>
           ) : null}
+          <div className="space-y-2 border-t border-gray-100 pt-4 dark:border-gray-800">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Agreement template</p>
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                disabled
+                checked={membership?.templateAssigned ?? false}
+                className="h-4 w-4 rounded"
+              />
+              Template assigned
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                disabled
+                checked={membership?.templateSigned ?? false}
+                className="h-4 w-4 rounded"
+              />
+              Template signed
+            </label>
+            {!membership?.templateSigned ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!membership) {
+                    alert(
+                      "Link this user to a project member (map to profile or add them on a project) before assigning a template.",
+                    );
+                    return;
+                  }
+                  setAssignOpen(true);
+                }}
+                className="mt-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+              >
+                Assign template
+              </button>
+            ) : null}
+            {membership ? (
+              <p className="text-xs text-gray-500">Project: {membership.projectLabel}</p>
+            ) : null}
+          </div>
         </section>
 
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
@@ -455,13 +477,14 @@ export default function EditUserPage() {
         </button>
       </form>
 
-      {assignOpen && membership && memberForModal ? (
+      {assignOpen && membership ? (
         <UserAssignCredentialsModal
           projectId={membership.projectId}
-          member={memberForModal}
+          memberId={membership.memberId}
+          memberName={membership.profileName}
+          userEmail={defaults.email}
           onClose={() => setAssignOpen(false)}
           onSuccess={() => {
-            setAssignOpen(false);
             void load();
           }}
         />

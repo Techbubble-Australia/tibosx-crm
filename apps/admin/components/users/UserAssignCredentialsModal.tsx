@@ -1,21 +1,32 @@
 "use client";
 
-import { GenerateCredentialsModal } from "@/components/projects/GenerateCredentialsModal";
+import { AssignTemplateModal } from "@/components/users/AssignTemplateModal";
 
 type Props = {
   projectId: string;
-  member: { id: string; firstName: string; lastName: string; email: string };
+  memberId: string;
+  memberName: string;
+  userEmail: string;
   onClose: () => void;
   onSuccess: () => void;
 };
 
-export function UserAssignCredentialsModal({ projectId, member, onClose, onSuccess }: Props) {
+export function UserAssignCredentialsModal({
+  projectId,
+  memberId,
+  memberName,
+  userEmail,
+  onClose,
+  onSuccess,
+}: Props) {
   return (
-    <GenerateCredentialsModal
+    <AssignTemplateModal
       projectId={projectId}
-      member={member}
+      memberId={memberId}
+      memberName={memberName}
+      userEmail={userEmail}
       onClose={onClose}
-      onSuccess={onSuccess}
+      onAssigned={onSuccess}
     />
   );
 }
