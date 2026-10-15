@@ -274,9 +274,27 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const onboarding = effectiveRoleList(user.role, user.additionalRoles).includes("project_member")
-    ? await getMemberOnboardingStatus(user.id)
-    : null;
+  const { prepareMemberOnboardingForUser, userQualifiesForMemberOnboarding } = await import(
+    "../lib/project-member-user.js"
+  );
+  await prepareMemberOnboardingForUser(user.id);
+  const qualifiesOnboarding = await userQualifiesForMemberOnboarding(
+    user.id,
+    user.role,
+    user.additionalRoles,
+  );
+  let onboarding = qualifiesOnboarding ? await getMemberOnboardingStatus(user.id) : null;
+
+  if (onboarding?.hasAgreementAssignment) {
+    const refreshed = await prisma.adminUser.findUnique({
+      where: { id: user.id },
+      select: { role: true, additionalRoles: true },
+    });
+    if (refreshed) {
+      user.role = refreshed.role;
+      user.additionalRoles = refreshed.additionalRoles;
+    }
+  }
 
   const { getTimesheetAccessForUser } = await import("../lib/timesheet-access.js");
   const timesheetAccess = await getTimesheetAccessForUser(

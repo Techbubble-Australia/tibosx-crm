@@ -24,7 +24,7 @@ function extractAgreementBody(html: string): string {
 }
 
 export function AgreementOnboardingGate() {
-  const { isEffectiveProjectMember, loading: sessionLoading } = useAdminSession();
+  const { sessionLoaded, memberOnboarding, refreshSession } = useAdminSession();
   const [agreement, setAgreement] = useState<AgreementData | null>(null);
   const [loading, setLoading] = useState(true);
   const [signatures, setSignatures] = useState<Record<string, string>>({});
@@ -32,16 +32,24 @@ export function AgreementOnboardingGate() {
   const [saving, setSaving] = useState(false);
   const signDocRef = useRef<AgreementSigningDocumentHandle>(null);
 
+  const needsAgreementSigning = Boolean(
+    memberOnboarding?.hasAgreementAssignment && !memberOnboarding.agreementSigned,
+  );
+
   const captureIds = useMemo(() => agreement?.signatureCaptureIds ?? [], [agreement?.signatureCaptureIds]);
   const bodyHtml = useMemo(() => (agreement ? extractAgreementBody(agreement.html) : ""), [agreement]);
   const allSigned = captureIds.length > 0 && signedCaptureIds.length === captureIds.length;
-  const showModal = !sessionLoading && isEffectiveProjectMember && agreement && !agreement.signed;
+  const showModal =
+    sessionLoaded && needsAgreementSigning && agreement && !agreement.signed;
 
   useEffect(() => {
-    if (sessionLoading || !isEffectiveProjectMember) {
+    if (!sessionLoaded) return;
+    if (!needsAgreementSigning) {
+      setAgreement(null);
       setLoading(false);
       return;
     }
+    setLoading(true);
     void adminFetch("/api/admin/projects/my-agreement")
       .then(async (res) => {
         if (res.status === 404) return null;
@@ -51,7 +59,7 @@ export function AgreementOnboardingGate() {
       })
       .then((row) => setAgreement(row))
       .finally(() => setLoading(false));
-  }, [sessionLoading, isEffectiveProjectMember]);
+  }, [sessionLoaded, needsAgreementSigning]);
 
   async function handleSubmit() {
     if (!allSigned) {
@@ -67,9 +75,7 @@ export function AgreementOnboardingGate() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to sign agreement");
-      const refresh = await adminFetch("/api/admin/projects/my-agreement");
-      const refreshData = await refresh.json();
-      if (refresh.ok) setAgreement(refreshData.data as AgreementData);
+      await refreshSession();
       window.location.reload();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to sign agreement");

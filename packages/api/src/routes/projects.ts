@@ -17,6 +17,10 @@ import {
 import { saveUploadBuffer } from "../lib/save-upload-buffer";
 import { readUploadTextByUrl } from "../lib/read-upload-buffer";
 import { canManageProjects, getActorId, isProjectManagerRole, isProjectMemberRole } from "../lib/project-access";
+import {
+  findCredentialProjectMemberForUser,
+  hasEffectiveProjectMemberRole,
+} from "../lib/project-member-user";
 import { isValidProjectManagerUserId, isValidTimesheetApproverUserId } from "../lib/timesheet-approver";
 import { emailTbosUserInvite } from "../lib/user-invite.js";
 import { logProjectFieldChanges, type ProjectSnapshot } from "../lib/project-activity";
@@ -495,21 +499,23 @@ router.get("/", async (req: AuthRequest, res) => {
 
 router.get("/my-agreement", async (req: AuthRequest, res) => {
   try {
-    const role = req.user?.role ?? "";
-    if (!isProjectMemberRole(role)) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
     const userId = getActorId(req);
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const member = await prisma.projectMember.findFirst({
-      where: { adminUserId: userId },
-      include: {
-        project: { select: { id: true, title: true, projectNumber: true } },
-        credentialTemplate: true,
-      },
-      orderBy: { updatedAt: "desc" },
+    const adminUser = await prisma.adminUser.findUnique({
+      where: { id: userId },
+      select: { role: true, additionalRoles: true },
     });
+    if (!adminUser) return res.status(401).json({ error: "Unauthorized" });
+    if (!hasEffectiveProjectMemberRole(adminUser.role, adminUser.additionalRoles)) {
+      const linked = await prisma.projectMember.findFirst({
+        where: { adminUserId: userId },
+        select: { id: true },
+      });
+      if (!linked) return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const member = await findCredentialProjectMemberForUser(userId);
     if (!member?.credentialTemplate) {
       return res.status(404).json({ error: "No agreement assigned" });
     }
@@ -570,12 +576,21 @@ router.get("/my-agreement", async (req: AuthRequest, res) => {
 
 router.post("/my-agreement/sign", async (req: AuthRequest, res) => {
   try {
-    const role = req.user?.role ?? "";
-    if (!isProjectMemberRole(role)) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
     const userId = getActorId(req);
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const adminUser = await prisma.adminUser.findUnique({
+      where: { id: userId },
+      select: { role: true, additionalRoles: true },
+    });
+    if (!adminUser) return res.status(401).json({ error: "Unauthorized" });
+    if (!hasEffectiveProjectMemberRole(adminUser.role, adminUser.additionalRoles)) {
+      const linked = await prisma.projectMember.findFirst({
+        where: { adminUserId: userId },
+        select: { id: true },
+      });
+      if (!linked) return res.status(403).json({ error: "Forbidden" });
+    }
 
     const body = z
       .object({
@@ -584,12 +599,10 @@ router.post("/my-agreement/sign", async (req: AuthRequest, res) => {
       })
       .parse(req.body);
 
-    const member = await prisma.projectMember.findFirst({
-      where: { adminUserId: userId, credentialTemplateId: { not: null } },
-      include: { credentialTemplate: true },
-      orderBy: { updatedAt: "desc" },
-    });
-    if (!member?.credentialTemplate) return res.status(404).json({ error: "No agreement assigned" });
+    const member = await findCredentialProjectMemberForUser(userId);
+    if (!member?.credentialTemplate) {
+      return res.status(404).json({ error: "No agreement assigned" });
+    }
 
     const variables = Array.isArray(member.credentialTemplate.variables)
       ? (member.credentialTemplate.variables as CredentialTemplateVariable[])

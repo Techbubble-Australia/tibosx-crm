@@ -21,6 +21,13 @@ import {
   isAdminRole,
 } from "@/lib/admin-roles";
 
+export type MemberOnboardingState = {
+  hasAgreementAssignment: boolean;
+  agreementSigned: boolean;
+  profileComplete: boolean;
+  canSubmitTimesheets: boolean;
+};
+
 type AdminSession = {
   role: AdminRole;
   additionalRoles: AdminRole[];
@@ -28,6 +35,7 @@ type AdminSession = {
   userId: string;
   userName: string | null;
   profilePhotoUrl: string | null;
+  memberOnboarding: MemberOnboardingState | null;
   loading: boolean;
   /** False until the first /api/auth/me request has finished (avoids role flash redirects). */
   sessionLoaded: boolean;
@@ -64,6 +72,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
   const [sessionLoaded, setSessionLoaded] = useState(false);
   const [canAccessProjectManagementTimesheets, setCanAccessProjectManagementTimesheets] = useState(false);
   const [canAccessWorkspaceTimesheets, setCanAccessWorkspaceTimesheets] = useState(false);
+  const [memberOnboarding, setMemberOnboarding] = useState<MemberOnboardingState | null>(null);
 
   const refreshSession = useCallback(async () => {
     try {
@@ -101,6 +110,17 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       } | null;
       setCanAccessProjectManagementTimesheets(Boolean(access?.projectManagementTimesheets));
       setCanAccessWorkspaceTimesheets(Boolean(access?.workspaceTimesheets));
+      const onboarding = data?.data?.user?.onboarding as MemberOnboardingState | null | undefined;
+      if (onboarding && typeof onboarding === "object") {
+        setMemberOnboarding({
+          hasAgreementAssignment: Boolean(onboarding.hasAgreementAssignment),
+          agreementSigned: Boolean(onboarding.agreementSigned),
+          profileComplete: Boolean(onboarding.profileComplete),
+          canSubmitTimesheets: Boolean(onboarding.canSubmitTimesheets),
+        });
+      } else {
+        setMemberOnboarding(null);
+      }
     } catch {
       // ignore
     }
@@ -121,6 +141,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       userId,
       userName,
       profilePhotoUrl,
+      memberOnboarding,
       loading,
       sessionLoaded,
       canAccessRecruitment: canAccessRecruitment(role),
@@ -150,6 +171,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       userId,
       userName,
       profilePhotoUrl,
+      memberOnboarding,
       loading,
       sessionLoaded,
       canAccessProjectManagementTimesheets,

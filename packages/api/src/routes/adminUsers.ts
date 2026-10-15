@@ -13,6 +13,7 @@ import {
   applyMappedProfile,
   assertMappedProfileAvailable,
 } from "../lib/admin-user-profile-map";
+import { candidateProfileSearchWhere } from "../lib/profile-search";
 
 const router: IRouter = Router();
 
@@ -226,16 +227,10 @@ router.get("/", async (_req, res) => {
 router.get("/profile-map-options", async (req, res) => {
   try {
     const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
-    const where =
-      q.length >= 2
-        ? {
-            OR: [
-              { firstName: { contains: q, mode: "insensitive" as const } },
-              { lastName: { contains: q, mode: "insensitive" as const } },
-              { email: { contains: q, mode: "insensitive" as const } },
-            ],
-          }
-        : {};
+    const where = candidateProfileSearchWhere(q);
+    if (q.length > 0 && Object.keys(where).length === 0) {
+      return res.json({ data: [] });
+    }
 
     const rows = await prisma.candidateProfile.findMany({
       where,

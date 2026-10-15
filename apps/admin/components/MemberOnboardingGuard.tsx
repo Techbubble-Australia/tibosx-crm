@@ -27,16 +27,13 @@ export function MemberOnboardingGuard({ children }: { children: React.ReactNode 
       .then((res) => res.json())
       .then((data) => {
         const user = data?.data?.user;
-        const roles = [user?.role, ...(Array.isArray(user?.additionalRoles) ? user.additionalRoles : [])].filter(
-          (r): r is string => typeof r === "string",
-        );
-        if (!roles.includes("project_member")) return;
         const onboarding = user.onboarding as {
           hasAgreementAssignment?: boolean;
           agreementSigned?: boolean;
           profileComplete?: boolean;
         } | null;
-        if (!onboarding?.hasAgreementAssignment) return;
+        if (!onboarding) return;
+        if (onboarding.hasAgreementAssignment && !onboarding.agreementSigned) return;
         if (onboarding.agreementSigned && !onboarding.profileComplete) {
           router.replace("/settings/profile?onboarding=1");
         }

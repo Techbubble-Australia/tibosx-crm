@@ -14,7 +14,7 @@ const inputClass =
 type EmergencyContact = { name: string; email?: string; phone?: string; relation?: string };
 
 export function MemberProfileCompletionGate() {
-  const { isEffectiveProjectMember, loading: sessionLoading } = useAdminSession();
+  const { sessionLoaded, memberOnboarding } = useAdminSession();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addressLine1, setAddressLine1] = useState("");
@@ -38,16 +38,15 @@ export function MemberProfileCompletionGate() {
     { name: "", email: "", phone: "" },
   ]);
 
+  const needsProfileCompletion = Boolean(
+    memberOnboarding?.agreementSigned && !memberOnboarding.profileComplete,
+  );
+
   useEffect(() => {
-    if (sessionLoading || !isEffectiveProjectMember) return;
+    if (!sessionLoaded || !needsProfileCompletion) return;
     void adminFetch("/api/auth/me")
       .then((res) => res.json())
       .then((data) => {
-        const onboarding = data?.data?.user?.onboarding as {
-          agreementSigned?: boolean;
-          profileComplete?: boolean;
-        } | null;
-        if (!onboarding?.agreementSigned || onboarding.profileComplete) return;
         const user = data?.data?.user as Record<string, unknown>;
         setAddressLine1(String(user.addressLine1 ?? ""));
         setCity(String(user.city ?? ""));
@@ -77,7 +76,7 @@ export function MemberProfileCompletionGate() {
         setOpen(true);
       })
       .catch(() => undefined);
-  }, [sessionLoading, isEffectiveProjectMember]);
+  }, [sessionLoaded, needsProfileCompletion]);
 
   async function uploadProof(
     file: File | undefined,

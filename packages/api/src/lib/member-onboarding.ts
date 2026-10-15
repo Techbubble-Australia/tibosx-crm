@@ -4,6 +4,7 @@ import {
   bankDetailsComplete,
   emergencyContactsComplete,
 } from "./member-profile";
+import { findCredentialProjectMemberForUser } from "./project-member-user";
 
 export type MemberOnboardingStatus = {
   hasAgreementAssignment: boolean;
@@ -13,28 +14,26 @@ export type MemberOnboardingStatus = {
 };
 
 export async function getMemberOnboardingStatus(userId: string): Promise<MemberOnboardingStatus> {
-  const [user, member] = await Promise.all([
-    prisma.adminUser.findUnique({
-      where: { id: userId },
-      select: {
-        profileDetailsCompletedAt: true,
-        addressLine1: true,
-        city: true,
-        state: true,
-        postcode: true,
-        country: true,
-        bankDetails: true,
-        idProofUrl: true,
-        addressProofUrl: true,
-        emergencyContacts: true,
-      },
-    }),
-    prisma.projectMember.findFirst({
-      where: { adminUserId: userId, credentialTemplateId: { not: null } },
-      orderBy: { updatedAt: "desc" },
-      select: { agreementSignedAt: true, credentialTemplateId: true },
-    }),
-  ]);
+  const user = await prisma.adminUser.findUnique({
+    where: { id: userId },
+    select: {
+      profileDetailsCompletedAt: true,
+      addressLine1: true,
+      city: true,
+      state: true,
+      postcode: true,
+      country: true,
+      bankDetails: true,
+      idProofUrl: true,
+      addressProofUrl: true,
+      emergencyContacts: true,
+    },
+  });
+
+  const memberRow = await findCredentialProjectMemberForUser(userId);
+  const member = memberRow
+    ? { agreementSignedAt: memberRow.agreementSignedAt, credentialTemplateId: memberRow.credentialTemplateId }
+    : null;
 
   const hasAgreementAssignment = Boolean(member?.credentialTemplateId);
   const agreementSigned = !hasAgreementAssignment || Boolean(member?.agreementSignedAt);

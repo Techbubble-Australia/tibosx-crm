@@ -30,7 +30,13 @@ export function MappedProfileSelect({ value, onChange, currentUserId, initialOpt
 
   useEffect(() => {
     const q = query.trim();
-    if (q.length < 2 && !value) {
+    if (!q && !value) {
+      if (!(initialOption && initialOption.id === value)) {
+        setOptions([]);
+      }
+      return;
+    }
+    if (q.length < 2 && !q.includes(" ")) {
       if (!(initialOption && initialOption.id === value)) {
         setOptions([]);
       }
@@ -38,7 +44,7 @@ export function MappedProfileSelect({ value, onChange, currentUserId, initialOpt
     }
     setLoading(true);
     const params = new URLSearchParams();
-    if (q.length >= 2) params.set("q", q);
+    if (q) params.set("q", q);
     void adminFetch(`/api/admin/users/profile-map-options?${params}`)
       .then((res) => res.json())
       .then((data) => setOptions((data.data as ProfileMapOption[]) ?? []))
@@ -65,7 +71,11 @@ export function MappedProfileSelect({ value, onChange, currentUserId, initialOpt
         onChange={(e) => onChange(e.target.value)}
       >
         <option value="">
-          {loading ? "Searching…" : query.trim().length < 2 ? "Type at least 2 characters to search" : "Select profile…"}
+          {loading
+            ? "Searching…"
+            : query.trim().length < 2 && !query.includes(" ")
+              ? "Type at least 2 characters (or first and last name) to search"
+              : "Select profile…"}
         </option>
         {options.map((opt) => {
           const takenByOther = opt.mappedUserId && opt.mappedUserId !== currentUserId;
