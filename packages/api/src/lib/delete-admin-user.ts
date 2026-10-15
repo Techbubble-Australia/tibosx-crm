@@ -1,4 +1,6 @@
-import { prisma } from "@techbubble/database";
+import { prisma, Prisma } from "@techbubble/database";
+
+const jsonNull = Prisma.DbNull;
 
 export async function deleteAdminUserCompletely(userId: string): Promise<void> {
   const user = await prisma.adminUser.findUnique({
@@ -32,7 +34,7 @@ export async function deleteAdminUserCompletely(userId: string): Promise<void> {
       data: {
         adminUserId: null,
         credentialTemplateId: null,
-        credentialData: null,
+        credentialData: jsonNull,
         agreementSignedAt: null,
       },
     });
@@ -43,7 +45,7 @@ export async function deleteAdminUserCompletely(userId: string): Promise<void> {
         data: {
           adminUserId: null,
           credentialTemplateId: null,
-          credentialData: null,
+          credentialData: jsonNull,
           agreementSignedAt: null,
         },
       });
@@ -73,9 +75,9 @@ export async function deleteAdminUserCompletely(userId: string): Promise<void> {
         profilePhotoUrl: null,
         idProofUrl: null,
         addressProofUrl: null,
-        userFiles: null,
-        bankDetails: null,
-        emergencyContacts: null,
+        userFiles: jsonNull,
+        bankDetails: jsonNull,
+        emergencyContacts: jsonNull,
       },
     });
 

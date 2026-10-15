@@ -610,10 +610,12 @@ router.put("/:id", async (req: AuthRequest, res) => {
 
 router.delete("/:id", async (req: AuthRequest, res) => {
   try {
-    if (req.user?.id === req.params.id) {
+    const userId = req.params.id;
+    if (!userId) return res.status(400).json({ error: "User id is required" });
+    if (req.user?.id === userId) {
       return res.status(400).json({ error: "Cannot delete your own account" });
     }
-    const target = await prisma.adminUser.findUnique({ where: { id: req.params.id } });
+    const target = await prisma.adminUser.findUnique({ where: { id: userId } });
     if (!target) return res.status(404).json({ error: "Not found" });
 
     if (target.role === "admin" && target.active) {
@@ -624,7 +626,7 @@ router.delete("/:id", async (req: AuthRequest, res) => {
     }
 
     try {
-      await deleteAdminUserCompletely(req.params.id);
+      await deleteAdminUserCompletely(userId);
     } catch (err) {
       const code = err instanceof Error ? err.message : "";
       if (code === "NOT_FOUND") return res.status(404).json({ error: "Not found" });
