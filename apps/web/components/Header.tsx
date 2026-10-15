@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Menu, X, ArrowRight } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
+import { tibosxLoginUrl } from "@/lib/tibosx-login-url";
 
 const navLinks = [
   { href: "/", label: "Home" },
@@ -69,7 +70,7 @@ export function Header() {
               Contact
             </Link>
             <a
-              href="https://tibosx.ai.techbubble.com.au"
+              href={tibosxLoginUrl()}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-[14px] bg-[#111111] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-neutral-800"
@@ -109,7 +110,7 @@ export function Header() {
               );
             })}
             <a
-              href="https://tibosx.ai.techbubble.com.au"
+              href={tibosxLoginUrl()}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setIsMenuOpen(false)}

@@ -89,14 +89,11 @@ export async function middleware(request: NextRequest) {
       }
 
       if (pathname.startsWith(MFA_SETUP_PATH)) {
-        if (purpose === MFA_SETUP_REQUIRED_PURPOSE) {
-          return NextResponse.next();
-        }
         if (purpose === PASSWORD_RESET_REQUIRED_PURPOSE) {
           return redirectTo(request, CHANGE_PASSWORD_PATH);
         }
-        const role = typeof payload.role === "string" ? payload.role : "website";
-        return redirectTo(request, defaultLandingPath(role));
+        // Any valid session may complete MFA setup (full token + MfaEnrollmentGuard redirect).
+        return NextResponse.next();
       }
 
       return NextResponse.next();

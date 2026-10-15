@@ -183,7 +183,7 @@ export default function EditUserPage() {
         (row) => row.name.trim() && row.email?.trim() && row.phone?.trim(),
       ),
       mappedClientContactId: roles.includes("client") ? mappedClientContactId || null : null,
-      mappedProfileId: mappedProfileId.trim() || null,
+      mappedProfileId: roles.includes("client") ? null : mappedProfileId.trim() || null,
       userFiles,
       bankDetails: bankDetailsToApi(bankDetails),
     };
@@ -276,7 +276,16 @@ export default function EditUserPage() {
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium">Roles *</label>
-            <AdminRolesMultiSelect value={roles} onChange={setRoles} />
+            <AdminRolesMultiSelect
+              value={roles}
+              onChange={(next) => {
+                setRoles(next);
+                if (next.includes("client")) {
+                  setMappedProfileId("");
+                  setMappedProfileOption(null);
+                }
+              }}
+            />
             <p className="mt-2 text-xs text-gray-500">Effective access: {formatRolesLabel(roles[0] ?? defaults.role, roles.slice(1))}</p>
           </div>
           {roles.includes("client") ? (
@@ -287,12 +296,14 @@ export default function EditUserPage() {
               required
             />
           ) : null}
-          <MappedProfileSelect
-            value={mappedProfileId}
-            onChange={setMappedProfileId}
-            currentUserId={id}
-            initialOption={mappedProfileOption}
-          />
+          {!roles.includes("client") ? (
+            <MappedProfileSelect
+              value={mappedProfileId}
+              onChange={setMappedProfileId}
+              currentUserId={id}
+              initialOption={mappedProfileOption}
+            />
+          ) : null}
           <div>
             <label className="mb-1 block text-sm font-medium">New password</label>
             <input name="password" type="password" minLength={8} className={inputClass} placeholder="Leave blank to keep current" />

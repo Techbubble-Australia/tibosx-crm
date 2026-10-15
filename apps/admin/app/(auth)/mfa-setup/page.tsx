@@ -22,27 +22,48 @@ export default function MfaSetupPage() {
 
   useEffect(() => {
     void (async () => {
+      let navigatingAway = false;
       try {
         const meRes = await adminFetch("/api/auth/me");
         const meData = await meRes.json();
+        const role =
+          typeof meData?.data?.user?.role === "string" ? meData.data.user.role : "website";
+
         if (meRes.ok && meData?.data?.user?.mfaEnabled) {
-          const role = typeof meData?.data?.user?.role === "string" ? meData.data.user.role : "website";
-          window.location.assign(defaultLandingPath(role));
-          return;
+          const resumeRes = await fetch("/api/auth/mfa/resume-session", {
+            method: "POST",
+            credentials: "include",
+          });
+          if (resumeRes.ok) {
+            navigatingAway = true;
+            window.location.assign(defaultLandingPath(role));
+            return;
+          }
+          const resumeErr = await resumeRes.json().catch(() => ({}));
+          throw new Error(
+            typeof (resumeErr as { error?: string }).error === "string"
+              ? (resumeErr as { error: string }).error
+              : "MFA is already enabled but your session could not be updated. Sign out and sign in again.",
+          );
         }
+
         const res = await adminFetch("/api/auth/mfa/setup", { method: "POST" });
         const data = await res.json();
         if (!res.ok) {
           throw new Error(typeof data.error === "string" ? data.error : "Failed to start MFA setup");
         }
-        setSetup({
-          otpauthUrl: data.data.otpauthUrl,
-          secret: data.data.secret,
-        });
+        const otpauthUrl = data?.data?.otpauthUrl;
+        const secret = data?.data?.secret;
+        if (typeof otpauthUrl !== "string" || typeof secret !== "string") {
+          throw new Error("Invalid MFA setup response from server");
+        }
+        setSetup({ otpauthUrl, secret });
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Failed to load MFA setup");
       } finally {
-        setIsLoading(false);
+        if (!navigatingAway) {
+          setIsLoading(false);
+        }
       }
     })();
   }, []);
@@ -98,6 +119,12 @@ export default function MfaSetupPage() {
         <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-950/40 dark:text-red-300">
           {error}
         </div>
+      ) : null}
+
+      {!setup && !error ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Unable to load MFA setup. Try signing out and signing in again.
+        </p>
       ) : null}
 
       {setup ? (

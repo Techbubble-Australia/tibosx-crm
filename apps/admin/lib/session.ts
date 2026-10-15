@@ -11,6 +11,6 @@ export function adminSessionCookieOptions(): Partial<ResponseCookie> {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: ADMIN_SESSION_MAX_AGE_SEC,
+    // Session cookie (no maxAge): cleared when the browser closes so marketing-site login opens the sign-in page.
   };
 }

@@ -194,6 +194,7 @@ function serializeProfile(row: {
     status: string;
     clientName: string;
   }>;
+  mappedAdminUser?: { id: string; email: string } | null;
 }) {
   const docs = Array.isArray(row.documentUrls)
     ? row.documentUrls.filter((url): url is string => typeof url === "string")
@@ -229,6 +230,8 @@ function serializeProfile(row: {
     duplicateMatchReason: row.duplicateMatchReason ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    mappedUserId: row.mappedAdminUser?.id ?? null,
+    mappedUserEmail: row.mappedAdminUser?.email ?? null,
     contracts: (row.contracts ?? []).map((contract) => ({
       id: contract.id,
       contractNumber: contract.contractNumber,
@@ -321,6 +324,7 @@ router.get("/:id", async (req, res) => {
             },
           },
         },
+        mappedAdminUser: { select: { id: true, email: true } },
       },
     });
     if (!row) {

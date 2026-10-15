@@ -9,12 +9,23 @@ type Props = {
 
 export function AdminRolesMultiSelect({ value, onChange }: Props) {
   function toggle(role: AdminRole) {
-    if (value.includes(role)) {
-      const next = value.filter((r) => r !== role);
+    if (role === "client") {
+      if (value.includes("client")) {
+        const next = value.filter((r) => r !== "client");
+        onChange(next.length ? next : ["website"]);
+      } else {
+        onChange(["client"]);
+      }
+      return;
+    }
+
+    const withoutClient = value.filter((r) => r !== "client");
+    if (withoutClient.includes(role)) {
+      const next = withoutClient.filter((r) => r !== role);
       onChange(next.length ? next : [role]);
       return;
     }
-    onChange([...value, role]);
+    onChange([...withoutClient, role]);
   }
 
   return (

@@ -624,6 +624,46 @@ router.post("/password/change-required", authMiddleware, async (req: AuthRequest
   }
 });
 
+/** Issue a full session when MFA is already enrolled but the cookie still has `mfa_setup_required`. */
+router.post("/mfa/resume-session", authMiddleware, async (req: AuthRequest, res) => {
+  const u = req.user;
+  if (!u) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const user = await prisma.adminUser.findUnique({
+    where: { id: u.id },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      mfaEnabled: true,
+      totpSecretEnc: true,
+      active: true,
+      passwordNeedsReset: true,
+    },
+  });
+  if (!user || user.active === false) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  if (!user.mfaEnabled || !user.totpSecretEnc) {
+    return res.status(400).json({ error: "MFA enrollment is not complete" });
+  }
+
+  const token = generateToken({
+    id: user.id,
+    email: user.email,
+    role: user.role,
+  });
+
+  res.json({
+    data: {
+      token,
+      user: publicUser(user),
+    },
+  });
+});
+
 router.post("/mfa/setup", authMiddleware, async (req: AuthRequest, res) => {
   const u = req.user;
   if (!u) {

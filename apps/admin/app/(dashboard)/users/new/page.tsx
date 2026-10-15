@@ -7,7 +7,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { AdminRolesMultiSelect, rolesToApi } from "@/components/users/AdminRolesMultiSelect";
 import { MappedClientContactSelect } from "@/components/users/MappedClientContactSelect";
-import { MappedProfileSelect } from "@/components/users/MappedProfileSelect";
+import { MappedProfileSelect, type ProfileMapOption } from "@/components/users/MappedProfileSelect";
 import { type AdminRole, isAdminRole } from "@/lib/admin-roles";
 
 const inputClass =
@@ -20,14 +20,47 @@ function NewUserPageInner() {
   const [roles, setRoles] = useState<AdminRole[]>(["website"]);
   const [mappedClientContactId, setMappedClientContactId] = useState("");
   const [mappedProfileId, setMappedProfileId] = useState("");
+  const [mappedProfileOption, setMappedProfileOption] = useState<ProfileMapOption | null>(null);
+  const [prefillEmail, setPrefillEmail] = useState("");
+  const [prefillName, setPrefillName] = useState("");
+  const [prefillPhone, setPrefillPhone] = useState("");
 
   useEffect(() => {
     const fromContact = searchParams.get("mappedClientContactId")?.trim();
     if (fromContact) {
       setMappedClientContactId(fromContact);
       setRoles(["client"]);
+      return;
+    }
+    const email = searchParams.get("email")?.trim();
+    if (email) setPrefillEmail(email);
+    const name = searchParams.get("name")?.trim();
+    if (name) setPrefillName(name);
+    const phone = searchParams.get("phone")?.trim();
+    if (phone) setPrefillPhone(phone);
+    const fromProfile = searchParams.get("mappedProfileId")?.trim();
+    if (fromProfile) {
+      setMappedProfileId(fromProfile);
+      setRoles(["project_member"]);
+      const label =
+        name && email ? `${name} (${email})` : name || email || "Selected profile";
+      setMappedProfileOption({
+        id: fromProfile,
+        label,
+        mappedUserId: null,
+        mappedUserEmail: null,
+      });
     }
   }, [searchParams]);
+
+  function handleRolesChange(next: AdminRole[]) {
+    const rolesNext = next.filter(isAdminRole);
+    setRoles(rolesNext);
+    if (rolesNext.includes("client")) {
+      setMappedProfileId("");
+      setMappedProfileOption(null);
+    }
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -52,7 +85,7 @@ function NewUserPageInner() {
           active: formData.get("active") === "on",
           passwordNeedsReset: formData.get("passwordNeedsReset") === "on",
           mappedClientContactId: roles.includes("client") ? mappedClientContactId : null,
-          mappedProfileId: mappedProfileId.trim() || null,
+          mappedProfileId: roles.includes("client") ? null : mappedProfileId.trim() || null,
         }),
       });
       if (!res.ok) {
@@ -81,15 +114,15 @@ function NewUserPageInner() {
       >
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Email *</label>
-          <input name="email" type="email" required className={inputClass} />
+          <input name="email" type="email" required className={inputClass} value={prefillEmail} onChange={(e) => setPrefillEmail(e.target.value)} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Name</label>
-          <input name="name" className={inputClass} />
+          <input name="name" className={inputClass} value={prefillName} onChange={(e) => setPrefillName(e.target.value)} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Phone *</label>
-          <input name="phone" required className={inputClass} />
+          <input name="phone" required className={inputClass} value={prefillPhone} onChange={(e) => setPrefillPhone(e.target.value)} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Password *</label>
@@ -98,12 +131,7 @@ function NewUserPageInner() {
         </div>
         <div>
           <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">Roles *</label>
-          <AdminRolesMultiSelect
-            value={roles}
-            onChange={(next) => {
-              setRoles(next.filter(isAdminRole));
-            }}
-          />
+          <AdminRolesMultiSelect value={roles} onChange={handleRolesChange} />
         </div>
         {roles.includes("client") ? (
           <MappedClientContactSelect
@@ -112,7 +140,13 @@ function NewUserPageInner() {
             required
           />
         ) : null}
-        <MappedProfileSelect value={mappedProfileId} onChange={setMappedProfileId} />
+        {!roles.includes("client") ? (
+          <MappedProfileSelect
+            value={mappedProfileId}
+            onChange={setMappedProfileId}
+            initialOption={mappedProfileOption}
+          />
+        ) : null}
         <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
           <input name="passwordNeedsReset" type="checkbox" defaultChecked className="h-4 w-4 rounded" />
           Password needs reset (user must change password on first login)
