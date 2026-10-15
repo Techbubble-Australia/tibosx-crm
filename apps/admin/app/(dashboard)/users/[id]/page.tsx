@@ -32,6 +32,7 @@ type ActivityRow = {
   id: string;
   action: string;
   fieldName: string | null;
+  fieldLabel?: string | null;
   oldValue: string | null;
   newValue: string | null;
   performedByName: string;
@@ -64,6 +65,8 @@ type UserDetail = {
   idProofUrl: string | null;
   addressProofUrl: string | null;
   userFiles: { name?: string; url?: string }[];
+  agreementTemplate?: { templatesSent: number; templatesSigned: number };
+  agreementFiles?: UserFileRow[];
   projectMembership: {
     memberId: string;
     projectId: string;
@@ -203,7 +206,6 @@ export default function EditUserPage() {
         throw new Error((err as { error?: string }).error || "Failed");
       }
       await load();
-      router.push("/users");
     } catch (e) {
       alert(e instanceof Error ? e.message : "Failed to update user");
     } finally {
@@ -303,43 +305,27 @@ export default function EditUserPage() {
           ) : null}
           <div className="space-y-2 border-t border-gray-100 pt-4 dark:border-gray-800">
             <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Agreement template</p>
-            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input
-                type="checkbox"
-                disabled
-                checked={membership?.templateAssigned ?? false}
-                className="h-4 w-4 rounded"
-              />
-              Template assigned
-            </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input
-                type="checkbox"
-                disabled
-                checked={membership?.templateSigned ?? false}
-                className="h-4 w-4 rounded"
-              />
-              Template signed
-            </label>
-            {!membership?.templateSigned ? (
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Template sent: <span className="font-medium">{defaults.agreementTemplate?.templatesSent ?? 0}</span>
+            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Template signed: <span className="font-medium">{defaults.agreementTemplate?.templatesSigned ?? 0}</span>
+            </p>
+            {membership ? (
               <button
                 type="button"
-                onClick={() => {
-                  if (!membership) {
-                    alert(
-                      "Link this user to a project member (map to profile or add them on a project) before assigning a template.",
-                    );
-                    return;
-                  }
-                  setAssignOpen(true);
-                }}
+                onClick={() => setAssignOpen(true)}
                 className="mt-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
               >
                 Assign template
               </button>
-            ) : null}
+            ) : (
+              <p className="text-xs text-gray-500">
+                Save the user and link them to a project member before assigning a template.
+              </p>
+            )}
             {membership ? (
-              <p className="text-xs text-gray-500">Project: {membership.projectLabel}</p>
+              <p className="text-xs text-gray-500">{membership.projectLabel}</p>
             ) : null}
           </div>
         </section>
@@ -447,7 +433,11 @@ export default function EditUserPage() {
           </button>
         </section>
 
-        <AdminUserFilesField files={userFiles} onChange={setUserFiles} />
+        <AdminUserFilesField
+          files={userFiles}
+          pinnedFiles={defaults.agreementFiles ?? []}
+          onChange={setUserFiles}
+        />
 
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
           <h3 className="mb-4 font-semibold">Activity log</h3>

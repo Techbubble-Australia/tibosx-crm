@@ -278,6 +278,32 @@ export function MemberProfileCompletionGate() {
           </section>
         </div>
 
+        <section className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-300">
+          <p className="font-semibold text-gray-900 dark:text-gray-100">Privacy notice — Documents and personal information</p>
+          <p className="mt-2 leading-relaxed">
+            Documents uploaded to TIBOSX may contain personal, employment, identity, visa, financial or other confidential
+            information. TechBubble Pty Ltd collects and uses these documents for legitimate business purposes, including
+            recruitment, employment administration, customer management and project delivery. Access is restricted according
+            to user permissions and business requirements. Authorised personnel and service providers, including those located
+            overseas, may process or access information where necessary. AI-enabled features may also process information when
+            used. Only upload information you are authorised to provide. For details about collection, use, storage,
+            disclosure, retention and your privacy rights, read the{" "}
+            <a
+              href={`${(process.env.NEXT_PUBLIC_WEB_URL || "https://techbubble.com.au").replace(/\/$/, "")}/privacy`}
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-blue-600 underline dark:text-blue-400"
+            >
+              TIBOSX Privacy Policy
+            </a>{" "}
+            or contact{" "}
+            <a href="mailto:hr@techbubble.com.au" className="font-medium text-blue-600 underline dark:text-blue-400">
+              hr@techbubble.com.au
+            </a>
+            .
+          </p>
+        </section>
+
         <div className="mt-6 flex justify-end">
           <button
             type="button"

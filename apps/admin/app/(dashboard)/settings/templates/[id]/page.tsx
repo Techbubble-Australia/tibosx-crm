@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
@@ -9,6 +9,7 @@ import { AdminOnlyGuard } from "@/components/AdminOnlyGuard";
 import { CredentialTemplateForm, type CredentialTemplateValues } from "@/components/templates/CredentialTemplateForm";
 
 export default function EditCredentialTemplatePage() {
+  const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const [defaults, setDefaults] = useState<CredentialTemplateValues | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -31,7 +32,7 @@ export default function EditCredentialTemplatePage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save template");
-      setDefaults(data.data as CredentialTemplateValues);
+      router.push("/settings/templates");
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to save template");
     } finally {

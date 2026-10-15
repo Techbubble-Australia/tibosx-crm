@@ -16,6 +16,8 @@ export interface AuthUser {
   email: string;
   role: string;
   additionalRoles?: string[];
+  /** When set, the session acts as `id` but the real admin is this user. */
+  impersonatorId?: string;
 }
 
 export interface AuthRequest extends Request {
@@ -27,6 +29,7 @@ export interface AuthRequest extends Request {
 interface JwtPayload extends AuthUser {
   purpose?: string;
   additionalRoles?: string[];
+  impersonatorId?: string;
 }
 
 function getCookie(req: Request, name: string): string | undefined {
@@ -65,7 +68,13 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
     if (decoded.purpose === MFA_PENDING_PURPOSE) {
       return res.status(401).json({ error: "Unauthorized: MFA verification required" });
     }
-    req.user = { id: decoded.id, email: decoded.email, role: decoded.role };
+    req.user = {
+      id: decoded.id,
+      email: decoded.email,
+      role: decoded.role,
+      ...(decoded.additionalRoles?.length ? { additionalRoles: decoded.additionalRoles } : {}),
+      ...(decoded.impersonatorId ? { impersonatorId: decoded.impersonatorId } : {}),
+    };
     req.sessionPurpose = decoded.purpose;
     req.mfaSetupRequired =
       decoded.purpose === MFA_SETUP_REQUIRED_PURPOSE ||

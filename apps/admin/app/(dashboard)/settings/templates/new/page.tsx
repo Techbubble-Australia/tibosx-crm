@@ -22,8 +22,7 @@ export default function NewCredentialTemplatePage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to create template");
-      const created = data.data as { id: string };
-      router.push(`/settings/templates/${created.id}`);
+      router.push("/settings/templates");
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to create template");
     } finally {

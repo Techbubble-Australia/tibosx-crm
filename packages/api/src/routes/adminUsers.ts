@@ -16,6 +16,7 @@ import {
 } from "../lib/admin-user-profile-map";
 import { candidateProfileSearchWhere } from "../lib/profile-search";
 import { deleteAdminUserCompletely } from "../lib/delete-admin-user.js";
+import { emailTbosUserInvite } from "../lib/user-invite.js";
 
 const router: IRouter = Router();
 
@@ -320,6 +321,21 @@ router.get("/:id", async (req, res) => {
     });
     if (!row) return res.status(404).json({ error: "Not found" });
 
+    const memberWhere: { OR: Array<{ adminUserId: string } | { profileId: string }> } = {
+      OR: [{ adminUserId: row.id }],
+    };
+    if (row.mappedProfileId) {
+      memberWhere.OR.push({ profileId: row.mappedProfileId });
+    }
+    const agreementMembers = await prisma.projectMember.findMany({
+      where: { ...memberWhere, credentialTemplateId: { not: null } },
+      select: { agreementSignedAt: true },
+    });
+    const agreementTemplate = {
+      templatesSent: agreementMembers.length,
+      templatesSigned: agreementMembers.filter((m) => m.agreementSignedAt).length,
+    };
+
     let membership = await prisma.projectMember.findFirst({
       where: { adminUserId: row.id },
       orderBy: { updatedAt: "desc" },
@@ -350,6 +366,10 @@ router.get("/:id", async (req, res) => {
     res.json({
       data: {
         ...sanitizeDetail(row),
+        agreementTemplate,
+        agreementFiles: row.agreementDocumentUrl
+          ? [{ name: "Signed contract / agreement", url: row.agreementDocumentUrl }]
+          : [],
         projectMembership: membership
           ? {
               memberId: membership.id,
@@ -416,7 +436,19 @@ router.post("/", async (req, res) => {
       }
       return created;
     });
-    res.status(201).json({ data: sanitizeUser(row) });
+    let inviteEmailSent = false;
+    try {
+      await emailTbosUserInvite({
+        to: row.email,
+        name: row.name || row.email,
+        temporaryPassword: data.password,
+      });
+      inviteEmailSent = true;
+    } catch (emailErr) {
+      console.error("User invite email failed:", emailErr);
+    }
+
+    res.status(201).json({ data: { ...sanitizeUser(row), inviteEmailSent } });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
@@ -432,7 +464,10 @@ router.put("/:id", async (req: AuthRequest, res) => {
     const existing = await prisma.adminUser.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: "Not found" });
 
-    const guardError = await assertCanModifyAdminUser(req.user?.id ?? "", req.params.id ?? "", {
+    const guardError = await assertCanModifyAdminUser(
+      req.user?.impersonatorId ?? req.user?.id ?? "",
+      req.params.id ?? "",
+      {
       role: data.role,
       active: data.active,
     });
@@ -440,7 +475,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: guardError });
     }
 
-    const actorId = req.user?.id ?? "";
+    const actorId = req.user?.impersonatorId ?? req.user?.id ?? "";
 
     const nextRole = data.role ?? existing.role;
     const nextAdditional =
@@ -605,6 +640,29 @@ router.put("/:id", async (req: AuthRequest, res) => {
     }
     console.error("Error updating admin user:", error);
     res.status(500).json({ error: "Failed to update user" });
+  }
+});
+
+router.post("/:id/deactivate", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.params.id;
+    if (!userId) return res.status(400).json({ error: "User id is required" });
+    const actorId = req.user?.impersonatorId ?? req.user?.id ?? "";
+    const guardError = await assertCanModifyAdminUser(actorId, userId, { active: false });
+    if (guardError) return res.status(400).json({ error: guardError });
+
+    const existing = await prisma.adminUser.findUnique({ where: { id: userId } });
+    if (!existing) return res.status(404).json({ error: "Not found" });
+    if (!existing.active) return res.json({ data: { active: false } });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.adminUser.update({ where: { id: userId }, data: { active: false } });
+      await logAdminUserFieldChange(tx, userId, actorId, "active", "true", "false");
+    });
+    res.json({ data: { active: false } });
+  } catch (error) {
+    console.error("Error deactivating user:", error);
+    res.status(500).json({ error: "Failed to deactivate user" });
   }
 });
 

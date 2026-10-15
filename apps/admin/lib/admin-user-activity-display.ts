@@ -24,10 +24,16 @@ export type AdminUserActivityRow = {
   fieldLabel?: string | null;
 };
 
+function humanizeFieldName(fieldName: string): string {
+  if (ADMIN_USER_FIELD_LABELS[fieldName]) return ADMIN_USER_FIELD_LABELS[fieldName];
+  const spaced = fieldName.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
 export function formatAdminUserActivityTitle(row: AdminUserActivityRow): string {
   const label =
     row.fieldLabel?.trim() ||
-    (row.fieldName ? ADMIN_USER_FIELD_LABELS[row.fieldName] ?? row.fieldName : null);
+    (row.fieldName ? humanizeFieldName(row.fieldName) : null);
   if (label) return `${label} updated`;
   return row.action.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }

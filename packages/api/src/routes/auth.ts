@@ -241,7 +241,53 @@ router.post("/refresh-full-session", authMiddleware, async (req: AuthRequest, re
   if (req.mfaSetupRequired) {
     return res.status(400).json({ error: "Complete password or MFA setup first" });
   }
-  const token = await createFullSessionTokenForUserId(u.id);
+  const token = await createFullSessionTokenForUserId(u.id, u.impersonatorId);
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
+  res.json({ data: { token } });
+});
+
+router.get("/impersonate/search", authMiddleware, async (req: AuthRequest, res) => {
+  const actor = req.user;
+  if (!actor || actor.role !== "admin" || actor.impersonatorId) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  if (q.length < 2) return res.json({ data: [] });
+  const rows = await prisma.adminUser.findMany({
+    where: {
+      active: true,
+      id: { not: actor.id },
+      OR: [
+        { email: { contains: q, mode: "insensitive" } },
+        { name: { contains: q, mode: "insensitive" } },
+      ],
+    },
+    orderBy: { email: "asc" },
+    take: 20,
+    select: { id: true, email: true, name: true, role: true },
+  });
+  res.json({ data: rows });
+});
+
+router.post("/impersonate/start", authMiddleware, async (req: AuthRequest, res) => {
+  const actor = req.user;
+  if (!actor || actor.role !== "admin" || actor.impersonatorId) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const targetUserId = typeof req.body?.userId === "string" ? req.body.userId.trim() : "";
+  if (!targetUserId) return res.status(400).json({ error: "userId is required" });
+  const { createImpersonationToken } = await import("../lib/admin-session-token.js");
+  const token = await createImpersonationToken(actor.id, targetUserId);
+  if (!token) return res.status(400).json({ error: "Cannot impersonate this user" });
+  res.json({ data: { token } });
+});
+
+router.post("/impersonate/end", authMiddleware, async (req: AuthRequest, res) => {
+  const actor = req.user;
+  if (!actor?.impersonatorId) {
+    return res.status(400).json({ error: "Not impersonating" });
+  }
+  const token = await createFullSessionTokenForUserId(actor.impersonatorId);
   if (!token) return res.status(401).json({ error: "Unauthorized" });
   res.json({ data: { token } });
 });
@@ -314,8 +360,23 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
     user.additionalRoles,
   );
 
+  let impersonation: { impersonatorId: string; impersonatorName: string } | null = null;
+  if (u.impersonatorId) {
+    const impersonator = await prisma.adminUser.findUnique({
+      where: { id: u.impersonatorId },
+      select: { id: true, name: true, email: true },
+    });
+    if (impersonator) {
+      impersonation = {
+        impersonatorId: impersonator.id,
+        impersonatorName: impersonator.name || impersonator.email,
+      };
+    }
+  }
+
   res.json({
     data: {
+      impersonation,
       user: {
         ...publicUser(user),
         requiresMfaEnrollment: req.sessionPurpose === MFA_SETUP_REQUIRED_PURPOSE,

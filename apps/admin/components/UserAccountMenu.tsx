@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, LogOut, UserCircle } from "lucide-react";
+import { ChevronDown, LogOut, UserCircle, VenetianMask } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 
 type Props = {
@@ -11,9 +11,19 @@ type Props = {
   photoUrl?: string | null;
   profileHref: string;
   onSignOut: () => void;
+  canImpersonate?: boolean;
+  onImpersonate?: () => void;
 };
 
-export function UserAccountMenu({ name, email, photoUrl, profileHref, onSignOut }: Props) {
+export function UserAccountMenu({
+  name,
+  email,
+  photoUrl,
+  profileHref,
+  onSignOut,
+  canImpersonate,
+  onImpersonate,
+}: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -56,6 +66,20 @@ export function UserAccountMenu({ name, email, photoUrl, profileHref, onSignOut 
             <UserCircle className="h-4 w-4" />
             My profile
           </Link>
+          {canImpersonate && onImpersonate ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+              onClick={() => {
+                setOpen(false);
+                onImpersonate();
+              }}
+            >
+              <VenetianMask className="h-4 w-4" />
+              Impersonate user
+            </button>
+          ) : null}
           <button
             type="button"
             role="menuitem"

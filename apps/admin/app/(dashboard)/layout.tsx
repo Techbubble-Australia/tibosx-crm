@@ -35,6 +35,8 @@ import {
   Ticket,
 } from "lucide-react";
 import { UserAccountMenu } from "@/components/UserAccountMenu";
+import { ImpersonationBanner } from "@/components/users/ImpersonationBanner";
+import { ImpersonateUserModal } from "@/components/users/ImpersonateUserModal";
 import { anyEffectiveRole, defaultLandingPath } from "@/lib/admin-roles";
 import { AdminSessionProvider, useAdminSession } from "@/contexts/AdminSessionContext";
 import { MfaEnrollmentGuard } from "@/components/MfaEnrollmentGuard";
@@ -138,7 +140,7 @@ const navGroups: NavGroup[] = [
       { href: "/settings/templates", label: "Templates", icon: FileCode, roles: ["admin"] },
       { href: "/settings/groups", label: "Groups", icon: Users, roles: ["admin"] },
       { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin"] },
-      { href: "/users", label: "Users", icon: UserCircle, roles: ["admin"] },
+      { href: "/users/active", label: "Users", icon: UserCircle, roles: ["admin"] },
     ],
   },
 ];
@@ -283,9 +285,11 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
     profilePhotoUrl,
     userId,
     loading,
+    impersonation,
     canAccessProjectManagementTimesheets,
     canAccessWorkspaceTimesheets,
   } = useAdminSession();
+  const [impersonateOpen, setImpersonateOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const { collapsed: sidebarCollapsed, toggle: toggleSidebar } = useSidebarCollapsed();
 
@@ -459,6 +463,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="min-w-0 flex-1 bg-gray-50 dark:bg-gray-950">
+        <ImpersonationBanner />
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-6 py-4 dark:border-gray-700 dark:bg-gray-900 lg:px-8">
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{headerTitle(pathname)}</h1>
           <div className="flex items-center gap-3">
@@ -469,6 +474,8 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
                 email={email}
                 photoUrl={profilePhotoUrl}
                 profileHref="/settings/profile"
+                canImpersonate={role === "admin" && !impersonation}
+                onImpersonate={() => setImpersonateOpen(true)}
                 onSignOut={() => {
                   void fetch("/api/auth/logout", { method: "POST", credentials: "include" }).finally(() => {
                     window.location.href = "/login?signin=1";
@@ -480,6 +487,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         </header>
         <div className="p-8">{children}</div>
       </main>
+      <ImpersonateUserModal open={impersonateOpen} onClose={() => setImpersonateOpen(false)} />
     </div>
   );
 }

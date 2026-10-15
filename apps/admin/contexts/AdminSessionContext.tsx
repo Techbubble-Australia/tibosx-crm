@@ -28,6 +28,11 @@ export type MemberOnboardingState = {
   canSubmitTimesheets: boolean;
 };
 
+export type ImpersonationState = {
+  impersonatorId: string;
+  impersonatorName: string;
+};
+
 type AdminSession = {
   role: AdminRole;
   additionalRoles: AdminRole[];
@@ -35,6 +40,7 @@ type AdminSession = {
   userId: string;
   userName: string | null;
   profilePhotoUrl: string | null;
+  impersonation: ImpersonationState | null;
   memberOnboarding: MemberOnboardingState | null;
   loading: boolean;
   /** False until the first /api/auth/me request has finished (avoids role flash redirects). */
@@ -73,6 +79,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
   const [canAccessProjectManagementTimesheets, setCanAccessProjectManagementTimesheets] = useState(false);
   const [canAccessWorkspaceTimesheets, setCanAccessWorkspaceTimesheets] = useState(false);
   const [memberOnboarding, setMemberOnboarding] = useState<MemberOnboardingState | null>(null);
+  const [impersonation, setImpersonation] = useState<ImpersonationState | null>(null);
 
   const refreshSession = useCallback(async () => {
     try {
@@ -121,6 +128,15 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       } else {
         setMemberOnboarding(null);
       }
+      const imp = data?.data?.impersonation as ImpersonationState | null | undefined;
+      if (imp && typeof imp.impersonatorId === "string") {
+        setImpersonation({
+          impersonatorId: imp.impersonatorId,
+          impersonatorName: String(imp.impersonatorName ?? ""),
+        });
+      } else {
+        setImpersonation(null);
+      }
     } catch {
       // ignore
     }
@@ -146,6 +162,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       userId,
       userName,
       profilePhotoUrl,
+      impersonation,
       memberOnboarding,
       loading,
       sessionLoaded,
@@ -178,6 +195,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       userId,
       userName,
       profilePhotoUrl,
+      impersonation,
       memberOnboarding,
       loading,
       sessionLoaded,

@@ -35,6 +35,7 @@ type ActivityRow = {
   id: string;
   action: string;
   fieldName: string | null;
+  fieldLabel?: string | null;
   oldValue: string | null;
   newValue: string | null;
   performedByName: string;
