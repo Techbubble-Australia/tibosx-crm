@@ -555,6 +555,11 @@ router.get("/my-agreement", async (req: AuthRequest, res) => {
       html = wrapTemplateHtml(rendered);
     }
 
+    const storedUser = await prisma.adminUser.findUnique({
+      where: { id: userId },
+      select: { agreementDocumentUrl: true },
+    });
+
     res.json({
       data: {
         memberId: member.id,
@@ -566,6 +571,7 @@ router.get("/my-agreement", async (req: AuthRequest, res) => {
         signed: Boolean(member.agreementSignedAt),
         signedAt: member.agreementSignedAt?.toISOString() ?? null,
         signatureCaptureIds: captureIds,
+        agreementDocumentUrl: storedUser?.agreementDocumentUrl ?? null,
       },
     });
   } catch (error) {

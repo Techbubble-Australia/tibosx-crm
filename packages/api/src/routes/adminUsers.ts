@@ -5,6 +5,7 @@ import { prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth";
 import { ADMIN_ROLES_LIST, assertCanModifyAdminUser, isAdminRole } from "../lib/admin-roles";
 import { logAdminUserFieldChange } from "../lib/admin-user-activity";
+import { adminUserFieldLabel } from "../lib/admin-user-field-labels";
 import {
   assertMappedContactAvailable,
   rolesIncludeClient,
@@ -298,6 +299,7 @@ router.get("/:id/activity", async (req, res) => {
         id: row.id,
         action: row.action,
         fieldName: row.fieldName,
+        fieldLabel: adminUserFieldLabel(row.fieldName),
         oldValue: row.oldValue,
         newValue: row.newValue,
         performedByName: row.performedBy?.name || row.performedBy?.email || "",

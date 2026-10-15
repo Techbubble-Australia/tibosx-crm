@@ -10,6 +10,7 @@ import { AdminRolesMultiSelect, rolesFromApi, rolesToApi } from "@/components/us
 import { MappedClientContactSelect } from "@/components/users/MappedClientContactSelect";
 import { MappedProfileSelect, type ProfileMapOption } from "@/components/users/MappedProfileSelect";
 import { AdminUserFilesField, type UserFileRow } from "@/components/users/AdminUserFilesField";
+import { formatAdminUserActivityTitle } from "@/lib/admin-user-activity-display";
 import { UserPhotoField } from "@/components/users/UserPhotoField";
 import { UserAssignCredentialsModal } from "@/components/users/UserAssignCredentialsModal";
 import type { AdminRole } from "@/lib/admin-roles";
@@ -456,7 +457,7 @@ export default function EditUserPage() {
             <ul className="divide-y divide-gray-100 text-sm dark:divide-gray-800">
               {activity.map((row) => (
                 <li key={row.id} className="py-3">
-                  <p className="font-medium">{row.fieldName ? `${row.fieldName} updated` : row.action.replaceAll("_", " ")}</p>
+                  <p className="font-medium">{formatAdminUserActivityTitle(row)}</p>
                   <p className="text-xs text-gray-400">
                     {new Date(row.createdAt).toLocaleString("en-AU")}
                     {row.performedByName ? ` · ${row.performedByName}` : ""}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { workspaceFetch } from "@/lib/workspace-fetch";
 import { TICKET_PRIORITY_LABELS, TICKET_STATUS_LABELS, TICKET_TYPE_LABELS } from "@/lib/support-ticket-labels";
+import { TicketStatusBadge } from "@/lib/ticket-status-styles";
 import { EmptyTickets } from "@/components/workspace/EmptyTickets";
 
 type TicketRow = {
@@ -86,7 +87,9 @@ export default function TicketsPage() {
                   </td>
                   <td className="px-4 py-3">{TICKET_TYPE_LABELS[row.type]}</td>
                   <td className="px-4 py-3">{TICKET_PRIORITY_LABELS[row.priority]}</td>
-                  <td className="px-4 py-3">{TICKET_STATUS_LABELS[row.status]}</td>
+                  <td className="px-4 py-3">
+                    <TicketStatusBadge status={row.status} />
+                  </td>
                   <td className="px-4 py-3 text-gray-500">{new Date(row.updatedAt).toLocaleString()}</td>
                 </tr>
               ))}

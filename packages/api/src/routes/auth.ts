@@ -25,6 +25,7 @@ import {
   emergencyContactsComplete,
 } from "../lib/member-profile";
 import { logAdminUserFieldChange } from "../lib/admin-user-activity";
+import { adminUserFieldLabel } from "../lib/admin-user-field-labels";
 import { effectiveRoleList, effectiveRolesForUser, hasEffectiveRole } from "../lib/admin-roles";
 import {
   generatePasswordResetToken,
@@ -361,6 +362,7 @@ router.get("/profile/activity", authMiddleware, async (req: AuthRequest, res) =>
       id: row.id,
       action: row.action,
       fieldName: row.fieldName,
+      fieldLabel: adminUserFieldLabel(row.fieldName),
       oldValue: row.oldValue,
       newValue: row.newValue,
       performedByName: row.performedBy?.name || row.performedBy?.email || "",

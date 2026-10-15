@@ -17,8 +17,49 @@ import {
 } from "../lib/ticket-access.js";
 import { saveTicketUpload } from "../lib/upload-storage.js";
 import { streamTicketAttachmentFile } from "../lib/serve-ticket-attachment.js";
+import {
+  canPerformLifecycleAction,
+  nextStatusForLifecycleAction,
+  type TicketLifecycleAction,
+} from "../lib/ticket-lifecycle.js";
+import { autoCloseStaleResolvedTickets } from "../lib/auto-close-resolved-tickets.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+const lifecycleSchema = z.object({
+  action: z.enum(["reopen", "start_work", "client_info_needed", "resolve", "close", "cancel"]),
+});
+
+function serializeAuditLog(row: {
+  id: string;
+  action: string;
+  field: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  metadata: unknown;
+  createdAt: Date;
+  actor?: { id: string; name: string } | null;
+}) {
+  return {
+    id: row.id,
+    action: row.action,
+    field: row.field,
+    oldValue: row.oldValue,
+    newValue: row.newValue,
+    metadata: row.metadata,
+    createdAt: row.createdAt.toISOString(),
+    actor: row.actor,
+  };
+}
+
+function auditVisibleToClient(log: { action: string; metadata: unknown }): boolean {
+  if (log.action !== "MESSAGE_ADDED") return true;
+  const meta = log.metadata;
+  if (meta && typeof meta === "object" && "isInternal" in meta) {
+    return !Boolean((meta as { isInternal?: boolean }).isInternal);
+  }
+  return true;
+}
 
 const router: IRouter = Router();
 
@@ -118,6 +159,7 @@ router.get("/activity/recent", async (req: TicketingRequest, res) => {
 });
 
 router.get("/", async (req: TicketingRequest, res) => {
+  await autoCloseStaleResolvedTickets();
   const user = req.ticketingUser!;
   const status = typeof req.query.status === "string" ? req.query.status : "";
   const organizationId = typeof req.query.organizationId === "string" ? req.query.organizationId : "";
@@ -252,6 +294,7 @@ router.get("/:id/attachments/:attachmentId/file", async (req: TicketingRequest, 
 });
 
 router.get("/:id", async (req: TicketingRequest, res) => {
+  await autoCloseStaleResolvedTickets();
   const user = req.ticketingUser!;
   const ticket = await prisma.ticket.findUnique({
     where: { id: req.params.id },
@@ -276,49 +319,48 @@ router.get("/:id", async (req: TicketingRequest, res) => {
     include: { author: { select: { id: true, name: true, email: true, role: true } } },
   });
 
+  const auditLogs = ticket.auditLogs
+    .filter((log) => (user.role === "CLIENT" ? auditVisibleToClient(log) : true))
+    .map(serializeAuditLog);
+
   res.json({
     data: {
       ...serializeTicket(ticket),
       attachments: ticket.attachments,
       messages,
-      auditLogs: user.role === "CONSULTANT" ? ticket.auditLogs : [],
+      auditLogs,
     },
   });
 });
 
-router.patch("/:id", async (req: TicketingRequest, res) => {
+router.post("/:id/lifecycle", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
-  const parsed = ticketUpdateSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "Validation error", details: parsed.error.errors });
+  const parsed = lifecycleSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
 
   const existing = await prisma.ticket.findUnique({ where: { id: req.params.id } });
   if (!existing || !(await canAccessTicketOrganization(user, existing.organizationId))) {
     return res.status(404).json({ error: "Ticket not found" });
   }
 
-  const isConsultant = user.role === "CONSULTANT" && user.consultantVerified;
-  if (isConsultant && existing.createdById === user.id && parsed.data.status !== undefined) {
+  const role = user.role === "CONSULTANT" && user.consultantVerified ? "CONSULTANT" : "CLIENT";
+  const action = parsed.data.action as TicketLifecycleAction;
+  if (!canPerformLifecycleAction(role, action)) {
+    return res.status(403).json({ error: "Not allowed to perform this action" });
+  }
+  if (role === "CONSULTANT" && existing.createdById === user.id) {
     return res.status(403).json({ error: "The ticket creator cannot change status" });
   }
-  if (!isConsultant) {
-    const allowed = Object.keys(parsed.data).every((k) => k === "description" || k === "subject");
-    if (!allowed || parsed.data.status || parsed.data.assignedToId !== undefined || parsed.data.priority || parsed.data.type) {
-      return res.status(403).json({ error: "Clients can only update subject and description on open tickets" });
-    }
-    if (existing.status === TicketStatus.CLOSED || existing.status === TicketStatus.RESOLVED) {
-      return res.status(400).json({ error: "Cannot edit a closed or resolved ticket" });
-    }
+
+  const nextStatus = nextStatusForLifecycleAction(existing.status, action);
+  if (!nextStatus) {
+    return res.status(400).json({ error: "Invalid status transition" });
   }
 
-  const data: Record<string, unknown> = {};
-  for (const [field, value] of Object.entries(parsed.data)) {
-    if (value === undefined) continue;
-    data[field] = value;
-  }
-  if (parsed.data.status === TicketStatus.CLOSED || parsed.data.status === TicketStatus.RESOLVED) {
+  const data: Record<string, unknown> = { status: nextStatus };
+  if (nextStatus === TicketStatus.CLOSED || nextStatus === TicketStatus.RESOLVED) {
     data.closedAt = new Date();
-  }
-  if (parsed.data.status && parsed.data.status !== TicketStatus.CLOSED && parsed.data.status !== TicketStatus.RESOLVED) {
+  } else if (nextStatus !== TicketStatus.CANCELLED) {
     data.closedAt = null;
   }
 
@@ -332,7 +374,58 @@ router.patch("/:id", async (req: TicketingRequest, res) => {
     },
   });
 
-  for (const field of ["status", "priority", "type", "assignedToId", "subject"] as const) {
+  await logTicketAudit(existing.id, user.id, "UPDATED", {
+    field: "status",
+    oldValue: existing.status,
+    newValue: nextStatus,
+    metadata: { lifecycleAction: action },
+  });
+
+  res.json({ data: serializeTicket(updated) });
+});
+
+router.patch("/:id", async (req: TicketingRequest, res) => {
+  const user = req.ticketingUser!;
+  const parsed = ticketUpdateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error", details: parsed.error.errors });
+
+  const existing = await prisma.ticket.findUnique({ where: { id: req.params.id } });
+  if (!existing || !(await canAccessTicketOrganization(user, existing.organizationId))) {
+    return res.status(404).json({ error: "Ticket not found" });
+  }
+
+  if (parsed.data.status !== undefined) {
+    return res.status(400).json({ error: "Use lifecycle actions to change status" });
+  }
+
+  const isConsultant = user.role === "CONSULTANT" && user.consultantVerified;
+  if (!isConsultant) {
+    const allowed = Object.keys(parsed.data).every((k) => k === "description" || k === "type" || k === "priority");
+    if (!allowed || parsed.data.assignedToId !== undefined || parsed.data.subject !== undefined) {
+      return res.status(403).json({ error: "Clients can only update description, type, and priority" });
+    }
+    if (existing.status === TicketStatus.CLOSED || existing.status === TicketStatus.CANCELLED) {
+      return res.status(400).json({ error: "Cannot edit a closed or cancelled ticket" });
+    }
+  }
+
+  const data: Record<string, unknown> = {};
+  for (const [field, value] of Object.entries(parsed.data)) {
+    if (value === undefined) continue;
+    data[field] = value;
+  }
+
+  const updated = await prisma.ticket.update({
+    where: { id: existing.id },
+    data,
+    include: {
+      organization: { select: { id: true, name: true, slug: true } },
+      createdBy: { select: { id: true, name: true, email: true } },
+      assignedTo: { select: { id: true, name: true, email: true } },
+    },
+  });
+
+  for (const field of ["priority", "type", "assignedToId", "subject", "description"] as const) {
     const next = parsed.data[field];
     if (next === undefined) continue;
     const prev = existing[field];
@@ -373,10 +466,28 @@ router.post("/:id/messages", async (req: TicketingRequest, res) => {
     include: { author: { select: { id: true, name: true, email: true, role: true } } },
   });
 
+  const statusPatch: { status?: TicketStatus } = {};
+  if (
+    user.role === "CLIENT" &&
+    ticket.status === TicketStatus.PENDING_CLIENT &&
+    !message.isInternal
+  ) {
+    statusPatch.status = TicketStatus.IN_PROGRESS;
+  }
+
   await prisma.ticket.update({
     where: { id: ticket.id },
-    data: { updatedAt: new Date() },
+    data: { updatedAt: new Date(), ...statusPatch },
   });
+
+  if (statusPatch.status) {
+    await logTicketAudit(ticket.id, user.id, "UPDATED", {
+      field: "status",
+      oldValue: ticket.status,
+      newValue: statusPatch.status,
+      metadata: { reason: "client_replied" },
+    });
+  }
 
   await logTicketAudit(ticket.id, user.id, "MESSAGE_ADDED", {
     metadata: { messageId: message.id, isInternal: message.isInternal },

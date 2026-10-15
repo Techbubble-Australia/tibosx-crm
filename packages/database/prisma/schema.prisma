@@ -888,6 +888,8 @@ model Timesheet {
   projectClientContactId String?
   projectClientContact   ProjectClientContact? @relation("TimesheetClientApprover", fields: [projectClientContactId], references: [id], onDelete: SetNull)
   fileUrls               Json?
+  /// Hours per weekday for the selected week (mon–sun).
+  dailyHours             Json?
   rejectReason           String?               @db.Text
   activityLogs           TimesheetActivityLog[]
   createdAt              DateTime              @default(now())
@@ -1014,11 +1016,13 @@ enum TicketPriority {
 }
 
 enum TicketStatus {
+  DRAFT
   OPEN
   IN_PROGRESS
   PENDING_CLIENT
   RESOLVED
   CLOSED
+  CANCELLED
 }
 
 /// Support portal tenant; optionally linked to TBOS delivery Project.

@@ -6,6 +6,7 @@ import { Info, Loader2, Plus, Trash2 } from "lucide-react";
 import { UserPhotoField } from "@/components/users/UserPhotoField";
 import { adminFetch } from "@/lib/admin-api";
 import { AdminUserFilesField, type UserFileRow } from "@/components/users/AdminUserFilesField";
+import { formatAdminUserActivityTitle } from "@/lib/admin-user-activity-display";
 import { resolveDocumentHref } from "@/lib/media-url";
 import { roleLabel, type AdminRole, isAdminRole } from "@/lib/admin-roles";
 import { COUNTRY_OPTIONS } from "@/lib/country-options";
@@ -101,9 +102,22 @@ export default function ProfileSettingsPageInner() {
         if (Array.isArray(contacts) && contacts.length) {
           setEmergencyContacts(contacts as EmergencyContact[]);
         }
-        setAgreementDocumentUrl(
-          typeof user.agreementDocumentUrl === "string" ? user.agreementDocumentUrl : null,
-        );
+        let agreementUrl =
+          typeof user.agreementDocumentUrl === "string" ? user.agreementDocumentUrl : null;
+        if (!agreementUrl?.trim()) {
+          try {
+            const agRes = await adminFetch("/api/admin/projects/my-agreement");
+            if (agRes.ok) {
+              const agData = await agRes.json();
+              const signed = Boolean((agData.data as { signed?: boolean })?.signed);
+              const docUrl = (agData.data as { agreementDocumentUrl?: string })?.agreementDocumentUrl;
+              if (signed && typeof docUrl === "string" && docUrl.trim()) agreementUrl = docUrl;
+            }
+          } catch {
+            /* optional */
+          }
+        }
+        setAgreementDocumentUrl(agreementUrl);
         setIdProofUrl(typeof user.idProofUrl === "string" ? user.idProofUrl : null);
         setAddressProofUrl(typeof user.addressProofUrl === "string" ? user.addressProofUrl : null);
         const files = user.userFiles;
@@ -601,6 +615,11 @@ export default function ProfileSettingsPageInner() {
 
       <AdminUserFilesField
         files={userFiles}
+        pinnedFiles={
+          agreementDocumentUrl
+            ? [{ name: "Signed contract / agreement", url: agreementDocumentUrl }]
+            : []
+        }
         allowUpload={role === "admin"}
         allowRemove={role === "admin"}
         onChange={(next) => {
@@ -623,7 +642,7 @@ export default function ProfileSettingsPageInner() {
             {activity.map((row) => (
               <li key={row.id} className="py-3">
                 <p className="font-medium text-gray-900 dark:text-gray-100">
-                  {row.fieldName ? `${row.fieldName} updated` : row.action.replaceAll("_", " ")}
+                  {formatAdminUserActivityTitle(row)}
                 </p>
                 <p className="text-xs text-gray-400">
                   {new Date(row.createdAt).toLocaleString("en-AU")}

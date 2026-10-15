@@ -5,6 +5,7 @@ import Link from "next/link";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { TICKET_PRIORITY_LABELS, TICKET_STATUS_LABELS } from "@/lib/support-ticket-labels";
+import { TicketStatusBadge } from "@/lib/ticket-status-styles";
 
 type TicketRow = {
   id: string;
@@ -116,7 +117,9 @@ export default function SupportTicketsPage() {
                   </td>
                   <td className="px-4 py-3">{row.organization?.name ?? "—"}</td>
                   <td className="px-4 py-3">{TICKET_PRIORITY_LABELS[row.priority] ?? row.priority}</td>
-                  <td className="px-4 py-3">{TICKET_STATUS_LABELS[row.status] ?? row.status}</td>
+                  <td className="px-4 py-3">
+                    <TicketStatusBadge status={row.status} />
+                  </td>
                   <td className="px-4 py-3 text-gray-500">{new Date(row.updatedAt).toLocaleString()}</td>
                 </tr>
               ))

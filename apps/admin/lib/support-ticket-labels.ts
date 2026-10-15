@@ -1,9 +1,11 @@
 export const TICKET_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Draft",
   OPEN: "Open",
   IN_PROGRESS: "In progress",
-  PENDING_CLIENT: "Pending client",
+  PENDING_CLIENT: "Awaiting client info",
   RESOLVED: "Resolved",
   CLOSED: "Closed",
+  CANCELLED: "Cancelled",
 };
 
 export const TICKET_PRIORITY_LABELS: Record<string, string> = {

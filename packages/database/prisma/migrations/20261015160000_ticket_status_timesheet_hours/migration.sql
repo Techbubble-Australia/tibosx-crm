@@ -1,0 +1,6 @@
+-- AlterEnum
+ALTER TYPE "TicketStatus" ADD VALUE IF NOT EXISTS 'DRAFT';
+ALTER TYPE "TicketStatus" ADD VALUE IF NOT EXISTS 'CANCELLED';
+
+-- AlterTable
+ALTER TABLE "Timesheet" ADD COLUMN IF NOT EXISTS "dailyHours" JSONB;

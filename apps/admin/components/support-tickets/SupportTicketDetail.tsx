@@ -6,12 +6,12 @@ import { adminFetch } from "@/lib/admin-api";
 import {
   TICKET_PRIORITIES,
   TICKET_PRIORITY_LABELS,
-  TICKET_STATUSES,
-  TICKET_STATUS_LABELS,
   TICKET_TYPE_LABELS,
   TICKET_TYPES,
 } from "@/lib/support-ticket-labels";
 import { TicketAttachmentList } from "@/components/support-tickets/TicketAttachmentList";
+import { TicketStatusBadge } from "@/lib/ticket-status-styles";
+import { formatTicketAuditLine, type TicketAuditRow } from "@/lib/ticket-audit-display";
 
 type Assignee = { id: string; name: string; email: string };
 
@@ -38,7 +38,7 @@ type TicketDetail = {
     author: { name: string; role: string };
   }[];
   attachments: { id: string; fileName: string; fileUrl: string; fileSize?: number | null }[];
-  auditLogs?: { id: string; action: string; field?: string | null; createdAt: string; actor?: { name: string } | null }[];
+  auditLogs?: TicketAuditRow[];
 };
 
 export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
@@ -155,16 +155,9 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
 
       <section className="grid gap-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Status">
-          <select
-            disabled={saving}
-            value={ticket.status}
-            onChange={(e) => void patch({ status: e.target.value })}
-            className="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
-          >
-            {TICKET_STATUSES.map((s) => (
-              <option key={s} value={s}>{TICKET_STATUS_LABELS[s]}</option>
-            ))}
-          </select>
+          <div className="mt-1">
+            <TicketStatusBadge status={ticket.status} />
+          </div>
         </Field>
         <Field label="Priority">
           <select
@@ -264,13 +257,11 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
 
       {ticket.auditLogs && ticket.auditLogs.length > 0 ? (
         <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-          <h2 className="mb-2 font-semibold">Activity</h2>
+          <h2 className="mb-2 font-semibold">Activity log</h2>
           <ul className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
             {ticket.auditLogs.map((log) => (
               <li key={log.id}>
-                {new Date(log.createdAt).toLocaleString()} — {log.action}
-                {log.field ? ` (${log.field})` : ""}
-                {log.actor?.name ? ` · ${log.actor.name}` : ""}
+                {new Date(log.createdAt).toLocaleString()} — {formatTicketAuditLine(log)}
               </li>
             ))}
           </ul>

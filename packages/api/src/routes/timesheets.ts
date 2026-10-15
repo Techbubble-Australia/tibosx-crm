@@ -16,6 +16,16 @@ import { formatZodError } from "../lib/zod-error";
 
 const router: IRouter = Router();
 
+const dailyHoursSchema = z.object({
+  mon: z.coerce.number().min(0).optional(),
+  tue: z.coerce.number().min(0).optional(),
+  wed: z.coerce.number().min(0).optional(),
+  thu: z.coerce.number().min(0).optional(),
+  fri: z.coerce.number().min(0).optional(),
+  sat: z.coerce.number().min(0).optional(),
+  sun: z.coerce.number().min(0).optional(),
+});
+
 const timesheetSchema = z
   .object({
     projectId: z.string().min(1).optional(),
@@ -25,14 +35,25 @@ const timesheetSchema = z
     projectClientContactId: z.string().min(1).optional(),
     startDate: z.coerce.date(),
     endDate: z.coerce.date(),
-    fileUrls: z.array(z.string().min(1)).min(1, "At least one file is required"),
+    fileUrls: z.array(z.string().min(1)).optional(),
+    dailyHours: dailyHoursSchema.optional(),
   })
   .refine((data) => Boolean(data.projectId || data.opportunityId || data.ticketId), {
     message: "Select a project, sales case, or support case",
   })
   .refine((data) => [data.projectId, data.opportunityId, data.ticketId].filter(Boolean).length === 1, {
     message: "Select only one target",
-  });
+  })
+  .refine(
+    (data) => {
+      const files = data.fileUrls?.length ?? 0;
+      const hours = data.dailyHours
+        ? Object.values(data.dailyHours).reduce((s, v) => s + (Number(v) || 0), 0)
+        : 0;
+      return files > 0 || hours > 0;
+    },
+    { message: "Enter hours for the week or attach at least one file" },
+  );
 
 function serializeActivity(row: {
   id: string;
@@ -62,6 +83,7 @@ function serializeTimesheet(row: {
   endDate: Date;
   status: string;
   fileUrls: unknown;
+  dailyHours: unknown;
   rejectReason: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -104,6 +126,7 @@ function serializeTimesheet(row: {
     status: row.status,
     statusLabel: TIMESHEET_STATUS_LABELS[status] ?? row.status,
     fileUrls,
+    dailyHours: row.dailyHours ?? null,
     rejectReason: row.rejectReason,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -192,6 +215,83 @@ router.get("/active-projects", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Error fetching active projects for timesheets:", error);
     res.status(500).json({ error: "Failed to fetch projects" });
+  }
+});
+
+router.get("/active-projects", async (req: AuthRequest, res) => {
+  try {
+    const actorId = getActorId(req);
+    const projectMemberships = await prisma.projectMember.findMany({
+      where: { adminUserId: actorId, project: { status: "ACTIVE" } },
+      include: {
+        project: { select: { id: true, title: true, projectNumber: true, kind: true } },
+      },
+      orderBy: { project: { updatedAt: "desc" } },
+    });
+    res.json({
+      data: projectMemberships.map((row) => ({
+        id: row.project.id,
+        label: `${row.project.projectNumber} — ${row.project.title}`,
+        kind: row.project.kind,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching active projects for timesheets:", error);
+    res.status(500).json({ error: "Failed to fetch projects" });
+  }
+});
+
+router.get("/project-cases", async (req: AuthRequest, res) => {
+  try {
+    const actorId = getActorId(req);
+    const projectId = typeof req.query.projectId === "string" ? req.query.projectId : "";
+    if (!projectId) return res.status(400).json({ error: "projectId is required" });
+
+    const membership = await prisma.projectMember.findFirst({
+      where: { adminUserId: actorId, projectId, project: { status: "ACTIVE" } },
+      include: { project: { select: { kind: true } } },
+    });
+    if (!membership) return res.status(403).json({ error: "Forbidden" });
+
+    if (membership.project.kind === "SUPPORT") {
+      const tickets = await prisma.ticket.findMany({
+        where: {
+          projectId,
+          status: { in: ["OPEN", "IN_PROGRESS", "PENDING_CLIENT"] },
+        },
+        select: { id: true, ticketNumber: true, subject: true },
+        orderBy: { updatedAt: "desc" },
+        take: 100,
+      });
+      return res.json({
+        data: tickets.map((row) => ({
+          kind: "ticket" as const,
+          id: row.id,
+          label: `${row.ticketNumber} — ${row.subject}`,
+        })),
+      });
+    }
+
+    const opportunities = await prisma.opportunity.findMany({
+      where: {
+        active: true,
+        status: { in: ["IN_PROGRESS", "ACCEPTED", "PROPOSAL"] },
+        ownerId: actorId,
+      },
+      select: { id: true, name: true },
+      orderBy: { updatedAt: "desc" },
+      take: 50,
+    });
+    res.json({
+      data: opportunities.map((row) => ({
+        kind: "opportunity" as const,
+        id: row.id,
+        label: row.name,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching project cases:", error);
+    res.status(500).json({ error: "Failed to fetch cases" });
   }
 });
 
@@ -337,15 +437,16 @@ async function buildProjectApprovers(projectId: string | null | undefined) {
   });
   if (!project) return [];
   const pmName = project.projectManager?.name || project.projectManager?.email || "Project manager";
-  const rows = [
-    { kind: "PM" as const, id: "PM", label: pmName },
-    ...project.clientContacts.map((row) => ({
-      kind: "CLIENT_CONTACT" as const,
-      id: row.id,
-      label: `${row.contact.name} (client)`,
-    })),
-  ];
-  return rows;
+  const clientRows = project.clientContacts.map((row) => ({
+    kind: "CLIENT_CONTACT" as const,
+    id: row.id,
+    label: `${row.contact.name} (client)`,
+  }));
+  const pmRow = { kind: "PM" as const, id: "PM", label: pmName };
+  if (project.kind === "SUPPORT" && clientRows.length > 0) {
+    return [...clientRows, pmRow];
+  }
+  return [pmRow, ...clientRows];
 }
 
 router.get("/defaults", async (_req, res) => {
@@ -450,7 +551,8 @@ router.post("/", async (req: AuthRequest, res) => {
           startDate: data.startDate,
           endDate: data.endDate,
           status: "DRAFT",
-          fileUrls: data.fileUrls,
+          fileUrls: data.fileUrls ?? [],
+          dailyHours: data.dailyHours ?? undefined,
         },
       });
       await tx.timesheetActivityLog.create({
@@ -509,7 +611,8 @@ router.put("/:id", async (req: AuthRequest, res) => {
             data.approverKind === "CLIENT_CONTACT" ? data.projectClientContactId ?? null : null,
           startDate: data.startDate,
           endDate: data.endDate,
-          fileUrls: data.fileUrls,
+          fileUrls: data.fileUrls ?? [],
+          dailyHours: data.dailyHours ?? undefined,
         },
       });
       await tx.timesheetActivityLog.create({

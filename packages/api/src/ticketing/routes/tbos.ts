@@ -15,6 +15,12 @@ import {
   syncConsultantAccessForOrganization,
 } from "../../lib/support-organization.js";
 import { listSupportPortalOrganizations } from "../lib/support-portal-orgs.js";
+import {
+  canPerformLifecycleAction,
+  nextStatusForLifecycleAction,
+  type TicketLifecycleAction,
+} from "../lib/ticket-lifecycle.js";
+import { autoCloseStaleResolvedTickets } from "../lib/auto-close-resolved-tickets.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -30,6 +36,10 @@ const ticketUpdateSchema = z.object({
 const messageSchema = z.object({
   body: z.string().min(1).max(20000),
   isInternal: z.boolean().optional(),
+});
+
+const lifecycleSchema = z.object({
+  action: z.enum(["reopen", "start_work", "client_info_needed", "resolve", "close", "cancel"]),
 });
 
 const ticketCreateSchema = z.object({
@@ -284,6 +294,7 @@ router.get("/tickets/:ticketId/attachments/:attachmentId/file", async (req: Tbos
 });
 
 router.get("/tickets/:id", async (req: TbosRequest, res) => {
+  await autoCloseStaleResolvedTickets();
   const tbosUser = req.tbosUser!;
   const orgScope = await orgFilterForTbos(tbosUser);
   const ticket = await prisma.ticket.findFirst({
@@ -293,7 +304,11 @@ router.get("/tickets/:id", async (req: TbosRequest, res) => {
       createdBy: { select: { id: true, name: true, email: true } },
       assignedTo: { select: { id: true, name: true, email: true } },
       attachments: { orderBy: { createdAt: "asc" } },
-      auditLogs: { orderBy: { createdAt: "desc" }, take: 50, include: { actor: { select: { id: true, name: true } } } },
+      auditLogs: {
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: { actor: { select: { id: true, name: true } } },
+      },
     },
   });
   if (!ticket) return res.status(404).json({ error: "Ticket not found" });
@@ -311,6 +326,67 @@ router.get("/tickets/:id", async (req: TbosRequest, res) => {
       updatedAt: ticket.updatedAt.toISOString(),
       closedAt: ticket.closedAt?.toISOString() ?? null,
       messages,
+      auditLogs: ticket.auditLogs.map((log) => ({
+        ...log,
+        createdAt: log.createdAt.toISOString(),
+      })),
+    },
+  });
+});
+
+router.post("/tickets/:id/lifecycle", async (req: TbosRequest, res) => {
+  const tbosUser = req.tbosUser!;
+  const parsed = lifecycleSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  const orgScope = await orgFilterForTbos(tbosUser);
+  const existing = await prisma.ticket.findFirst({
+    where: { id: req.params.id, ...orgScope },
+  });
+  if (!existing) return res.status(404).json({ error: "Ticket not found" });
+
+  const consultant = await prisma.ticketingUser.findFirst({
+    where: { tbosAdminUserId: tbosUser.id, role: "CONSULTANT", consultantVerified: true },
+  });
+  const role = consultant ? "CONSULTANT" : "CLIENT";
+  const action = parsed.data.action as TicketLifecycleAction;
+  if (!canPerformLifecycleAction(role, action)) {
+    return res.status(403).json({ error: "Not allowed to perform this action" });
+  }
+
+  const actorId = await resolveTbosActorUserId(tbosUser);
+  if (consultant && existing.createdById === actorId) {
+    return res.status(403).json({ error: "The ticket creator cannot change status" });
+  }
+
+  const nextStatus = nextStatusForLifecycleAction(existing.status, action);
+  if (!nextStatus) return res.status(400).json({ error: "Invalid status transition" });
+
+  const data: Record<string, unknown> = { status: nextStatus };
+  if (nextStatus === TicketStatus.CLOSED || nextStatus === TicketStatus.RESOLVED) {
+    data.closedAt = new Date();
+  } else if (nextStatus !== TicketStatus.CANCELLED) {
+    data.closedAt = null;
+  }
+
+  const updated = await prisma.ticket.update({
+    where: { id: existing.id },
+    data,
+  });
+
+  await logTicketAudit(existing.id, actorId, "UPDATED", {
+    field: "status",
+    oldValue: existing.status,
+    newValue: nextStatus,
+    metadata: { lifecycleAction: action },
+  });
+
+  res.json({
+    data: {
+      ...updated,
+      createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString(),
+      closedAt: updated.closedAt?.toISOString() ?? null,
     },
   });
 });
@@ -440,6 +516,9 @@ router.patch("/tickets/:id", async (req: TbosRequest, res) => {
   const tbosUser = req.tbosUser!;
   const parsed = ticketUpdateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+  if (parsed.data.status !== undefined) {
+    return res.status(400).json({ error: "Use lifecycle actions to change status" });
+  }
 
   const orgScope = await orgFilterForTbos(tbosUser);
   const existing = await prisma.ticket.findFirst({
@@ -470,7 +549,7 @@ router.patch("/tickets/:id", async (req: TbosRequest, res) => {
     },
   });
 
-  for (const field of ["status", "priority", "type", "assignedToId", "subject"] as const) {
+  for (const field of ["priority", "type", "assignedToId", "subject", "description"] as const) {
     const next = parsed.data[field];
     if (next === undefined) continue;
     const prev = existing[field];
@@ -515,10 +594,32 @@ router.post("/tickets/:id/messages", async (req: TbosRequest, res) => {
     include: { author: { select: { id: true, name: true, email: true, role: true } } },
   });
 
+  const statusPatch: { status?: TicketStatus } = {};
+  const author = await prisma.ticketingUser.findUnique({
+    where: { id: actorId },
+    select: { role: true },
+  });
+  if (
+    author?.role === "CLIENT" &&
+    ticket.status === TicketStatus.PENDING_CLIENT &&
+    !message.isInternal
+  ) {
+    statusPatch.status = TicketStatus.IN_PROGRESS;
+  }
+
   await prisma.ticket.update({
     where: { id: ticket.id },
-    data: { updatedAt: new Date() },
+    data: { updatedAt: new Date(), ...statusPatch },
   });
+
+  if (statusPatch.status) {
+    await logTicketAudit(ticket.id, actorId, "UPDATED", {
+      field: "status",
+      oldValue: ticket.status,
+      newValue: statusPatch.status,
+      metadata: { reason: "client_replied" },
+    });
+  }
 
   await logTicketAudit(ticket.id, actorId, "MESSAGE_ADDED", {
     metadata: { messageId: message.id, isInternal: message.isInternal },

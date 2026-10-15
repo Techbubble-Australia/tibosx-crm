@@ -1,12 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { readUploadImageUrlFromJson } from "@/lib/upload-response";
 import { resolveDocumentHref } from "@/lib/media-url";
 import { TIMESHEET_STATUS_LABELS, type TimesheetStatus } from "@/lib/project-types";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
+import {
+  type DailyHours,
+  snapToMondayInput,
+  sumDailyHours,
+  toDateInputUtc,
+  weekDatesFromMonday,
+  WEEKDAY_KEYS,
+  mondayOfWeek,
+  sundayOfWeek,
+} from "@/lib/timesheet-week";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
@@ -25,6 +35,7 @@ export type TimesheetFormValues = {
   endDate: string;
   status: TimesheetStatus;
   fileUrls: string[];
+  dailyHours?: DailyHours | null;
   rejectReason?: string | null;
   activityLogs?: Array<{
     id: string;
@@ -35,7 +46,8 @@ export type TimesheetFormValues = {
   }>;
 };
 
-type TargetOption = { kind: "project" | "opportunity" | "ticket"; id: string; label: string };
+type ProjectOption = { id: string; label: string; kind: string };
+type CaseOption = { kind: "ticket" | "opportunity"; id: string; label: string };
 type ApproverOption = { kind: "PM" | "CLIENT_CONTACT"; id: string; label: string };
 
 type Props = {
@@ -62,31 +74,58 @@ function formatActivityDate(value: string) {
   });
 }
 
-function targetKey(kind: TargetOption["kind"], id: string) {
-  return `${kind}:${id}`;
+function emptyHours(): DailyHours {
+  return {};
 }
 
 export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }: Props) {
   const { userName, email } = useAdminSession();
-  const initialKind: "project" | "opportunity" | "ticket" = defaults.ticketId
-    ? "ticket"
-    : defaults.opportunityId
-      ? "opportunity"
-      : "project";
-  const initialId = defaults.ticketId ?? defaults.opportunityId ?? defaults.projectId ?? "";
-  const [selectedTarget, setSelectedTarget] = useState(
-    initialId ? targetKey(initialKind, initialId) : "",
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [projectId, setProjectId] = useState(defaults.projectId ?? "");
+  const [cases, setCases] = useState<CaseOption[]>([]);
+  const [caseKey, setCaseKey] = useState(
+    defaults.ticketId
+      ? `ticket:${defaults.ticketId}`
+      : defaults.opportunityId
+        ? `opportunity:${defaults.opportunityId}`
+        : "",
+  );
+  const [weekMonday, setWeekMonday] = useState(
+    snapToMondayInput(toDateInput(defaults.startDate) || toDateInputUtc(mondayOfWeek())),
+  );
+  const [dailyHours, setDailyHours] = useState<DailyHours>(
+    (defaults.dailyHours as DailyHours) ?? emptyHours(),
   );
   const [managerName, setManagerName] = useState("");
   const [approvers, setApprovers] = useState<ApproverOption[]>([]);
   const [selectedApprover, setSelectedApprover] = useState("");
-  const [startDate, setStartDate] = useState(toDateInput(defaults.startDate));
-  const [endDate, setEndDate] = useState(toDateInput(defaults.endDate));
   const [fileUrls, setFileUrls] = useState<string[]>(defaults.fileUrls ?? []);
-  const [targets, setTargets] = useState<TargetOption[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [projectSearch, setProjectSearch] = useState("");
+  const [caseSearch, setCaseSearch] = useState("");
+
   const status = defaults.status ?? "DRAFT";
   const editable = !readOnly && status === "DRAFT";
+
+  const weekRange = useMemo(() => {
+    const mon = new Date(`${weekMonday}T00:00:00.000Z`);
+    const sun = sundayOfWeek(mon);
+    return `${weekMonday} – ${toDateInputUtc(sun)}`;
+  }, [weekMonday]);
+
+  const weekDays = useMemo(() => weekDatesFromMonday(weekMonday), [weekMonday]);
+
+  const filteredProjects = useMemo(() => {
+    const q = projectSearch.trim().toLowerCase();
+    if (!q) return projects;
+    return projects.filter((p) => p.label.toLowerCase().includes(q));
+  }, [projects, projectSearch]);
+
+  const filteredCases = useMemo(() => {
+    const q = caseSearch.trim().toLowerCase();
+    if (!q) return cases;
+    return cases.filter((c) => c.label.toLowerCase().includes(q));
+  }, [cases, caseSearch]);
 
   useEffect(() => {
     if (defaults.approverKind === "CLIENT_CONTACT" && defaults.projectClientContactId) {
@@ -97,42 +136,39 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
   }, [defaults.approverKind, defaults.projectClientContactId]);
 
   useEffect(() => {
-    void adminFetch("/api/admin/timesheets/active-targets")
+    void adminFetch("/api/admin/timesheets/active-projects")
       .then((r) => r.json())
       .then((data) => {
-        const list = (data.data as TargetOption[]) ?? [];
-        setTargets(list);
-        if (!selectedTarget && list[0]) {
-          setSelectedTarget(targetKey(list[0].kind, list[0].id));
-        }
+        const list = (data.data as ProjectOption[]) ?? [];
+        setProjects(list);
+        if (!projectId && list[0]) setProjectId(list[0].id);
       });
-    if (!startDate || !endDate) {
-      void adminFetch("/api/admin/timesheets/defaults")
-        .then((r) => r.json())
-        .then((data) => {
-          const d = data.data as { startDate?: string; endDate?: string };
-          if (!startDate && d.startDate) setStartDate(toDateInput(d.startDate));
-          if (!endDate && d.endDate) setEndDate(toDateInput(d.endDate));
-        });
-    }
   }, []);
 
   useEffect(() => {
-    if (!selectedTarget) {
-      setManagerName("");
+    if (!projectId) {
+      setCases([]);
+      setCaseKey("");
       return;
     }
-    const [kind, id] = selectedTarget.split(":");
-    if (!kind || !id) {
+    void adminFetch(`/api/admin/timesheets/project-cases?projectId=${encodeURIComponent(projectId)}`)
+      .then((r) => r.json())
+      .then((data) => setCases((data.data as CaseOption[]) ?? []));
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) {
       setManagerName("");
+      setApprovers([]);
       return;
     }
+    const [kind, id] = caseKey ? caseKey.split(":") : ["", ""];
     const query =
-      kind === "project"
-        ? `projectId=${encodeURIComponent(id)}`
-        : kind === "ticket"
-          ? `ticketId=${encodeURIComponent(id)}`
-          : `opportunityId=${encodeURIComponent(id)}`;
+      kind === "ticket" && id
+        ? `ticketId=${encodeURIComponent(id)}`
+        : kind === "opportunity" && id
+          ? `opportunityId=${encodeURIComponent(id)}`
+          : `projectId=${encodeURIComponent(projectId)}`;
     void adminFetch(`/api/admin/timesheets/target-meta?${query}`)
       .then((r) => r.json())
       .then((data) => {
@@ -140,14 +176,15 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
         setManagerName(row.managerName ?? "");
         const list = row.approvers ?? [];
         setApprovers(list);
-        setSelectedApprover(list[0] ? `${list[0].kind}:${list[0].id}` : "");
+        if (editable) {
+          setSelectedApprover(list[0] ? `${list[0].kind}:${list[0].id}` : "");
+        }
       })
       .catch(() => {
         setManagerName("");
         setApprovers([]);
-        setSelectedApprover("");
       });
-  }, [selectedTarget]);
+  }, [projectId, caseKey, editable]);
 
   async function uploadFiles(files: FileList | null) {
     if (!files?.length || !editable) return;
@@ -172,19 +209,28 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedTarget) {
-      alert("Select a project or case.");
+    if (!projectId) {
+      alert("Select a project.");
       return;
     }
-    if (!fileUrls.length) {
-      alert("At least one file is required.");
+    const hoursTotal = sumDailyHours(dailyHours);
+    if (!fileUrls.length && hoursTotal <= 0) {
+      alert("Enter hours for the week or attach at least one file.");
       return;
     }
-    const [kind, id] = selectedTarget.split(":");
-    const payload: Record<string, unknown> = { startDate, endDate, fileUrls };
-    if (kind === "project") payload.projectId = id;
-    else if (kind === "ticket") payload.ticketId = id;
-    else payload.opportunityId = id;
+    const mon = new Date(`${weekMonday}T00:00:00.000Z`);
+    const sun = sundayOfWeek(mon);
+    const payload: Record<string, unknown> = {
+      startDate: weekMonday,
+      endDate: toDateInputUtc(sun),
+      fileUrls,
+      dailyHours,
+    };
+    const [kind, id] = caseKey ? caseKey.split(":") : ["", ""];
+    if (kind === "ticket" && id) payload.ticketId = id;
+    else if (kind === "opportunity" && id) payload.opportunityId = id;
+    else payload.projectId = projectId;
+
     if (approvers.length && selectedApprover) {
       const [approverKind, approverId] = selectedApprover.split(":");
       payload.approverKind = approverKind;
@@ -209,23 +255,66 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
             <input className={`${inputClass} ${readOnlyClass}`} value={TIMESHEET_STATUS_LABELS[status]} readOnly />
           </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Select week (Monday)</label>
+            <input
+              type="date"
+              className={`${inputClass} ${editable ? "" : readOnlyClass}`}
+              value={weekMonday}
+              onChange={(e) => setWeekMonday(snapToMondayInput(e.target.value))}
+              readOnly={!editable}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Week</label>
+            <input className={`${inputClass} ${readOnlyClass}`} value={weekRange} readOnly />
+          </div>
           <div className="sm:col-span-2">
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Project / case *</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Search project *</label>
+            <input
+              type="search"
+              placeholder="Filter projects…"
+              className={`${inputClass} mb-2 ${editable ? "" : readOnlyClass}`}
+              value={projectSearch}
+              onChange={(e) => setProjectSearch(e.target.value)}
+              disabled={!editable}
+            />
             <select
               className={`${inputClass} ${editable ? "" : readOnlyClass}`}
-              value={selectedTarget}
-              onChange={(e) => setSelectedTarget(e.target.value)}
+              value={projectId}
+              onChange={(e) => {
+                setProjectId(e.target.value);
+                setCaseKey("");
+              }}
               required
               disabled={!editable}
             >
-              <option value="">Select project or case…</option>
-              {targets.map((row) => (
-                <option key={targetKey(row.kind, row.id)} value={targetKey(row.kind, row.id)}>
-                  {row.kind === "opportunity"
-                    ? `Sales case: ${row.label}`
-                    : row.kind === "ticket"
-                      ? `Support case: ${row.label}`
-                      : row.label}
+              <option value="">Select project…</option>
+              {filteredProjects.map((row) => (
+                <option key={row.id} value={row.id}>{row.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Case</label>
+            <input
+              type="search"
+              placeholder="Filter cases…"
+              className={`${inputClass} mb-2 ${editable ? "" : readOnlyClass}`}
+              value={caseSearch}
+              onChange={(e) => setCaseSearch(e.target.value)}
+              disabled={!editable}
+            />
+            <select
+              className={`${inputClass} ${editable ? "" : readOnlyClass}`}
+              value={caseKey}
+              onChange={(e) => setCaseKey(e.target.value)}
+              disabled={!editable || !projectId}
+            >
+              <option value="">No case (project only)</option>
+              {filteredCases.map((row) => (
+                <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
+                  {row.label}
                 </option>
               ))}
             </select>
@@ -248,9 +337,6 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-gray-500">
-                Client approvers act in the TBOS workspace, not project-management timesheets.
-              </p>
             </div>
           ) : null}
           {!editable && defaults.approverLabel ? (
@@ -259,34 +345,49 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
               <input className={`${inputClass} ${readOnlyClass}`} value={defaults.approverLabel} readOnly />
             </div>
           ) : null}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Start date *</label>
-            <input
-              type="date"
-              className={`${inputClass} ${editable ? "" : readOnlyClass}`}
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              required
-              readOnly={!editable}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">End date *</label>
-            <input
-              type="date"
-              className={`${inputClass} ${editable ? "" : readOnlyClass}`}
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              required
-              readOnly={!editable}
-            />
-          </div>
+        </div>
+
+        <div className="mt-6 overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="text-left text-gray-500">
+                {weekDays.map((d) => (
+                  <th key={d.key} className="px-2 py-2 font-medium">{d.label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                {WEEKDAY_KEYS.map((key) => (
+                  <td key={key} className="px-2 py-1">
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.25}
+                      inputMode="decimal"
+                      className={`${inputClass} ${editable ? "" : readOnlyClass}`}
+                      value={dailyHours[key] ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setDailyHours((prev) => ({
+                          ...prev,
+                          [key]: v === "" ? undefined : Number(v),
+                        }));
+                      }}
+                      readOnly={!editable}
+                    />
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+          <p className="mt-2 text-xs text-gray-500">Enter hours in decimal (e.g. 7.5).</p>
         </div>
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-        <h3 className="mb-2 font-semibold text-gray-900 dark:text-gray-100">Files *</h3>
-        <p className="mb-3 text-xs text-gray-500">Add approved screenshots, emails, etc. from client.</p>
+        <h3 className="mb-2 font-semibold text-gray-900 dark:text-gray-100">Files</h3>
+        <p className="mb-3 text-xs text-gray-500">Optional when weekly hours are entered. Otherwise attach client approval.</p>
         {editable ? (
           <input type="file" multiple onChange={(e) => void uploadFiles(e.target.files)} disabled={uploading} />
         ) : null}

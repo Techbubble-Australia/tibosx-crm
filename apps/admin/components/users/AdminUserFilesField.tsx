@@ -10,6 +10,7 @@ export type UserFileRow = { name: string; url: string };
 
 type Props = {
   files: UserFileRow[];
+  pinnedFiles?: UserFileRow[];
   onChange: (files: UserFileRow[]) => void;
   allowUpload?: boolean;
   allowRemove?: boolean;
@@ -17,10 +18,13 @@ type Props = {
 
 export function AdminUserFilesField({
   files,
+  pinnedFiles = [],
   onChange,
   allowUpload = true,
   allowRemove = true,
 }: Props) {
+  const pinned = pinnedFiles.filter((f) => f.url.trim());
+  const hasAny = pinned.length > 0 || files.length > 0;
   const [uploading, setUploading] = useState(false);
 
   async function onUpload(fileList: FileList | null) {
@@ -63,10 +67,22 @@ export function AdminUserFilesField({
           </label>
         ) : null}
       </div>
-      {files.length === 0 ? (
+      {!hasAny ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">No files uploaded yet.</p>
       ) : (
         <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+          {pinned.map((file, index) => (
+            <li key={`pinned-${file.url}-${index}`} className="flex items-center justify-between gap-3 py-2 text-sm">
+              <a
+                href={resolveDocumentHref(file.url)}
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-600 hover:underline dark:text-blue-400"
+              >
+                {file.name}
+              </a>
+            </li>
+          ))}
           {files.map((file, index) => (
             <li key={`${file.url}-${index}`} className="flex items-center justify-between gap-3 py-2 text-sm">
               <a
