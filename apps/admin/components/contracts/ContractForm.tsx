@@ -37,6 +37,11 @@ const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
 const readOnlyClass = "bg-gray-50 dark:bg-gray-900 cursor-not-allowed";
 
+function roundMoney(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(value * 100) / 100;
+}
+
 export type ContractWorkUnitMonth = WorkUnitMonthInput;
 
 export type ContractAssignedProfile = {
@@ -791,8 +796,8 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       body = {
         variationDate,
         variationEndDate,
-        qty,
-        rate: rateVal,
+        qty: roundMoney(qty),
+        rate: roundMoney(rateVal),
         workUnitMonths: variationWorkUnitMonths,
         comments: variationComments.trim(),
       };
@@ -805,7 +810,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       body = {
         variationDate,
         variationEndDate: variationEndDate || null,
-        variationValue: value,
+        variationValue: roundMoney(value),
         comments: variationComments.trim(),
       };
     }
@@ -927,9 +932,9 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
         status: invoiceStatus,
         currency: invoiceCurrency,
         description: invoiceDescription.trim(),
-        qty,
-        rate: rateVal,
-        taxRate,
+        qty: roundMoney(qty),
+        rate: roundMoney(rateVal),
+        taxRate: roundMoney(taxRate),
         fileUrl: invoiceFileUrl || null,
       };
       const res = await adminFetch(
@@ -1065,13 +1070,14 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       numberOfUnits: type === "T_AND_M" ? sumWorkUnits(workUnitMonths) : null,
       workUnitMonths: type === "T_AND_M" ? workUnitMonths : undefined,
       currency,
-      rate: type === "FIXED_PRICE" ? 0 : rate ? Number.parseFloat(rate) : 0,
-      contractValue:
+      rate: roundMoney(type === "FIXED_PRICE" ? 0 : rate ? Number.parseFloat(rate) : 0),
+      contractValue: roundMoney(
         type === "T_AND_M"
           ? sumWorkUnits(workUnitMonths) * (Number.parseFloat(rate) || 0)
           : contractValue
             ? Number.parseFloat(contractValue)
             : 0,
+      ),
       comments: comments.trim(),
       fileUrls,
     };

@@ -313,8 +313,15 @@ export function formatRolesLabel(primary: string, additional?: string[] | null):
   return labels.length ? labels.join(", ") : roleLabel(primary);
 }
 
+/** Workspace-only users (no project_management access via any effective role). */
+export function isRestrictedToWorkspaceOnly(primary: string, additional?: string[] | null): boolean {
+  if (primary !== "client" && primary !== "customer_support") return false;
+  return !anyEffectiveRole(primary, additional, ["admin", "project_manager", "project_member"]);
+}
+
 /** Post-login landing route (relative TBOS path). */
-export function defaultLandingPath(role: string): string {
+export function defaultLandingPath(role: string, additional?: string[] | null): string {
+  if (isRestrictedToWorkspaceOnly(role, additional)) return "/workspace/dashboard";
   if (role === "client" || role === "customer_support") return "/workspace/dashboard";
   if (role === "admin" || role === "sales") return "/sales/dashboard";
   if (role === "recruiter_admin" || role === "recruiter") return "/database/dashboard";

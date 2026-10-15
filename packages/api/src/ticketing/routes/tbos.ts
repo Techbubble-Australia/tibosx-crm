@@ -162,22 +162,19 @@ router.get("/tickets/activity/recent", async (req: TbosRequest, res) => {
   const logs = await prisma.ticketAuditLog.findMany({
     where: { ticketId: { in: ticketIds } },
     orderBy: { createdAt: "desc" },
-    take: 20,
+    take: 100,
     include: {
       ticket: { select: { id: true, ticketNumber: true, subject: true } },
       actor: { select: { name: true, email: true } },
     },
   });
 
+  const { latestActivityPerTicket, serializeTicketActivityRow } = await import(
+    "../lib/recent-ticket-activity.js"
+  );
+
   res.json({
-    data: logs.map((row) => ({
-      id: row.ticket.id,
-      action: row.action,
-      ticketNumber: row.ticket.ticketNumber,
-      subject: row.ticket.subject,
-      createdAt: row.createdAt.toISOString(),
-      actorName: row.actor?.name || row.actor?.email || "",
-    })),
+    data: latestActivityPerTicket(logs).map(serializeTicketActivityRow),
   });
 });
 

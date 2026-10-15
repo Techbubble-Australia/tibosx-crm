@@ -6,7 +6,7 @@ import {
   MFA_SETUP_REQUIRED_PURPOSE,
   PASSWORD_RESET_REQUIRED_PURPOSE,
 } from "@/lib/auth-constants";
-import { defaultLandingPath, isExternalLandingPath } from "@/lib/admin-roles";
+import { defaultLandingPath, isExternalLandingPath, isRestrictedToWorkspaceOnly } from "@/lib/admin-roles";
 
 function jwtSecretKey() {
   return new TextEncoder().encode(
@@ -30,6 +30,12 @@ function isPublicUnauthenticatedPath(pathname: string): boolean {
 
 function isSessionAuthPath(pathname: string): boolean {
   return SESSION_AUTH_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
+
+function parseAdditionalRoles(payload: Record<string, unknown>): string[] {
+  const raw = payload.additionalRoles;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((r): r is string => typeof r === "string" && r.trim().length > 0);
 }
 
 function redirectTo(request: NextRequest, pathname: string) {
@@ -67,7 +73,8 @@ export async function middleware(request: NextRequest) {
         return redirectTo(request, MFA_SETUP_PATH);
       }
       const role = typeof payload.role === "string" ? payload.role : "website";
-      return redirectTo(request, defaultLandingPath(role));
+      const additionalRoles = parseAdditionalRoles(payload as Record<string, unknown>);
+      return redirectTo(request, defaultLandingPath(role, additionalRoles));
     } catch {
       const res = NextResponse.next();
       res.cookies.delete(ADMIN_SESSION_COOKIE);
@@ -124,22 +131,20 @@ export async function middleware(request: NextRequest) {
     }
 
     const role = typeof payload.role === "string" ? payload.role : "website";
+    const additionalRoles = parseAdditionalRoles(payload as Record<string, unknown>);
+    const workspaceOnly = isRestrictedToWorkspaceOnly(role, additionalRoles);
 
-    if (
-      (role === "client" || role === "customer_support") &&
-      !purpose &&
-      pathname === "/"
-    ) {
-      return redirectTo(request, defaultLandingPath(role));
+    if (workspaceOnly && !purpose && pathname === "/") {
+      return redirectTo(request, defaultLandingPath(role, additionalRoles));
     }
 
     if (
-      (role === "client" || role === "customer_support") &&
+      workspaceOnly &&
       !purpose &&
       !pathname.startsWith("/workspace") &&
       !pathname.startsWith("/settings/profile")
     ) {
-      return redirectTo(request, defaultLandingPath(role));
+      return redirectTo(request, defaultLandingPath(role, additionalRoles));
     }
 
     if (pathname.startsWith("/settings/security")) {

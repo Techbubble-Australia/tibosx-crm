@@ -11,7 +11,27 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const refreshed = await refreshAdminSessionToken(token);
+  const apiUrl = process.env.API_URL || "http://localhost:3001";
+  let refreshed: string | null = null;
+
+  try {
+    const fullRes = await fetch(`${apiUrl}/api/auth/refresh-full-session`, {
+      method: "POST",
+      headers: { cookie: `${ADMIN_SESSION_COOKIE}=${token}` },
+    });
+    if (fullRes.ok) {
+      const data = await fullRes.json();
+      if (typeof data?.data?.token === "string") {
+        refreshed = data.data.token;
+      }
+    }
+  } catch {
+    // fall through to local refresh
+  }
+
+  if (!refreshed) {
+    refreshed = await refreshAdminSessionToken(token);
+  }
   if (!refreshed) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

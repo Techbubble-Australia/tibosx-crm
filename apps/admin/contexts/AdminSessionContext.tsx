@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { adminFetch } from "@/lib/admin-api";
 import {
   type AdminRole,
-  canAccessProjectManagement,
+  canAccessModuleWithRoles,
   canAccessRecruitment,
   canAccessSales,
   canAccessWebsite,
@@ -124,6 +124,11 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
     } catch {
       // ignore
     }
+    try {
+      await fetch("/api/auth/session", { method: "GET", credentials: "include" });
+    } catch {
+      // ignore
+    }
   }, []);
 
   useEffect(() => {
@@ -147,8 +152,10 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       canAccessRecruitment: canAccessRecruitment(role),
       canAccessWebsite: canAccessWebsite(role),
       canAccessSales: canAccessSales(role),
-      canAccessProjectManagement: canAccessProjectManagement(role),
-      canManageProjects: canManageProjects(role),
+      canAccessProjectManagement: canAccessModuleWithRoles(role, additionalRoles, "project_management"),
+      canManageProjects:
+        canManageProjects(role) ||
+        additionalRoles.some((r) => r === "project_manager" || r === "admin"),
       isProjectMember: isProjectMember(role),
       isEffectiveProjectMember: isEffectiveProjectMember(role, additionalRoles),
       canAccessProjectManagementTimesheets,

@@ -17,6 +17,7 @@ export function ProjectManagementGuard({ children, requireManageProjects = false
     canManageProjects,
     loading,
     role,
+    additionalRoles,
   } = useAdminSession();
   const canAccess = canAccessProjectManagement || canAccessProjectManagementTimesheets;
   const router = useRouter();
@@ -24,13 +25,13 @@ export function ProjectManagementGuard({ children, requireManageProjects = false
   useEffect(() => {
     if (loading) return;
     if (!canAccess) {
-      router.replace(defaultLandingPath(role));
+      router.replace(defaultLandingPath(role, additionalRoles));
       return;
     }
     if (requireManageProjects && !canManageProjects) {
       router.replace("/timesheets");
     }
-  }, [canAccess, canManageProjects, loading, requireManageProjects, role, router]);
+  }, [additionalRoles, canAccess, canManageProjects, loading, requireManageProjects, role, router]);
 
   if (loading) {
     return (

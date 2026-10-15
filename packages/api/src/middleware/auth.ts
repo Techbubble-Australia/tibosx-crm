@@ -15,6 +15,7 @@ export interface AuthUser {
   id: string;
   email: string;
   role: string;
+  additionalRoles?: string[];
 }
 
 export interface AuthRequest extends Request {
@@ -25,6 +26,7 @@ export interface AuthRequest extends Request {
 
 interface JwtPayload extends AuthUser {
   purpose?: string;
+  additionalRoles?: string[];
 }
 
 function getCookie(req: Request, name: string): string | undefined {

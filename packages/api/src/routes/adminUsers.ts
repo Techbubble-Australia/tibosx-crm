@@ -14,6 +14,7 @@ import {
   assertMappedProfileAvailable,
 } from "../lib/admin-user-profile-map";
 import { candidateProfileSearchWhere } from "../lib/profile-search";
+import { deleteAdminUserCompletely } from "../lib/delete-admin-user.js";
 
 const router: IRouter = Router();
 
@@ -620,7 +621,23 @@ router.delete("/:id", async (req: AuthRequest, res) => {
       }
     }
 
-    await prisma.adminUser.delete({ where: { id: req.params.id } });
+    try {
+      await deleteAdminUserCompletely(req.params.id);
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "";
+      if (code === "NOT_FOUND") return res.status(404).json({ error: "Not found" });
+      if (code === "PROJECT_MANAGER") {
+        return res.status(400).json({
+          error: "Reassign project manager on all projects before deleting this user",
+        });
+      }
+      if (code === "TIMESHEET_APPROVER") {
+        return res.status(400).json({
+          error: "Reassign timesheet approver on all projects before deleting this user",
+        });
+      }
+      throw err;
+    }
     res.json({ message: "Deleted" });
   } catch (error) {
     console.error("Error deleting admin user:", error);

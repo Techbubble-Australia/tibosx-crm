@@ -24,10 +24,15 @@ export async function refreshAdminSessionToken(token: string): Promise<string | 
     const purpose = typeof payload.purpose === "string" ? payload.purpose : undefined;
     if (purpose === MFA_PENDING_PURPOSE) return null;
 
+    const additionalRoles = Array.isArray(payload.additionalRoles)
+      ? payload.additionalRoles.filter((r): r is string => typeof r === "string" && r.trim().length > 0)
+      : [];
+
     const signer = new SignJWT({
       id,
       email,
       role,
+      ...(additionalRoles.length ? { additionalRoles } : {}),
       ...(purpose ? { purpose } : {}),
     }).setProtectedHeader({ alg: "HS256" });
 

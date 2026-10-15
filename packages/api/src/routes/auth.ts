@@ -18,6 +18,7 @@ import {
   verifyUserTotpCode,
 } from "../lib/mfa";
 import { getMemberOnboardingStatus } from "../lib/member-onboarding";
+import { createFullSessionTokenForUserId, sessionAuthUser } from "../lib/admin-session-token.js";
 import {
   addressComplete,
   bankDetailsComplete,
@@ -174,11 +175,7 @@ router.post("/mfa/verify", async (req, res) => {
       return res.status(401).json({ error: "Invalid verification code" });
     }
 
-    const token = generateToken({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-    });
+    const token = generateToken(sessionAuthUser(user));
 
     res.json({
       message: "Login successful",
@@ -234,6 +231,18 @@ const profileUpdateSchema = z.object({
     .array(z.object({ name: z.string().max(500), url: z.string().min(1).max(2000) }))
     .max(50)
     .optional(),
+});
+
+/** Re-issue a full session JWT from the database (includes current additionalRoles). */
+router.post("/refresh-full-session", authMiddleware, async (req: AuthRequest, res) => {
+  const u = req.user;
+  if (!u) return res.status(401).json({ error: "Unauthorized" });
+  if (req.mfaSetupRequired) {
+    return res.status(400).json({ error: "Complete password or MFA setup first" });
+  }
+  const token = await createFullSessionTokenForUserId(u.id);
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
+  res.json({ data: { token } });
 });
 
 router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
@@ -617,17 +626,13 @@ router.post("/password/change-required", authMiddleware, async (req: AuthRequest
         data: { mfaEnabled: false, totpSecretEnc: null, mfaEnrolledAt: null },
       });
     }
+    const sessionUser = sessionAuthUser({
+      ...updated,
+      additionalRoles: user.additionalRoles,
+    });
     const token = mfaFullyEnrolled
-      ? generateToken({
-          id: updated.id,
-          email: updated.email,
-          role: updated.role,
-        })
-      : generateMfaSetupRequiredToken({
-          id: updated.id,
-          email: updated.email,
-          role: updated.role,
-        });
+      ? generateToken(sessionUser)
+      : generateMfaSetupRequiredToken(sessionUser);
 
     res.json({
       message: "Password updated",
@@ -659,6 +664,7 @@ router.post("/mfa/resume-session", authMiddleware, async (req: AuthRequest, res)
       id: true,
       email: true,
       role: true,
+      additionalRoles: true,
       mfaEnabled: true,
       totpSecretEnc: true,
       active: true,
@@ -672,11 +678,7 @@ router.post("/mfa/resume-session", authMiddleware, async (req: AuthRequest, res)
     return res.status(400).json({ error: "MFA enrollment is not complete" });
   }
 
-  const token = generateToken({
-    id: user.id,
-    email: user.email,
-    role: user.role,
-  });
+  const token = generateToken(sessionAuthUser(user));
 
   res.json({
     data: {
@@ -768,14 +770,17 @@ router.post("/mfa/confirm", authMiddleware, async (req: AuthRequest, res) => {
         mfaEnabled: true,
         mfaEnrolledAt: new Date(),
       },
-      select: { id: true, email: true, role: true, mfaEnabled: true, mfaEnrolledAt: true },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        additionalRoles: true,
+        mfaEnabled: true,
+        mfaEnrolledAt: true,
+      },
     });
 
-    const token = generateToken({
-      id: updated.id,
-      email: updated.email,
-      role: updated.role,
-    });
+    const token = generateToken(sessionAuthUser(updated));
 
     res.json({
       message: "MFA enabled",

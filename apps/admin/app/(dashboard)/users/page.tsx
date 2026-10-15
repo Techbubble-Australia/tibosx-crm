@@ -132,7 +132,13 @@ export default function UsersPage() {
   }
 
   async function deleteRow(id: string) {
-    if (!confirm("Delete this admin account? This cannot be undone.")) return;
+    if (
+      !confirm(
+        "All user data including any mappings, signed documents will be deleted. Do you want to continue?",
+      )
+    ) {
+      return;
+    }
     try {
       const res = await adminFetch(`/api/admin/users/${id}`, { method: "DELETE" });
       if (res.ok) setRows((r) => r.filter((x) => x.id !== id));
