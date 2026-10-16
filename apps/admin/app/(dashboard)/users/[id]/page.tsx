@@ -223,6 +223,7 @@ export default function EditUserPage() {
   if (!defaults) return <p className="text-gray-500">User not found.</p>;
 
   const membership = defaults.projectMembership;
+  const canAssignTemplate = !roles.includes("client");
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -311,7 +312,7 @@ export default function EditUserPage() {
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Template signed: <span className="font-medium">{defaults.agreementTemplate?.templatesSigned ?? 0}</span>
             </p>
-            {membership ? (
+            {canAssignTemplate ? (
               <button
                 type="button"
                 onClick={() => setAssignOpen(true)}
@@ -320,13 +321,8 @@ export default function EditUserPage() {
                 Assign template
               </button>
             ) : (
-              <p className="text-xs text-gray-500">
-                Save the user and link them to a project member before assigning a template.
-              </p>
+              <p className="text-xs text-gray-500">Agreement templates are not assigned to client portal users.</p>
             )}
-            {membership ? (
-              <p className="text-xs text-gray-500">{membership.projectLabel}</p>
-            ) : null}
           </div>
         </section>
 
@@ -468,14 +464,16 @@ export default function EditUserPage() {
         </button>
       </form>
 
-      {assignOpen && membership ? (
+      {assignOpen && canAssignTemplate ? (
         <UserAssignCredentialsModal
-          projectId={membership.projectId}
-          memberId={membership.memberId}
-          memberName={membership.profileName}
+          userId={id}
+          displayName={membership?.profileName || defaults.name || defaults.email}
           userEmail={defaults.email}
+          projectId={membership?.projectId}
+          memberId={membership?.memberId}
           onClose={() => setAssignOpen(false)}
           onSuccess={() => {
+            setAssignOpen(false);
             void load();
           }}
         />

@@ -706,9 +706,35 @@ model CredentialTemplate {
   requireStartDate Boolean         @default(true)
   addEndDate       Boolean         @default(true)
   requireEndDate   Boolean         @default(true)
-  members          ProjectMember[]
+  members                    ProjectMember[]
+  adminUserCredentialAssignments AdminUserCredentialAssignment[]
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
+}
+
+model EmailNotificationPreference {
+  id             String   @id @default(cuid())
+  notificationId String
+  role           String
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([notificationId, role])
+  @@index([notificationId])
+}
+
+model AdminUserCredentialAssignment {
+  id                   String             @id @default(cuid())
+  adminUserId          String             @unique
+  adminUser            AdminUser          @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  credentialTemplateId String
+  credentialTemplate   CredentialTemplate @relation(fields: [credentialTemplateId], references: [id], onDelete: Restrict)
+  credentialData       Json?
+  agreementSignedAt    DateTime?
+  signatureDataUrl     String?            @db.Text
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 }
 
 model Project {
@@ -972,6 +998,7 @@ model AdminUser {
   ticketingUser       TicketingUser?         @relation("TicketingTbosUser")
   supportGroupMemberships ProjectSupportGroupMember[] @relation("SupportGroupMember")
   workspaceGroupMemberships WorkspaceGroupMember[]      @relation("WorkspaceGroupMember")
+  credentialAssignment    AdminUserCredentialAssignment?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

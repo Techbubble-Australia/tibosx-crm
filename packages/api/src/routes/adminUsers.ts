@@ -17,6 +17,11 @@ import {
 import { candidateProfileSearchWhere } from "../lib/profile-search";
 import { deleteAdminUserCompletely } from "../lib/delete-admin-user.js";
 import { emailTbosUserInvite } from "../lib/user-invite.js";
+import {
+  assignCredentialTemplateSchema,
+  assignCredentialTemplateToAdminUser,
+  credentialDefaultsForAdminUser,
+} from "../lib/assign-credential-template";
 
 const router: IRouter = Router();
 
@@ -313,6 +318,36 @@ router.get("/:id/activity", async (req, res) => {
   }
 });
 
+router.get("/:id/credential-defaults", async (req, res) => {
+  try {
+    const defaults = await credentialDefaultsForAdminUser(req.params.id);
+    res.json({ data: defaults });
+  } catch (error) {
+    console.error("Error fetching user credential defaults:", error);
+    res.status(500).json({ error: "Failed to load defaults" });
+  }
+});
+
+router.post("/:id/assign-template", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.params.id;
+    if (!userId) return res.status(400).json({ error: "Invalid id" });
+    const input = assignCredentialTemplateSchema.parse(req.body);
+    const result = await assignCredentialTemplateToAdminUser(userId, input);
+    if (result.error) {
+      const status = result.error === "User not found" ? 404 : 400;
+      return res.status(status).json({ error: result.error });
+    }
+    res.json({ message: "Template assigned" });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error assigning user template:", error);
+    res.status(500).json({ error: "Failed to assign template" });
+  }
+});
+
 router.get("/:id", async (req, res) => {
   try {
     const row = await prisma.adminUser.findUnique({
@@ -331,9 +366,17 @@ router.get("/:id", async (req, res) => {
       where: { ...memberWhere, credentialTemplateId: { not: null } },
       select: { agreementSignedAt: true },
     });
+    const userAssignment = await prisma.adminUserCredentialAssignment.findUnique({
+      where: { adminUserId: row.id },
+      select: { agreementSignedAt: true, credentialTemplateId: true },
+    });
+    const sentFromMembers = agreementMembers.length;
+    const signedFromMembers = agreementMembers.filter((m) => m.agreementSignedAt).length;
+    const sentFromUser = userAssignment?.credentialTemplateId ? 1 : 0;
+    const signedFromUser = userAssignment?.agreementSignedAt ? 1 : 0;
     const agreementTemplate = {
-      templatesSent: agreementMembers.length,
-      templatesSigned: agreementMembers.filter((m) => m.agreementSignedAt).length,
+      templatesSent: sentFromMembers + sentFromUser,
+      templatesSigned: signedFromMembers + signedFromUser,
     };
 
     let membership = await prisma.projectMember.findFirst({

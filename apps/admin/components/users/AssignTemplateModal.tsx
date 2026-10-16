@@ -19,8 +19,11 @@ type TemplateOption = {
 };
 
 type Props = {
-  projectId: string;
-  memberId: string;
+  /** Project member assign flow */
+  projectId?: string;
+  memberId?: string;
+  /** Direct user assign (non–project-member roles) */
+  userId?: string;
   memberName: string;
   userEmail: string;
   onClose: () => void;
@@ -30,11 +33,13 @@ type Props = {
 export function AssignTemplateModal({
   projectId,
   memberId,
+  userId,
   memberName,
   userEmail,
   onClose,
   onAssigned,
 }: Props) {
+  const assignToUser = Boolean(userId && !projectId && !memberId);
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [templateId, setTemplateId] = useState("");
   const [values, setValues] = useState<Record<string, string>>({});
@@ -49,9 +54,12 @@ export function AssignTemplateModal({
   useEffect(() => {
     async function load() {
       try {
+        const defaultsUrl = assignToUser
+          ? `/api/admin/users/${userId}/credential-defaults`
+          : `/api/admin/projects/${projectId}/members/${memberId}/credential-defaults`;
         const [templatesRes, defaultsRes] = await Promise.all([
           adminFetch("/api/admin/credential-templates"),
-          adminFetch(`/api/admin/projects/${projectId}/members/${memberId}/credential-defaults`),
+          adminFetch(defaultsUrl),
         ]);
         const templatesData = await templatesRes.json();
         const defaultsData = await defaultsRes.json();
@@ -67,7 +75,7 @@ export function AssignTemplateModal({
       }
     }
     void load();
-  }, [projectId, memberId]);
+  }, [assignToUser, projectId, memberId, userId]);
 
   function setValue(key: string, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -104,14 +112,14 @@ export function AssignTemplateModal({
       const body: Record<string, unknown> = { templateId, values };
       if (startDate) body.startDate = startDate;
       if (endDate) body.endDate = endDate;
-      const res = await adminFetch(
-        `/api/admin/projects/${projectId}/members/${memberId}/assign-template`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        },
-      );
+      const url = assignToUser
+        ? `/api/admin/users/${userId}/assign-template`
+        : `/api/admin/projects/${projectId}/members/${memberId}/assign-template`;
+      const res = await adminFetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       const data = await res.json();
       if (!res.ok) {
         throw new Error((data as { error?: string }).error || "Failed to assign template");

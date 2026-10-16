@@ -250,3 +250,29 @@ export function defaultCredentialValuesForProfile(profile: {
     Frequency: profile.mode ?? "",
   };
 }
+
+export function defaultCredentialValuesForAdminUser(user: {
+  name: string | null;
+  email: string;
+  phone: string | null;
+}): Record<string, string> {
+  const fullName = user.name?.trim() || user.email;
+  const today = new Date().toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const phone = user.phone?.trim() ?? "";
+
+  return {
+    name: fullName,
+    email: user.email,
+    phone,
+    personnel_name: fullName,
+    nominated_personnel_full_name: fullName,
+    date: today,
+    Name: fullName,
+    Email: user.email,
+    Phone: phone,
+  };
+}

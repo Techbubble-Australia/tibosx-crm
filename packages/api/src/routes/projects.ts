@@ -19,6 +19,7 @@ import { readUploadTextByUrl } from "../lib/read-upload-buffer";
 import { canManageProjects, getActorId, isProjectManagerRole, isProjectMemberRole } from "../lib/project-access";
 import {
   findCredentialProjectMemberForUser,
+  findUserCredentialAgreement,
   hasEffectiveProjectMemberRole,
 } from "../lib/project-member-user";
 import { isValidProjectManagerUserId, isValidTimesheetApproverUserId } from "../lib/timesheet-approver";
@@ -502,34 +503,22 @@ router.get("/my-agreement", async (req: AuthRequest, res) => {
     const userId = getActorId(req);
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const adminUser = await prisma.adminUser.findUnique({
-      where: { id: userId },
-      select: { role: true, additionalRoles: true },
-    });
-    if (!adminUser) return res.status(401).json({ error: "Unauthorized" });
-    if (!hasEffectiveProjectMemberRole(adminUser.role, adminUser.additionalRoles)) {
-      const linked = await prisma.projectMember.findFirst({
-        where: { adminUserId: userId },
-        select: { id: true },
-      });
-      if (!linked) return res.status(403).json({ error: "Forbidden" });
-    }
-
-    const member = await findCredentialProjectMemberForUser(userId);
-    if (!member?.credentialTemplate) {
+    const agreement = await findUserCredentialAgreement(userId);
+    if (!agreement) {
       return res.status(404).json({ error: "No agreement assigned" });
     }
 
-    const variables = Array.isArray(member.credentialTemplate.variables)
-      ? (member.credentialTemplate.variables as CredentialTemplateVariable[])
+    const template = agreement.credentialTemplate;
+    const variables = Array.isArray(template.variables)
+      ? (template.variables as CredentialTemplateVariable[])
       : [];
     const values =
-      member.credentialData && typeof member.credentialData === "object"
-        ? (member.credentialData as Record<string, string>)
+      agreement.credentialData && typeof agreement.credentialData === "object"
+        ? (agreement.credentialData as Record<string, string>)
         : {};
-    const captureIds = listSignatureCaptureIds(member.credentialTemplate.html);
+    const captureIds = listSignatureCaptureIds(template.html);
     let html = "";
-    if (member.agreementSignedAt) {
+    if (agreement.agreementSignedAt) {
       const storedUser = await prisma.adminUser.findUnique({
         where: { id: userId },
         select: { agreementDocumentUrl: true },
@@ -542,16 +531,16 @@ router.get("/my-agreement", async (req: AuthRequest, res) => {
         ? storedHtml
         : wrapTemplateHtml(
             renderTemplateHtmlWithSignatures(
-              member.credentialTemplate.html,
+              template.html,
               values,
               variables,
-              member.signatureDataUrl
-                ? { [captureIds[0] ?? "contractor"]: member.signatureDataUrl }
+              agreement.signatureDataUrl
+                ? { [captureIds[0] ?? "contractor"]: agreement.signatureDataUrl }
                 : {},
             ),
           );
     } else {
-      const rendered = renderTemplateHtml(member.credentialTemplate.html, values, variables, null);
+      const rendered = renderTemplateHtml(template.html, values, variables, null);
       html = wrapTemplateHtml(rendered);
     }
 
@@ -562,14 +551,15 @@ router.get("/my-agreement", async (req: AuthRequest, res) => {
 
     res.json({
       data: {
-        memberId: member.id,
-        projectId: member.projectId,
-        projectTitle: member.project.title,
-        projectNumber: member.project.projectNumber,
-        templateName: member.credentialTemplate.name,
+        memberId: agreement.source === "project_member" ? agreement.memberId : null,
+        projectId: agreement.source === "project_member" ? agreement.projectId : null,
+        projectTitle:
+          agreement.source === "project_member" ? agreement.projectTitle : agreement.credentialTemplate.name,
+        projectNumber: agreement.source === "project_member" ? agreement.projectNumber : "",
+        templateName: template.name,
         html,
-        signed: Boolean(member.agreementSignedAt),
-        signedAt: member.agreementSignedAt?.toISOString() ?? null,
+        signed: Boolean(agreement.agreementSignedAt),
+        signedAt: agreement.agreementSignedAt?.toISOString() ?? null,
         signatureCaptureIds: captureIds,
         agreementDocumentUrl: storedUser?.agreementDocumentUrl ?? null,
       },
@@ -585,19 +575,6 @@ router.post("/my-agreement/sign", async (req: AuthRequest, res) => {
     const userId = getActorId(req);
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const adminUser = await prisma.adminUser.findUnique({
-      where: { id: userId },
-      select: { role: true, additionalRoles: true },
-    });
-    if (!adminUser) return res.status(401).json({ error: "Unauthorized" });
-    if (!hasEffectiveProjectMemberRole(adminUser.role, adminUser.additionalRoles)) {
-      const linked = await prisma.projectMember.findFirst({
-        where: { adminUserId: userId },
-        select: { id: true },
-      });
-      if (!linked) return res.status(403).json({ error: "Forbidden" });
-    }
-
     const body = z
       .object({
         signatureDataUrl: z.string().min(1).max(500_000).optional(),
@@ -605,19 +582,20 @@ router.post("/my-agreement/sign", async (req: AuthRequest, res) => {
       })
       .parse(req.body);
 
-    const member = await findCredentialProjectMemberForUser(userId);
-    if (!member?.credentialTemplate) {
+    const agreement = await findUserCredentialAgreement(userId);
+    if (!agreement) {
       return res.status(404).json({ error: "No agreement assigned" });
     }
 
-    const variables = Array.isArray(member.credentialTemplate.variables)
-      ? (member.credentialTemplate.variables as CredentialTemplateVariable[])
+    const template = agreement.credentialTemplate;
+    const variables = Array.isArray(template.variables)
+      ? (template.variables as CredentialTemplateVariable[])
       : [];
     const values =
-      member.credentialData && typeof member.credentialData === "object"
-        ? (member.credentialData as Record<string, string>)
+      agreement.credentialData && typeof agreement.credentialData === "object"
+        ? (agreement.credentialData as Record<string, string>)
         : {};
-    const captureIds = listSignatureCaptureIds(member.credentialTemplate.html);
+    const captureIds = listSignatureCaptureIds(template.html);
     const signatures: Record<string, string> = body.signatures ?? {};
     if (body.signatureDataUrl) {
       if (!body.signatureDataUrl.startsWith("data:image/")) {
@@ -666,34 +644,46 @@ router.post("/my-agreement/sign", async (req: AuthRequest, res) => {
     const primarySignature =
       captureIds.length && firstCaptureId ? signatures[firstCaptureId] : body.signatureDataUrl!;
     const rendered = captureIds.length
-      ? renderTemplateHtmlWithSignatures(member.credentialTemplate.html, valuesWithDate, variables, signatures)
-      : renderTemplateHtml(member.credentialTemplate.html, valuesWithDate, variables, primarySignature);
+      ? renderTemplateHtmlWithSignatures(template.html, valuesWithDate, variables, signatures)
+      : renderTemplateHtml(template.html, valuesWithDate, variables, primarySignature);
     const wrapped = wrapTemplateHtml(rendered);
+    const fileKey =
+      agreement.source === "project_member" ? `agreement-${agreement.memberId}` : `agreement-user-${userId}`;
     const documentUrl = await saveUploadBuffer(
       Buffer.from(wrapped, "utf8"),
-      `agreement-${member.id}.html`,
+      `${fileKey}.html`,
       "text/html; charset=utf-8",
     );
 
-    const updated = await prisma.$transaction(async (tx) => {
-      const row = await tx.projectMember.update({
-        where: { id: member.id },
-        data: {
-          signatureDataUrl: primarySignature,
-          agreementSignedAt: new Date(),
-        },
-      });
+    const signedAt = new Date();
+    await prisma.$transaction(async (tx) => {
+      if (agreement.source === "project_member") {
+        await tx.projectMember.update({
+          where: { id: agreement.memberId },
+          data: {
+            signatureDataUrl: primarySignature,
+            agreementSignedAt: signedAt,
+          },
+        });
+      } else {
+        await tx.adminUserCredentialAssignment.update({
+          where: { adminUserId: userId },
+          data: {
+            signatureDataUrl: primarySignature,
+            agreementSignedAt: signedAt,
+          },
+        });
+      }
       await tx.adminUser.update({
         where: { id: userId },
         data: { agreementDocumentUrl: documentUrl },
       });
-      return row;
     });
 
     res.json({
       data: {
         signed: true,
-        signedAt: updated.agreementSignedAt?.toISOString() ?? null,
+        signedAt: signedAt.toISOString(),
         agreementDocumentUrl: documentUrl,
       },
     });

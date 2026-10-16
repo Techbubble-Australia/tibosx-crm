@@ -4,7 +4,7 @@ import {
   bankDetailsComplete,
   emergencyContactsComplete,
 } from "./member-profile";
-import { findCredentialProjectMemberForUser } from "./project-member-user";
+import { findUserCredentialAgreement } from "./project-member-user";
 
 export type MemberOnboardingStatus = {
   hasAgreementAssignment: boolean;
@@ -30,13 +30,9 @@ export async function getMemberOnboardingStatus(userId: string): Promise<MemberO
     },
   });
 
-  const memberRow = await findCredentialProjectMemberForUser(userId);
-  const member = memberRow
-    ? { agreementSignedAt: memberRow.agreementSignedAt, credentialTemplateId: memberRow.credentialTemplateId }
-    : null;
-
-  const hasAgreementAssignment = Boolean(member?.credentialTemplateId);
-  const agreementSigned = !hasAgreementAssignment || Boolean(member?.agreementSignedAt);
+  const agreement = await findUserCredentialAgreement(userId);
+  const hasAgreementAssignment = Boolean(agreement);
+  const agreementSigned = !hasAgreementAssignment || Boolean(agreement?.agreementSignedAt);
   const profileComplete = Boolean(
     user &&
       addressComplete(user) &&

@@ -28,6 +28,7 @@ import {
 import {
   formatMonthLabel,
   generateWorkUnitMonths,
+  roundWorkUnits,
   sumWorkUnits,
   type WorkUnitMonthInput,
 } from "@/lib/contract-work-units";
@@ -208,11 +209,11 @@ function WorkUnitMonthsEditor({
                 <input
                   type="number"
                   min="0.0001"
-                  step="0.01"
-                  value={row.workUnits}
+                  step="any"
+                  value={roundWorkUnits(row.workUnits)}
                   readOnly={!editable}
                   onChange={(e) => {
-                    const workUnits = Number.parseFloat(e.target.value);
+                    const workUnits = roundWorkUnits(Number.parseFloat(e.target.value));
                     if (!Number.isFinite(workUnits) || workUnits <= 0) return;
                     onChange(
                       rows.map((item) =>

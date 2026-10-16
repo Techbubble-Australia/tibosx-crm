@@ -50,6 +50,10 @@ export function sumWorkUnits(rows: Array<{ workUnits: number }>): number {
   return rows.reduce((sum, row) => sum + row.workUnits, 0);
 }
 
+export function roundWorkUnits(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 export function generateWorkUnitMonths(
   startDate: string,
   endDate: string | null | undefined,
@@ -70,7 +74,8 @@ export function generateWorkUnitMonths(
   while (year < endYear || (year === endYear && month <= endMonth)) {
     const weekdays = weekdaysInMonthRange(year, month, start, end);
     if (weekdays > 0) {
-      const workUnits = unit === "HOUR" ? weekdays * 8 : weekdays;
+      const raw = unit === "HOUR" ? weekdays * 8 : weekdays;
+      const workUnits = roundWorkUnits(raw);
       rows.push({
         year,
         month,

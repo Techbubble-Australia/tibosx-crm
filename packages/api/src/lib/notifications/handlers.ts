@@ -13,6 +13,7 @@ import {
   resolveTimesheetApproverAdminEmails,
   timesheetTargetLabel,
 } from "./timesheet-email";
+import { sendEmailIfEnabled } from "./send-if-enabled";
 
 function contactNotificationEmail(): string {
   return (
@@ -41,12 +42,14 @@ export const notificationHandlers: {
     if (!to) return;
 
     const memberName = timesheet.memberUser?.name || timesheet.memberUser?.email || "Team member";
-    await sendTimesheetApprovalRequestEmail({
-      to,
-      memberName,
-      targetLabel: timesheetTargetLabel(timesheet),
-      portalUrl: workspaceTimesheetsUrl(),
-    });
+    await sendEmailIfEnabled("timesheet.submitted.client", to, () =>
+      sendTimesheetApprovalRequestEmail({
+        to,
+        memberName,
+        targetLabel: timesheetTargetLabel(timesheet),
+        portalUrl: workspaceTimesheetsUrl(),
+      }),
+    );
   },
 
   async "timesheet.submitted.approver"({ timesheetId }) {
@@ -62,12 +65,14 @@ export const notificationHandlers: {
     const reviewUrl = timesheetAdminUrl(timesheetId);
 
     for (const to of recipients) {
-      await sendTimesheetPmApprovalRequestEmail({
-        to,
-        memberName,
-        targetLabel,
-        reviewUrl,
-      });
+      await sendEmailIfEnabled("timesheet.submitted.approver", to, () =>
+        sendTimesheetPmApprovalRequestEmail({
+          to,
+          memberName,
+          targetLabel,
+          reviewUrl,
+        }),
+      );
     }
   },
 
@@ -76,13 +81,15 @@ export const notificationHandlers: {
     const to = timesheet?.memberUser?.email;
     if (!timesheet || !to || timesheet.status !== "APPROVED") return;
 
-    await sendTimesheetMemberDecisionEmail({
-      to,
-      memberName: timesheet.memberUser?.name || timesheet.memberUser?.email || "there",
-      decision: "approved",
-      targetLabel: timesheetTargetLabel(timesheet),
-      reviewUrl: timesheetAdminUrl(timesheetId),
-    });
+    await sendEmailIfEnabled("timesheet.approved", to, () =>
+      sendTimesheetMemberDecisionEmail({
+        to,
+        memberName: timesheet.memberUser?.name || timesheet.memberUser?.email || "there",
+        decision: "approved",
+        targetLabel: timesheetTargetLabel(timesheet),
+        reviewUrl: timesheetAdminUrl(timesheetId),
+      }),
+    );
   },
 
   async "timesheet.rejected"({ timesheetId, reason }) {
@@ -90,14 +97,16 @@ export const notificationHandlers: {
     const to = timesheet?.memberUser?.email;
     if (!timesheet || !to) return;
 
-    await sendTimesheetMemberDecisionEmail({
-      to,
-      memberName: timesheet.memberUser?.name || timesheet.memberUser?.email || "there",
-      decision: "rejected",
-      targetLabel: timesheetTargetLabel(timesheet),
-      reason,
-      reviewUrl: timesheetAdminUrl(timesheetId),
-    });
+    await sendEmailIfEnabled("timesheet.rejected", to, () =>
+      sendTimesheetMemberDecisionEmail({
+        to,
+        memberName: timesheet.memberUser?.name || timesheet.memberUser?.email || "there",
+        decision: "rejected",
+        targetLabel: timesheetTargetLabel(timesheet),
+        reason,
+        reviewUrl: timesheetAdminUrl(timesheetId),
+      }),
+    );
   },
 
   async "ticket.created"({ ticketId }) {
@@ -135,7 +144,9 @@ export const notificationHandlers: {
     const body = `New support case on ${ticket.project?.projectNumber ?? "project"}: ${ticket.subject}\n\n${supportTicketAdminUrl(ticket.id)}`;
 
     for (const to of recipients) {
-      await sendSupportTicketNotificationEmail({ to, subject, body });
+      await sendEmailIfEnabled("ticket.created", to, () =>
+        sendSupportTicketNotificationEmail({ to, subject, body }),
+      );
     }
   },
 
@@ -175,7 +186,9 @@ export const notificationHandlers: {
     const body = `${message.author.name || message.author.email} wrote:\n\n${preview}\n\nView ticket: ${workspaceTicketUrl(ticket.id)}`;
 
     for (const to of recipients) {
-      await sendSupportTicketNotificationEmail({ to, subject, body });
+      await sendEmailIfEnabled("ticket.message", to, () =>
+        sendSupportTicketNotificationEmail({ to, subject, body }),
+      );
     }
   },
 
@@ -183,18 +196,21 @@ export const notificationHandlers: {
     const row = await prisma.contactSubmission.findUnique({ where: { id: submissionId } });
     if (!row) return;
 
-    await sendContactFormNotificationEmail({
-      to: contactNotificationEmail(),
-      submission: {
-        firstName: row.firstName,
-        lastName: row.lastName,
-        email: row.email,
-        phone: row.phone,
-        company: row.company,
-        interest: row.interest,
-        country: row.country,
-        message: row.message,
-      },
-    });
+    const to = contactNotificationEmail();
+    await sendEmailIfEnabled("contact.submitted", to, () =>
+      sendContactFormNotificationEmail({
+        to,
+        submission: {
+          firstName: row.firstName,
+          lastName: row.lastName,
+          email: row.email,
+          phone: row.phone,
+          company: row.company,
+          interest: row.interest,
+          country: row.country,
+          message: row.message,
+        },
+      }),
+    );
   },
 };

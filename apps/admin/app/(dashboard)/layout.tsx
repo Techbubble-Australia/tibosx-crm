@@ -138,6 +138,7 @@ const navGroups: NavGroup[] = [
       { href: "/settings/departments", label: "Department", icon: Building, roles: ["admin", "website"] },
       { href: "/settings/levels", label: "Level", icon: Target, roles: ["admin", "website"] },
       { href: "/settings/templates", label: "Templates", icon: FileCode, roles: ["admin"] },
+      { href: "/settings/notifications", label: "Email notifications", icon: Mail, roles: ["admin"] },
       { href: "/settings/groups", label: "Groups", icon: Users, roles: ["admin"] },
       { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin"] },
       { href: "/users/active", label: "Users", icon: UserCircle, roles: ["admin"] },

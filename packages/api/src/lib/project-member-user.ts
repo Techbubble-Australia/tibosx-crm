@@ -1,4 +1,5 @@
 import { prisma } from "@techbubble/database";
+import type { CredentialTemplate } from "@techbubble/database";
 import { effectiveRoleList } from "./admin-roles";
 import { ensureProjectMemberRole } from "./admin-user-profile-map";
 
@@ -27,7 +28,12 @@ export async function userQualifiesForMemberOnboarding(
   if (hasEffectiveProjectMemberRole(primary, additional)) return true;
   if (await userHasProjectMembership(userId)) return true;
   const member = await findCredentialProjectMemberForUser(userId);
-  return Boolean(member?.credentialTemplateId);
+  if (member?.credentialTemplateId) return true;
+  const assignment = await prisma.adminUserCredentialAssignment.findUnique({
+    where: { adminUserId: userId },
+    select: { credentialTemplateId: true },
+  });
+  return Boolean(assignment?.credentialTemplateId);
 }
 
 /** Link project member + ensure project_member role before onboarding checks (e.g. first login). */
@@ -67,4 +73,57 @@ export async function findCredentialProjectMemberForUser(userId: string) {
   }
 
   return member;
+}
+
+export type UserCredentialAgreement =
+  | {
+      source: "project_member";
+      memberId: string;
+      projectId: string;
+      projectTitle: string;
+      projectNumber: string;
+      credentialTemplate: CredentialTemplate;
+      credentialData: unknown;
+      agreementSignedAt: Date | null;
+      signatureDataUrl: string | null;
+    }
+  | {
+      source: "admin_user";
+      adminUserId: string;
+      credentialTemplate: CredentialTemplate;
+      credentialData: unknown;
+      agreementSignedAt: Date | null;
+      signatureDataUrl: string | null;
+    };
+
+export async function findUserCredentialAgreement(userId: string): Promise<UserCredentialAgreement | null> {
+  const member = await findCredentialProjectMemberForUser(userId);
+  if (member?.credentialTemplate) {
+    return {
+      source: "project_member",
+      memberId: member.id,
+      projectId: member.projectId,
+      projectTitle: member.project.title,
+      projectNumber: member.project.projectNumber,
+      credentialTemplate: member.credentialTemplate,
+      credentialData: member.credentialData,
+      agreementSignedAt: member.agreementSignedAt,
+      signatureDataUrl: member.signatureDataUrl,
+    };
+  }
+
+  const assignment = await prisma.adminUserCredentialAssignment.findUnique({
+    where: { adminUserId: userId },
+    include: { credentialTemplate: true },
+  });
+  if (!assignment?.credentialTemplate) return null;
+
+  return {
+    source: "admin_user",
+    adminUserId: userId,
+    credentialTemplate: assignment.credentialTemplate,
+    credentialData: assignment.credentialData,
+    agreementSignedAt: assignment.agreementSignedAt,
+    signatureDataUrl: assignment.signatureDataUrl,
+  };
 }

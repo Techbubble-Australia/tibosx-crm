@@ -3,27 +3,32 @@
 import { AssignTemplateModal } from "@/components/users/AssignTemplateModal";
 
 type Props = {
-  projectId: string;
-  memberId: string;
-  memberName: string;
+  userId: string;
+  displayName: string;
   userEmail: string;
+  projectId?: string;
+  memberId?: string;
   onClose: () => void;
   onSuccess: () => void;
 };
 
 export function UserAssignCredentialsModal({
+  userId,
+  displayName,
+  userEmail,
   projectId,
   memberId,
-  memberName,
-  userEmail,
   onClose,
   onSuccess,
 }: Props) {
+  const useProjectMember = Boolean(projectId && memberId);
+
   return (
     <AssignTemplateModal
-      projectId={projectId}
-      memberId={memberId}
-      memberName={memberName}
+      userId={useProjectMember ? undefined : userId}
+      projectId={useProjectMember ? projectId : undefined}
+      memberId={useProjectMember ? memberId : undefined}
+      memberName={displayName}
       userEmail={userEmail}
       onClose={onClose}
       onAssigned={onSuccess}

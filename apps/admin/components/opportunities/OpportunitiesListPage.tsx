@@ -499,8 +499,19 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
     return `/jobs/active?${params.toString()}`;
   }
 
+  function resolveStatus(status: string): OpportunityStatus {
+    if ((OPPORTUNITY_STATUSES as readonly string[]).includes(status)) {
+      return status as OpportunityStatus;
+    }
+    const match = OPPORTUNITY_STATUSES.find(
+      (key) => OPPORTUNITY_STATUS_LABELS[key].toLowerCase() === status.trim().toLowerCase(),
+    );
+    return match ?? "DRAFT";
+  }
+
   function renderTableRow(row: OpportunityRow) {
-    const colors = OPPORTUNITY_STATUS_COLORS[row.status] ?? OPPORTUNITY_STATUS_COLORS.DRAFT;
+    const statusKey = resolveStatus(row.status);
+    const colors = OPPORTUNITY_STATUS_COLORS[statusKey] ?? OPPORTUNITY_STATUS_COLORS.DRAFT;
     const contacts = contactsByClient[row.clientId] ?? [];
     return (
       <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
@@ -647,7 +658,7 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
             }
           >
             <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`}>
-              {OPPORTUNITY_STATUS_LABELS[row.status]}
+              {OPPORTUNITY_STATUS_LABELS[statusKey]}
             </span>
           </InlineEditableCell>
         </td>
