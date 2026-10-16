@@ -214,8 +214,11 @@ export function TimesheetForm({
         ? "Timesheet is in draft — add your entry, save, then submit for approval."
         : `Status: ${TIMESHEET_STATUS_LABELS[status]}`;
 
-  const gridTemplate =
-    "grid-cols-[minmax(11rem,1.45fr)_repeat(7,minmax(2.5rem,1fr))_minmax(3.5rem,auto)]";
+  const thBase =
+    "border-b border-gray-200 bg-white px-2 py-2.5 text-xs font-semibold text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100";
+  const thDay = `${thBase} border-l text-center whitespace-nowrap`;
+  const tdBase = "border-b border-gray-200 bg-white p-2 align-middle dark:border-gray-600 dark:bg-gray-900";
+  const tdDay = "border-b border-l border-gray-200 bg-white p-1.5 text-center align-middle dark:border-gray-600 dark:bg-gray-900";
 
   useEffect(() => {
     if (defaults.id && sumDailyHours((defaults.dailyHours as DailyHours) ?? {}) > 0) {
@@ -353,19 +356,19 @@ export function TimesheetForm({
   return (
     <form onSubmit={(e) => void handleSave(e)} className="space-y-4">
       {/* Reference header — outside entry card */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+      <div className="mb-3 grid grid-cols-1 items-end gap-3 xl:grid-cols-[auto_auto_minmax(0,1fr)_auto]">
         <div className="shrink-0">
-          <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Select Week</label>
+          <label className="mb-1 block text-sm font-medium text-gray-800 dark:text-gray-200">Select Week</label>
           <input
             type="date"
-            className={`${inputClass} w-[10.5rem] ${editable ? "" : readOnlyClass}`}
+            className={`${inputClass} w-[11rem] ${editable ? "" : readOnlyClass}`}
             value={weekMonday}
             onChange={(e) => setWeekMonday(snapToMondayInput(e.target.value))}
             readOnly={!editable}
           />
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 text-sm text-gray-800 dark:text-gray-100">
+        <div className="flex shrink-0 items-center gap-1 pb-2 text-sm text-gray-800 dark:text-gray-100">
           <button
             type="button"
             className="rounded border border-gray-200 p-1 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600"
@@ -389,14 +392,14 @@ export function TimesheetForm({
           </button>
         </div>
 
-        <div className="flex flex-1 items-center gap-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">
-          <Info className="h-4 w-4 shrink-0" />
+        <div className="flex min-h-[2.75rem] flex-1 items-center gap-2 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900 xl:mx-2 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-100">
+          <Info className="h-4 w-4 shrink-0 text-sky-600" />
           <span>{weekBanner}</span>
         </div>
 
-        <div className="shrink-0 text-right text-sm">
-          <p className="font-semibold text-gray-900 dark:text-gray-100">Total: {hoursTotal}h</p>
-          <div className="mt-1 flex flex-wrap items-center justify-end gap-3 text-xs text-gray-500">
+        <div className="shrink-0 pb-1 text-right text-sm">
+          <p className="font-bold text-gray-900 dark:text-gray-100">Total: {hoursTotal}h</p>
+          <div className="mt-1 flex flex-col items-end gap-0.5 text-xs text-gray-600 dark:text-gray-400">
             <span className="inline-flex items-center gap-1">
               <span className="h-2 w-2 rounded-full bg-green-500" aria-hidden /> Tracked (Timer)
             </span>
@@ -407,175 +410,166 @@ export function TimesheetForm({
         </div>
       </div>
 
-      {/* Main entry card */}
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-        <div className="overflow-x-auto p-3 sm:p-4">
-          <div className={`grid min-w-[44rem] ${gridTemplate} gap-0 text-sm`}>
-            <div className="border-b border-gray-200 px-2 py-2 text-xs font-semibold text-gray-800 dark:border-gray-600 dark:text-gray-200">
-              Project/Board Task
-            </div>
-            {weekDays.map((d, i) => {
-              const dow = d.label.split(" ")[0] ?? d.key;
-              const isLastDay = i === weekDays.length - 1;
-              return (
-                <div
-                  key={d.key}
-                  className={`border-b border-gray-200 px-0.5 py-2 text-center text-xs font-semibold text-gray-800 dark:border-gray-600 dark:text-gray-200 ${
-                    isLastDay ? "border-r" : "border-r"
-                  }`}
-                >
-                  {formatDayColumnLabel(dow, d.iso)}
-                </div>
-              );
-            })}
-            <div className="border-b border-gray-200 px-2 py-2 text-center text-xs font-semibold text-gray-800 dark:border-gray-600 dark:text-gray-200">
-              Billable
-            </div>
-
-            {/* Entry row */}
-            <div className="flex flex-col justify-center gap-2 border-b border-r border-gray-200 py-2 pr-2 dark:border-gray-600">
-              {!editable && defaults.targetLabel ? (
-                <p className="text-sm text-gray-900 dark:text-gray-100">{defaults.targetLabel}</p>
-              ) : (
-                <>
-                  <select
-                    className={`${selectClass} ${editable ? "" : readOnlyClass}`}
-                    value={projectId}
-                    onChange={(e) => {
-                      setProjectId(e.target.value);
-                      setCaseKey("");
-                      setEntryAdded(false);
-                    }}
-                    disabled={!editable}
-                  >
-                    <option value="">Search project or board...</option>
-                    {projects.map((row) => (
-                      <option key={row.id} value={row.id}>{row.label}</option>
-                    ))}
-                  </select>
-                  <select
-                    className={`${selectClass} ${editable ? "" : readOnlyClass}`}
-                    value={caseKey}
-                    onChange={(e) => {
-                      setCaseKey(e.target.value);
-                      setEntryAdded(false);
-                    }}
-                    disabled={!editable || !projectId}
-                  >
-                    <option value="">
-                      {projectId ? "Choose task (optional)" : "Choose project/board first"}
-                    </option>
-                    {cases.map((row) => (
-                      <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
-                        {row.label}
-                      </option>
-                    ))}
-                  </select>
-                </>
-              )}
-            </div>
-
-            {WEEKDAY_KEYS.map((key, index) => (
-              <div
-                key={key}
-                className={`flex items-center justify-center border-b border-gray-200 py-2 dark:border-gray-600 ${
-                  index === WEEKDAY_KEYS.length - 1 ? "border-r" : "border-r"
-                }`}
-              >
-                <input
-                  type="number"
-                  min={0}
-                  step={0.25}
-                  inputMode="decimal"
-                  className={`${dayInputClass} ${editable ? "" : readOnlyClass}`}
-                  value={dailyHours[key] ?? ""}
-                  placeholder="0"
-                  disabled={!editable}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setEntryAdded(false);
-                    setDailyHours((prev) => ({
-                      ...prev,
-                      [key]: v === "" ? undefined : Number(v),
-                    }));
-                  }}
-                  readOnly={!editable}
-                />
-              </div>
-            ))}
-
-            <div className="flex items-center justify-center border-b border-gray-200 py-2 dark:border-gray-600">
-              <BillableToggle checked={billable} onChange={setBillable} disabled={!editable} />
-            </div>
-
-            {/* Comments + Add entry row */}
-            <div className="col-span-full border-t border-gray-100 pt-3 dark:border-gray-800">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
-                <div className="min-w-0 flex-1">
+      {/* Main entry card — table matches reference */}
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[52rem] border-collapse text-sm">
+            <thead>
+              <tr>
+                <th className={`${thBase} w-[26%] min-w-[12rem] text-left`}>Project/Board Task</th>
+                {weekDays.map((d) => {
+                  const dow = d.label.split(" ")[0] ?? d.key;
+                  return (
+                    <th key={d.key} className={`${thDay} w-[8%]`}>
+                      {formatDayColumnLabel(dow, d.iso)}
+                    </th>
+                  );
+                })}
+                <th className={`${thDay} w-[5.5rem]`}>Billable</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className={`${tdBase} align-top`}>
+                  {!editable && defaults.targetLabel ? (
+                    <p className="text-sm text-gray-900 dark:text-gray-100">{defaults.targetLabel}</p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <select
+                        className={`${selectClass} ${editable ? "" : readOnlyClass}`}
+                        value={projectId}
+                        onChange={(e) => {
+                          setProjectId(e.target.value);
+                          setCaseKey("");
+                          setEntryAdded(false);
+                        }}
+                        disabled={!editable}
+                      >
+                        <option value="">Search project or board...</option>
+                        {projects.map((row) => (
+                          <option key={row.id} value={row.id}>{row.label}</option>
+                        ))}
+                      </select>
+                      <select
+                        className={`${selectClass} ${editable ? "" : readOnlyClass}`}
+                        value={caseKey}
+                        onChange={(e) => {
+                          setCaseKey(e.target.value);
+                          setEntryAdded(false);
+                        }}
+                        disabled={!editable || !projectId}
+                      >
+                        <option value="">Choose project/board first</option>
+                        {cases.map((row) => (
+                          <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
+                            {row.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </td>
+                {WEEKDAY_KEYS.map((key) => (
+                  <td key={key} className={tdDay}>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.25}
+                      inputMode="decimal"
+                      className={`${dayInputClass} mx-auto ${editable ? "" : readOnlyClass}`}
+                      value={dailyHours[key] ?? ""}
+                      placeholder="0"
+                      disabled={!editable}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setEntryAdded(false);
+                        setDailyHours((prev) => ({
+                          ...prev,
+                          [key]: v === "" ? undefined : Number(v),
+                        }));
+                      }}
+                      readOnly={!editable}
+                    />
+                  </td>
+                ))}
+                <td className={tdDay}>
+                  <div className="flex justify-center">
+                    <BillableToggle checked={billable} onChange={setBillable} disabled={!editable} />
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td colSpan={8} className="border-b border-gray-200 bg-white p-2 align-top dark:border-gray-600 dark:bg-gray-900">
                   <textarea
-                    className={`${inputClass} min-h-[5rem] resize-y ${editable ? "" : readOnlyClass}`}
+                    className={`${inputClass} min-h-[4.5rem] resize-none ${editable ? "" : readOnlyClass}`}
                     placeholder="Add comments (optional)"
                     value={comments}
                     onChange={(e) => setComments(e.target.value)}
                     readOnly={!editable}
                     rows={3}
                   />
+                </td>
+                <td className="border-b border-l border-gray-200 bg-white p-2 align-top dark:border-gray-600 dark:bg-gray-900">
                   {editable ? (
-                    <p className="mt-2 flex items-start gap-1 text-xs italic text-amber-700 dark:text-amber-400">
-                      <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      Enter project, optional task, and hours for each day, then click &apos;Add Entry&apos;
-                    </p>
-                  ) : null}
-                </div>
-                {editable ? (
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 lg:max-w-md">
-                    <div
-                      className="flex min-w-[4.5rem] items-center justify-center rounded-lg border border-dashed border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 dark:border-gray-600 dark:text-gray-200"
-                    >
-                      {rowHoursTotal.toFixed(1)}h
+                    <div className="flex min-w-[7.5rem] flex-col items-stretch gap-2">
+                      <div
+                        className="rounded-lg border border-dashed border-sky-300 bg-sky-50/30 px-2 py-2 text-center text-sm font-semibold text-gray-800 dark:border-sky-700 dark:bg-sky-950/20 dark:text-gray-100"
+                      >
+                        {rowHoursTotal.toFixed(1)}h
+                      </div>
+                      <span
+                        className={`rounded-md px-2 py-1 text-center text-xs font-medium ${
+                          billable
+                            ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200"
+                            : "bg-gray-100 text-gray-600"
+                        }`}
+                      >
+                        Billable
+                      </span>
+                      <button
+                        type="button"
+                        disabled={!canAddEntry}
+                        onClick={() => addEntry()}
+                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add Entry
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => clearEntryRow()}
+                        className="self-end text-gray-400 hover:text-gray-600"
+                        aria-label="Clear entry row"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
                     </div>
-                    <span
-                      className={`rounded-md px-2.5 py-1 text-xs font-medium ${
-                        billable
-                          ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200"
-                          : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-                      }`}
-                    >
-                      Billable
-                    </span>
-                    <button
-                      type="button"
-                      disabled={!canAddEntry}
-                      onClick={() => addEntry()}
-                      className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                    >
-                      <Plus className="h-4 w-4" /> Add Entry
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => clearEntryRow()}
-                      className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800"
-                      aria-label="Clear entry row"
-                    >
-                      <X className="h-5 w-5" />
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </div>
+                  ) : null}
+                </td>
+              </tr>
+              {editable ? (
+                <tr>
+                  <td colSpan={9} className="border-b border-gray-200 bg-white px-2 pb-3 pt-1 dark:border-gray-600 dark:bg-gray-900">
+                    <p className="flex items-start gap-1 text-xs text-amber-700 dark:text-amber-400">
+                      <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <span className="italic">
+                        Enter project, optional task, and hours for each day, then click &apos;Add Entry&apos;
+                      </span>
+                    </p>
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
         </div>
 
-        {/* Footer — approver + save / submit */}
         <div className="border-t border-gray-200 px-4 py-4 dark:border-gray-700">
-          <label className="mb-1 block text-sm font-semibold text-gray-900 dark:text-gray-100">
-            Select Approver (Manager)
-          </label>
-          {editable && approvers.length > 0 ? (
+          <p className="mb-1 text-sm font-bold text-gray-900 dark:text-gray-100">Select Approver (Manager)</p>
+          {editable ? (
             <select
               className={inputClass}
               value={selectedApprover}
               onChange={(e) => setSelectedApprover(e.target.value)}
+              disabled={!approvers.length}
             >
               <option value="">Choose a manager to approve your timesheet</option>
               {approvers.map((row) => (
@@ -591,7 +585,7 @@ export function TimesheetForm({
               value={
                 defaults.approverLabel ||
                 approvers.find((a) => selectedApprover === `${a.kind}:${a.id}`)?.label ||
-                "Choose a manager to approve your timesheet"
+                "—"
               }
             />
           )}
@@ -601,20 +595,16 @@ export function TimesheetForm({
             </p>
           ) : null}
 
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-            {footerActions}
+          <div className="mt-5 flex flex-col items-stretch gap-2 sm:items-end">
+            {footerActions ? <div className="flex flex-wrap justify-end gap-2">{footerActions}</div> : null}
             {editable ? (
-              <>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
                 <button
                   type="submit"
                   disabled={!canSave || isSaving}
-                  className={`${footerBtnClass} border border-gray-200 bg-gray-100 text-gray-600 disabled:cursor-not-allowed disabled:opacity-80 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300`}
+                  className={`${footerBtnClass} w-full border border-gray-200 bg-[#f3f4f6] text-gray-500 sm:w-auto disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400`}
                 >
-                  {isSaving ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   {canSave ? "Save timesheet" : "Add timesheet entries first"}
                 </button>
                 {showSubmitForApproval ? (
@@ -622,7 +612,7 @@ export function TimesheetForm({
                     type="button"
                     disabled={!canSubmitForApproval || submitForApprovalLoading}
                     onClick={() => void onSubmitForApproval?.()}
-                    className={`${footerBtnClass} border border-gray-200 bg-gray-100 text-gray-600 disabled:cursor-not-allowed disabled:opacity-80 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300`}
+                    className={`${footerBtnClass} w-full border border-gray-200 bg-[#f3f4f6] text-gray-500 sm:w-auto disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400`}
                   >
                     {submitForApprovalLoading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -632,7 +622,7 @@ export function TimesheetForm({
                     {canSubmitForApproval ? "Submit for approval" : "Add entries to submit"}
                   </button>
                 ) : null}
-              </>
+              </div>
             ) : null}
           </div>
         </div>
