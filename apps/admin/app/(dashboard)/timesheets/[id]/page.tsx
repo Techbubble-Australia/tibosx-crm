@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
@@ -206,39 +206,30 @@ export default function TimesheetDetailPage() {
             onSubmit={handleSubmit}
             isSaving={isSaving}
             readOnly={status !== "DRAFT"}
+            showSubmitForApproval={canSubmitTimesheet}
+            submitForApprovalLoading={actionLoading}
+            onSubmitForApproval={() => void submitForApproval()}
             footerActions={
-              <>
-                {canSubmitTimesheet ? (
+              pmCanAct ? (
+                <>
                   <button
                     type="button"
-                    onClick={() => void submitForApproval()}
+                    onClick={() => void approve()}
                     disabled={actionLoading}
-                    className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+                    className="inline-flex min-w-[10rem] items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
                   >
-                    <Send className="h-4 w-4" /> Submit for approval
+                    Approve
                   </button>
-                ) : null}
-                {pmCanAct ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => void approve()}
-                      disabled={actionLoading}
-                      className="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
-                    >
-                      Approve
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowReject(true)}
-                      disabled={actionLoading}
-                      className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
-                    >
-                      Reject
-                    </button>
-                  </>
-                ) : null}
-              </>
+                  <button
+                    type="button"
+                    onClick={() => setShowReject(true)}
+                    disabled={actionLoading}
+                    className="inline-flex min-w-[10rem] items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
+                  >
+                    Reject
+                  </button>
+                </>
+              ) : null
             }
           />
         )}
