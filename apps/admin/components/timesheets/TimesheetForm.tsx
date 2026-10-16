@@ -193,8 +193,10 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
       .then((data) => {
         const list = (data.data as { approvers?: ApproverOption[] })?.approvers ?? [];
         setApprovers(list);
-        if (editable && list[0]) {
-          setSelectedApprover((prev) => prev || `${list[0].kind}:${list[0].id}`);
+        const first = list[0];
+        if (editable && first) {
+          const defaultKey = `${first.kind}:${first.id}`;
+          setSelectedApprover((prev) => prev || defaultKey);
         }
       })
       .catch(() => setApprovers([]));
