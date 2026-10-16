@@ -2,6 +2,7 @@ export const WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as
 export type WeekdayKey = (typeof WEEKDAY_KEYS)[number];
 
 export type DailyHours = Partial<Record<WeekdayKey, number>>;
+export type DailyComments = Partial<Record<WeekdayKey, string>>;
 
 export function mondayOfWeek(date = new Date()): Date {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));

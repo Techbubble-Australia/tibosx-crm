@@ -1,5 +1,6 @@
 import { prisma } from "@techbubble/database";
 import { effectiveRoleList } from "./admin-roles";
+import { listActiveProjectMembershipsForUser } from "./project-member-resolution";
 
 export type TimesheetAccessFlags = {
   projectManagementTimesheets: boolean;
@@ -16,11 +17,8 @@ export async function getTimesheetAccessForUser(
     return { projectManagementTimesheets: true, workspaceTimesheets: roles.includes("customer_support") };
   }
 
-  const activeMembership = await prisma.projectMember.findFirst({
-    where: { adminUserId: userId, project: { status: "ACTIVE" } },
-    select: { id: true },
-  });
-  const projectManagementTimesheets = Boolean(activeMembership);
+  const memberships = await listActiveProjectMembershipsForUser(userId);
+  const projectManagementTimesheets = memberships.length > 0;
 
   const admin = await prisma.adminUser.findUnique({
     where: { id: userId },
@@ -44,7 +42,7 @@ export async function getTimesheetAccessForUser(
   const workspaceTimesheets =
     roles.includes("customer_support") ||
     (roles.includes("client") && Boolean(approverLink)) ||
-    Boolean(activeMembership);
+    memberships.length > 0;
 
   return { projectManagementTimesheets, workspaceTimesheets };
 }

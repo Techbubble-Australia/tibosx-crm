@@ -13,6 +13,11 @@ import { getMemberOnboardingStatus } from "../lib/member-onboarding";
 import { notifyAsync } from "../lib/notifications";
 import { mondayOfWeek, sundayOfWeek, TIMESHEET_STATUSES, TIMESHEET_STATUS_LABELS } from "../lib/project-types";
 import { formatZodError } from "../lib/zod-error";
+import {
+  listActiveProjectMembershipsForUser,
+  projectMemberWhereForUser,
+  userHasActiveProjectMembership,
+} from "../lib/project-member-resolution";
 
 const router: IRouter = Router();
 
@@ -26,6 +31,16 @@ const dailyHoursSchema = z.object({
   sun: z.coerce.number().min(0).optional(),
 });
 
+const dailyCommentsSchema = z.object({
+  mon: z.string().max(2000).optional(),
+  tue: z.string().max(2000).optional(),
+  wed: z.string().max(2000).optional(),
+  thu: z.string().max(2000).optional(),
+  fri: z.string().max(2000).optional(),
+  sat: z.string().max(2000).optional(),
+  sun: z.string().max(2000).optional(),
+});
+
 const timesheetSchema = z
   .object({
     projectId: z.string().min(1).optional(),
@@ -37,6 +52,7 @@ const timesheetSchema = z
     endDate: z.coerce.date(),
     fileUrls: z.array(z.string().min(1)).optional(),
     dailyHours: dailyHoursSchema.optional(),
+    dailyComments: dailyCommentsSchema.optional(),
     comments: z.string().max(10000).optional().nullable(),
   })
   .refine((data) => Boolean(data.projectId || data.opportunityId || data.ticketId), {
@@ -85,6 +101,7 @@ function serializeTimesheet(row: {
   status: string;
   fileUrls: unknown;
   dailyHours: unknown;
+  dailyComments: unknown;
   rejectReason: string | null;
   comments: string | null;
   createdAt: Date;
@@ -129,6 +146,7 @@ function serializeTimesheet(row: {
     statusLabel: TIMESHEET_STATUS_LABELS[status] ?? row.status,
     fileUrls,
     dailyHours: row.dailyHours ?? null,
+    dailyComments: row.dailyComments ?? null,
     rejectReason: row.rejectReason,
     comments: row.comments,
     createdAt: row.createdAt.toISOString(),
@@ -203,13 +221,7 @@ async function assertMemberCanSubmitTimesheets(actorId: string, roles: string[])
 router.get("/active-projects", async (req: AuthRequest, res) => {
   try {
     const actorId = getActorId(req);
-    const projectMemberships = await prisma.projectMember.findMany({
-      where: { adminUserId: actorId, project: { status: "ACTIVE" } },
-      include: {
-        project: { select: { id: true, title: true, projectNumber: true, kind: true } },
-      },
-      orderBy: { project: { updatedAt: "desc" } },
-    });
+    const projectMemberships = await listActiveProjectMembershipsForUser(actorId);
     res.json({
       data: projectMemberships.map((row) => ({
         id: row.project.id,
@@ -229,11 +241,14 @@ router.get("/project-cases", async (req: AuthRequest, res) => {
     const projectId = typeof req.query.projectId === "string" ? req.query.projectId : "";
     if (!projectId) return res.status(400).json({ error: "projectId is required" });
 
+    const hasMembership = await userHasActiveProjectMembership(actorId, projectId);
+    if (!hasMembership) return res.status(403).json({ error: "Forbidden" });
+    const whereMember = await projectMemberWhereForUser(actorId);
     const membership = await prisma.projectMember.findFirst({
-      where: { adminUserId: actorId, projectId, project: { status: "ACTIVE" } },
+      where: { ...whereMember, projectId, project: { status: "ACTIVE" } },
       include: { project: { select: { kind: true } } },
     });
-    if (!membership) return res.status(403).json({ error: "Forbidden" });
+    if (!membership?.project) return res.status(403).json({ error: "Forbidden" });
 
     if (membership.project.kind === "SUPPORT") {
       const tickets = await prisma.ticket.findMany({
@@ -281,8 +296,9 @@ router.get("/active-targets", async (req: AuthRequest, res) => {
   try {
     const actorId = getActorId(req);
 
+    const whereMember = await projectMemberWhereForUser(actorId);
     const projectMemberships = await prisma.projectMember.findMany({
-      where: { adminUserId: actorId, project: { status: "ACTIVE" } },
+      where: { ...whereMember, project: { status: "ACTIVE" } },
       include: {
         project: { select: { id: true, title: true, projectNumber: true } },
       },
@@ -509,10 +525,8 @@ router.post("/", async (req: AuthRequest, res) => {
     await assertMemberCanSubmitTimesheets(actorId, roles);
 
     if (data.projectId) {
-      const membership = await prisma.projectMember.findFirst({
-        where: { adminUserId: actorId, projectId: data.projectId, project: { status: "ACTIVE" } },
-      });
-      if (!membership) {
+      const ok = await userHasActiveProjectMembership(actorId, data.projectId);
+      if (!ok) {
         return res.status(400).json({ error: "You are not assigned to this active project" });
       }
     } else if (data.opportunityId) {
@@ -549,6 +563,7 @@ router.post("/", async (req: AuthRequest, res) => {
           status: "DRAFT",
           fileUrls: data.fileUrls ?? [],
           dailyHours: data.dailyHours ?? undefined,
+          dailyComments: data.dailyComments ?? undefined,
           comments: data.comments?.trim() || null,
         },
       });
@@ -610,6 +625,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
           endDate: data.endDate,
           fileUrls: data.fileUrls ?? [],
           dailyHours: data.dailyHours ?? undefined,
+          dailyComments: data.dailyComments ?? undefined,
           comments: data.comments?.trim() || null,
         },
       });

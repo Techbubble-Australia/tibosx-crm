@@ -17,7 +17,9 @@ import { adminFetch } from "@/lib/admin-api";
 import { readUploadImageUrlFromJson } from "@/lib/upload-response";
 import { resolveDocumentHref } from "@/lib/media-url";
 import { TIMESHEET_STATUS_LABELS, type TimesheetStatus } from "@/lib/project-types";
+import { formatTimesheetActivityTitle } from "@/lib/timesheet-activity-display";
 import {
+  type DailyComments,
   type DailyHours,
   snapToMondayInput,
   sumDailyHours,
@@ -50,6 +52,7 @@ export type TimesheetFormValues = {
   status: TimesheetStatus;
   fileUrls: string[];
   dailyHours?: DailyHours | null;
+  dailyComments?: DailyComments | null;
   comments?: string | null;
   rejectReason?: string | null;
   targetLabel?: string;
@@ -175,6 +178,9 @@ export function TimesheetForm({
   const [dailyHours, setDailyHours] = useState<DailyHours>(
     (defaults.dailyHours as DailyHours) ?? emptyHours(),
   );
+  const [dailyComments, setDailyComments] = useState<DailyComments>(
+    (defaults.dailyComments as DailyComments) ?? {},
+  );
   const [comments, setComments] = useState(defaults.comments ?? "");
   const [billable, setBillable] = useState(true);
   const [entryAdded, setEntryAdded] = useState(Boolean(defaults.id && sumDailyHours((defaults.dailyHours as DailyHours) ?? {}) > 0));
@@ -286,6 +292,7 @@ export function TimesheetForm({
     setProjectId("");
     setCaseKey("");
     setDailyHours(emptyHours());
+    setDailyComments({});
     setComments("");
     setBillable(true);
     setEntryAdded(false);
@@ -335,6 +342,7 @@ export function TimesheetForm({
       endDate: toDateInputUtc(sun),
       fileUrls,
       dailyHours,
+      dailyComments,
       comments: comments.trim() || null,
     };
     const [kind, id] = caseKey ? caseKey.split(":") : ["", ""];
@@ -358,7 +366,7 @@ export function TimesheetForm({
       {/* Reference header — outside entry card */}
       <div className="mb-3 grid grid-cols-1 items-end gap-3 xl:grid-cols-[auto_auto_minmax(0,1fr)_auto]">
         <div className="shrink-0">
-          <label className="mb-1 block text-sm font-medium text-gray-800 dark:text-gray-200">Select Week</label>
+          <label className="mb-1 block text-sm font-medium text-gray-800 dark:text-gray-200">Select first day of week</label>
           <input
             type="date"
             className={`${inputClass} w-[11rem] ${editable ? "" : readOnlyClass}`}
@@ -459,7 +467,7 @@ export function TimesheetForm({
                         }}
                         disabled={!editable || !projectId}
                       >
-                        <option value="">Choose project/board first</option>
+                        <option value="">{projectId ? "No case (project only)" : "Choose project/board first"}</option>
                         {cases.map((row) => (
                           <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
                             {row.label}
@@ -499,16 +507,30 @@ export function TimesheetForm({
                 </td>
               </tr>
               <tr>
-                <td colSpan={8} className="border-b border-gray-200 bg-white p-2 align-top dark:border-gray-600 dark:bg-gray-900">
-                  <textarea
-                    className={`${inputClass} min-h-[4.5rem] resize-none ${editable ? "" : readOnlyClass}`}
-                    placeholder="Add comments (optional)"
-                    value={comments}
-                    onChange={(e) => setComments(e.target.value)}
-                    readOnly={!editable}
-                    rows={3}
-                  />
-                </td>
+                <td className={`${tdBase} text-xs font-medium text-gray-600 dark:text-gray-400`}>Task comments</td>
+                {WEEKDAY_KEYS.map((key) => (
+                  <td key={`comment-${key}`} className={tdDay}>
+                    <input
+                      type="text"
+                      className={`${dayInputClass} mx-auto w-full max-w-none px-1 text-left text-xs ${editable ? "" : readOnlyClass}`}
+                      placeholder="—"
+                      value={dailyComments[key] ?? ""}
+                      disabled={!editable}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setDailyComments((prev) => ({
+                          ...prev,
+                          [key]: v.trim() ? v : undefined,
+                        }));
+                      }}
+                      readOnly={!editable}
+                    />
+                  </td>
+                ))}
+                <td className={tdDay} />
+              </tr>
+              <tr>
+                <td colSpan={8} className="border-b border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-900" />
                 <td className="border-b border-l border-gray-200 bg-white p-2 align-top dark:border-gray-600 dark:bg-gray-900">
                   {editable ? (
                     <div className="flex min-w-[7.5rem] flex-col items-stretch gap-2">
@@ -560,6 +582,18 @@ export function TimesheetForm({
               ) : null}
             </tbody>
           </table>
+        </div>
+
+        <div className="border-t border-gray-200 px-4 py-4 dark:border-gray-700">
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Timesheet comments</label>
+          <textarea
+            className={`${inputClass} min-h-[4.5rem] resize-y ${editable ? "" : readOnlyClass}`}
+            placeholder="Notes for this timesheet (rejection reasons are appended here when a manager rejects)"
+            value={comments}
+            onChange={(e) => setComments(e.target.value)}
+            readOnly={!editable}
+            rows={3}
+          />
         </div>
 
         <div className="border-t border-gray-200 px-4 py-4 dark:border-gray-700">
@@ -690,7 +724,7 @@ export function TimesheetForm({
           <ul className="divide-y divide-gray-100 dark:divide-gray-800">
             {defaults.activityLogs.map((log) => (
               <li key={log.id} className="py-3 text-sm">
-                <p className="font-medium text-gray-900 dark:text-gray-100">{log.action.replaceAll("_", " ")}</p>
+                <p className="font-medium text-gray-900 dark:text-gray-100">{formatTimesheetActivityTitle(log.action)}</p>
                 {log.reason ? <p className="text-gray-600 dark:text-gray-400">Reason: {log.reason}</p> : null}
                 <p className="mt-1 text-xs text-gray-400">
                   {formatActivityDate(log.createdAt)}

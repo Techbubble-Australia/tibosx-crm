@@ -104,7 +104,6 @@ async function fetchJson<T>(path: string, fallback: T): Promise<T> {
 export default function ClientTimesheetsPage() {
   const [rows, setRows] = useState<PendingRow[]>([]);
   const [allRows, setAllRows] = useState<AllRow[]>([]);
-  const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [canApprove, setCanApprove] = useState(false);
   const [role, setRole] = useState<string>("CLIENT");
@@ -116,7 +115,6 @@ export default function ClientTimesheetsPage() {
   const load = useCallback(() => {
     setLoading(true);
     setError("");
-    const params = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : "";
     void Promise.all([
       workspaceFetch("/auth/me").then(async (r) => {
         const body = await r.json();
@@ -129,20 +127,20 @@ export default function ClientTimesheetsPage() {
         return body;
       }),
       fetchJson<PendingRow[]>("/timesheets/pending-approval", []),
-      fetchJson<AllRow[]>(`/timesheets${params}`, []),
+      fetchJson<AllRow[]>(`/timesheets`, []),
       fetchJson<MemberRow[]>("/member-timesheets", []),
     ])
       .then(([meData, pending, all, member]) => {
         const me = meData.data as { canApproveTimesheets?: boolean; role?: string };
         setRole(me.role ?? "CLIENT");
-        setCanApprove(Boolean(me.canApproveTimesheets));
+        setCanApprove(Boolean(me.canApproveTimesheets) || me.role === "admin");
         setRows(pending);
         setAllRows(all);
         setMemberRows(member);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load timesheets"))
       .finally(() => setLoading(false));
-  }, [statusFilter]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -239,7 +237,7 @@ export default function ClientTimesheetsPage() {
     );
   }
 
-  if (role !== "CLIENT") {
+  if (role !== "CLIENT" && role !== "admin") {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-10 text-center text-slate-600">
         <p className="font-medium text-slate-900">Timesheets unavailable</p>
@@ -248,30 +246,15 @@ export default function ClientTimesheetsPage() {
     );
   }
 
+  const approvedRows = allRows.filter((row) => row.status === "APPROVED");
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Timesheets</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">Approve/Reject Timesheets</h1>
         <p className="mt-1 text-sm text-slate-500">
-          View all timesheets for your project and approve submissions when you are an approver.
+          Review submitted timesheets and approve or reject. Approved timesheets are listed for reference.
         </p>
-      </div>
-
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Filter by status</label>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-          >
-            <option value="">All</option>
-            <option value="DRAFT">Draft</option>
-            <option value="SUBMITTED">Submitted</option>
-            <option value="APPROVED">Approved</option>
-            <option value="REJECTED">Rejected</option>
-          </select>
-        </div>
       </div>
 
       {error ? (
@@ -279,76 +262,71 @@ export default function ClientTimesheetsPage() {
       ) : null}
 
       <section>
-        <h2 className="mb-2 font-semibold text-slate-900">All timesheets</h2>
-        {allRows.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-200 bg-white p-10 text-center text-slate-500">
-            <ClipboardCheck className="mx-auto mb-3 h-10 w-10 text-slate-300" />
-            <p className="font-medium text-slate-700">No timesheets yet</p>
-            <p className="mt-1 text-sm">
-              Timesheets appear here once your project is linked in TBOS and consultants submit time.
-            </p>
+        <h2 className="mb-2 font-semibold text-slate-900">Submitted</h2>
+        {!canApprove ? (
+          <p className="text-sm text-slate-500">
+            To approve timesheets, ask your project manager to enable <strong>Timesheet approver</strong> on your client
+            contact in TBOS.
+          </p>
+        ) : rows.length === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500">
+            <p className="font-medium text-slate-700">No submitted timesheets</p>
           </div>
         ) : (
-          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
-            {allRows.map((row) => (
-              <li key={row.id} className="px-4 py-3 text-sm">
-                <p className="font-medium text-slate-900">{row.memberName}</p>
-                <p className="text-slate-600">
-                  {formatDate(row.startDate)} – {formatDate(row.endDate)} · {row.status}
-                </p>
+          <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            {rows.map((row) => (
+              <li key={row.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="font-medium text-slate-900">{row.memberName}</p>
+                  <p className="text-sm text-slate-600">{row.targetLabel || "Project / case"}</p>
+                  <p className="text-xs text-slate-400">
+                    {formatDate(row.startDate)} – {formatDate(row.endDate)}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    disabled={actingId === row.id}
+                    onClick={() => void approve(row.id)}
+                    className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    disabled={actingId === row.id}
+                    onClick={() => setRejectId(row.id)}
+                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Reject
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      {canApprove ? (
-        <section>
-          <h2 className="mb-2 font-semibold text-slate-900">Awaiting your approval</h2>
-          {rows.length === 0 ? (
-            <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500">
-              <p className="font-medium text-slate-700">No timesheets waiting for approval</p>
-            </div>
-          ) : (
-            <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-              {rows.map((row) => (
-                <li key={row.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="font-medium text-slate-900">{row.memberName}</p>
-                    <p className="text-sm text-slate-600">{row.targetLabel || "Project / case"}</p>
-                    <p className="text-xs text-slate-400">
-                      {formatDate(row.startDate)} – {formatDate(row.endDate)}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 gap-2">
-                    <button
-                      type="button"
-                      disabled={actingId === row.id}
-                      onClick={() => void approve(row.id)}
-                      className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
-                    >
-                      Approve
-                    </button>
-                    <button
-                      type="button"
-                      disabled={actingId === row.id}
-                      onClick={() => setRejectId(row.id)}
-                      className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      Reject
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      ) : (
-        <p className="text-sm text-slate-500">
-          To approve timesheets, ask your project manager to enable <strong>Timesheet approver</strong> on your client
-          contact in TBOS.
-        </p>
-      )}
+      <section>
+        <h2 className="mb-2 font-semibold text-slate-900">Approved</h2>
+        {approvedRows.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-white p-10 text-center text-slate-500">
+            <ClipboardCheck className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+            <p className="font-medium text-slate-700">No approved timesheets yet</p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+            {approvedRows.map((row) => (
+              <li key={row.id} className="px-4 py-3 text-sm">
+                <p className="font-medium text-slate-900">{row.memberName}</p>
+                <p className="text-slate-600">
+                  {formatDate(row.startDate)} – {formatDate(row.endDate)}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {rejectId ? (
         <RejectDialog

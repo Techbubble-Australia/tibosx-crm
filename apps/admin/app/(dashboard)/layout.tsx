@@ -96,7 +96,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/workspace/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["customer_support", "client"] },
       { href: "/workspace/tickets", label: "Tickets", icon: Ticket, roles: ["customer_support", "client"] },
-      { href: "/workspace/timesheets", label: "Timesheets", icon: ClipboardCheck, roles: ["customer_support", "client"] },
+      { href: "/workspace/timesheets", label: "Approve/Reject Timesheets", icon: ClipboardCheck, roles: ["admin", "client"] },
       { href: "/support-tickets/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin"] },
       { href: "/support-tickets", label: "Tickets", icon: Ticket, roles: ["admin"] },
     ],
@@ -154,7 +154,7 @@ function headerTitle(pathname: string): string {
     if (pathname.startsWith("/workspace/tickets/new")) return "Create ticket";
     if (pathname.startsWith("/workspace/tickets/")) return "Ticket";
     if (pathname.startsWith("/workspace/tickets")) return "Tickets";
-    if (pathname.startsWith("/workspace/timesheets")) return "Timesheets";
+    if (pathname.startsWith("/workspace/timesheets")) return "Approve/Reject Timesheets";
     return "Dashboard";
   }
   if (pathname.startsWith("/support-tickets")) {

@@ -916,6 +916,8 @@ model Timesheet {
   fileUrls               Json?
   /// Hours per weekday for the selected week (mon–sun).
   dailyHours             Json?
+  /// Optional note per weekday (mon–sun).
+  dailyComments          Json?
   rejectReason           String?               @db.Text
   comments               String?               @db.Text
   activityLogs           TimesheetActivityLog[]

@@ -195,11 +195,15 @@ router.post("/:id/reject", async (req: TicketingRequest, res) => {
   if (!link) return res.status(403).json({ error: "Forbidden" });
 
   const reason = parsed.data.reason?.trim() || "Rejected by client contact";
+  const commentBlock = `[Rejected ${new Date().toISOString().slice(0, 10)}] ${reason}`;
+  const mergedComments = timesheet.comments
+    ? `${commentBlock}\n\n${timesheet.comments}`
+    : commentBlock;
 
   await prisma.$transaction(async (tx) => {
     await tx.timesheet.update({
       where: { id: timesheet.id },
-      data: { status: "DRAFT", rejectReason: reason },
+      data: { status: "DRAFT", rejectReason: reason, comments: mergedComments },
     });
     await tx.timesheetActivityLog.create({
       data: {

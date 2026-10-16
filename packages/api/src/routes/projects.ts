@@ -17,6 +17,7 @@ import {
 import { saveUploadBuffer } from "../lib/save-upload-buffer";
 import { readUploadTextByUrl } from "../lib/read-upload-buffer";
 import { canManageProjects, getActorId, isProjectManagerRole, isProjectMemberRole } from "../lib/project-access";
+import { effectiveRoleList } from "../lib/admin-roles";
 import {
   findCredentialProjectMemberForUser,
   findUserCredentialAgreement,
@@ -972,6 +973,69 @@ router.delete("/:id", async (req: AuthRequest, res) => {
   }
 });
 
+router.get("/:id/member-user-options", async (req: AuthRequest, res) => {
+  try {
+    const projectId = req.params.id;
+    if (!projectId) return res.status(400).json({ error: "Invalid id" });
+    if (!canManageProjects(req.user?.role ?? "") && !isProjectManagerRole(req.user?.role ?? "")) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+
+    const existing = await prisma.projectMember.findMany({
+      where: { projectId },
+      select: { adminUserId: true, profileId: true },
+    });
+    const excludeUserIds = new Set(existing.map((row) => row.adminUserId).filter(Boolean) as string[]);
+    const excludeProfileIds = new Set(existing.map((row) => row.profileId));
+
+    const users = await prisma.adminUser.findMany({
+      where: {
+        active: true,
+        role: { not: "client" },
+        ...(q
+          ? {
+              OR: [
+                { email: { contains: q, mode: "insensitive" } },
+                { name: { contains: q, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ email: "asc" }],
+      take: 80,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        role: true,
+        additionalRoles: true,
+        mappedProfileId: true,
+      },
+    });
+
+    const data = users
+      .filter((user) => {
+        if (excludeUserIds.has(user.id)) return false;
+        if (user.mappedProfileId && excludeProfileIds.has(user.mappedProfileId)) return false;
+        const roles = effectiveRoleList(user.role, user.additionalRoles);
+        return !roles.includes("client");
+      })
+      .map((user) => ({
+        id: user.id,
+        email: user.email,
+        name: user.name?.trim() || user.email,
+        phone: user.phone ?? "",
+      }));
+
+    res.json({ data });
+  } catch (error) {
+    console.error("Error fetching member user options:", error);
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
 router.get("/:id/member-options", async (req: AuthRequest, res) => {
   try {
     const projectId = req.params.id;
@@ -1039,9 +1103,14 @@ router.get("/:id/member-options", async (req: AuthRequest, res) => {
   }
 });
 
-const addMemberSchema = z.object({
-  profileId: z.string().min(1),
-});
+const addMemberSchema = z
+  .object({
+    profileId: z.string().min(1).optional(),
+    adminUserId: z.string().min(1).optional(),
+  })
+  .refine((data) => Boolean(data.profileId || data.adminUserId), {
+    message: "profileId or adminUserId is required",
+  });
 
 async function canRemoveProjectMember(req: AuthRequest, projectId: string): Promise<boolean> {
   const role = req.user?.role ?? "";
@@ -1093,9 +1162,48 @@ router.post("/:id/members", async (req: AuthRequest, res) => {
     if (!canManageProjects(req.user?.role ?? "") && !isProjectManagerRole(req.user?.role ?? "")) {
       return res.status(403).json({ error: "Forbidden" });
     }
-    const { profileId } = addMemberSchema.parse(req.body);
+    const body = addMemberSchema.parse(req.body);
     const project = await prisma.project.findUnique({ where: { id: projectId }, select: { id: true } });
     if (!project) return res.status(404).json({ error: "Not found" });
+
+    let profileId = body.profileId;
+    let linkedUserId: string | null = body.adminUserId ?? null;
+
+    if (body.adminUserId) {
+      const user = await prisma.adminUser.findUnique({
+        where: { id: body.adminUserId },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          additionalRoles: true,
+          mappedProfileId: true,
+        },
+      });
+      if (!user) return res.status(404).json({ error: "User not found" });
+      const roles = effectiveRoleList(user.role, user.additionalRoles);
+      if (roles.includes("client")) {
+        return res.status(400).json({ error: "Client users cannot be added as project members" });
+      }
+      profileId = user.mappedProfileId ?? undefined;
+      if (!profileId) {
+        const byEmail = await prisma.candidateProfile.findFirst({
+          where: { email: { equals: user.email, mode: "insensitive" } },
+          select: { id: true },
+        });
+        profileId = byEmail?.id;
+      }
+      if (!profileId) {
+        return res.status(400).json({
+          error: "Link this user to a recruitment profile (Settings → Users) before adding them to the project.",
+        });
+      }
+      linkedUserId = user.id;
+    }
+
+    if (!profileId) {
+      return res.status(400).json({ error: "Profile is required" });
+    }
 
     const profile = await prisma.candidateProfile.findUnique({
       where: { id: profileId },
@@ -1103,7 +1211,9 @@ router.post("/:id/members", async (req: AuthRequest, res) => {
     });
     if (!profile) return res.status(404).json({ error: "Profile not found" });
 
-    const linkedUserId = profile.mappedAdminUser?.id ?? null;
+    if (!linkedUserId) {
+      linkedUserId = profile.mappedAdminUser?.id ?? null;
+    }
 
     const member = await prisma.projectMember.upsert({
       where: { projectId_profileId: { projectId, profileId } },

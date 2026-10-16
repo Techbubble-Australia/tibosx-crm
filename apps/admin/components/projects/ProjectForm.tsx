@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Loader2, Plus, Trash2 } from "lucide-react";
+import { AddProjectMemberModal } from "@/components/projects/AddProjectMemberModal";
 import { adminFetch } from "@/lib/admin-api";
 import { readUploadImageUrlFromJson } from "@/lib/upload-response";
 import { resolveDocumentHref } from "@/lib/media-url";
@@ -163,6 +164,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
   const [contracts, setContracts] = useState<ContractOption[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
 
   useEffect(() => {
     void Promise.all([
@@ -196,6 +198,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
   const canRemoveMembers =
     sessionRole === "admin" ||
     (sessionRole === "project_manager" && defaults.projectManagerId === sessionUserId);
+  const canAddMembers = canRemoveMembers;
 
   const canEditEstimates = sessionRole === "admin" || sessionRole === "project_manager";
 
@@ -534,8 +537,17 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
 
         {defaults.id ? (
           <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-            <div className="mb-4">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-semibold text-gray-900 dark:text-gray-100">Members</h3>
+              {canAddMembers ? (
+                <button
+                  type="button"
+                  onClick={() => setAddMemberOpen(true)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                >
+                  <Plus className="h-4 w-4" /> Add member
+                </button>
+              ) : null}
             </div>
             {members.length === 0 ? (
               <p className="text-sm text-gray-400">
@@ -634,6 +646,16 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
         </div>
       </form>
 
+      {addMemberOpen && defaults.id ? (
+        <AddProjectMemberModal
+          projectId={defaults.id}
+          onClose={() => setAddMemberOpen(false)}
+          onAdded={() => {
+            onMembersRefresh?.();
+            setAddMemberOpen(false);
+          }}
+        />
+      ) : null}
     </>
   );
 }
