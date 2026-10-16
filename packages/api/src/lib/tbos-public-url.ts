@@ -19,3 +19,7 @@ export function workspaceTicketUrl(ticketId: string): string {
 export function supportTicketAdminUrl(ticketId: string): string {
   return `${tbosAdminPublicBase()}/support-tickets/${ticketId}`;
 }
+
+export function timesheetAdminUrl(timesheetId: string): string {
+  return `${tbosAdminPublicBase()}/timesheets/${timesheetId}`;
+}

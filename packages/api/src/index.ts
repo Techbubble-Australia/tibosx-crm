@@ -34,6 +34,7 @@ import { salesDashboardRoutes } from "./routes/sales-dashboard";
 import { credentialTemplateRoutes } from "./routes/credentialTemplates";
 import { projectRoutes } from "./routes/projects";
 import { timesheetRoutes } from "./routes/timesheets";
+import { notificationRoutes } from "./routes/notifications";
 import { invoiceRoutes } from "./routes/invoices";
 import { authRoutes as ticketingPortalAuthRoutes } from "./ticketing/routes/auth";
 import { ticketRoutes as ticketingTicketRoutes } from "./ticketing/routes/tickets";
@@ -160,6 +161,13 @@ app.use(
   requireMfaEnrolled,
   requireModule("project_management"),
   timesheetRoutes,
+);
+app.use(
+  "/api/admin/notifications",
+  authMiddleware,
+  requireMfaEnrolled,
+  requireRole("admin"),
+  notificationRoutes,
 );
 app.use(
   "/api/admin/ticketing",

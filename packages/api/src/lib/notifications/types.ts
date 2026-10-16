@@ -1,0 +1,11 @@
+export type NotificationPayloads = {
+  "timesheet.submitted.client": { timesheetId: string };
+  "timesheet.submitted.approver": { timesheetId: string };
+  "timesheet.approved": { timesheetId: string };
+  "timesheet.rejected": { timesheetId: string; reason: string };
+  "ticket.created": { ticketId: string };
+  "ticket.message": { ticketId: string; messageId: string };
+  "contact.submitted": { submissionId: string };
+};
+
+export type NotificationEvent = keyof NotificationPayloads;

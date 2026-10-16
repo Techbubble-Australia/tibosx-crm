@@ -10,7 +10,7 @@ import {
 import { canActAsTimesheetApprover } from "../lib/timesheet-approver";
 import { effectiveRolesForUser, hasEffectiveRole } from "../lib/admin-roles";
 import { getMemberOnboardingStatus } from "../lib/member-onboarding";
-import { notifyClientApproverOfSubmittedTimesheet } from "../lib/timesheet-client-approval";
+import { notifyAsync } from "../lib/notifications";
 import { mondayOfWeek, sundayOfWeek, TIMESHEET_STATUSES, TIMESHEET_STATUS_LABELS } from "../lib/project-types";
 import { formatZodError } from "../lib/zod-error";
 
@@ -733,16 +733,19 @@ router.post("/submit", async (req: AuthRequest, res) => {
       }
     });
 
-    const submittedClient = await prisma.timesheet.findMany({
+    const submitted = await prisma.timesheet.findMany({
       where: {
         id: { in: rows.map((r) => r.id) },
         status: "SUBMITTED",
-        approverKind: "CLIENT_CONTACT",
       },
-      select: { id: true },
+      select: { id: true, approverKind: true },
     });
-    for (const row of submittedClient) {
-      void notifyClientApproverOfSubmittedTimesheet(row.id);
+    for (const row of submitted) {
+      if (row.approverKind === "CLIENT_CONTACT") {
+        notifyAsync("timesheet.submitted.client", { timesheetId: row.id });
+      } else {
+        notifyAsync("timesheet.submitted.approver", { timesheetId: row.id });
+      }
     }
 
     res.json({ data: { submitted: rows.length } });
@@ -800,6 +803,8 @@ router.post("/:id/approve", async (req: AuthRequest, res) => {
         data: { timesheetId, action: "APPROVED", performedById: actorId },
       });
     });
+
+    notifyAsync("timesheet.approved", { timesheetId });
 
     const detail = await fetchTimesheet(timesheetId);
     res.json({ data: detail ? mapDetail(detail) : null });
@@ -862,6 +867,8 @@ router.post("/:id/reject", async (req: AuthRequest, res) => {
         },
       });
     });
+
+    notifyAsync("timesheet.rejected", { timesheetId, reason: trimmed });
 
     const detail = await fetchTimesheet(timesheetId);
     res.json({ data: detail ? mapDetail(detail) : null });

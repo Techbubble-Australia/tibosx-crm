@@ -23,6 +23,7 @@ import {
   type TicketLifecycleAction,
 } from "../lib/ticket-lifecycle.js";
 import { autoCloseStaleResolvedTickets } from "../lib/auto-close-resolved-tickets.js";
+import { notifyAsync } from "../../lib/notifications";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -492,6 +493,10 @@ router.post("/:id/messages", async (req: TicketingRequest, res) => {
   await logTicketAudit(ticket.id, user.id, "MESSAGE_ADDED", {
     metadata: { messageId: message.id, isInternal: message.isInternal },
   });
+
+  if (!message.isInternal) {
+    notifyAsync("ticket.message", { ticketId: ticket.id, messageId: message.id });
+  }
 
   res.status(201).json({ data: message });
 });

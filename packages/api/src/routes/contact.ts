@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { prisma } from "@techbubble/database";
+import { notifyAsync } from "../lib/notifications";
 
 const router: IRouter = Router();
 
@@ -22,10 +23,9 @@ router.post("/", async (req, res) => {
     const submission = await prisma.contactSubmission.create({
       data: validatedData,
     });
-    
-    // Here you could also send an email notification
-    // await sendEmailNotification(submission);
-    
+
+    notifyAsync("contact.submitted", { submissionId: submission.id });
+
     res.status(201).json({ 
       message: "Thank you for your message. We'll get back to you within 4 business hours.",
       data: { id: submission.id }

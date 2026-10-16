@@ -89,6 +89,77 @@ export async function sendTimesheetApprovalRequestEmail(input: {
   }
 }
 
+export async function sendTimesheetPmApprovalRequestEmail(input: {
+  to: string;
+  memberName: string;
+  targetLabel: string;
+  reviewUrl: string;
+}): Promise<void> {
+  const subject = `Timesheet to review — ${input.memberName}`;
+  const text = `${input.memberName} submitted a timesheet for ${input.targetLabel || "a project"}.\n\nReview and approve in TBOS:\n${input.reviewUrl}\n`;
+  await sendSupportTicketNotificationEmail({ to: input.to, subject, body: text });
+}
+
+export async function sendTimesheetMemberDecisionEmail(input: {
+  to: string;
+  memberName: string;
+  targetLabel: string;
+  reviewUrl: string;
+  decision: "approved" | "rejected";
+  reason?: string;
+}): Promise<void> {
+  const verb = input.decision === "approved" ? "approved" : "rejected";
+  const subject = `Your timesheet was ${verb}`;
+  const lines = [
+    `Hello ${input.memberName},`,
+    "",
+    `Your timesheet for ${input.targetLabel || "your project"} was ${verb}.`,
+  ];
+  if (input.decision === "rejected" && input.reason?.trim()) {
+    lines.push("", `Reason: ${input.reason.trim()}`);
+  }
+  lines.push("", `Open timesheet: ${input.reviewUrl}`);
+  await sendSupportTicketNotificationEmail({
+    to: input.to,
+    subject,
+    body: lines.join("\n"),
+  });
+}
+
+export type ContactFormEmailData = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string | null;
+  company?: string | null;
+  interest?: string | null;
+  country?: string | null;
+  message: string;
+};
+
+export async function sendContactFormNotificationEmail(input: {
+  to: string;
+  submission: ContactFormEmailData;
+}): Promise<void> {
+  const s = input.submission;
+  const name = `${s.firstName} ${s.lastName}`.trim();
+  const subject = `Contact form: ${name}`;
+  const text = [
+    `Name: ${name}`,
+    `Email: ${s.email}`,
+    s.phone ? `Phone: ${s.phone}` : null,
+    s.company ? `Company: ${s.company}` : null,
+    s.interest ? `Interest: ${s.interest}` : null,
+    s.country ? `Country: ${s.country}` : null,
+    "",
+    "Message:",
+    s.message,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  await sendSupportTicketNotificationEmail({ to: input.to, subject, body: text });
+}
+
 export async function sendSupportTicketNotificationEmail(input: {
   to: string;
   subject: string;

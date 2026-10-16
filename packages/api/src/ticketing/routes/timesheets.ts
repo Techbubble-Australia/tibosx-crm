@@ -4,6 +4,7 @@ import { prisma } from "@techbubble/database";
 import { authMiddleware, type TicketingRequest } from "../middleware/auth.js";
 import { resolveClientTimesheetProjectIds } from "../lib/client-timesheet-projects.js";
 import { formatZodError } from "../../lib/zod-error.js";
+import { notifyAsync } from "../../lib/notifications";
 
 const router: IRouter = Router();
 
@@ -166,6 +167,8 @@ router.post("/:id/approve", async (req: TicketingRequest, res) => {
     });
   });
 
+  notifyAsync("timesheet.approved", { timesheetId: timesheet.id });
+
   res.json({ data: { id: timesheet.id, status: "APPROVED" } });
 });
 
@@ -206,6 +209,8 @@ router.post("/:id/reject", async (req: TicketingRequest, res) => {
       },
     });
   });
+
+  notifyAsync("timesheet.rejected", { timesheetId: timesheet.id, reason });
 
   res.json({ data: { id: timesheet.id, status: "DRAFT" } });
 });

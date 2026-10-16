@@ -2,8 +2,7 @@ import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@techbubble/database";
 import { ensureSupportOrganizationForProject } from "./support-organization";
-import { sendSupportTicketNotificationEmail } from "./mail";
-import { supportTicketAdminUrl } from "./tbos-public-url";
+import { notifyAsync } from "./notifications";
 
 export const PROJECT_KINDS = ["DELIVERY", "SUPPORT"] as const;
 export type ProjectKind = (typeof PROJECT_KINDS)[number];
@@ -273,46 +272,7 @@ export async function assignTicketToSupportGroup(ticketId: string, projectId: st
 }
 
 export async function notifySupportGroupOfTicket(ticketId: string) {
-  const ticket = await prisma.ticket.findUnique({
-    where: { id: ticketId },
-    include: {
-      organization: true,
-      assignedTo: { select: { email: true, name: true } },
-      project: { select: { projectNumber: true, title: true } },
-    },
-  });
-  if (!ticket?.projectId) return;
-
-  const group = await prisma.projectSupportGroup.findUnique({
-    where: { projectId: ticket.projectId },
-    include: {
-      members: {
-        include: {
-          ticketingUser: { select: { email: true, name: true } },
-          adminUser: { select: { email: true, name: true } },
-        },
-      },
-    },
-  });
-  if (!group) return;
-
-  const recipients = new Set<string>();
-  for (const m of group.members) {
-    const email = m.ticketingUser?.email || m.adminUser?.email;
-    if (email) recipients.add(email);
-  }
-  if (ticket.assignedTo?.email) recipients.add(ticket.assignedTo.email);
-
-  const subject = `[${ticket.ticketNumber}] ${ticket.subject}`;
-  const body = `New support case on ${ticket.project?.projectNumber ?? "project"}: ${ticket.subject}\n${supportTicketAdminUrl(ticket.id)}`;
-
-  for (const to of recipients) {
-    try {
-      await sendSupportTicketNotificationEmail({ to, subject, body });
-    } catch (err) {
-      console.error("Ticket notification email failed:", to, err);
-    }
-  }
+  notifyAsync("ticket.created", { ticketId });
 }
 
 export async function activateSupportProject(projectId: string) {
