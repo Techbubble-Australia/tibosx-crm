@@ -1,0 +1,1 @@
+ALTER TABLE "Timesheet" ADD COLUMN IF NOT EXISTS "comments" TEXT;

@@ -6,15 +6,15 @@ export function ticketStatusBadgeClass(status: string): string {
     case "DRAFT":
       return "bg-gray-100 text-gray-700 ring-gray-200";
     case "OPEN":
-      return "bg-slate-100 text-slate-800 ring-slate-200";
+      return "bg-gray-200 text-gray-900 ring-gray-300";
     case "IN_PROGRESS":
       return "bg-amber-100 text-amber-900 ring-amber-200";
     case "PENDING_CLIENT":
       return "bg-blue-100 text-blue-900 ring-blue-200";
     case "RESOLVED":
-      return "bg-emerald-100 text-emerald-800 ring-emerald-200";
+      return "bg-green-200 text-green-900 ring-green-300";
     case "CLOSED":
-      return "bg-green-800 text-white ring-green-900";
+      return "bg-green-700 text-white ring-green-800";
     case "CANCELLED":
       return "bg-red-100 text-red-800 ring-red-200";
     default:
@@ -26,7 +26,7 @@ export function TicketStatusBadge({ status }: { status: string }) {
   const label = TICKET_STATUS_LABELS[status] ?? status;
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${ticketStatusBadgeClass(status)}`}
+      className={`inline-flex rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${ticketStatusBadgeClass(status)}`}
     >
       {label}
     </span>

@@ -891,6 +891,7 @@ model Timesheet {
   /// Hours per weekday for the selected week (mon–sun).
   dailyHours             Json?
   rejectReason           String?               @db.Text
+  comments               String?               @db.Text
   activityLogs           TimesheetActivityLog[]
   createdAt              DateTime              @default(now())
   updatedAt              DateTime              @updatedAt

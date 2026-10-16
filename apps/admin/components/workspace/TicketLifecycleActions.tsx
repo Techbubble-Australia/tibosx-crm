@@ -8,6 +8,12 @@ type Props = {
   onAction: (action: string) => void | Promise<void>;
 };
 
+const LIFECYCLE_CONFIRM: Partial<Record<string, string>> = {
+  resolve: "Do you want to mark this ticket as resolved?",
+  close: "Do you want to close this ticket?",
+  cancel: "Do you want to cancel this ticket?",
+};
+
 export function TicketLifecycleActions({ status, role, isCreator, disabled, onAction }: Props) {
   const isConsultant = role === "CONSULTANT";
   const isClient = role === "CLIENT";
@@ -46,7 +52,11 @@ export function TicketLifecycleActions({ status, role, isCreator, disabled, onAc
           key={b.action}
           type="button"
           disabled={disabled}
-          onClick={() => void onAction(b.action)}
+          onClick={() => {
+            const message = LIFECYCLE_CONFIRM[b.action];
+            if (message && !window.confirm(message)) return;
+            void onAction(b.action);
+          }}
           className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50"
         >
           {b.label}

@@ -34,12 +34,13 @@ function RejectDialog({
         className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900"
       >
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Reject timesheet</h3>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Please add a reason for rejection.</p>
         <textarea
           className="mt-4 w-full rounded-lg border border-gray-200 px-4 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
           rows={4}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="Reject reason"
+          placeholder="Rejection reason"
           required
         />
         <div className="mt-4 flex justify-end gap-2">
@@ -61,17 +62,31 @@ function RejectDialog({
 
 export default function TimesheetDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { isEffectiveProjectMember, canManageProjects } = useAdminSession();
-  const [timesheet, setTimesheet] = useState<TimesheetFormValues | null>(null);
+  const { isEffectiveProjectMember } = useAdminSession();
+  const [timesheet, setTimesheet] = useState<
+    (TimesheetFormValues & { canApprove?: boolean; canSubmit?: boolean }) | null
+  >(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [showReject, setShowReject] = useState(false);
 
   useEffect(() => {
+    setLoadError(null);
+    setIsLoading(true);
     void adminFetch(`/api/admin/timesheets/${id}`)
-      .then((r) => r.json())
-      .then((data) => setTimesheet(data.data as TimesheetFormValues))
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) {
+          throw new Error(messageFromApiError(data, r.status === 403 ? "You cannot view this timesheet" : "Timesheet not found"));
+        }
+        setTimesheet(data.data as TimesheetFormValues & { canApprove?: boolean; canSubmit?: boolean });
+      })
+      .catch((error) => {
+        setTimesheet(null);
+        setLoadError(error instanceof Error ? error.message : "Failed to load timesheet");
+      })
       .finally(() => setIsLoading(false));
   }, [id]);
 
@@ -123,6 +138,7 @@ export default function TimesheetDetailPage() {
   }
 
   async function approve() {
+    if (!window.confirm("Do you want to continue to approve?")) return;
     setActionLoading(true);
     try {
       const res = await adminFetch(`/api/admin/timesheets/${id}/approve`, { method: "POST" });
@@ -158,7 +174,8 @@ export default function TimesheetDetailPage() {
   const status = timesheet?.status ?? "DRAFT";
   const awaitingClient =
     status === "SUBMITTED" && timesheet?.approverKind === "CLIENT_CONTACT";
-  const pmCanAct = canManageProjects && status === "SUBMITTED" && !awaitingClient;
+  const pmCanAct = Boolean(timesheet?.canApprove);
+  const canSubmitTimesheet = Boolean(timesheet?.canSubmit) && isEffectiveProjectMember;
 
   return (
     <ProjectManagementGuard>
@@ -170,7 +187,7 @@ export default function TimesheetDetailPage() {
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Timesheet</h2>
           <div className="flex gap-2">
-            {isEffectiveProjectMember && status === "DRAFT" ? (
+            {canSubmitTimesheet ? (
               <button
                 type="button"
                 onClick={() => void submitForApproval()}
@@ -211,8 +228,12 @@ export default function TimesheetDetailPage() {
           </div>
         ) : null}
 
-        {isLoading || !timesheet ? (
+        {isLoading ? (
           <p className="text-sm text-gray-400">Loading…</p>
+        ) : loadError ? (
+          <p className="text-sm text-red-600 dark:text-red-400">{loadError}</p>
+        ) : !timesheet ? (
+          <p className="text-sm text-gray-400">Timesheet not found.</p>
         ) : (
           <TimesheetForm
             defaults={timesheet}

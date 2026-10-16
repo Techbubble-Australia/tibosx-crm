@@ -37,6 +37,7 @@ const timesheetSchema = z
     endDate: z.coerce.date(),
     fileUrls: z.array(z.string().min(1)).optional(),
     dailyHours: dailyHoursSchema.optional(),
+    comments: z.string().max(10000).optional().nullable(),
   })
   .refine((data) => Boolean(data.projectId || data.opportunityId || data.ticketId), {
     message: "Select a project, sales case, or support case",
@@ -85,6 +86,7 @@ function serializeTimesheet(row: {
   fileUrls: unknown;
   dailyHours: unknown;
   rejectReason: string | null;
+  comments: string | null;
   createdAt: Date;
   updatedAt: Date;
   project?: { id: string; title: string; projectNumber: string; projectManagerId: string } | null;
@@ -128,6 +130,7 @@ function serializeTimesheet(row: {
     fileUrls,
     dailyHours: row.dailyHours ?? null,
     rejectReason: row.rejectReason,
+    comments: row.comments,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     activityLogs: row.activityLogs ?? [],
@@ -168,22 +171,22 @@ function mapDetail(row: NonNullable<Awaited<ReturnType<typeof fetchTimesheet>>>)
 async function timesheetAccessWhere(req: AuthRequest): Promise<Prisma.TimesheetWhereInput> {
   const role = req.user?.role ?? "";
   const actorId = getActorId(req);
-  if (canManageAllTimesheets(role) && role === "admin") {
+  const roles = await effectiveRolesForUser(actorId, role);
+  if (roles.includes("admin")) {
     return {};
   }
-  if (isProjectManagerRole(role) && role !== "admin") {
-    return {
-      OR: [
-        { project: { timesheetApproverUserId: actorId } },
-        { project: { projectManagerId: actorId } },
-        { opportunity: { ownerId: actorId } },
-      ],
-    };
+  const or: Prisma.TimesheetWhereInput[] = [{ memberUserId: actorId }];
+  if (roles.some((r) => r === "project_manager" || r === "admin")) {
+    or.push(
+      { project: { timesheetApproverUserId: actorId } },
+      { project: { projectManagerId: actorId } },
+      { opportunity: { ownerId: actorId } },
+    );
   }
-  if (role === "client") {
-    return { project: { timesheetApproverUserId: actorId } };
+  if (roles.includes("client")) {
+    or.push({ project: { timesheetApproverUserId: actorId } });
   }
-  return { memberUserId: actorId };
+  return { OR: or };
 }
 
 async function assertMemberCanSubmitTimesheets(actorId: string, roles: string[]) {
@@ -196,27 +199,6 @@ async function assertMemberCanSubmitTimesheets(actorId: string, roles: string[])
     throw new Error("PROFILE_REQUIRED");
   }
 }
-
-router.get("/active-projects", async (req: AuthRequest, res) => {
-  try {
-    const actorId = getActorId(req);
-    const memberships = await prisma.projectMember.findMany({
-      where: { adminUserId: actorId, project: { status: "ACTIVE" } },
-      include: {
-        project: {
-          select: { id: true, title: true, projectNumber: true, status: true, updatedAt: true },
-        },
-      },
-      orderBy: { project: { updatedAt: "desc" } },
-    });
-    res.json({
-      data: memberships.map((row) => row.project),
-    });
-  } catch (error) {
-    console.error("Error fetching active projects for timesheets:", error);
-    res.status(500).json({ error: "Failed to fetch projects" });
-  }
-});
 
 router.get("/active-projects", async (req: AuthRequest, res) => {
   try {
@@ -494,7 +476,21 @@ router.get("/:id", async (req: AuthRequest, res) => {
     const where = await timesheetAccessWhere(req);
     const allowed = await prisma.timesheet.findFirst({ where: { id: timesheetId, ...where } });
     if (!allowed) return res.status(403).json({ error: "Forbidden" });
-    res.json({ data: mapDetail(row) });
+    const role = req.user?.role ?? "";
+    const actorId = getActorId(req);
+    const canApprove =
+      row.status === "SUBMITTED" &&
+      row.approverKind !== "CLIENT_CONTACT" &&
+      ((row.project && canActAsTimesheetApprover(actorId, role, row.project)) ||
+        row.opportunity?.ownerId === actorId);
+    const canSubmit = row.memberUserId === actorId && row.status === "DRAFT";
+    res.json({
+      data: {
+        ...mapDetail(row),
+        canApprove,
+        canSubmit,
+      },
+    });
   } catch (error) {
     console.error("Error fetching timesheet:", error);
     res.status(500).json({ error: "Failed to fetch timesheet" });
@@ -553,6 +549,7 @@ router.post("/", async (req: AuthRequest, res) => {
           status: "DRAFT",
           fileUrls: data.fileUrls ?? [],
           dailyHours: data.dailyHours ?? undefined,
+          comments: data.comments?.trim() || null,
         },
       });
       await tx.timesheetActivityLog.create({
@@ -613,6 +610,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
           endDate: data.endDate,
           fileUrls: data.fileUrls ?? [],
           dailyHours: data.dailyHours ?? undefined,
+          comments: data.comments?.trim() || null,
         },
       });
       await tx.timesheetActivityLog.create({
@@ -844,10 +842,16 @@ router.post("/:id/reject", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "This timesheet must be rejected by the selected client contact in the support portal" });
     }
 
+    const trimmed = reason.trim();
+    const commentBlock = `[Rejected ${new Date().toISOString().slice(0, 10)}] ${trimmed}`;
+    const mergedComments = existing.comments
+      ? `${commentBlock}\n\n${existing.comments}`
+      : commentBlock;
+
     await prisma.$transaction(async (tx) => {
       await tx.timesheet.update({
         where: { id: timesheetId },
-        data: { status: "DRAFT", rejectReason: reason.trim() },
+        data: { status: "DRAFT", rejectReason: trimmed, comments: mergedComments },
       });
       await tx.timesheetActivityLog.create({
         data: {
