@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, Info, Loader2, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { readUploadImageUrlFromJson } from "@/lib/upload-response";
 import { resolveDocumentHref } from "@/lib/media-url";
 import { TIMESHEET_STATUS_LABELS, type TimesheetStatus } from "@/lib/project-types";
+import { TimesheetStatusBadge } from "@/lib/timesheet-status-styles";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import {
   type DailyHours,
@@ -22,7 +23,9 @@ const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
 const readOnlyClass = "bg-gray-50 dark:bg-gray-900 cursor-not-allowed";
 const dayInputClass =
-  "w-full min-w-[3rem] rounded-md border border-gray-200 bg-white px-2 py-1.5 text-center text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800";
+  "h-9 w-full min-w-[2.75rem] max-w-[4.5rem] rounded-md border border-gray-200 bg-white px-1 py-1.5 text-center text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800";
+const selectClass =
+  "h-9 w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
 
 export type TimesheetFormValues = {
   id?: string;
@@ -40,6 +43,7 @@ export type TimesheetFormValues = {
   dailyHours?: DailyHours | null;
   comments?: string | null;
   rejectReason?: string | null;
+  targetLabel?: string;
   activityLogs?: Array<{
     id: string;
     action: string;
@@ -58,6 +62,8 @@ type Props = {
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
   isSaving: boolean;
   readOnly?: boolean;
+  /** Lifecycle actions (submit / approve / reject) rendered in the card footer. */
+  footerActions?: ReactNode;
 };
 
 function toDateInput(value?: string | null) {
@@ -95,7 +101,82 @@ function emptyHours(): DailyHours {
   return {};
 }
 
-export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }: Props) {
+function SearchableProjectSelect({
+  options,
+  value,
+  onChange,
+  disabled,
+  placeholder,
+}: {
+  options: ProjectOption[];
+  value: string;
+  onChange: (id: string) => void;
+  disabled?: boolean;
+  placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const selected = options.find((o) => o.id === value);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((o) => o.label.toLowerCase().includes(q));
+  }, [options, query]);
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        className={`${selectClass} ${disabled ? readOnlyClass : ""}`}
+        placeholder={placeholder}
+        disabled={disabled}
+        value={open ? query : selected?.label ?? ""}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+          if (!e.target.value.trim()) onChange("");
+        }}
+        onFocus={() => {
+          setOpen(true);
+          setQuery(selected?.label ?? "");
+        }}
+        onBlur={() => {
+          window.setTimeout(() => setOpen(false), 150);
+        }}
+        autoComplete="off"
+      />
+      {open && !disabled ? (
+        <ul
+          className="absolute z-20 mt-1 max-h-52 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-800"
+          role="listbox"
+        >
+          {filtered.length === 0 ? (
+            <li className="px-3 py-2 text-sm text-gray-500">No matching projects</li>
+          ) : (
+            filtered.map((o) => (
+              <li key={o.id} role="option">
+                <button
+                  type="button"
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-sky-50 dark:hover:bg-gray-700"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    onChange(o.id);
+                    setQuery("");
+                    setOpen(false);
+                  }}
+                >
+                  {o.label}
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false, footerActions }: Props) {
   const { userName, email } = useAdminSession();
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [projectId, setProjectId] = useState(defaults.projectId ?? "");
@@ -118,8 +199,6 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
   const [selectedApprover, setSelectedApprover] = useState("");
   const [fileUrls, setFileUrls] = useState<string[]>(defaults.fileUrls ?? []);
   const [uploading, setUploading] = useState(false);
-  const [projectSearch, setProjectSearch] = useState("");
-  const [caseSearch, setCaseSearch] = useState("");
 
   const status = defaults.status ?? "DRAFT";
   const editable = !readOnly && status === "DRAFT";
@@ -132,19 +211,9 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
   const weekDays = useMemo(() => weekDatesFromMonday(weekMonday), [weekMonday]);
   const hoursTotal = useMemo(() => sumDailyHours(dailyHours), [dailyHours]);
 
-  const filteredProjects = useMemo(() => {
-    const q = projectSearch.trim().toLowerCase();
-    if (!q) return projects;
-    return projects.filter((p) => p.label.toLowerCase().includes(q));
-  }, [projects, projectSearch]);
-
-  const filteredCases = useMemo(() => {
-    const q = caseSearch.trim().toLowerCase();
-    if (!q) return cases;
-    return cases.filter((c) => c.label.toLowerCase().includes(q));
-  }, [cases, caseSearch]);
-
   const managerRequired = editable && approvers.length > 0 && !selectedApprover;
+  const hasHoursOrFiles = hoursTotal > 0 || fileUrls.length > 0;
+  const gridCols = "grid-cols-[minmax(14rem,1.6fr)_repeat(7,minmax(2.75rem,1fr))]";
 
   useEffect(() => {
     if (defaults.approverKind === "CLIENT_CONTACT" && defaults.projectClientContactId) {
@@ -161,7 +230,6 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
         const list = (data.data as ProjectOption[]) ?? [];
         setProjects(list);
         if (!projectId && defaults.projectId) setProjectId(defaults.projectId);
-        else if (!projectId && list[0] && editable) setProjectId(list[0].id);
       });
   }, []);
 
@@ -304,11 +372,12 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
-          <div className="text-right">
+          <div className="flex flex-col items-end gap-1 text-right">
+            <TimesheetStatusBadge status={status} />
             <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Total: {hoursTotal}h</p>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="text-xs text-gray-500">
               <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-orange-400" /> Manual entry
+                <span className="h-2 w-2 rounded-full bg-orange-400" aria-hidden /> Manual entry
               </span>
             </p>
           </div>
@@ -320,142 +389,167 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
         </div>
 
         <div className="overflow-x-auto p-4">
-          <table className="min-w-full border-collapse text-sm">
-            <thead>
-              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <th className="min-w-[14rem] pb-2 pr-2">Project / board task</th>
-                {weekDays.map((d) => (
-                  <th key={d.key} className="px-1 pb-2 text-center whitespace-nowrap">
-                    {d.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="align-top">
-                <td className="pr-2 py-1">
-                  <input
-                    type="search"
-                    placeholder="Search project or board…"
-                    className={`${inputClass} mb-2 ${editable ? "" : readOnlyClass}`}
-                    value={projectSearch}
-                    onChange={(e) => setProjectSearch(e.target.value)}
-                    disabled={!editable}
-                  />
-                  <select
-                    className={`${inputClass} mb-2 ${editable ? "" : readOnlyClass}`}
+          <div className={`grid min-w-[40rem] ${gridCols} overflow-hidden rounded-lg border border-gray-200 text-sm dark:border-gray-600`}>
+            <div className="border-b border-r border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600 dark:border-gray-600 dark:bg-gray-800/80 dark:text-gray-300">
+              Project / board task
+            </div>
+            {weekDays.map((d, i) => {
+              const [dow, ...rest] = d.label.split(" ");
+              const isLast = i === weekDays.length - 1;
+              return (
+                <div
+                  key={d.key}
+                  className={`border-b border-gray-200 bg-gray-50 px-0.5 py-2 text-center text-[0.65rem] font-semibold uppercase leading-tight text-gray-600 dark:border-gray-600 dark:bg-gray-800/80 dark:text-gray-300 ${
+                    isLast ? "" : "border-r"
+                  }`}
+                >
+                  <div>{dow}</div>
+                  <div className="font-normal normal-case text-gray-500 dark:text-gray-400">{rest.join(" ")}</div>
+                </div>
+              );
+            })}
+
+            <div className="flex min-h-[4.5rem] flex-col justify-center gap-2 border-b border-r border-gray-200 bg-white p-2 dark:border-gray-600 dark:bg-gray-900">
+              {!editable && defaults.targetLabel ? (
+                <p className="text-sm font-medium leading-snug text-gray-900 dark:text-gray-100">{defaults.targetLabel}</p>
+              ) : (
+                <>
+                  <SearchableProjectSelect
+                    options={projects}
                     value={projectId}
-                    onChange={(e) => {
-                      setProjectId(e.target.value);
+                    disabled={!editable}
+                    placeholder="Search project or board…"
+                    onChange={(id) => {
+                      setProjectId(id);
                       setCaseKey("");
                     }}
-                    required
-                    disabled={!editable}
-                  >
-                    <option value="">Search project or board…</option>
-                    {filteredProjects.map((row) => (
-                      <option key={row.id} value={row.id}>{row.label}</option>
-                    ))}
-                  </select>
-                  <input
-                    type="search"
-                    placeholder="Filter tasks…"
-                    className={`${inputClass} mb-2 ${editable ? "" : readOnlyClass}`}
-                    value={caseSearch}
-                    onChange={(e) => setCaseSearch(e.target.value)}
-                    disabled={!editable || !projectId}
                   />
                   <select
-                    className={`${inputClass} ${editable ? "" : readOnlyClass}`}
+                    className={`${selectClass} ${editable ? "" : readOnlyClass}`}
                     value={caseKey}
                     onChange={(e) => setCaseKey(e.target.value)}
                     disabled={!editable || !projectId}
+                    aria-label="Task or case"
                   >
-                    <option value="">{projectId ? "Choose task (optional)" : "Choose project/board first"}</option>
-                    {filteredCases.map((row) => (
+                    <option value="">
+                      {projectId ? "Choose task (optional)" : "Choose project/board first"}
+                    </option>
+                    {cases.map((row) => (
                       <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
                         {row.label}
                       </option>
                     ))}
                   </select>
-                </td>
-                {WEEKDAY_KEYS.map((key) => (
-                  <td key={key} className="px-1 py-1">
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.25}
-                      inputMode="decimal"
-                      className={`${dayInputClass} ${editable ? "" : readOnlyClass}`}
-                      value={dailyHours[key] ?? ""}
-                      placeholder="0"
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setDailyHours((prev) => ({
-                          ...prev,
-                          [key]: v === "" ? undefined : Number(v),
-                        }));
-                      }}
-                      readOnly={!editable}
-                    />
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
+                </>
+              )}
+            </div>
+            {WEEKDAY_KEYS.map((key, index) => (
+              <div
+                key={key}
+                className={`flex items-center justify-center border-b border-gray-200 bg-white p-1.5 dark:border-gray-600 dark:bg-gray-900 ${
+                  index === WEEKDAY_KEYS.length - 1 ? "" : "border-r"
+                }`}
+              >
+                <input
+                  type="number"
+                  min={0}
+                  step={0.25}
+                  inputMode="decimal"
+                  aria-label={weekDays[index]?.label ?? key}
+                  className={`${dayInputClass} ${editable ? "" : readOnlyClass}`}
+                  value={dailyHours[key] ?? ""}
+                  placeholder="0"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setDailyHours((prev) => ({
+                      ...prev,
+                      [key]: v === "" ? undefined : Number(v),
+                    }));
+                  }}
+                  readOnly={!editable}
+                />
+              </div>
+            ))}
 
-          <div className="mt-4">
-            <textarea
-              className={`${inputClass} min-h-[4rem] ${editable ? "" : readOnlyClass}`}
-              placeholder="Add comments (optional)"
-              value={comments}
-              onChange={(e) => setComments(e.target.value)}
-              readOnly={!editable}
-              rows={3}
-            />
-            {editable ? (
-              <p className="mt-2 text-xs italic text-amber-700 dark:text-amber-400">
-                Enter project, optional task, and hours for each day, then save the timesheet.
-              </p>
-            ) : null}
+            <div className="col-span-full border-t border-gray-200 bg-white p-3 dark:border-gray-600 dark:bg-gray-900">
+              <textarea
+                className={`${inputClass} min-h-[4rem] resize-y ${editable ? "" : readOnlyClass}`}
+                placeholder="Add comments (optional)"
+                value={comments}
+                onChange={(e) => setComments(e.target.value)}
+                readOnly={!editable}
+                rows={2}
+              />
+              {editable ? (
+                <p className="mt-2 text-xs italic text-amber-700 dark:text-amber-400">
+                  Enter project, optional task, and hours for each day, then save the timesheet.
+                </p>
+              ) : null}
+            </div>
           </div>
         </div>
 
         <div className="border-t border-gray-100 px-4 py-4 dark:border-gray-800">
-          <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Select approver (manager)
-          </label>
-          {editable && approvers.length > 0 ? (
-            <select
-              className={inputClass}
-              value={selectedApprover}
-              onChange={(e) => setSelectedApprover(e.target.value)}
-              required
-            >
-              <option value="">Choose a manager to approve your timesheet</option>
-              {approvers.map((row) => (
-                <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
-                  {row.label}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              className={`${inputClass} ${readOnlyClass}`}
-              readOnly
-              value={
-                defaults.approverLabel ||
-                approvers.find((a) => selectedApprover === `${a.kind}:${a.id}`)?.label ||
-                "—"
-              }
-            />
-          )}
-          {managerRequired ? (
-            <p className="mt-1 text-xs text-red-600">* Manager selection is required before saving or submitting.</p>
-          ) : null}
-          <p className="mt-1 text-xs text-gray-500">
-            Member: {defaults.memberName || userName || email} · Status: {TIMESHEET_STATUS_LABELS[status]}
-          </p>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0 flex-1">
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Select approver (manager)
+              </label>
+              {editable && approvers.length > 0 ? (
+                <select
+                  className={inputClass}
+                  value={selectedApprover}
+                  onChange={(e) => setSelectedApprover(e.target.value)}
+                  required
+                >
+                  <option value="">Choose a manager to approve your timesheet</option>
+                  {approvers.map((row) => (
+                    <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
+                      {row.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className={`${inputClass} ${readOnlyClass}`}
+                  readOnly
+                  value={
+                    defaults.approverLabel ||
+                    approvers.find((a) => selectedApprover === `${a.kind}:${a.id}`)?.label ||
+                    "—"
+                  }
+                />
+              )}
+              {managerRequired ? (
+                <p className="mt-1 text-xs text-red-600">
+                  * Manager selection is required before saving or submitting timesheet
+                </p>
+              ) : null}
+              <p className="mt-1 text-xs text-gray-500">
+                Member: {defaults.memberName || userName || email}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {footerActions}
+              {editable ? (
+                <button
+                  type="submit"
+                  disabled={isSaving || managerRequired || !projectId}
+                  title={
+                    !hasHoursOrFiles
+                      ? "Add timesheet entries first"
+                      : managerRequired
+                        ? "Select an approver"
+                        : undefined
+                  }
+                  className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Save timesheet
+                </button>
+              ) : null}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -463,7 +557,21 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
         <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">Files</h3>
         <p className="mb-3 text-xs text-gray-500">Attach evidence when required (optional if weekly hours are entered).</p>
         {editable ? (
-          <input type="file" multiple onChange={(e) => void uploadFiles(e.target.files)} disabled={uploading} />
+          <label
+            className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500 transition hover:border-sky-300 hover:bg-sky-50/50 dark:border-gray-600 dark:hover:border-sky-700 dark:hover:bg-sky-950/20 ${
+              uploading ? "pointer-events-none opacity-60" : ""
+            }`}
+          >
+            <span className="font-medium text-gray-700 dark:text-gray-300">Upload files</span>
+            <span className="mt-1 text-xs">PDF, images, or documents</span>
+            <input
+              type="file"
+              multiple
+              className="sr-only"
+              onChange={(e) => void uploadFiles(e.target.files)}
+              disabled={uploading}
+            />
+          </label>
         ) : null}
         {uploading ? <p className="mt-2 text-xs text-gray-500">Uploading…</p> : null}
         {fileUrls.length > 0 ? (
@@ -521,18 +629,6 @@ export function TimesheetForm({ defaults, onSubmit, isSaving, readOnly = false }
         )}
       </section>
 
-      {editable ? (
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={isSaving || managerRequired}
-            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
-          >
-            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Save timesheet
-          </button>
-        </div>
-      ) : null}
     </form>
   );
 }

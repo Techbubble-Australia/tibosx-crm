@@ -7,7 +7,8 @@ import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
 import { messageFromApiError } from "@/lib/api-error";
-import { TIMESHEET_STATUS_LABELS, type TimesheetStatus } from "@/lib/project-types";
+import { type TimesheetStatus } from "@/lib/project-types";
+import { TimesheetStatusBadge } from "@/lib/timesheet-status-styles";
 
 type TimesheetRow = {
   id: string;
@@ -197,7 +198,7 @@ export default function TimesheetsPage() {
                       {formatDate(row.startDate)} – {formatDate(row.endDate)}
                     </td>
                     <td className="px-4 py-3">
-                      {TIMESHEET_STATUS_LABELS[row.status]}
+                      <TimesheetStatusBadge status={row.status} />
                       {row.status === "SUBMITTED" && row.approverKind === "CLIENT_CONTACT" ? (
                         <span className="mt-0.5 block text-xs text-sky-600 dark:text-sky-400">
                           Awaiting client{row.approverLabel ? `: ${row.approverLabel}` : ""}

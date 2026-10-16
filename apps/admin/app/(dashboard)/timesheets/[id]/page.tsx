@@ -184,41 +184,7 @@ export default function TimesheetDetailPage() {
           <ArrowLeft className="h-4 w-4" /> Back to timesheets
         </Link>
 
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Timesheet</h2>
-          <div className="flex gap-2">
-            {canSubmitTimesheet ? (
-              <button
-                type="button"
-                onClick={() => void submitForApproval()}
-                disabled={actionLoading}
-                className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
-              >
-                <Send className="h-4 w-4" /> Submit for approval
-              </button>
-            ) : null}
-            {pmCanAct ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => void approve()}
-                  disabled={actionLoading}
-                  className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                >
-                  Approve
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowReject(true)}
-                  disabled={actionLoading}
-                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                >
-                  Reject
-                </button>
-              </>
-            ) : null}
-          </div>
-        </div>
+        <h2 className="mb-6 text-lg font-semibold text-gray-900 dark:text-gray-100">Timesheet</h2>
 
         {awaitingClient ? (
           <div className="mb-6 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">
@@ -240,6 +206,40 @@ export default function TimesheetDetailPage() {
             onSubmit={handleSubmit}
             isSaving={isSaving}
             readOnly={status !== "DRAFT"}
+            footerActions={
+              <>
+                {canSubmitTimesheet ? (
+                  <button
+                    type="button"
+                    onClick={() => void submitForApproval()}
+                    disabled={actionLoading}
+                    className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+                  >
+                    <Send className="h-4 w-4" /> Submit for approval
+                  </button>
+                ) : null}
+                {pmCanAct ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void approve()}
+                      disabled={actionLoading}
+                      className="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowReject(true)}
+                      disabled={actionLoading}
+                      className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                    >
+                      Reject
+                    </button>
+                  </>
+                ) : null}
+              </>
+            }
           />
         )}
 
