@@ -405,23 +405,32 @@ router.post("/:id/invite", async (req: AuthRequest, res) => {
     if (!user.active) return res.status(400).json({ error: "User is inactive" });
 
     const temporaryPassword = randomBytes(12).toString("base64url");
+
+    try {
+      await emailTbosUserInvite({
+        to: user.email,
+        name: user.name || user.email,
+        temporaryPassword,
+        context: user.role === "client" ? "client" : "project_member",
+      });
+    } catch (emailErr) {
+      console.error("User invite email failed:", emailErr);
+      const message =
+        emailErr instanceof Error ? emailErr.message : "Failed to send invite email";
+      return res.status(502).json({ error: message });
+    }
+
     const passwordHash = await bcrypt.hash(temporaryPassword, 10);
     await prisma.adminUser.update({
       where: { id: userId },
       data: { passwordHash, passwordNeedsReset: true },
     });
 
-    await emailTbosUserInvite({
-      to: user.email,
-      name: user.name || user.email,
-      temporaryPassword,
-      context: user.role === "client" ? "client" : "project_member",
-    });
-
-    res.json({ message: "Invite email sent" });
+    res.json({ message: "Invite email sent", passwordReset: true });
   } catch (error) {
     console.error("Error sending user invite:", error);
-    res.status(500).json({ error: "Failed to send invite email" });
+    const message = error instanceof Error ? error.message : "Failed to send invite email";
+    res.status(500).json({ error: message });
   }
 });
 

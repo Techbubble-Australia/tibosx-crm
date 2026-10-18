@@ -19,6 +19,20 @@ function getResendClient(): Resend | null {
   return new Resend(apiKey);
 }
 
+export function isResendConfigured(): boolean {
+  return Boolean(process.env.RESEND_API_KEY?.trim());
+}
+
+export function requireResendClient(): Resend {
+  const resend = getResendClient();
+  if (!resend) {
+    throw new Error(
+      "Email is not configured on the API server. Set RESEND_API_KEY (and MAIL_FROM) on the API service, then restart.",
+    );
+  }
+  return resend;
+}
+
 function getMailFrom(): string {
   return process.env.MAIL_FROM?.trim() || "TechBubble Careers <careers@techbubble.com.au>";
 }
@@ -225,7 +239,7 @@ export async function sendUserInviteEmail(input: {
   loginUrl: string;
   extraText?: string;
 }): Promise<void> {
-  const resend = getResendClient();
+  const resend = requireResendClient();
   const subject = "Your TechBubble account invitation";
   const text = `Hello ${input.name},
 
@@ -240,11 +254,6 @@ You will be asked to set a new password and enroll in multi-factor authenticatio
 ${input.extraText ?? ""}
 
 If you did not expect this email, please contact your administrator.`;
-
-  if (!resend) {
-    console.info("[user-invite-email] RESEND not configured; would send to", input.to, subject);
-    return;
-  }
 
   const { error } = await resend.emails.send({
     from: getMailFrom(),

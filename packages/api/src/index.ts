@@ -49,6 +49,11 @@ import { workspaceGroupRoutes } from "./routes/workspaceGroups";
 import { createTicketUploadsMiddleware } from "./ticketing/middleware/serve-ticket-uploads";
 import { uploadDir as ticketUploadDir } from "./ticketing/lib/upload-storage";
 
+// Load monorepo root `.env` first, then `packages/api/.env` (later files override).
+const apiPackageRoot = path.resolve(__dirname, "..");
+const monorepoRoot = path.resolve(apiPackageRoot, "..", "..");
+dotenv.config({ path: path.join(monorepoRoot, ".env") });
+dotenv.config({ path: path.join(apiPackageRoot, ".env") });
 dotenv.config();
 
 const app = express();

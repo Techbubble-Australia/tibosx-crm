@@ -124,7 +124,7 @@ export default function EditUserPage() {
       const res = await adminFetch(`/api/admin/users/${id}/invite`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(messageFromApiError(data, "Failed to send invite"));
-      alert("Invite email sent.");
+      alert("Invite email sent. A new temporary password was set for this user.");
     } catch (e) {
       alert(e instanceof Error ? e.message : "Failed to send invite");
     } finally {
