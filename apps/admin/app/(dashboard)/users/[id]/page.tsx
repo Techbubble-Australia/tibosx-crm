@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Mail } from "lucide-react";
+import { messageFromApiError } from "@/lib/api-error";
+import { resolveDocumentHref } from "@/lib/media-url";
 import { adminFetch } from "@/lib/admin-api";
 import { formatRolesLabel } from "@/lib/admin-roles";
 import { AdminRolesMultiSelect, rolesFromApi, rolesToApi } from "@/components/users/AdminRolesMultiSelect";
@@ -66,6 +68,16 @@ type UserDetail = {
   addressProofUrl: string | null;
   userFiles: { name?: string; url?: string }[];
   agreementTemplate?: { templatesSent: number; templatesSigned: number };
+  agreementRecords?: Array<{
+    id: string;
+    templateName: string;
+    projectLabel: string | null;
+    startDate: string | null;
+    endDate: string | null;
+    assignedAt: string;
+    signedAt: string | null;
+    documentUrl: string | null;
+  }>;
   agreementFiles?: UserFileRow[];
   projectMembership: {
     memberId: string;
@@ -95,6 +107,30 @@ export default function EditUserPage() {
   const [mappedProfileOption, setMappedProfileOption] = useState<ProfileMapOption | null>(null);
   const [userFiles, setUserFiles] = useState<UserFileRow[]>([]);
   const [bankDetails, setBankDetails] = useState<BankDetailsFormValue>(bankDetailsFromApi(null));
+  const [inviteLoading, setInviteLoading] = useState(false);
+
+  function formatAgreementDate(value: string | null) {
+    if (!value) return "—";
+    return new Date(value).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  async function inviteUser() {
+    const ok = window.confirm(
+      "The user will be sent an email with temporary password. Do you want to continue?",
+    );
+    if (!ok) return;
+    setInviteLoading(true);
+    try {
+      const res = await adminFetch(`/api/admin/users/${id}/invite`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(messageFromApiError(data, "Failed to send invite"));
+      alert("Invite email sent.");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to send invite");
+    } finally {
+      setInviteLoading(false);
+    }
+  }
 
   async function load() {
     try {
@@ -203,8 +239,7 @@ export default function EditUserPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        const msg = (err as { error?: string }).error || "Failed to save user";
-        throw new Error(msg);
+        throw new Error(messageFromApiError(err, "Failed to save user"));
       }
       await load();
     } catch (e) {
@@ -225,6 +260,7 @@ export default function EditUserPage() {
 
   const membership = defaults.projectMembership;
   const canAssignTemplate = !roles.includes("client");
+  const isClientUser = roles.includes("client");
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -305,26 +341,77 @@ export default function EditUserPage() {
           {defaults.mfaEnabled ? (
             <p className="text-xs text-gray-500">MFA is enabled. User manages it under Settings → Security.</p>
           ) : null}
-          <div className="space-y-2 border-t border-gray-100 pt-4 dark:border-gray-800">
-            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Agreement template</p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Template sent: <span className="font-medium">{defaults.agreementTemplate?.templatesSent ?? 0}</span>
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Template signed: <span className="font-medium">{defaults.agreementTemplate?.templatesSigned ?? 0}</span>
-            </p>
+          <button
+            type="button"
+            disabled={inviteLoading || !defaults.active}
+            onClick={() => void inviteUser()}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
+          >
+            {inviteLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+            Invite user
+          </button>
+        </section>
+
+        <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100">Agreements</h3>
             {canAssignTemplate ? (
               <button
                 type="button"
                 onClick={() => setAssignOpen(true)}
-                className="mt-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
               >
                 Assign template
               </button>
-            ) : (
-              <p className="text-xs text-gray-500">Agreement templates are not assigned to client portal users.</p>
-            )}
+            ) : null}
           </div>
+          {defaults.agreementRecords && defaults.agreementRecords.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[32rem] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 text-xs uppercase text-gray-500 dark:border-gray-700">
+                    <th className="py-2 pr-3">Template</th>
+                    <th className="py-2 pr-3">Project</th>
+                    <th className="py-2 pr-3">Start</th>
+                    <th className="py-2 pr-3">End</th>
+                    <th className="py-2 pr-3">Signed</th>
+                    <th className="py-2">Document</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {defaults.agreementRecords.map((row) => (
+                    <tr key={row.id} className="border-b border-gray-100 dark:border-gray-800">
+                      <td className="py-2 pr-3">{row.templateName}</td>
+                      <td className="py-2 pr-3 text-gray-600 dark:text-gray-400">{row.projectLabel ?? "—"}</td>
+                      <td className="py-2 pr-3">{formatAgreementDate(row.startDate)}</td>
+                      <td className="py-2 pr-3">{formatAgreementDate(row.endDate)}</td>
+                      <td className="py-2 pr-3">{formatAgreementDate(row.signedAt)}</td>
+                      <td className="py-2">
+                        {row.documentUrl ? (
+                          <a
+                            href={resolveDocumentHref(row.documentUrl)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-600 hover:underline dark:text-blue-400"
+                          >
+                            View
+                          </a>
+                        ) : (
+                          <span className="text-gray-400">Pending</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">
+              {canAssignTemplate
+                ? "No agreements assigned yet. Use Assign template to send a contract for signing."
+                : "Agreement templates are not assigned to client portal users."}
+            </p>
+          )}
         </section>
 
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
@@ -332,8 +419,15 @@ export default function EditUserPage() {
           <p className="mb-4 text-xs text-gray-500">Usually completed by the member during first login after signing their contract.</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <label className="mb-1 block text-sm font-medium">Address line 1 *</label>
-              <input name="addressLine1" required defaultValue={defaults.addressLine1 ?? ""} className={inputClass} />
+              <label className="mb-1 block text-sm font-medium">
+                Address line 1{isClientUser ? "" : " *"}
+              </label>
+              <input
+                name="addressLine1"
+                required={!isClientUser}
+                defaultValue={defaults.addressLine1 ?? ""}
+                className={inputClass}
+              />
             </div>
             <div className="sm:col-span-2">
               <label className="mb-1 block text-sm font-medium">Address line 2</label>
@@ -348,16 +442,16 @@ export default function EditUserPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">City *</label>
-              <input name="city" required defaultValue={defaults.city ?? ""} className={inputClass} />
+              <label className="mb-1 block text-sm font-medium">City{isClientUser ? "" : " *"}</label>
+              <input name="city" required={!isClientUser} defaultValue={defaults.city ?? ""} className={inputClass} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">State *</label>
-              <input name="state" required defaultValue={defaults.state ?? ""} className={inputClass} />
+              <label className="mb-1 block text-sm font-medium">State{isClientUser ? "" : " *"}</label>
+              <input name="state" required={!isClientUser} defaultValue={defaults.state ?? ""} className={inputClass} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Country *</label>
-              <select name="country" required defaultValue={defaults.country ?? ""} className={inputClass}>
+              <label className="mb-1 block text-sm font-medium">Country{isClientUser ? "" : " *"}</label>
+              <select name="country" required={!isClientUser} defaultValue={defaults.country ?? ""} className={inputClass}>
                 <option value="">Select country…</option>
                 {COUNTRY_OPTIONS.map((option) => (
                   <option key={option} value={option}>{option}</option>

@@ -709,6 +709,7 @@ model CredentialTemplate {
   requireEndDate   Boolean         @default(true)
   members                    ProjectMember[]
   adminUserCredentialAssignments AdminUserCredentialAssignment[]
+  agreementRecords           AdminUserAgreementRecord[]
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 }
@@ -769,6 +770,7 @@ model Project {
   clientContacts      ProjectClientContact[]
   supportGroup        ProjectSupportGroup?
   tickets             Ticket[]
+  agreementRecords    AdminUserAgreementRecord[]
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
 
@@ -1003,8 +1005,31 @@ model AdminUser {
   supportGroupMemberships ProjectSupportGroupMember[] @relation("SupportGroupMember")
   workspaceGroupMemberships WorkspaceGroupMember[]      @relation("WorkspaceGroupMember")
   credentialAssignment    AdminUserCredentialAssignment?
+  agreementRecords        AdminUserAgreementRecord[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+model AdminUserAgreementRecord {
+  id                   String             @id @default(cuid())
+  adminUserId          String
+  adminUser            AdminUser          @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  credentialTemplateId String
+  credentialTemplate   CredentialTemplate @relation(fields: [credentialTemplateId], references: [id], onDelete: Restrict)
+  templateName         String
+  projectId            String?
+  project              Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  projectMemberId      String?
+  startDate            DateTime?
+  endDate              DateTime?
+  assignedAt           DateTime           @default(now())
+  agreementSignedAt    DateTime?
+  agreementDocumentUrl String?            @db.Text
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([adminUserId])
+  @@index([projectMemberId])
 }
 
 model AdminUserActivityLog {

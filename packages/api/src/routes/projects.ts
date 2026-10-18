@@ -18,6 +18,8 @@ import { saveUploadBuffer } from "../lib/save-upload-buffer";
 import { readUploadTextByUrl } from "../lib/read-upload-buffer";
 import { canManageProjects, getActorId, isProjectManagerRole, isProjectMemberRole } from "../lib/project-access";
 import { effectiveRoleList } from "../lib/admin-roles";
+import { ensureCandidateProfileForAdminUser } from "../lib/admin-user-profile-map";
+import { createUserAgreementRecord, markLatestAgreementSigned } from "../lib/user-agreement-records";
 import {
   findCredentialProjectMemberForUser,
   findUserCredentialAgreement,
@@ -679,6 +681,13 @@ router.post("/my-agreement/sign", async (req: AuthRequest, res) => {
         where: { id: userId },
         data: { agreementDocumentUrl: documentUrl },
       });
+      await markLatestAgreementSigned(tx, {
+        adminUserId: userId,
+        credentialTemplateId: template.id,
+        projectMemberId: agreement.source === "project_member" ? agreement.memberId : null,
+        agreementSignedAt: signedAt,
+        agreementDocumentUrl: documentUrl,
+      });
     });
 
     res.json({
@@ -1221,37 +1230,38 @@ router.post("/:id/members", async (req: AuthRequest, res) => {
       if (roles.includes("client")) {
         return res.status(400).json({ error: "Client users cannot be added as project members" });
       }
-      profileId = user.mappedProfileId ?? undefined;
-      if (!profileId) {
-        const byEmail = await prisma.candidateProfile.findFirst({
-          where: { email: { equals: user.email, mode: "insensitive" } },
-          select: { id: true },
-        });
-        profileId = byEmail?.id;
-      }
-      if (!profileId) {
-        return res.status(400).json({
-          error: "Link this user to a recruitment profile (Settings → Users) before adding them to the project.",
-        });
-      }
       linkedUserId = user.id;
     }
 
-    if (!profileId) {
+    if (!profileId && !body.adminUserId) {
       return res.status(400).json({ error: "Profile is required" });
     }
 
-    const profile = await prisma.candidateProfile.findUnique({
-      where: { id: profileId },
-      select: { mappedAdminUser: { select: { id: true } } },
-    });
-    if (!profile) return res.status(404).json({ error: "Profile not found" });
+    const member = await prisma.$transaction(async (tx) => {
+      if (body.adminUserId && linkedUserId) {
+        const fullUser = await tx.adminUser.findUnique({
+          where: { id: linkedUserId },
+          select: { id: true, email: true, name: true, phone: true },
+        });
+        if (!fullUser) throw new Error("USER_NOT_FOUND");
+        profileId = await ensureCandidateProfileForAdminUser(tx, fullUser);
+      }
 
-    if (!linkedUserId) {
-      linkedUserId = profile.mappedAdminUser?.id ?? null;
-    }
+      if (!profileId) {
+        throw new Error("PROFILE_REQUIRED");
+      }
 
-    const member = await prisma.projectMember.upsert({
+      const profile = await tx.candidateProfile.findUnique({
+        where: { id: profileId },
+        select: { mappedAdminUser: { select: { id: true } } },
+      });
+      if (!profile) throw new Error("PROFILE_NOT_FOUND");
+
+      if (!linkedUserId) {
+        linkedUserId = profile.mappedAdminUser?.id ?? null;
+      }
+
+      return tx.projectMember.upsert({
       where: { projectId_profileId: { projectId, profileId } },
       create: { projectId, profileId, adminUserId: linkedUserId },
       update: linkedUserId ? { adminUserId: linkedUserId } : {},
@@ -1268,6 +1278,7 @@ router.post("/:id/members", async (req: AuthRequest, res) => {
         },
         adminUser: { select: { id: true, email: true, name: true } },
       },
+      });
     });
 
     await prisma.projectActivityLog.create({
@@ -1287,6 +1298,15 @@ router.post("/:id/members", async (req: AuthRequest, res) => {
       },
     });
   } catch (error) {
+    if (error instanceof Error && error.message === "PROFILE_REQUIRED") {
+      return res.status(400).json({ error: "Profile is required" });
+    }
+    if (error instanceof Error && error.message === "PROFILE_NOT_FOUND") {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+    if (error instanceof Error && error.message === "USER_NOT_FOUND") {
+      return res.status(404).json({ error: "User not found" });
+    }
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
     }
@@ -1592,6 +1612,15 @@ router.post("/:id/members/:memberId/assign-template", async (req: AuthRequest, r
           credentialData: mergedValues,
           agreementSignedAt: null,
         },
+      });
+      await createUserAgreementRecord(tx, {
+        adminUserId: member.adminUserId!,
+        credentialTemplateId: template.id,
+        templateName: template.name,
+        projectId,
+        projectMemberId: member.id,
+        startDate: input.startDate ?? null,
+        endDate: input.endDate ?? null,
       });
       await tx.projectActivityLog.create({
         data: {

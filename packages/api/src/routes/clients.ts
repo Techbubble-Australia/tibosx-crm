@@ -111,7 +111,7 @@ router.post("/contacts/:contactId/create-user", async (req: AuthRequest, res) =>
       });
     }
 
-    const phone = `${contact.phoneCountryCode} ${contact.phoneNumber}`.trim();
+    const phone = `${contact.phoneCountryCode ?? ""} ${contact.phoneNumber ?? ""}`.trim() || "—";
     const tempPassword = randomBytes(12).toString("base64url");
     const passwordHash = await bcrypt.hash(tempPassword, 10);
 

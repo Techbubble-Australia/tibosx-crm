@@ -1,5 +1,6 @@
 import { prisma } from "@techbubble/database";
 import { z } from "zod";
+import { createUserAgreementRecord } from "./user-agreement-records";
 import {
   defaultCredentialValuesForAdminUser,
   defaultCredentialValuesForProfile,
@@ -116,21 +117,30 @@ export async function assignCredentialTemplateToAdminUser(
   const defaults = defaultCredentialValuesForAdminUser(user);
   const mergedValues = mergeCredentialTemplateValues(defaults, user.email, input);
 
-  await prisma.adminUserCredentialAssignment.upsert({
-    where: { adminUserId },
-    create: {
+  await prisma.$transaction(async (tx) => {
+    await tx.adminUserCredentialAssignment.upsert({
+      where: { adminUserId },
+      create: {
+        adminUserId,
+        credentialTemplateId: template.id,
+        credentialData: mergedValues,
+        agreementSignedAt: null,
+        signatureDataUrl: null,
+      },
+      update: {
+        credentialTemplateId: template.id,
+        credentialData: mergedValues,
+        agreementSignedAt: null,
+        signatureDataUrl: null,
+      },
+    });
+    await createUserAgreementRecord(tx, {
       adminUserId,
       credentialTemplateId: template.id,
-      credentialData: mergedValues,
-      agreementSignedAt: null,
-      signatureDataUrl: null,
-    },
-    update: {
-      credentialTemplateId: template.id,
-      credentialData: mergedValues,
-      agreementSignedAt: null,
-      signatureDataUrl: null,
-    },
+      templateName: template.name,
+      startDate: input.startDate ?? null,
+      endDate: input.endDate ?? null,
+    });
   });
 
   return {};

@@ -61,3 +61,60 @@ export async function applyMappedProfile(
     await ensureProjectMemberRole(tx, userId);
   }
 }
+
+function splitDisplayName(name: string | null | undefined, email: string): { firstName: string; lastName: string } {
+  const base = (name || email.split("@")[0] || "User").trim();
+  const parts = base.split(/\s+/).filter(Boolean);
+  if (!parts.length) return { firstName: "User", lastName: "—" };
+  if (parts.length === 1) return { firstName: parts[0]!, lastName: "—" };
+  return { firstName: parts[0]!, lastName: parts.slice(1).join(" ") };
+}
+
+/** Ensure a recruitment profile exists and is linked (for project membership). */
+export async function ensureCandidateProfileForAdminUser(
+  tx: Prisma.TransactionClient,
+  user: { id: string; email: string; name: string | null; phone: string | null },
+): Promise<string> {
+  const current = await tx.adminUser.findUnique({
+    where: { id: user.id },
+    select: { mappedProfileId: true },
+  });
+  if (current?.mappedProfileId) return current.mappedProfileId;
+
+  const byEmail = await tx.candidateProfile.findFirst({
+    where: { email: { equals: user.email, mode: "insensitive" } },
+    select: { id: true },
+  });
+  if (byEmail) {
+    await tx.adminUser.update({
+      where: { id: user.id },
+      data: { mappedProfileId: byEmail.id },
+    });
+    await applyMappedProfile(tx, user.id, byEmail.id);
+    return byEmail.id;
+  }
+
+  const { firstName, lastName } = splitDisplayName(user.name, user.email);
+  const phone = user.phone?.trim() || "—";
+  const profile = await tx.candidateProfile.create({
+    data: {
+      firstName,
+      lastName,
+      email: user.email.trim().toLowerCase(),
+      phone,
+      country: "Australia",
+      category: "Consultant",
+      technology: "General",
+      expectedRate: 0,
+      currency: "AUD",
+      mode: "Contract",
+      documentUrls: [],
+    },
+  });
+  await tx.adminUser.update({
+    where: { id: user.id },
+    data: { mappedProfileId: profile.id },
+  });
+  await applyMappedProfile(tx, user.id, profile.id);
+  return profile.id;
+}

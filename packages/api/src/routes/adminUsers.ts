@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 import { prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth";
 import { ADMIN_ROLES_LIST, assertCanModifyAdminUser, isAdminRole } from "../lib/admin-roles";
@@ -22,6 +23,7 @@ import {
   assignCredentialTemplateToAdminUser,
   credentialDefaultsForAdminUser,
 } from "../lib/assign-credential-template";
+import { listAgreementRecordsForUser } from "../lib/user-agreement-records";
 
 const router: IRouter = Router();
 
@@ -31,6 +33,32 @@ const emergencyContactSchema = z.object({
   phone: z.string().min(1).max(50),
   relation: z.string().max(100).optional(),
 });
+
+function sanitizeEmergencyContactsInput(value: unknown) {
+  if (!Array.isArray(value)) return value;
+  return value.filter((row) => {
+    if (!row || typeof row !== "object") return false;
+    const record = row as Record<string, unknown>;
+    return (
+      typeof record.name === "string" &&
+      record.name.trim() &&
+      typeof record.email === "string" &&
+      record.email.trim() &&
+      typeof record.phone === "string" &&
+      record.phone.trim()
+    );
+  });
+}
+
+function sanitizeBankDetailsInput(value: unknown) {
+  if (value === null || value === undefined) return value;
+  if (typeof value !== "object") return value;
+  const row = value as Record<string, unknown>;
+  const keys = ["bankName", "accountName", "accountNumber", "country", "bsb", "swiftCode", "notes"] as const;
+  const hasValue = keys.some((key) => typeof row[key] === "string" && row[key]!.trim());
+  if (!hasValue) return null;
+  return value;
+}
 
 const bankDetailsSchema = z.object({
   bankName: z.string().min(1).max(200),
@@ -71,7 +99,10 @@ const createSchema = z.object({
 const updateSchema = z.object({
   email: z.string().email().optional(),
   name: z.string().max(200).optional().nullable(),
-  phone: z.string().min(1).max(50).optional(),
+  phone: z.preprocess(
+    (val) => (typeof val === "string" && !val.trim() ? undefined : val),
+    z.string().min(1).max(50).optional(),
+  ),
   password: z.string().min(8).optional(),
   role: z.enum(ADMIN_ROLES_LIST).optional(),
   additionalRoles: z.array(z.enum(ADMIN_ROLES_LIST)).max(10).optional(),
@@ -85,8 +116,10 @@ const updateSchema = z.object({
   city: z.string().max(100).optional().nullable(),
   state: z.string().max(100).optional().nullable(),
   country: z.string().max(100).optional().nullable(),
-  bankDetails: bankDetailsUpdateSchema.optional(),
-  emergencyContacts: z.array(emergencyContactSchema).max(5).optional(),
+  bankDetails: z.preprocess(sanitizeBankDetailsInput, bankDetailsUpdateSchema.optional()),
+  emergencyContacts: z
+    .preprocess(sanitizeEmergencyContactsInput, z.array(emergencyContactSchema).max(5).optional())
+    .optional(),
   mappedClientContactId: z.string().min(1).optional().nullable(),
   mappedProfileId: z.string().min(1).optional().nullable(),
   userFiles: z
@@ -360,6 +393,38 @@ router.post("/:id/assign-template", async (req: AuthRequest, res) => {
   }
 });
 
+router.post("/:id/invite", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.params.id;
+    if (!userId) return res.status(400).json({ error: "Invalid id" });
+    const user = await prisma.adminUser.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true, role: true, active: true },
+    });
+    if (!user) return res.status(404).json({ error: "Not found" });
+    if (!user.active) return res.status(400).json({ error: "User is inactive" });
+
+    const temporaryPassword = randomBytes(12).toString("base64url");
+    const passwordHash = await bcrypt.hash(temporaryPassword, 10);
+    await prisma.adminUser.update({
+      where: { id: userId },
+      data: { passwordHash, passwordNeedsReset: true },
+    });
+
+    await emailTbosUserInvite({
+      to: user.email,
+      name: user.name || user.email,
+      temporaryPassword,
+      context: user.role === "client" ? "client" : "project_member",
+    });
+
+    res.json({ message: "Invite email sent" });
+  } catch (error) {
+    console.error("Error sending user invite:", error);
+    res.status(500).json({ error: "Failed to send invite email" });
+  }
+});
+
 router.get("/:id", async (req, res) => {
   try {
     const row = await prisma.adminUser.findUnique({
@@ -367,6 +432,8 @@ router.get("/:id", async (req, res) => {
       select: detailSelect,
     });
     if (!row) return res.status(404).json({ error: "Not found" });
+
+    const agreementRecords = await listAgreementRecordsForUser(row.id);
 
     const memberWhere: { OR: Array<{ adminUserId: string } | { profileId: string }> } = {
       OR: [{ adminUserId: row.id }],
@@ -422,6 +489,18 @@ router.get("/:id", async (req, res) => {
       data: {
         ...sanitizeDetail(row),
         agreementTemplate,
+        agreementRecords: agreementRecords.map((record) => ({
+          id: record.id,
+          templateName: record.templateName,
+          projectLabel: record.project
+            ? `${record.project.projectNumber} — ${record.project.title}`
+            : null,
+          startDate: record.startDate?.toISOString() ?? null,
+          endDate: record.endDate?.toISOString() ?? null,
+          assignedAt: record.assignedAt.toISOString(),
+          signedAt: record.agreementSignedAt?.toISOString() ?? null,
+          documentUrl: record.agreementDocumentUrl,
+        })),
         agreementFiles: row.agreementDocumentUrl
           ? [{ name: "Signed contract / agreement", url: row.agreementDocumentUrl }]
           : [],
