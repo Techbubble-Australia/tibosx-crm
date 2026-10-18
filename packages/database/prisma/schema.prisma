@@ -384,9 +384,10 @@ model Opportunity {
   ownerId   String?
   owner     AdminUser? @relation("OpportunityOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   jobs       JobListing[]
-  timesheets Timesheet[]
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  timesheets       Timesheet[]
+  timesheetEntries TimesheetEntry[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   @@index([clientId])
   @@index([contactId])
@@ -921,6 +922,7 @@ model Timesheet {
   rejectReason           String?               @db.Text
   comments               String?               @db.Text
   activityLogs           TimesheetActivityLog[]
+  entries                TimesheetEntry[]
   createdAt              DateTime              @default(now())
   updatedAt              DateTime              @updatedAt
 
@@ -1136,11 +1138,30 @@ model Ticket {
   messages    TicketMessage[]
   attachments TicketAttachment[]
   auditLogs   TicketAuditLog[]
-  timesheets  Timesheet[]
+  timesheets       Timesheet[]
+  timesheetEntries TimesheetEntry[]
 
   @@index([organizationId, status])
   @@index([projectId])
   @@index([createdAt])
+}
+
+model TimesheetEntry {
+  id             String       @id @default(cuid())
+  timesheetId    String
+  timesheet      Timesheet    @relation(fields: [timesheetId], references: [id], onDelete: Cascade)
+  sortOrder      Int          @default(0)
+  opportunityId  String?
+  opportunity    Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  ticketId       String?
+  ticket         Ticket?      @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  dailyHours     Json?
+  dailyComments  Json?
+  billable       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([timesheetId])
 }
 
 model TicketMessage {

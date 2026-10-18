@@ -30,6 +30,10 @@ export default function NewTimesheetPage() {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
+      if (res.status === 409 && data.data?.id) {
+        router.push(`/timesheets/${data.data.id as string}`);
+        return;
+      }
       if (!res.ok) throw new Error(messageFromApiError(data, "Failed to create timesheet"));
       const created = data.data as { id: string };
       router.push(`/timesheets/${created.id}`);

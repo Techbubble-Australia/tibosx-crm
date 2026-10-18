@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { AddProjectMemberModal } from "@/components/projects/AddProjectMemberModal";
+import { ProjectTicketsSection } from "@/components/projects/ProjectTicketsSection";
 import { adminFetch } from "@/lib/admin-api";
 import { readUploadImageUrlFromJson } from "@/lib/upload-response";
 import { resolveDocumentHref } from "@/lib/media-url";
@@ -631,6 +632,10 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
           rows={supportClientContacts}
           onRowsChange={setSupportClientContacts}
         />
+
+        {defaults.id && (kind === "SUPPORT" || forCustomerSupport) ? (
+          <ProjectTicketsSection projectId={defaults.id} />
+        ) : null}
 
         {defaults.activityLogs ? <ProjectActivityLogSection logs={defaults.activityLogs} /> : null}
 

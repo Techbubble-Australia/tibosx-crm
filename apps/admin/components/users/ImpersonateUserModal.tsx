@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Search, X } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
+import { defaultLandingPath } from "@/lib/admin-roles";
 
 type SearchRow = { id: string; email: string; name: string | null; role: string };
 
@@ -43,7 +44,12 @@ export function ImpersonateUserModal({ open, onClose }: { open: boolean; onClose
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed");
-      window.location.href = "/settings/profile";
+      const meRes = await adminFetch("/api/auth/me");
+      const meData = await meRes.json();
+      const user = meData?.data?.user as { role?: string; additionalRoles?: string[] } | undefined;
+      const role = user?.role ?? "website";
+      const additional = Array.isArray(user?.additionalRoles) ? user.additionalRoles : [];
+      window.location.href = defaultLandingPath(role, additional);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Failed to impersonate");
     } finally {

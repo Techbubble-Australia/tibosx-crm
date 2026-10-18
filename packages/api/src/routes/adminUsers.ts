@@ -42,6 +42,18 @@ const bankDetailsSchema = z.object({
   notes: z.string().max(2000).optional(),
 });
 
+const bankDetailsUpdateSchema = z
+  .object({
+    bankName: z.string().max(200).optional(),
+    accountName: z.string().max(200).optional(),
+    accountNumber: z.string().max(100).optional(),
+    country: z.string().max(100).optional(),
+    swiftCode: z.string().max(50).optional(),
+    bsb: z.string().max(50).optional(),
+    notes: z.string().max(2000).optional(),
+  })
+  .nullable();
+
 const createSchema = z.object({
   email: z.string().email(),
   name: z.string().max(200).optional(),
@@ -71,9 +83,9 @@ const updateSchema = z.object({
   suburb: z.string().max(100).optional().nullable(),
   postcode: z.string().max(20).optional().nullable(),
   city: z.string().max(100).optional().nullable(),
-  state: z.string().min(1).max(100).optional().nullable(),
+  state: z.string().max(100).optional().nullable(),
   country: z.string().max(100).optional().nullable(),
-  bankDetails: bankDetailsSchema.optional().nullable(),
+  bankDetails: bankDetailsUpdateSchema.optional(),
   emergencyContacts: z.array(emergencyContactSchema).max(5).optional(),
   mappedClientContactId: z.string().min(1).optional().nullable(),
   mappedProfileId: z.string().min(1).optional().nullable(),
@@ -679,7 +691,12 @@ router.put("/:id", async (req: AuthRequest, res) => {
     res.json({ data: sanitizeDetail(row) });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: "Validation error", details: error.errors });
+      const first = error.errors[0];
+      const hint = first ? `${first.path.join(".")}: ${first.message}` : "Invalid request";
+      return res.status(400).json({ error: hint, details: error.errors });
+    }
+    if (error && typeof error === "object" && "code" in error && (error as { code: string }).code === "P2002") {
+      return res.status(409).json({ error: "That email address is already in use" });
     }
     console.error("Error updating admin user:", error);
     res.status(500).json({ error: "Failed to update user" });

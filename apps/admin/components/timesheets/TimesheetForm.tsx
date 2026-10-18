@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
@@ -34,9 +35,21 @@ const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
 const readOnlyClass = "bg-gray-50 dark:bg-gray-900 cursor-not-allowed";
 const dayInputClass =
-  "h-9 w-full min-w-[2.5rem] max-w-[3.25rem] rounded-lg border border-gray-200 bg-white px-1 py-1 text-center text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800";
+  "h-9 w-full min-w-[2.75rem] rounded-lg border border-gray-200 bg-white px-1 py-1 text-center text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800";
+const dayCommentInputClass =
+  "h-9 w-full min-w-[4.5rem] rounded-lg border border-gray-200 bg-white px-1.5 py-1 text-left text-[11px] leading-tight focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800";
 const selectClass =
   "h-9 w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
+
+export type TimesheetEntryValues = {
+  id?: string;
+  opportunityId?: string | null;
+  ticketId?: string | null;
+  label?: string;
+  dailyHours?: DailyHours | null;
+  dailyComments?: DailyComments | null;
+  billable?: boolean;
+};
 
 export type TimesheetFormValues = {
   id?: string;
@@ -53,6 +66,7 @@ export type TimesheetFormValues = {
   fileUrls: string[];
   dailyHours?: DailyHours | null;
   dailyComments?: DailyComments | null;
+  entries?: TimesheetEntryValues[];
   comments?: string | null;
   rejectReason?: string | null;
   targetLabel?: string;
@@ -123,6 +137,78 @@ function emptyHours(): DailyHours {
   return {};
 }
 
+type LineEntry = {
+  key: string;
+  id?: string;
+  caseKey: string;
+  label?: string;
+  dailyHours: DailyHours;
+  dailyComments: DailyComments;
+  billable: boolean;
+};
+
+function newLineKey() {
+  return `line-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+function caseKeyFromTargets(ticketId?: string | null, opportunityId?: string | null) {
+  if (ticketId) return `ticket:${ticketId}`;
+  if (opportunityId) return `opportunity:${opportunityId}`;
+  return "";
+}
+
+function emptyDraftLine(): LineEntry {
+  return {
+    key: newLineKey(),
+    caseKey: "",
+    dailyHours: emptyHours(),
+    dailyComments: {},
+    billable: true,
+  };
+}
+
+function linesFromDefaults(defaults: Partial<TimesheetFormValues>): LineEntry[] {
+  if (defaults.entries?.length) {
+    return defaults.entries.map((row) => ({
+      key: row.id ?? newLineKey(),
+      id: row.id,
+      caseKey: caseKeyFromTargets(row.ticketId, row.opportunityId),
+      label: row.label,
+      dailyHours: (row.dailyHours as DailyHours) ?? emptyHours(),
+      dailyComments: (row.dailyComments as DailyComments) ?? {},
+      billable: row.billable ?? true,
+    }));
+  }
+  const hours = (defaults.dailyHours as DailyHours) ?? emptyHours();
+  if (defaults.id && sumDailyHours(hours) > 0) {
+    return [
+      {
+        key: defaults.id,
+        id: defaults.id,
+        caseKey: caseKeyFromTargets(defaults.ticketId, defaults.opportunityId),
+        label: defaults.targetLabel,
+        dailyHours: hours,
+        dailyComments: (defaults.dailyComments as DailyComments) ?? {},
+        billable: true,
+      },
+    ];
+  }
+  return [];
+}
+
+function linePayload(line: LineEntry) {
+  const [kind, id] = line.caseKey ? line.caseKey.split(":") : ["", ""];
+  const entry: Record<string, unknown> = {
+    dailyHours: line.dailyHours,
+    dailyComments: line.dailyComments,
+    billable: line.billable,
+  };
+  if (line.id) entry.id = line.id;
+  if (kind === "ticket" && id) entry.ticketId = id;
+  else if (kind === "opportunity" && id) entry.opportunityId = id;
+  return entry;
+}
+
 function BillableToggle({
   checked,
   onChange,
@@ -162,28 +248,16 @@ export function TimesheetForm({
   submitForApprovalLoading = false,
   showSubmitForApproval = false,
 }: Props) {
+  const router = useRouter();
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [projectId, setProjectId] = useState(defaults.projectId ?? "");
   const [cases, setCases] = useState<CaseOption[]>([]);
-  const [caseKey, setCaseKey] = useState(
-    defaults.ticketId
-      ? `ticket:${defaults.ticketId}`
-      : defaults.opportunityId
-        ? `opportunity:${defaults.opportunityId}`
-        : "",
-  );
+  const [lines, setLines] = useState<LineEntry[]>(() => linesFromDefaults(defaults));
+  const [draft, setDraft] = useState<LineEntry>(() => emptyDraftLine());
   const [weekMonday, setWeekMonday] = useState(
     snapToMondayInput(toDateInput(defaults.startDate) || toDateInputUtc(mondayOfWeek())),
   );
-  const [dailyHours, setDailyHours] = useState<DailyHours>(
-    (defaults.dailyHours as DailyHours) ?? emptyHours(),
-  );
-  const [dailyComments, setDailyComments] = useState<DailyComments>(
-    (defaults.dailyComments as DailyComments) ?? {},
-  );
   const [comments, setComments] = useState(defaults.comments ?? "");
-  const [billable, setBillable] = useState(true);
-  const [entryAdded, setEntryAdded] = useState(Boolean(defaults.id && sumDailyHours((defaults.dailyHours as DailyHours) ?? {}) > 0));
   const [approvers, setApprovers] = useState<ApproverOption[]>([]);
   const [selectedApprover, setSelectedApprover] = useState("");
   const [fileUrls, setFileUrls] = useState<string[]>(defaults.fileUrls ?? []);
@@ -198,18 +272,21 @@ export function TimesheetForm({
   }, [weekMonday]);
 
   const weekDays = useMemo(() => weekDatesFromMonday(weekMonday), [weekMonday]);
-  const rowHoursTotal = useMemo(() => sumDailyHours(dailyHours), [dailyHours]);
-  const hoursTotal = rowHoursTotal;
+  const draftHoursTotal = useMemo(() => sumDailyHours(draft.dailyHours), [draft.dailyHours]);
+  const committedHoursTotal = useMemo(
+    () => lines.reduce((sum, line) => sum + sumDailyHours(line.dailyHours), 0),
+    [lines],
+  );
+  const hoursTotal = committedHoursTotal + draftHoursTotal;
 
   const managerRequired = editable && approvers.length > 0 && !selectedApprover;
-  const hasLineContent = Boolean(projectId) && (rowHoursTotal > 0 || fileUrls.length > 0);
-  const canAddEntry = editable && hasLineContent;
-  const canSave = editable && entryAdded && hasLineContent && !managerRequired;
+  const hasAnyHours = hoursTotal > 0;
+  const canAddEntry = editable && Boolean(projectId) && draftHoursTotal > 0;
+  const canSave = editable && Boolean(projectId) && hasAnyHours && !managerRequired;
   const canSubmitForApproval =
     showSubmitForApproval &&
     Boolean(defaults.id) &&
-    entryAdded &&
-    hasLineContent &&
+    hasAnyHours &&
     !managerRequired &&
     status === "DRAFT";
 
@@ -227,10 +304,11 @@ export function TimesheetForm({
   const tdDay = "border-b border-l border-gray-200 bg-white p-1.5 text-center align-middle dark:border-gray-600 dark:bg-gray-900";
 
   useEffect(() => {
-    if (defaults.id && sumDailyHours((defaults.dailyHours as DailyHours) ?? {}) > 0) {
-      setEntryAdded(true);
+    if (defaults.id) {
+      setLines(linesFromDefaults(defaults));
+      setDraft(emptyDraftLine());
     }
-  }, [defaults.id, defaults.dailyHours]);
+  }, [defaults.id, defaults.entries, defaults.dailyHours, defaults.ticketId, defaults.opportunityId, defaults.targetLabel]);
 
   useEffect(() => {
     if (defaults.approverKind === "CLIENT_CONTACT" && defaults.projectClientContactId) {
@@ -246,14 +324,17 @@ export function TimesheetForm({
       .then((data) => {
         const list = (data.data as ProjectOption[]) ?? [];
         setProjects(list);
-        if (!projectId && defaults.projectId) setProjectId(defaults.projectId);
+        if (!projectId && defaults.projectId) {
+          setProjectId(defaults.projectId);
+        } else if (!projectId && list.length === 1) {
+          setProjectId(list[0]!.id);
+        }
       });
-  }, []);
+  }, [defaults.projectId, projectId]);
 
   useEffect(() => {
     if (!projectId) {
       setCases([]);
-      if (editable) setCaseKey("");
       return;
     }
     void adminFetch(`/api/admin/timesheets/project-cases?projectId=${encodeURIComponent(projectId)}`)
@@ -266,14 +347,7 @@ export function TimesheetForm({
       setApprovers([]);
       return;
     }
-    const [kind, id] = caseKey ? caseKey.split(":") : ["", ""];
-    const query =
-      kind === "ticket" && id
-        ? `ticketId=${encodeURIComponent(id)}`
-        : kind === "opportunity" && id
-          ? `opportunityId=${encodeURIComponent(id)}`
-          : `projectId=${encodeURIComponent(projectId)}`;
-    void adminFetch(`/api/admin/timesheets/target-meta?${query}`)
+    void adminFetch(`/api/admin/timesheets/target-meta?projectId=${encodeURIComponent(projectId)}`)
       .then((r) => r.json())
       .then((data) => {
         const list = (data.data as { approvers?: ApproverOption[] })?.approvers ?? [];
@@ -285,22 +359,40 @@ export function TimesheetForm({
         }
       })
       .catch(() => setApprovers([]));
-  }, [projectId, caseKey, editable]);
+  }, [projectId, editable]);
 
-  function clearEntryRow() {
+  useEffect(() => {
+    if (!editable || defaults.id || !projectId || !weekMonday) return;
+    void adminFetch(
+      `/api/admin/timesheets/for-week?projectId=${encodeURIComponent(projectId)}&startDate=${encodeURIComponent(weekMonday)}`,
+    )
+      .then((r) => r.json())
+      .then((data) => {
+        const existing = data.data as { id?: string } | null;
+        if (existing?.id) {
+          router.replace(`/timesheets/${existing.id}`);
+        }
+      })
+      .catch(() => undefined);
+  }, [editable, defaults.id, projectId, weekMonday, router]);
+
+  function updateLine(key: string, patch: Partial<LineEntry>) {
+    setLines((prev) => prev.map((line) => (line.key === key ? { ...line, ...patch } : line)));
+  }
+
+  function removeLine(key: string) {
+    setLines((prev) => prev.filter((line) => line.key !== key));
+  }
+
+  function clearDraftRow() {
     if (!editable) return;
-    setProjectId("");
-    setCaseKey("");
-    setDailyHours(emptyHours());
-    setDailyComments({});
-    setComments("");
-    setBillable(true);
-    setEntryAdded(false);
+    setDraft(emptyDraftLine());
   }
 
   function addEntry() {
     if (!canAddEntry) return;
-    setEntryAdded(true);
+    setLines((prev) => [...prev, { ...draft, key: newLineKey() }]);
+    setDraft(emptyDraftLine());
   }
 
   async function uploadFiles(files: FileList | null) {
@@ -337,18 +429,18 @@ export function TimesheetForm({
     }
     const mon = new Date(`${weekMonday}T00:00:00.000Z`);
     const sun = sundayOfWeek(mon);
+    const entryRows = [...lines];
+    if (sumDailyHours(draft.dailyHours) > 0) {
+      entryRows.push(draft);
+    }
     const payload: Record<string, unknown> = {
+      projectId,
       startDate: weekMonday,
       endDate: toDateInputUtc(sun),
       fileUrls,
-      dailyHours,
-      dailyComments,
+      entries: entryRows.map(linePayload),
       comments: comments.trim() || null,
     };
-    const [kind, id] = caseKey ? caseKey.split(":") : ["", ""];
-    if (kind === "ticket" && id) payload.ticketId = id;
-    else if (kind === "opportunity" && id) payload.opportunityId = id;
-    else payload.projectId = projectId;
 
     if (approvers.length && selectedApprover) {
       const [approverKind, approverId] = selectedApprover.split(":");
@@ -365,15 +457,40 @@ export function TimesheetForm({
     <form onSubmit={(e) => void handleSave(e)} className="space-y-4">
       {/* Reference header — outside entry card */}
       <div className="mb-3 grid grid-cols-1 items-end gap-3 xl:grid-cols-[auto_auto_minmax(0,1fr)_auto]">
-        <div className="shrink-0">
-          <label className="mb-1 block text-sm font-medium text-gray-800 dark:text-gray-200">Select first day of week</label>
-          <input
-            type="date"
-            className={`${inputClass} w-[11rem] ${editable ? "" : readOnlyClass}`}
-            value={weekMonday}
-            onChange={(e) => setWeekMonday(snapToMondayInput(e.target.value))}
-            readOnly={!editable}
-          />
+        <div className="shrink-0 space-y-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-800 dark:text-gray-200">Select first day of week</label>
+            <input
+              type="date"
+              className={`${inputClass} w-[11rem] ${editable ? "" : readOnlyClass}`}
+              value={weekMonday}
+              onChange={(e) => setWeekMonday(snapToMondayInput(e.target.value))}
+              readOnly={!editable}
+            />
+          </div>
+          {editable || defaults.projectId ? (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-800 dark:text-gray-200">
+                Search project <span className="text-red-500">*</span>
+              </label>
+              <select
+                className={`${selectClass} w-full min-w-[12rem] max-w-[18rem] ${editable ? "" : readOnlyClass}`}
+                value={projectId}
+                onChange={(e) => {
+                  setProjectId(e.target.value);
+                  setLines([]);
+                  setDraft(emptyDraftLine());
+                }}
+                disabled={!editable}
+                required
+              >
+                <option value="">Search project…</option>
+                {projects.map((row) => (
+                  <option key={row.id} value={row.id}>{row.label}</option>
+                ))}
+              </select>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex shrink-0 items-center gap-1 pb-2 text-sm text-gray-800 dark:text-gray-100">
@@ -421,164 +538,240 @@ export function TimesheetForm({
       {/* Main entry card — table matches reference */}
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[52rem] border-collapse text-sm">
+          <table className="w-full table-fixed border-collapse text-sm">
+            <colgroup>
+              <col className="w-[10%]" />
+              {weekDays.map((d) => (
+                <col key={d.key} className="w-[10%]" />
+              ))}
+              <col className="w-[4.5rem]" />
+            </colgroup>
             <thead>
               <tr>
-                <th className={`${thBase} w-[26%] min-w-[12rem] text-left`}>Project/Board Task</th>
+                <th className={`${thBase} text-left`}>Project/Ticket Task</th>
                 {weekDays.map((d) => {
                   const dow = d.label.split(" ")[0] ?? d.key;
                   return (
-                    <th key={d.key} className={`${thDay} w-[8%]`}>
+                    <th key={d.key} className={thDay}>
                       {formatDayColumnLabel(dow, d.iso)}
                     </th>
                   );
                 })}
-                <th className={`${thDay} w-[5.5rem]`}>Billable</th>
+                <th className={`${thDay} w-[4.5rem]`} aria-label="Entry actions" />
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td className={`${tdBase} align-top`}>
-                  {!editable && defaults.targetLabel ? (
-                    <p className="text-sm text-gray-900 dark:text-gray-100">{defaults.targetLabel}</p>
-                  ) : (
-                    <div className="flex flex-col gap-2">
+              {(editable ? lines : lines.length ? lines : linesFromDefaults(defaults)).map((line) => {
+                const lineTotal = sumDailyHours(line.dailyHours);
+                const lineEditable = editable;
+                const caseLabel =
+                  line.label ||
+                  (line.caseKey
+                    ? cases.find((c) => `${c.kind}:${c.id}` === line.caseKey)?.label
+                    : undefined) ||
+                  (line.caseKey ? line.caseKey : "Project (no ticket)");
+                return (
+                  <Fragment key={line.key}>
+                    <tr>
+                      <td className={`${tdBase} align-top`}>
+                        {lineEditable ? (
+                          <select
+                            className={`${selectClass} w-full`}
+                            value={line.caseKey}
+                            onChange={(e) => updateLine(line.key, { caseKey: e.target.value, label: undefined })}
+                            disabled={!projectId}
+                          >
+                            <option value="">{projectId ? "Choose project or ticket" : "Select a project first"}</option>
+                            {cases.map((row) => (
+                              <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
+                                {row.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <p className="text-sm text-gray-900 dark:text-gray-100">{caseLabel}</p>
+                        )}
+                      </td>
+                      {WEEKDAY_KEYS.map((key) => (
+                        <td key={key} className={tdDay}>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.25}
+                            inputMode="decimal"
+                            className={`${dayInputClass} mx-auto ${lineEditable ? "" : readOnlyClass}`}
+                            value={line.dailyHours[key] ?? ""}
+                            placeholder="0"
+                            disabled={!lineEditable}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              updateLine(line.key, {
+                                dailyHours: {
+                                  ...line.dailyHours,
+                                  [key]: v === "" ? undefined : Number(v),
+                                },
+                              });
+                            }}
+                            readOnly={!lineEditable}
+                          />
+                        </td>
+                      ))}
+                      <td className={tdDay}>
+                        <div className="flex flex-col items-center gap-1">
+                          <BillableToggle
+                            checked={line.billable}
+                            onChange={(v) => updateLine(line.key, { billable: v })}
+                            disabled={!lineEditable}
+                          />
+                          {lineEditable ? (
+                            <button
+                              type="button"
+                              onClick={() => removeLine(line.key)}
+                              className="text-gray-400 hover:text-red-500"
+                              aria-label="Remove entry"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className={`${tdBase} text-xs font-medium text-gray-600 dark:text-gray-400`}>Task comments</td>
+                      {WEEKDAY_KEYS.map((key) => (
+                        <td key={`comment-${line.key}-${key}`} className={tdDay}>
+                          <input
+                            type="text"
+                            className={`${dayCommentInputClass} ${lineEditable ? "" : readOnlyClass}`}
+                            placeholder="—"
+                            value={line.dailyComments[key] ?? ""}
+                            disabled={!lineEditable}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              updateLine(line.key, {
+                                dailyComments: {
+                                  ...line.dailyComments,
+                                  [key]: v.trim() ? v : undefined,
+                                },
+                              });
+                            }}
+                            readOnly={!lineEditable}
+                          />
+                        </td>
+                      ))}
+                      <td className={tdDay}>
+                        <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">{lineTotal.toFixed(1)}h</span>
+                      </td>
+                    </tr>
+                  </Fragment>
+                );
+              })}
+              {editable ? (
+                <>
+                  <tr key="draft-hours">
+                    <td className={`${tdBase} align-top`}>
                       <select
-                        className={`${selectClass} ${editable ? "" : readOnlyClass}`}
-                        value={projectId}
-                        onChange={(e) => {
-                          setProjectId(e.target.value);
-                          setCaseKey("");
-                          setEntryAdded(false);
-                        }}
-                        disabled={!editable}
+                        className={`${selectClass} w-full`}
+                        value={draft.caseKey}
+                        onChange={(e) => setDraft((prev) => ({ ...prev, caseKey: e.target.value }))}
+                        disabled={!projectId}
                       >
-                        <option value="">Search project or board...</option>
-                        {projects.map((row) => (
-                          <option key={row.id} value={row.id}>{row.label}</option>
-                        ))}
-                      </select>
-                      <select
-                        className={`${selectClass} ${editable ? "" : readOnlyClass}`}
-                        value={caseKey}
-                        onChange={(e) => {
-                          setCaseKey(e.target.value);
-                          setEntryAdded(false);
-                        }}
-                        disabled={!editable || !projectId}
-                      >
-                        <option value="">{projectId ? "No case (project only)" : "Choose project/board first"}</option>
+                        <option value="">{projectId ? "Choose project or ticket" : "Select a project first"}</option>
                         {cases.map((row) => (
-                          <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
+                          <option key={`draft-${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
                             {row.label}
                           </option>
                         ))}
                       </select>
-                    </div>
-                  )}
-                </td>
-                {WEEKDAY_KEYS.map((key) => (
-                  <td key={key} className={tdDay}>
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.25}
-                      inputMode="decimal"
-                      className={`${dayInputClass} mx-auto ${editable ? "" : readOnlyClass}`}
-                      value={dailyHours[key] ?? ""}
-                      placeholder="0"
-                      disabled={!editable}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setEntryAdded(false);
-                        setDailyHours((prev) => ({
-                          ...prev,
-                          [key]: v === "" ? undefined : Number(v),
-                        }));
-                      }}
-                      readOnly={!editable}
-                    />
-                  </td>
-                ))}
-                <td className={tdDay}>
-                  <div className="flex justify-center">
-                    <BillableToggle checked={billable} onChange={setBillable} disabled={!editable} />
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className={`${tdBase} text-xs font-medium text-gray-600 dark:text-gray-400`}>Task comments</td>
-                {WEEKDAY_KEYS.map((key) => (
-                  <td key={`comment-${key}`} className={tdDay}>
-                    <input
-                      type="text"
-                      className={`${dayInputClass} mx-auto w-full max-w-none px-1 text-left text-xs ${editable ? "" : readOnlyClass}`}
-                      placeholder="—"
-                      value={dailyComments[key] ?? ""}
-                      disabled={!editable}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setDailyComments((prev) => ({
-                          ...prev,
-                          [key]: v.trim() ? v : undefined,
-                        }));
-                      }}
-                      readOnly={!editable}
-                    />
-                  </td>
-                ))}
-                <td className={tdDay} />
-              </tr>
-              <tr>
-                <td colSpan={8} className="border-b border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-900" />
-                <td className="border-b border-l border-gray-200 bg-white p-2 align-top dark:border-gray-600 dark:bg-gray-900">
-                  {editable ? (
-                    <div className="flex min-w-[7.5rem] flex-col items-stretch gap-2">
-                      <div
-                        className="rounded-lg border border-dashed border-sky-300 bg-sky-50/30 px-2 py-2 text-center text-sm font-semibold text-gray-800 dark:border-sky-700 dark:bg-sky-950/20 dark:text-gray-100"
-                      >
-                        {rowHoursTotal.toFixed(1)}h
+                    </td>
+                    {WEEKDAY_KEYS.map((key) => (
+                      <td key={`draft-${key}`} className={tdDay}>
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.25}
+                          inputMode="decimal"
+                          className={dayInputClass}
+                          value={draft.dailyHours[key] ?? ""}
+                          placeholder="0"
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setDraft((prev) => ({
+                              ...prev,
+                              dailyHours: {
+                                ...prev.dailyHours,
+                                [key]: v === "" ? undefined : Number(v),
+                              },
+                            }));
+                          }}
+                        />
+                      </td>
+                    ))}
+                    <td className={tdDay}>
+                      <BillableToggle
+                        checked={draft.billable}
+                        onChange={(v) => setDraft((prev) => ({ ...prev, billable: v }))}
+                      />
+                    </td>
+                  </tr>
+                  <tr key="draft-comments">
+                    <td className={`${tdBase} text-xs font-medium text-gray-600 dark:text-gray-400`}>Task comments</td>
+                    {WEEKDAY_KEYS.map((key) => (
+                      <td key={`draft-comment-${key}`} className={tdDay}>
+                        <input
+                          type="text"
+                          className={dayCommentInputClass}
+                          placeholder="—"
+                          value={draft.dailyComments[key] ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setDraft((prev) => ({
+                              ...prev,
+                              dailyComments: {
+                                ...prev.dailyComments,
+                                [key]: v.trim() ? v : undefined,
+                              },
+                            }));
+                          }}
+                        />
+                      </td>
+                    ))}
+                    <td className={tdDay}>
+                      <div className="flex min-w-[7.5rem] flex-col items-stretch gap-2">
+                        <div className="rounded-lg border border-dashed border-sky-300 bg-sky-50/30 px-2 py-2 text-center text-sm font-semibold text-gray-800 dark:border-sky-700 dark:bg-sky-950/20 dark:text-gray-100">
+                          {draftHoursTotal.toFixed(1)}h
+                        </div>
+                        <button
+                          type="button"
+                          disabled={!canAddEntry}
+                          onClick={() => addEntry()}
+                          className="inline-flex items-center justify-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                        >
+                          <Plus className="h-3.5 w-3.5" /> Add Entry
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => clearDraftRow()}
+                          className="self-end text-gray-400 hover:text-gray-600"
+                          aria-label="Clear draft row"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
                       </div>
-                      <span
-                        className={`rounded-md px-2 py-1 text-center text-xs font-medium ${
-                          billable
-                            ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200"
-                            : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        Billable
-                      </span>
-                      <button
-                        type="button"
-                        disabled={!canAddEntry}
-                        onClick={() => addEntry()}
-                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                      >
-                        <Plus className="h-3.5 w-3.5" /> Add Entry
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => clearEntryRow()}
-                        className="self-end text-gray-400 hover:text-gray-600"
-                        aria-label="Clear entry row"
-                      >
-                        <X className="h-5 w-5" />
-                      </button>
-                    </div>
-                  ) : null}
-                </td>
-              </tr>
-              {editable ? (
-                <tr>
-                  <td colSpan={9} className="border-b border-gray-200 bg-white px-2 pb-3 pt-1 dark:border-gray-600 dark:bg-gray-900">
-                    <p className="flex items-start gap-1 text-xs text-amber-700 dark:text-amber-400">
-                      <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      <span className="italic">
-                        Enter project, optional task, and hours for each day, then click &apos;Add Entry&apos;
-                      </span>
-                    </p>
-                  </td>
-                </tr>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colSpan={9} className="border-b border-gray-200 bg-white px-2 pb-3 pt-1 dark:border-gray-600 dark:bg-gray-900">
+                      <p className="flex items-start gap-1 text-xs text-amber-700 dark:text-amber-400">
+                        <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <span className="italic">
+                          Add each ticket or case as a line (optional). Use Add Entry for more lines, or Save to include the
+                          current row.
+                        </span>
+                      </p>
+                    </td>
+                  </tr>
+                </>
               ) : null}
             </tbody>
           </table>

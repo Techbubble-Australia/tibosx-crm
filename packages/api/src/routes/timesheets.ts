@@ -18,34 +18,27 @@ import {
   projectMemberWhereForUser,
   userHasActiveProjectMembership,
 } from "../lib/project-member-resolution";
+import {
+  activeEntryRows,
+  assertValidTimesheetEntries,
+  dailyCommentsSchema,
+  dailyHoursSchema,
+  entryHasHours,
+  entryLabel,
+  replaceTimesheetEntries,
+  resolveTimesheetTargets,
+  sumDailyHours,
+  timesheetEntryInputSchema,
+} from "../lib/timesheet-entries";
 
 const router: IRouter = Router();
-
-const dailyHoursSchema = z.object({
-  mon: z.coerce.number().min(0).optional(),
-  tue: z.coerce.number().min(0).optional(),
-  wed: z.coerce.number().min(0).optional(),
-  thu: z.coerce.number().min(0).optional(),
-  fri: z.coerce.number().min(0).optional(),
-  sat: z.coerce.number().min(0).optional(),
-  sun: z.coerce.number().min(0).optional(),
-});
-
-const dailyCommentsSchema = z.object({
-  mon: z.string().max(2000).optional(),
-  tue: z.string().max(2000).optional(),
-  wed: z.string().max(2000).optional(),
-  thu: z.string().max(2000).optional(),
-  fri: z.string().max(2000).optional(),
-  sat: z.string().max(2000).optional(),
-  sun: z.string().max(2000).optional(),
-});
 
 const timesheetSchema = z
   .object({
     projectId: z.string().min(1).optional(),
     opportunityId: z.string().min(1).optional(),
     ticketId: z.string().min(1).optional(),
+    entries: z.array(timesheetEntryInputSchema).optional(),
     approverKind: z.enum(["PM", "CLIENT_CONTACT"]).optional(),
     projectClientContactId: z.string().min(1).optional(),
     startDate: z.coerce.date(),
@@ -55,22 +48,68 @@ const timesheetSchema = z
     dailyComments: dailyCommentsSchema.optional(),
     comments: z.string().max(10000).optional().nullable(),
   })
-  .refine((data) => Boolean(data.projectId || data.opportunityId || data.ticketId), {
-    message: "Select a project, sales case, or support case",
-  })
-  .refine((data) => [data.projectId, data.opportunityId, data.ticketId].filter(Boolean).length === 1, {
-    message: "Select only one target",
+  .superRefine((data, ctx) => {
+    const entryRows = activeEntryRows(data.entries);
+    if (entryRows.length > 0) {
+      if (!data.projectId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Select a project for line entries",
+          path: ["projectId"],
+        });
+      }
+      return;
+    }
+    if (!data.projectId && !data.opportunityId && !data.ticketId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Select a project, sales case, or support case",
+        path: ["projectId"],
+      });
+    }
+    if ([data.projectId, data.opportunityId, data.ticketId].filter(Boolean).length !== 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Select only one target",
+        path: ["projectId"],
+      });
+    }
   })
   .refine(
     (data) => {
+      const entryRows = activeEntryRows(data.entries);
       const files = data.fileUrls?.length ?? 0;
-      const hours = data.dailyHours
-        ? Object.values(data.dailyHours).reduce((s, v) => s + (Number(v) || 0), 0)
-        : 0;
+      if (entryRows.length > 0) {
+        return files > 0 || entryRows.some((row) => entryHasHours(row.dailyHours));
+      }
+      const hours = data.dailyHours ? sumDailyHours(data.dailyHours) : 0;
       return files > 0 || hours > 0;
     },
     { message: "Enter hours for the week or attach at least one file" },
   );
+
+function serializeEntry(row: {
+  id: string;
+  sortOrder: number;
+  opportunityId: string | null;
+  ticketId: string | null;
+  dailyHours: unknown;
+  dailyComments: unknown;
+  billable: boolean;
+  opportunity?: { name: string } | null;
+  ticket?: { ticketNumber: string; subject: string } | null;
+}) {
+  return {
+    id: row.id,
+    sortOrder: row.sortOrder,
+    opportunityId: row.opportunityId,
+    ticketId: row.ticketId,
+    label: entryLabel(row),
+    dailyHours: row.dailyHours ?? null,
+    dailyComments: row.dailyComments ?? null,
+    billable: row.billable,
+  };
+}
 
 function serializeActivity(row: {
   id: string;
@@ -112,11 +151,19 @@ function serializeTimesheet(row: {
   projectClientContact?: { id: string; contact: { name: string; email: string } } | null;
   memberUser?: { id: string; name: string | null; email: string };
   activityLogs?: ReturnType<typeof serializeActivity>[];
+  entries?: ReturnType<typeof serializeEntry>[];
 }) {
   const fileUrls = Array.isArray(row.fileUrls)
     ? row.fileUrls.filter((url): url is string => typeof url === "string")
     : [];
   const status = row.status as keyof typeof TIMESHEET_STATUS_LABELS;
+  const serializedEntries = row.entries ?? [];
+  const multiLineLabel =
+    serializedEntries.length > 0
+      ? serializedEntries.length === 1
+        ? serializedEntries[0]!.label
+        : `${serializedEntries.length} entries — ${row.project?.projectNumber ?? ""} ${row.project?.title ?? ""}`.trim()
+      : "";
   return {
     id: row.id,
     projectId: row.projectId,
@@ -133,11 +180,14 @@ function serializeTimesheet(row: {
     projectTitle: row.project?.title ?? "",
     projectNumber: row.project?.projectNumber ?? "",
     opportunityName: row.opportunity?.name ?? "",
-    targetLabel: row.ticket
-      ? `${row.ticket.ticketNumber} — ${row.ticket.subject}`
-      : row.project
-        ? `${row.project.projectNumber} — ${row.project.title}`
-        : row.opportunity?.name ?? "",
+    targetLabel: multiLineLabel
+      ? multiLineLabel
+      : row.ticket
+        ? `${row.ticket.ticketNumber} — ${row.ticket.subject}`
+        : row.project
+          ? `${row.project.projectNumber} — ${row.project.title}`
+          : row.opportunity?.name ?? "",
+    entries: serializedEntries,
     memberUserId: row.memberUserId,
     memberName: row.memberUser?.name || row.memberUser?.email || "",
     startDate: row.startDate.toISOString(),
@@ -173,6 +223,13 @@ const detailInclude = {
     orderBy: { createdAt: "desc" as const },
     include: { performedBy: { select: { name: true, email: true } } },
   },
+  entries: {
+    orderBy: { sortOrder: "asc" as const },
+    include: {
+      opportunity: { select: { name: true } },
+      ticket: { select: { ticketNumber: true, subject: true } },
+    },
+  },
 };
 
 async function fetchTimesheet(id: string) {
@@ -183,6 +240,7 @@ function mapDetail(row: NonNullable<Awaited<ReturnType<typeof fetchTimesheet>>>)
   return serializeTimesheet({
     ...row,
     activityLogs: row.activityLogs.map(serializeActivity),
+    entries: row.entries.map(serializeEntry),
   });
 }
 
@@ -456,6 +514,30 @@ router.get("/defaults", async (_req, res) => {
   });
 });
 
+router.get("/for-week", async (req: AuthRequest, res) => {
+  try {
+    const actorId = getActorId(req);
+    const projectId = typeof req.query.projectId === "string" ? req.query.projectId : "";
+    const startDateRaw = typeof req.query.startDate === "string" ? req.query.startDate : "";
+    if (!projectId || !startDateRaw) {
+      return res.status(400).json({ error: "projectId and startDate are required" });
+    }
+    const startDate = new Date(`${startDateRaw}T00:00:00.000Z`);
+    if (Number.isNaN(startDate.getTime())) {
+      return res.status(400).json({ error: "Invalid startDate" });
+    }
+    const row = await prisma.timesheet.findFirst({
+      where: { memberUserId: actorId, projectId, startDate },
+      include: detailInclude,
+    });
+    if (!row) return res.json({ data: null });
+    res.json({ data: mapDetail(row) });
+  } catch (error) {
+    console.error("Error fetching timesheet for week:", error);
+    res.status(500).json({ error: "Failed to fetch timesheet" });
+  }
+});
+
 router.get("/", async (req: AuthRequest, res) => {
   try {
     const where = await timesheetAccessWhere(req);
@@ -524,10 +606,37 @@ router.post("/", async (req: AuthRequest, res) => {
     const data = timesheetSchema.parse(req.body);
     await assertMemberCanSubmitTimesheets(actorId, roles);
 
-    if (data.projectId) {
-      const ok = await userHasActiveProjectMembership(actorId, data.projectId);
+    let resolved;
+    try {
+      resolved = resolveTimesheetTargets(data);
+    } catch (error) {
+      if (error instanceof Error && error.message === "PROJECT_REQUIRED") {
+        return res.status(400).json({ error: "Select a project for line entries" });
+      }
+      throw error;
+    }
+
+    if (resolved.projectId) {
+      const ok = await userHasActiveProjectMembership(actorId, resolved.projectId);
       if (!ok) {
         return res.status(400).json({ error: "You are not assigned to this active project" });
+      }
+      if (resolved.entryRows.length > 0) {
+        await assertValidTimesheetEntries(actorId, resolved.projectId, resolved.entryRows);
+        const duplicate = await prisma.timesheet.findFirst({
+          where: {
+            memberUserId: actorId,
+            projectId: resolved.projectId,
+            startDate: data.startDate,
+          },
+          select: { id: true },
+        });
+        if (duplicate) {
+          return res.status(409).json({
+            error: "A timesheet already exists for this project and week",
+            data: { id: duplicate.id },
+          });
+        }
       }
     } else if (data.opportunityId) {
       const opportunity = await prisma.opportunity.findUnique({ where: { id: data.opportunityId } });
@@ -551,9 +660,9 @@ router.post("/", async (req: AuthRequest, res) => {
     const row = await prisma.$transaction(async (tx) => {
       const created = await tx.timesheet.create({
         data: {
-          projectId: data.projectId ?? null,
-          opportunityId: data.opportunityId ?? null,
-          ticketId: data.ticketId ?? null,
+          projectId: resolved.projectId,
+          opportunityId: resolved.opportunityId,
+          ticketId: resolved.ticketId,
           approverKind: data.approverKind ?? null,
           projectClientContactId:
             data.approverKind === "CLIENT_CONTACT" ? data.projectClientContactId ?? null : null,
@@ -562,11 +671,14 @@ router.post("/", async (req: AuthRequest, res) => {
           endDate: data.endDate,
           status: "DRAFT",
           fileUrls: data.fileUrls ?? [],
-          dailyHours: data.dailyHours ?? undefined,
-          dailyComments: data.dailyComments ?? undefined,
+          dailyHours: resolved.dailyHours ?? undefined,
+          dailyComments: resolved.dailyComments ?? undefined,
           comments: data.comments?.trim() || null,
         },
       });
+      if (resolved.entryRows.length > 0) {
+        await replaceTimesheetEntries(tx, created.id, resolved.entryRows);
+      }
       await tx.timesheetActivityLog.create({
         data: {
           timesheetId: created.id,
@@ -585,6 +697,12 @@ router.post("/", async (req: AuthRequest, res) => {
     }
     if (error instanceof Error && error.message === "PROFILE_REQUIRED") {
       return res.status(403).json({ error: "Complete your profile before creating timesheets" });
+    }
+    if (error instanceof Error && error.message === "INVALID_ENTRY_TICKET") {
+      return res.status(400).json({ error: "One or more tickets do not belong to this project" });
+    }
+    if (error instanceof Error && error.message === "INVALID_ENTRY_OPPORTUNITY") {
+      return res.status(400).json({ error: "One or more cases are invalid or not owned by you" });
     }
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: formatZodError(error), details: error.errors });
@@ -611,24 +729,49 @@ router.put("/:id", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Only draft timesheets can be edited" });
     }
 
+    let resolved;
+    try {
+      resolved = resolveTimesheetTargets(data);
+    } catch (error) {
+      if (error instanceof Error && error.message === "PROJECT_REQUIRED") {
+        return res.status(400).json({ error: "Select a project for line entries" });
+      }
+      throw error;
+    }
+
+    if (resolved.projectId) {
+      const ok = await userHasActiveProjectMembership(actorId, resolved.projectId);
+      if (!ok) {
+        return res.status(400).json({ error: "You are not assigned to this active project" });
+      }
+      if (resolved.entryRows.length > 0) {
+        await assertValidTimesheetEntries(actorId, resolved.projectId, resolved.entryRows);
+      }
+    }
+
     const row = await prisma.$transaction(async (tx) => {
       const updated = await tx.timesheet.update({
         where: { id: req.params.id },
         data: {
-          projectId: data.projectId ?? null,
-          opportunityId: data.opportunityId ?? null,
-          ticketId: data.ticketId ?? null,
+          projectId: resolved.projectId,
+          opportunityId: resolved.opportunityId,
+          ticketId: resolved.ticketId,
           approverKind: data.approverKind ?? null,
           projectClientContactId:
             data.approverKind === "CLIENT_CONTACT" ? data.projectClientContactId ?? null : null,
           startDate: data.startDate,
           endDate: data.endDate,
           fileUrls: data.fileUrls ?? [],
-          dailyHours: data.dailyHours ?? undefined,
-          dailyComments: data.dailyComments ?? undefined,
+          dailyHours: resolved.dailyHours ?? undefined,
+          dailyComments: resolved.dailyComments ?? undefined,
           comments: data.comments?.trim() || null,
         },
       });
+      if (resolved.entryRows.length > 0) {
+        await replaceTimesheetEntries(tx, updated.id, resolved.entryRows);
+      } else if (data.entries) {
+        await tx.timesheetEntry.deleteMany({ where: { timesheetId: updated.id } });
+      }
       await tx.timesheetActivityLog.create({
         data: { timesheetId: updated.id, action: "UPDATED", performedById: actorId },
       });
@@ -643,6 +786,12 @@ router.put("/:id", async (req: AuthRequest, res) => {
     }
     if (error instanceof Error && error.message === "PROFILE_REQUIRED") {
       return res.status(403).json({ error: "Complete your profile before editing timesheets" });
+    }
+    if (error instanceof Error && error.message === "INVALID_ENTRY_TICKET") {
+      return res.status(400).json({ error: "One or more tickets do not belong to this project" });
+    }
+    if (error instanceof Error && error.message === "INVALID_ENTRY_OPPORTUNITY") {
+      return res.status(400).json({ error: "One or more cases are invalid or not owned by you" });
     }
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: formatZodError(error), details: error.errors });

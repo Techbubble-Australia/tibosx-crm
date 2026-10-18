@@ -697,6 +697,42 @@ router.post("/my-agreement/sign", async (req: AuthRequest, res) => {
   }
 });
 
+router.get("/:id/tickets", async (req: AuthRequest, res) => {
+  try {
+    const projectId = req.params.id;
+    if (!projectId) return res.status(400).json({ error: "Invalid id" });
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { id: true, kind: true },
+    });
+    if (!project) return res.status(404).json({ error: "Not found" });
+    if (project.kind !== "SUPPORT") {
+      return res.json({ data: [] });
+    }
+    const tickets = await prisma.ticket.findMany({
+      where: { projectId },
+      orderBy: { updatedAt: "desc" },
+      take: 100,
+      select: {
+        id: true,
+        ticketNumber: true,
+        subject: true,
+        status: true,
+        updatedAt: true,
+      },
+    });
+    res.json({
+      data: tickets.map((row) => ({
+        ...row,
+        updatedAt: row.updatedAt.toISOString(),
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching project tickets:", error);
+    res.status(500).json({ error: "Failed to fetch tickets" });
+  }
+});
+
 router.get("/:id", async (req: AuthRequest, res) => {
   try {
     const projectId = req.params.id;

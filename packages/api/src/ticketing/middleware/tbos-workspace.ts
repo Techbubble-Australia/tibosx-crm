@@ -1,5 +1,6 @@
 import type { Response, NextFunction } from "express";
 import type { AuthRequest } from "../../middleware/auth.js";
+import { effectiveRoleList } from "../../lib/admin-roles.js";
 import {
   isWorkspaceTbosRole,
   resolveTicketingUserForWorkspace,
@@ -17,7 +18,9 @@ export async function tbosWorkspaceTicketingMiddleware(
   if (!tbosUser?.id || !tbosUser.email) {
     return res.status(401).json({ error: "Unauthorized" });
   }
-  if (!isWorkspaceTbosRole(tbosUser.role)) {
+  const effectiveRoles = effectiveRoleList(tbosUser.role, tbosUser.additionalRoles);
+  const workspaceRole = effectiveRoles.find((r) => isWorkspaceTbosRole(r));
+  if (!workspaceRole) {
     return res.status(403).json({ error: "Workspace access is for client and customer support roles only" });
   }
 
@@ -25,12 +28,12 @@ export async function tbosWorkspaceTicketingMiddleware(
     const ticketingUser = await resolveTicketingUserForWorkspace(
       tbosUser.id,
       tbosUser.email,
-      tbosUser.role,
+      workspaceRole,
     );
     if (!ticketingUser) {
       return res.status(403).json({
         error:
-          tbosUser.role === "client"
+          workspaceRole === "client"
             ? "No support portal access linked to your client contact. Ask your administrator to enable portal access on your project."
             : "Could not provision your support workspace account",
       });

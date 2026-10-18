@@ -15,7 +15,12 @@ export function MfaEnrollmentGuard({ children }: { children: React.ReactNode }) 
     void adminFetch("/api/auth/me")
       .then((res) => res.json())
       .then((data) => {
+        const impersonating = Boolean(data?.data?.impersonation?.impersonatorId);
         const user = data?.data?.user;
+        if (impersonating) {
+          setAllowed(true);
+          return;
+        }
         if (user?.passwordNeedsReset === true) {
           window.location.assign("/change-password");
           return;

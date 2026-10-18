@@ -36,17 +36,24 @@ export function bankDetailsFromApi(value: unknown): BankDetailsFormValue {
   };
 }
 
-export function bankDetailsToApi(value: BankDetailsFormValue) {
+export function bankDetailsToApi(value: BankDetailsFormValue): Record<string, string> | null {
   const country = mergeCountryValue(value.countrySelect, value.countryOther);
+  const bankName = value.bankName.trim();
+  const accountName = value.accountName.trim();
+  const accountNumber = value.accountNumber.trim();
+  const bsb = value.bsb.trim();
+  if (!bankName && !accountName && !accountNumber && !country && !bsb) {
+    return null;
+  }
   return {
-    bankName: value.bankName.trim(),
-    accountName: value.accountName.trim(),
-    accountNumber: value.accountNumber.trim(),
+    bankName,
+    accountName,
+    accountNumber,
     country,
     swiftCode: value.swiftCode.trim() || undefined,
-    bsb: value.bsb.trim(),
+    bsb,
     notes: value.notes.trim() || undefined,
-  };
+  } as Record<string, string>;
 }
 
 type Props = {

@@ -203,7 +203,8 @@ export default function EditUserPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error((err as { error?: string }).error || "Failed");
+        const msg = (err as { error?: string }).error || "Failed to save user";
+        throw new Error(msg);
       }
       await load();
     } catch (e) {
