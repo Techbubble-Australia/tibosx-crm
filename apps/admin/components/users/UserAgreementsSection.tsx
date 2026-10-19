@@ -5,7 +5,6 @@ import { resolveDocumentHref } from "@/lib/media-url";
 export type AgreementRecordRow = {
   id: string;
   templateName: string;
-  projectLabel: string | null;
   startDate: string | null;
   endDate: string | null;
   startDateDisplay?: string | null;
@@ -39,7 +38,6 @@ export function UserAgreementsSection({ records, emptyMessage, headerAction }: P
             <thead>
               <tr className="border-b border-gray-200 text-xs uppercase text-gray-500 dark:border-gray-700">
                 <th className="py-2 pr-3">Template</th>
-                <th className="py-2 pr-3">Project</th>
                 <th className="py-2 pr-3">Start</th>
                 <th className="py-2 pr-3">End</th>
                 <th className="py-2 pr-3">Signed</th>
@@ -50,7 +48,6 @@ export function UserAgreementsSection({ records, emptyMessage, headerAction }: P
               {records.map((row) => (
                 <tr key={row.id} className="border-b border-gray-100 dark:border-gray-800">
                   <td className="py-2 pr-3">{row.templateName}</td>
-                  <td className="py-2 pr-3 text-gray-600 dark:text-gray-400">{row.projectLabel ?? "—"}</td>
                   <td className="py-2 pr-3">{formatDate(row.startDate, row.startDateDisplay)}</td>
                   <td className="py-2 pr-3">{formatDate(row.endDate, row.endDateDisplay)}</td>
                   <td className="py-2 pr-3">{formatDate(row.signedAt)}</td>

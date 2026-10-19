@@ -19,7 +19,11 @@ import { readUploadTextByUrl } from "../lib/read-upload-buffer";
 import { canManageProjects, getActorId, isProjectManagerRole, isProjectMemberRole } from "../lib/project-access";
 import { effectiveRoleList } from "../lib/admin-roles";
 import { ensureCandidateProfileForAdminUser } from "../lib/admin-user-profile-map";
-import { createUserAgreementRecord, markLatestAgreementSigned } from "../lib/user-agreement-records";
+import {
+  agreementDatesFromCredentialData,
+  createUserAgreementRecord,
+  markLatestAgreementSigned,
+} from "../lib/user-agreement-records";
 import {
   findCredentialProjectMemberForUser,
   findUserCredentialAgreement,
@@ -681,11 +685,14 @@ router.post("/my-agreement/sign", async (req: AuthRequest, res) => {
         where: { id: userId },
         data: { agreementDocumentUrl: documentUrl },
       });
+      const agreementDates = agreementDatesFromCredentialData(values);
       await markLatestAgreementSigned(tx, {
         adminUserId: userId,
         credentialTemplateId: template.id,
         templateName: template.name,
         projectMemberId: agreement.source === "project_member" ? agreement.memberId : null,
+        startDate: agreementDates.startDate,
+        endDate: agreementDates.endDate,
         agreementSignedAt: signedAt,
         agreementDocumentUrl: documentUrl,
       });

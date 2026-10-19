@@ -123,7 +123,12 @@ export default function NewTicketPage() {
       <form onSubmit={onSubmit} className="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div>
           <label className="mb-1 block text-sm font-medium">Project *</label>
-          {orgs.length <= 1 && orgs.length > 0 ? (
+          {orgs.length === 0 ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              No active support projects are linked to your account. Ask your administrator to enable portal access on
+              your project client contact, or to assign you as timesheet approver on an active support project.
+            </p>
+          ) : orgs.length <= 1 && orgs.length > 0 ? (
             <input
               readOnly
               value={orgs[0]?.name ?? me?.organization?.name ?? ""}

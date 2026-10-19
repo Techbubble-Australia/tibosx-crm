@@ -10,11 +10,7 @@ router.use(authMiddleware);
 
 router.get("/", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
-  if (user.role === "CLIENT") {
-    if (!user.organizationId) {
-      return res.json({ data: [] });
-    }
-  } else if (user.role !== "CONSULTANT" || !user.consultantVerified) {
+  if (user.role !== "CLIENT" && (user.role !== "CONSULTANT" || !user.consultantVerified)) {
     return res.status(403).json({ error: "Forbidden" });
   }
 

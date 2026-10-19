@@ -37,6 +37,14 @@ function getMailFrom(): string {
   return process.env.MAIL_FROM?.trim() || "TechBubble Careers <careers@techbubble.com.au>";
 }
 
+function getTbosMailFrom(): string {
+  return (
+    process.env.TBOS_MAIL_FROM?.trim() ||
+    process.env.MAIL_FROM?.trim() ||
+    "TIBOSX <noreply@techbubble.com.au>"
+  );
+}
+
 function getHrEmail(): string {
   return process.env.CAREERS_HR_EMAIL?.trim() || "hr@techbubble.com.au";
 }
@@ -256,7 +264,7 @@ ${input.extraText ?? ""}
 If you did not expect this email, please contact your administrator.`;
 
   const { error } = await resend.emails.send({
-    from: getMailFrom(),
+    from: getTbosMailFrom(),
     to: [input.to],
     subject,
     text,

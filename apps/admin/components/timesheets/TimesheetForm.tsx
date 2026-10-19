@@ -80,7 +80,7 @@ export type TimesheetFormValues = {
 };
 
 type ProjectOption = { id: string; label: string; kind: string };
-type CaseOption = { kind: "ticket" | "opportunity"; id: string; label: string };
+type CaseOption = { kind: "ticket" | "opportunity" | "project"; id: string; label: string };
 type ApproverOption = { kind: "PM" | "CLIENT_CONTACT"; id: string; label: string };
 
 type Props = {

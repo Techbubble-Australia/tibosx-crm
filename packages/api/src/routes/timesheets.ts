@@ -304,26 +304,43 @@ router.get("/project-cases", async (req: AuthRequest, res) => {
     const whereMember = await projectMemberWhereForUser(actorId);
     const membership = await prisma.projectMember.findFirst({
       where: { ...whereMember, projectId, project: { status: "ACTIVE" } },
-      include: { project: { select: { kind: true } } },
+      include: {
+        project: { select: { kind: true, projectNumber: true, title: true } },
+      },
     });
     if (!membership?.project) return res.status(403).json({ error: "Forbidden" });
 
     if (membership.project.kind === "SUPPORT") {
+      const supportOrg = await prisma.organization.findFirst({
+        where: { projectId, active: true },
+        select: { id: true },
+      });
       const tickets = await prisma.ticket.findMany({
         where: {
-          projectId,
           status: { in: ["OPEN", "IN_PROGRESS", "PENDING_CLIENT"] },
+          OR: [
+            { projectId },
+            ...(supportOrg ? [{ organizationId: supportOrg.id }] : []),
+          ],
         },
         select: { id: true, ticketNumber: true, subject: true },
         orderBy: { updatedAt: "desc" },
         take: 100,
       });
+      const projectOption = {
+        kind: "project" as const,
+        id: projectId,
+        label: `${membership.project.projectNumber} — ${membership.project.title}`,
+      };
       return res.json({
-        data: tickets.map((row) => ({
-          kind: "ticket" as const,
-          id: row.id,
-          label: `${row.ticketNumber} — ${row.subject}`,
-        })),
+        data: [
+          projectOption,
+          ...tickets.map((row) => ({
+            kind: "ticket" as const,
+            id: row.id,
+            label: `${row.ticketNumber} — ${row.subject}`,
+          })),
+        ],
       });
     }
 

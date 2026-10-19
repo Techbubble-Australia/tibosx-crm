@@ -41,14 +41,30 @@ export async function organizationIdsForClientPortal(
     if (admin?.mappedClientContactId) {
       contactIds.add(admin.mappedClientContactId);
     }
+
+    const approverProjects = await prisma.project.findMany({
+      where: {
+        status: "ACTIVE",
+        timesheetApproverUserId: tbosAdminUserId,
+        supportOrganization: { active: true },
+      },
+      select: { id: true },
+    });
+    for (const row of approverProjects) {
+      projectIds.add(row.id);
+    }
   }
 
   const portalLinks = await prisma.projectClientContact.findMany({
     where: {
       OR: [
         { ticketingUserId, portalAccess: true },
+        { ticketingUserId, canApproveTimesheets: true },
         ...(contactIds.size
-          ? [{ contactId: { in: [...contactIds] }, portalAccess: true }]
+          ? [
+              { contactId: { in: [...contactIds] }, portalAccess: true },
+              { contactId: { in: [...contactIds] }, canApproveTimesheets: true },
+            ]
           : []),
       ],
       project: { status: "ACTIVE" },

@@ -19,7 +19,9 @@ export async function tbosWorkspaceTicketingMiddleware(
     return res.status(401).json({ error: "Unauthorized" });
   }
   const effectiveRoles = effectiveRoleList(tbosUser.role, tbosUser.additionalRoles);
-  const workspaceRole = effectiveRoles.find((r) => isWorkspaceTbosRole(r));
+  const workspaceRole = effectiveRoles.includes("client")
+    ? "client"
+    : effectiveRoles.find((r) => isWorkspaceTbosRole(r));
   if (!workspaceRole) {
     return res.status(403).json({ error: "Workspace access is for client and customer support roles only" });
   }

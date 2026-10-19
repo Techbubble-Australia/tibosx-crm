@@ -14,7 +14,7 @@ export async function getTimesheetAccessForUser(
 ): Promise<TimesheetAccessFlags> {
   const roles = effectiveRoleList(primaryRole, additionalRoles);
   if (roles.some((r) => r === "admin" || r === "project_manager" || r === "project_member")) {
-    return { projectManagementTimesheets: true, workspaceTimesheets: roles.includes("customer_support") };
+    return { projectManagementTimesheets: true, workspaceTimesheets: false };
   }
 
   const memberships = await listActiveProjectMembershipsForUser(userId);
@@ -39,10 +39,7 @@ export async function getTimesheetAccessForUser(
     select: { id: true },
   });
 
-  const workspaceTimesheets =
-    roles.includes("customer_support") ||
-    (roles.includes("client") && Boolean(approverLink)) ||
-    memberships.length > 0;
+  const workspaceTimesheets = roles.includes("client") && Boolean(approverLink);
 
   return { projectManagementTimesheets, workspaceTimesheets };
 }

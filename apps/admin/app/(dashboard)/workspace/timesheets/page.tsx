@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ClipboardCheck, Loader2, Plus } from "lucide-react";
+import { ClipboardCheck, Loader2 } from "lucide-react";
 import { workspaceFetch } from "@/lib/workspace-fetch";
 import { messageFromApiError } from "@/lib/api-error";
 
@@ -187,61 +187,12 @@ export default function ClientTimesheetsPage() {
     );
   }
 
-  if (role === "CONSULTANT") {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-900">Timesheets</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Approve timesheets against projects and support cases.
-            </p>
-          </div>
-          <Link
-            href="/workspace/timesheets/new"
-            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
-          >
-            <Plus className="h-4 w-4" /> Create timesheet
-          </Link>
-        </div>
-        {memberRows.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-200 bg-white p-10 text-center text-slate-500">
-            <p className="font-medium text-slate-700">No timesheets yet</p>
-            <p className="mt-1 text-sm">Create a timesheet for an active project or case.</p>
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <table className="min-w-full text-sm">
-              <thead className="border-b bg-slate-50 text-left text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Project / case</th>
-                  <th className="px-4 py-3">Period</th>
-                  <th className="px-4 py-3">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {memberRows.map((row) => (
-                  <tr key={row.id}>
-                    <td className="px-4 py-3 font-medium text-slate-900">{row.targetLabel}</td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {formatDate(row.startDate)} – {formatDate(row.endDate)}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{row.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    );
-  }
-
   if (role !== "CLIENT" && role !== "admin") {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-10 text-center text-slate-600">
-        <p className="font-medium text-slate-900">Timesheets unavailable</p>
-        <Link href="/workspace/dashboard" className="mt-4 inline-block text-sm text-sky-600 hover:underline">Back to dashboard</Link>
+        <p className="font-medium text-slate-900">Approve/Reject Timesheets</p>
+        <p className="mt-2 text-sm">This area is for client contacts who approve timesheets. To create or edit your own timesheets, use Project Management.</p>
+        <Link href="/timesheets" className="mt-4 inline-block text-sm text-sky-600 hover:underline">Open Project Management timesheets</Link>
       </div>
     );
   }
