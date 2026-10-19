@@ -5,7 +5,6 @@ import { resolveDocumentHref } from "@/lib/media-url";
 type UserFileRow = { name?: string; url?: string };
 
 type Props = {
-  agreementDocumentUrl?: string | null;
   idProofUrl?: string | null;
   addressProofUrl?: string | null;
   userFiles?: UserFileRow[] | null;
@@ -26,27 +25,21 @@ function FileLink({ label, url }: { label: string; url: string }) {
   );
 }
 
-export function UserFilesSection({
-  agreementDocumentUrl,
-  idProofUrl,
-  addressProofUrl,
-  userFiles,
-}: Props) {
+export function UserFilesSection({ idProofUrl, addressProofUrl, userFiles }: Props) {
   const extraFiles = (userFiles ?? []).filter((f) => typeof f?.url === "string" && f.url.trim());
   const hasAny =
-    Boolean(agreementDocumentUrl?.trim()) ||
     Boolean(idProofUrl?.trim()) ||
     Boolean(addressProofUrl?.trim()) ||
     extraFiles.length > 0;
 
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-      <h3 className="mb-3 font-semibold text-gray-900 dark:text-gray-100">Files</h3>
+      <h3 className="mb-1 font-semibold text-gray-900 dark:text-gray-100">Files</h3>
+      <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+        ID, address, and other documents. See Agreements for contracts and dates.
+      </p>
       {hasAny ? (
         <ul className="list-inside list-disc space-y-1 text-gray-700 dark:text-gray-300">
-          {agreementDocumentUrl?.trim() ? (
-            <FileLink label="Signed contract / agreement" url={agreementDocumentUrl} />
-          ) : null}
           {idProofUrl?.trim() ? <FileLink label="ID proof" url={idProofUrl} /> : null}
           {addressProofUrl?.trim() ? <FileLink label="Address proof" url={addressProofUrl} /> : null}
           {extraFiles.map((file, index) => (

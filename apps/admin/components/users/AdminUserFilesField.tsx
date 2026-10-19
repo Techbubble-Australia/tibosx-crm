@@ -50,7 +50,12 @@ export function AdminUserFilesField({
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Files</h3>
+        <div>
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100">Files</h3>
+          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+            ID, address, and other uploads. Contracts and start/expiry dates are under Agreements.
+          </p>
+        </div>
         {allowUpload ? (
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800">
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}

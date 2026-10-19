@@ -596,7 +596,6 @@ export default function ProfileSettingsPageInner() {
       <AdminUserFilesField
         files={userFiles}
         pinnedFiles={buildPinnedUserFiles({
-          agreementDocumentUrl,
           idProofUrl,
           addressProofUrl,
         })}

@@ -499,9 +499,7 @@ router.get("/:id", async (req, res) => {
         ...sanitizeDetail(row),
         agreementTemplate,
         agreementRecords,
-        agreementFiles: row.agreementDocumentUrl
-          ? [{ name: "Signed contract / agreement", url: row.agreementDocumentUrl }]
-          : [],
+        agreementFiles: [],
         projectMembership: membership
           ? {
               memberId: membership.id,

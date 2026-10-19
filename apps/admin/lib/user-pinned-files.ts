@@ -1,14 +1,11 @@
 import type { UserFileRow } from "@/components/users/AdminUserFilesField";
 
+/** Identity / compliance files only — signed agreements live in the Agreements table. */
 export function buildPinnedUserFiles(row: {
-  agreementDocumentUrl?: string | null;
   idProofUrl?: string | null;
   addressProofUrl?: string | null;
 }): UserFileRow[] {
   const pinned: UserFileRow[] = [];
-  if (row.agreementDocumentUrl?.trim()) {
-    pinned.push({ name: "Signed contract / agreement", url: row.agreementDocumentUrl.trim() });
-  }
   if (row.idProofUrl?.trim()) {
     pinned.push({ name: "ID proof", url: row.idProofUrl.trim() });
   }

@@ -339,26 +339,6 @@ export default function EditUserPage() {
           </button>
         </section>
 
-        <UserAgreementsSection
-          records={defaults.agreementRecords ?? []}
-          emptyMessage={
-            canAssignTemplate
-              ? "No agreements assigned yet. Use Assign template to send a contract for signing."
-              : "Agreement templates are not assigned to client portal users."
-          }
-          headerAction={
-            canAssignTemplate ? (
-              <button
-                type="button"
-                onClick={() => setAssignOpen(true)}
-                className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
-              >
-                Assign template
-              </button>
-            ) : null
-          }
-        />
-
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
           <h3 className="mb-4 font-semibold">Address</h3>
           <p className="mb-4 text-xs text-gray-500">Usually completed by the member during first login after signing their contract.</p>
@@ -468,6 +448,26 @@ export default function EditUserPage() {
             + Add contact
           </button>
         </section>
+
+        <UserAgreementsSection
+          records={defaults.agreementRecords ?? []}
+          emptyMessage={
+            canAssignTemplate
+              ? "No agreements assigned yet. Use Assign template to send a contract for signing."
+              : "Agreement templates are not assigned to client portal users."
+          }
+          headerAction={
+            canAssignTemplate ? (
+              <button
+                type="button"
+                onClick={() => setAssignOpen(true)}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+              >
+                Assign template
+              </button>
+            ) : null
+          }
+        />
 
         <AdminUserFilesField
           files={userFiles}
