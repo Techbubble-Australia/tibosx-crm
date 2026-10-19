@@ -48,7 +48,7 @@ Deploy **api**, **admin**, and **web** only (`pnpm run deploy:railway` or per-se
 - API: `railway.api.toml` / `Dockerfile.api`
 - Admin: `railway.admin.toml` / `Dockerfile.admin`
 
-Ensure `ADMIN_PUBLIC_URL` on the API matches the public TBOS admin URL.
+Ensure `ADMIN_PUBLIC_URL` on the API matches the public TBOS admin URL (e.g. `https://tibosx.ai.techbubble.net.au`).
 
 ## Troubleshooting
 

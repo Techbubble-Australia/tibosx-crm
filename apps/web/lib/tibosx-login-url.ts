@@ -2,6 +2,6 @@
 export function tibosxLoginUrl(): string {
   const base =
     process.env.NEXT_PUBLIC_TIBOSX_URL?.trim().replace(/\/$/, "") ||
-    "https://tibosx.ai.techbubble.com.au";
+    "https://tibosx.ai.techbubble.net.au";
   return `${base}/login?signin=1`;
 }
