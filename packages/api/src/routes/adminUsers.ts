@@ -5,7 +5,7 @@ import { randomBytes } from "crypto";
 import { prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth";
 import { ADMIN_ROLES_LIST, assertCanModifyAdminUser, isAdminRole } from "../lib/admin-roles";
-import { logAdminUserFieldChange } from "../lib/admin-user-activity";
+import { logAdminUserCreated, logAdminUserFieldChange } from "../lib/admin-user-activity";
 import { adminUserFieldLabel } from "../lib/admin-user-field-labels";
 import {
   assertMappedContactAvailable,
@@ -23,7 +23,7 @@ import {
   assignCredentialTemplateToAdminUser,
   credentialDefaultsForAdminUser,
 } from "../lib/assign-credential-template";
-import { listAgreementRecordsForUser } from "../lib/user-agreement-records";
+import { buildAgreementRecordsForUser } from "../lib/user-agreement-records";
 
 const router: IRouter = Router();
 
@@ -442,7 +442,7 @@ router.get("/:id", async (req, res) => {
     });
     if (!row) return res.status(404).json({ error: "Not found" });
 
-    const agreementRecords = await listAgreementRecordsForUser(row.id);
+    const agreementRecords = await buildAgreementRecordsForUser(row.id);
 
     const memberWhere: { OR: Array<{ adminUserId: string } | { profileId: string }> } = {
       OR: [{ adminUserId: row.id }],
@@ -498,18 +498,7 @@ router.get("/:id", async (req, res) => {
       data: {
         ...sanitizeDetail(row),
         agreementTemplate,
-        agreementRecords: agreementRecords.map((record) => ({
-          id: record.id,
-          templateName: record.templateName,
-          projectLabel: record.project
-            ? `${record.project.projectNumber} — ${record.project.title}`
-            : null,
-          startDate: record.startDate?.toISOString() ?? null,
-          endDate: record.endDate?.toISOString() ?? null,
-          assignedAt: record.assignedAt.toISOString(),
-          signedAt: record.agreementSignedAt?.toISOString() ?? null,
-          documentUrl: record.agreementDocumentUrl,
-        })),
+        agreementRecords,
         agreementFiles: row.agreementDocumentUrl
           ? [{ name: "Signed contract / agreement", url: row.agreementDocumentUrl }]
           : [],
@@ -532,7 +521,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", async (req: AuthRequest, res) => {
   try {
     const data = createSchema.parse(req.body);
     const additionalRoles = data.additionalRoles?.length ? data.additionalRoles : [];
@@ -556,6 +545,7 @@ router.post("/", async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(data.password, 10);
+    const actorId = req.user?.impersonatorId ?? req.user?.id ?? null;
     const row = await prisma.$transaction(async (tx) => {
       const created = await tx.adminUser.create({
         data: {
@@ -577,6 +567,7 @@ router.post("/", async (req, res) => {
       if (mappedProfileId) {
         await applyMappedProfile(tx, created.id, mappedProfileId);
       }
+      await logAdminUserCreated(tx, created.id, actorId, created.email);
       return created;
     });
     let inviteEmailSent = false;

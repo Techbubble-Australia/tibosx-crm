@@ -684,6 +684,7 @@ router.post("/my-agreement/sign", async (req: AuthRequest, res) => {
       await markLatestAgreementSigned(tx, {
         adminUserId: userId,
         credentialTemplateId: template.id,
+        templateName: template.name,
         projectMemberId: agreement.source === "project_member" ? agreement.memberId : null,
         agreementSignedAt: signedAt,
         agreementDocumentUrl: documentUrl,

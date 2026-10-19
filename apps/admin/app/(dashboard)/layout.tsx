@@ -348,7 +348,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         <div className={`min-w-0 p-4 ${sidebarCollapsed ? "px-2" : "p-6"}`}>
           <div className="flex items-center justify-between gap-2">
             <Link href={defaultLandingPath(role)} className="flex min-w-0 items-center gap-2">
-              <TechBubbleLogo variant="sidebar" compact={sidebarCollapsed} />
+              <TechBubbleLogo variant="sidebar" compact={sidebarCollapsed} showProductLabel />
             </Link>
             <button
               type="button"

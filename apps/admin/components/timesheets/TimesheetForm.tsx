@@ -857,7 +857,9 @@ export function TimesheetForm({
 
       <section className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
         <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">Files</h3>
-        <p className="mb-3 text-xs text-gray-500">Attach evidence when required (optional if weekly hours are entered).</p>
+        <p className="mb-3 text-xs text-gray-500">
+          Attach evidence (mandatory when the timesheet is approved by the end client outside of this system).
+        </p>
         {editable ? (
           <label
             className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500 transition hover:border-sky-300 hover:bg-sky-50/50 dark:border-gray-600 dark:hover:border-sky-700 dark:hover:bg-sky-950/20 ${

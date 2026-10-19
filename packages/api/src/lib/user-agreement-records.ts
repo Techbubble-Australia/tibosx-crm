@@ -30,7 +30,10 @@ export async function markLatestAgreementSigned(
   input: {
     adminUserId: string;
     credentialTemplateId: string;
+    templateName?: string;
     projectMemberId?: string | null;
+    startDate?: Date | null;
+    endDate?: Date | null;
     agreementSignedAt: Date;
     agreementDocumentUrl: string;
   },
@@ -58,8 +61,10 @@ export async function markLatestAgreementSigned(
     data: {
       adminUserId: input.adminUserId,
       credentialTemplateId: input.credentialTemplateId,
-      templateName: "Agreement",
+      templateName: input.templateName ?? "Agreement",
       projectMemberId: input.projectMemberId ?? null,
+      startDate: input.startDate ?? null,
+      endDate: input.endDate ?? null,
       agreementSignedAt: input.agreementSignedAt,
       agreementDocumentUrl: input.agreementDocumentUrl,
     },
@@ -82,4 +87,155 @@ export async function listAgreementRecordsForUser(adminUserId: string) {
       project: { select: { projectNumber: true, title: true } },
     },
   });
+}
+
+function displayDatesFromCredentialData(data: unknown): {
+  startDateDisplay: string | null;
+  endDateDisplay: string | null;
+} {
+  if (!data || typeof data !== "object") {
+    return { startDateDisplay: null, endDateDisplay: null };
+  }
+  const row = data as Record<string, unknown>;
+  const start =
+    (typeof row.startDate === "string" && row.startDate) ||
+    (typeof row.start_date === "string" && row.start_date) ||
+    (typeof row.Start_Date === "string" && row.Start_Date) ||
+    null;
+  const end =
+    (typeof row.endDate === "string" && row.endDate) ||
+    (typeof row.end_date === "string" && row.end_date) ||
+    (typeof row.End_Date === "string" && row.End_Date) ||
+    null;
+  return { startDateDisplay: start, endDateDisplay: end };
+}
+
+export type SerializedAgreementRecord = {
+  id: string;
+  templateName: string;
+  projectLabel: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  startDateDisplay: string | null;
+  endDateDisplay: string | null;
+  assignedAt: string;
+  signedAt: string | null;
+  documentUrl: string | null;
+};
+
+function serializeRow(
+  row: {
+    id: string;
+    templateName: string;
+    startDate: Date | null;
+    endDate: Date | null;
+    assignedAt: Date;
+    agreementSignedAt: Date | null;
+    agreementDocumentUrl: string | null;
+    project?: { projectNumber: string; title: string } | null;
+  },
+  extras?: { startDateDisplay?: string | null; endDateDisplay?: string | null; documentUrl?: string | null },
+): SerializedAgreementRecord {
+  return {
+    id: row.id,
+    templateName: row.templateName,
+    projectLabel: row.project ? `${row.project.projectNumber} — ${row.project.title}` : null,
+    startDate: row.startDate?.toISOString() ?? null,
+    endDate: row.endDate?.toISOString() ?? null,
+    startDateDisplay: extras?.startDateDisplay ?? null,
+    endDateDisplay: extras?.endDateDisplay ?? null,
+    assignedAt: row.assignedAt.toISOString(),
+    signedAt: row.agreementSignedAt?.toISOString() ?? null,
+    documentUrl: extras?.documentUrl ?? row.agreementDocumentUrl,
+  };
+}
+
+/** Stored rows plus legacy fallbacks from credential assignments and project members. */
+export async function buildAgreementRecordsForUser(adminUserId: string): Promise<SerializedAgreementRecord[]> {
+  const user = await prisma.adminUser.findUnique({
+    where: { id: adminUserId },
+    select: { agreementDocumentUrl: true, mappedProfileId: true },
+  });
+  if (!user) return [];
+
+  const stored = await listAgreementRecordsForUser(adminUserId);
+  if (stored.length > 0) {
+    return stored.map((row) =>
+      serializeRow(row, {
+        documentUrl:
+          row.agreementDocumentUrl ??
+          (row.agreementSignedAt ? user.agreementDocumentUrl : null),
+      }),
+    );
+  }
+
+  const results: SerializedAgreementRecord[] = [];
+
+  const assignment = await prisma.adminUserCredentialAssignment.findUnique({
+    where: { adminUserId },
+    include: { credentialTemplate: { select: { id: true, name: true } } },
+  });
+  if (assignment?.credentialTemplate) {
+    const dates = displayDatesFromCredentialData(assignment.credentialData);
+    results.push(
+      serializeRow(
+        {
+          id: `assignment-${assignment.id}`,
+          templateName: assignment.credentialTemplate.name,
+          startDate: null,
+          endDate: null,
+          assignedAt: assignment.createdAt,
+          agreementSignedAt: assignment.agreementSignedAt,
+          agreementDocumentUrl: assignment.agreementSignedAt ? user.agreementDocumentUrl : null,
+          project: null,
+        },
+        {
+          ...dates,
+          documentUrl: assignment.agreementSignedAt ? user.agreementDocumentUrl : null,
+        },
+      ),
+    );
+  }
+
+  const memberWhere: { OR: Array<{ adminUserId: string } | { profileId: string }> } = {
+    OR: [{ adminUserId }],
+  };
+  if (user.mappedProfileId) {
+    memberWhere.OR.push({ profileId: user.mappedProfileId });
+  }
+
+  const members = await prisma.projectMember.findMany({
+    where: {
+      ...memberWhere,
+      credentialTemplateId: { not: null },
+    },
+    include: {
+      credentialTemplate: { select: { id: true, name: true } },
+      project: { select: { projectNumber: true, title: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  for (const member of members) {
+    if (!member.credentialTemplate) continue;
+    const dates = displayDatesFromCredentialData(member.credentialData);
+    const signedDoc = member.agreementSignedAt ? user.agreementDocumentUrl : null;
+    results.push(
+      serializeRow(
+        {
+          id: `member-${member.id}`,
+          templateName: member.credentialTemplate.name,
+          startDate: null,
+          endDate: null,
+          assignedAt: member.createdAt,
+          agreementSignedAt: member.agreementSignedAt,
+          agreementDocumentUrl: signedDoc,
+          project: member.project,
+        },
+        { ...dates, documentUrl: signedDoc },
+      ),
+    );
+  }
+
+  return results;
 }

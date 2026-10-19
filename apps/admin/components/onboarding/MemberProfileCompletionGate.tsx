@@ -37,6 +37,7 @@ export function MemberProfileCompletionGate() {
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([
     { name: "", email: "", phone: "" },
   ]);
+  const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
 
   const needsProfileCompletion = Boolean(
     memberOnboarding?.agreementSigned && !memberOnboarding.profileComplete,
@@ -131,6 +132,10 @@ export function MemberProfileCompletionGate() {
     }
     if (!idProofUrl || !addressProofUrl) {
       alert("Upload ID proof and address proof.");
+      return;
+    }
+    if (!privacyAcknowledged) {
+      alert("Please read and acknowledge the Privacy Notice before continuing.");
       return;
     }
 
@@ -282,12 +287,12 @@ export function MemberProfileCompletionGate() {
           <p className="font-semibold text-gray-900 dark:text-gray-100">Privacy notice — Documents and personal information</p>
           <p className="mt-2 leading-relaxed">
             Documents uploaded to TIBOSX may contain personal, employment, identity, visa, financial or other confidential
-            information. TechBubble Pty Ltd collects and uses these documents for legitimate business purposes, including
-            recruitment, employment administration, customer management and project delivery. Access is restricted according
-            to user permissions and business requirements. Authorised personnel and service providers, including those located
-            overseas, may process or access information where necessary. AI-enabled features may also process information when
-            used. Only upload information you are authorised to provide. For details about collection, use, storage,
-            disclosure, retention and your privacy rights, read the{" "}
+            information. The system collects and uses these documents for legitimate business purposes, including recruitment,
+            employment administration, customer management and project delivery. Access is restricted according to user
+            permissions and business requirements. The system stores all information securely and follows our data retention
+            policy. Authorised personnel and service providers, including those located overseas, may process or access
+            information where necessary. For details about collection, use, storage, disclosure, retention and your privacy
+            rights, read the{" "}
             <a
               href={`${(process.env.NEXT_PUBLIC_WEB_URL || "https://techbubble.com.au").replace(/\/$/, "")}/privacy`}
               target="_blank"
@@ -302,12 +307,25 @@ export function MemberProfileCompletionGate() {
             </a>
             .
           </p>
+          <label className="mt-4 flex cursor-pointer items-start gap-2 text-sm text-gray-800 dark:text-gray-200">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 rounded border-gray-300"
+              checked={privacyAcknowledged}
+              onChange={(e) => setPrivacyAcknowledged(e.target.checked)}
+              required
+            />
+            <span>
+              I have read the Privacy Notice and acknowledge how my information may be handled as described in the TIBOSX
+              Privacy Policy.
+            </span>
+          </label>
         </section>
 
         <div className="mt-6 flex justify-end">
           <button
             type="button"
-            disabled={saving}
+            disabled={saving || !privacyAcknowledged}
             onClick={() => void handleSave()}
             className="inline-flex items-center gap-2 rounded-lg bg-black px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
           >

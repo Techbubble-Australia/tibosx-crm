@@ -360,6 +360,9 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
     user.additionalRoles,
   );
 
+  const { buildAgreementRecordsForUser } = await import("../lib/user-agreement-records.js");
+  const agreementRecords = await buildAgreementRecordsForUser(user.id);
+
   let impersonation: { impersonatorId: string; impersonatorName: string } | null = null;
   if (u.impersonatorId) {
     const impersonator = await prisma.adminUser.findUnique({
@@ -402,6 +405,7 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
           : [],
         onboarding,
         timesheetAccess,
+        agreementRecords,
       },
     },
   });

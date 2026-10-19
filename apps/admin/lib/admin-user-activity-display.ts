@@ -31,6 +31,7 @@ function humanizeFieldName(fieldName: string): string {
 }
 
 export function formatAdminUserActivityTitle(row: AdminUserActivityRow): string {
+  if (row.action === "USER_CREATED") return "User created";
   const label =
     row.fieldLabel?.trim() ||
     (row.fieldName ? humanizeFieldName(row.fieldName) : null);

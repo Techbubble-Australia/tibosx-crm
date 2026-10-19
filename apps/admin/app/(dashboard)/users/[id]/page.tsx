@@ -5,7 +5,8 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Mail } from "lucide-react";
 import { messageFromApiError } from "@/lib/api-error";
-import { resolveDocumentHref } from "@/lib/media-url";
+import { UserAgreementsSection, type AgreementRecordRow } from "@/components/users/UserAgreementsSection";
+import { buildPinnedUserFiles } from "@/lib/user-pinned-files";
 import { adminFetch } from "@/lib/admin-api";
 import { formatRolesLabel } from "@/lib/admin-roles";
 import { AdminRolesMultiSelect, rolesFromApi, rolesToApi } from "@/components/users/AdminRolesMultiSelect";
@@ -68,16 +69,7 @@ type UserDetail = {
   addressProofUrl: string | null;
   userFiles: { name?: string; url?: string }[];
   agreementTemplate?: { templatesSent: number; templatesSigned: number };
-  agreementRecords?: Array<{
-    id: string;
-    templateName: string;
-    projectLabel: string | null;
-    startDate: string | null;
-    endDate: string | null;
-    assignedAt: string;
-    signedAt: string | null;
-    documentUrl: string | null;
-  }>;
+  agreementRecords?: AgreementRecordRow[];
   agreementFiles?: UserFileRow[];
   projectMembership: {
     memberId: string;
@@ -108,11 +100,6 @@ export default function EditUserPage() {
   const [userFiles, setUserFiles] = useState<UserFileRow[]>([]);
   const [bankDetails, setBankDetails] = useState<BankDetailsFormValue>(bankDetailsFromApi(null));
   const [inviteLoading, setInviteLoading] = useState(false);
-
-  function formatAgreementDate(value: string | null) {
-    if (!value) return "—";
-    return new Date(value).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
-  }
 
   async function inviteUser() {
     const ok = window.confirm(
@@ -352,10 +339,15 @@ export default function EditUserPage() {
           </button>
         </section>
 
-        <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100">Agreements</h3>
-            {canAssignTemplate ? (
+        <UserAgreementsSection
+          records={defaults.agreementRecords ?? []}
+          emptyMessage={
+            canAssignTemplate
+              ? "No agreements assigned yet. Use Assign template to send a contract for signing."
+              : "Agreement templates are not assigned to client portal users."
+          }
+          headerAction={
+            canAssignTemplate ? (
               <button
                 type="button"
                 onClick={() => setAssignOpen(true)}
@@ -363,56 +355,9 @@ export default function EditUserPage() {
               >
                 Assign template
               </button>
-            ) : null}
-          </div>
-          {defaults.agreementRecords && defaults.agreementRecords.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[32rem] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200 text-xs uppercase text-gray-500 dark:border-gray-700">
-                    <th className="py-2 pr-3">Template</th>
-                    <th className="py-2 pr-3">Project</th>
-                    <th className="py-2 pr-3">Start</th>
-                    <th className="py-2 pr-3">End</th>
-                    <th className="py-2 pr-3">Signed</th>
-                    <th className="py-2">Document</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {defaults.agreementRecords.map((row) => (
-                    <tr key={row.id} className="border-b border-gray-100 dark:border-gray-800">
-                      <td className="py-2 pr-3">{row.templateName}</td>
-                      <td className="py-2 pr-3 text-gray-600 dark:text-gray-400">{row.projectLabel ?? "—"}</td>
-                      <td className="py-2 pr-3">{formatAgreementDate(row.startDate)}</td>
-                      <td className="py-2 pr-3">{formatAgreementDate(row.endDate)}</td>
-                      <td className="py-2 pr-3">{formatAgreementDate(row.signedAt)}</td>
-                      <td className="py-2">
-                        {row.documentUrl ? (
-                          <a
-                            href={resolveDocumentHref(row.documentUrl)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-600 hover:underline dark:text-blue-400"
-                          >
-                            View
-                          </a>
-                        ) : (
-                          <span className="text-gray-400">Pending</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">
-              {canAssignTemplate
-                ? "No agreements assigned yet. Use Assign template to send a contract for signing."
-                : "Agreement templates are not assigned to client portal users."}
-            </p>
-          )}
-        </section>
+            ) : null
+          }
+        />
 
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
           <h3 className="mb-4 font-semibold">Address</h3>
@@ -526,7 +471,7 @@ export default function EditUserPage() {
 
         <AdminUserFilesField
           files={userFiles}
-          pinnedFiles={defaults.agreementFiles ?? []}
+          pinnedFiles={buildPinnedUserFiles(defaults)}
           onChange={setUserFiles}
         />
 

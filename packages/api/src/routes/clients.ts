@@ -115,18 +115,24 @@ router.post("/contacts/:contactId/create-user", async (req: AuthRequest, res) =>
     const tempPassword = randomBytes(12).toString("base64url");
     const passwordHash = await bcrypt.hash(tempPassword, 10);
 
-    const user = await prisma.adminUser.create({
-      data: {
-        email,
-        name: contact.name.trim(),
-        phone,
-        role: "client",
-        active: true,
-        passwordHash,
-        passwordNeedsReset: true,
-        mfaEnabled: false,
-        mappedClientContactId: contact.id,
-      },
+    const actorId = req.user?.impersonatorId ?? req.user?.id ?? null;
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.adminUser.create({
+        data: {
+          email,
+          name: contact.name.trim(),
+          phone,
+          role: "client",
+          active: true,
+          passwordHash,
+          passwordNeedsReset: true,
+          mfaEnabled: false,
+          mappedClientContactId: contact.id,
+        },
+      });
+      const { logAdminUserCreated } = await import("../lib/admin-user-activity.js");
+      await logAdminUserCreated(tx, created.id, actorId, `Client contact: ${email}`);
+      return created;
     });
 
     let inviteEmailSent = false;

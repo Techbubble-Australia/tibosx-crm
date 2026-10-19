@@ -6,8 +6,9 @@ import { Info, Loader2, Plus, Trash2 } from "lucide-react";
 import { UserPhotoField } from "@/components/users/UserPhotoField";
 import { adminFetch } from "@/lib/admin-api";
 import { AdminUserFilesField, type UserFileRow } from "@/components/users/AdminUserFilesField";
+import { UserAgreementsSection, type AgreementRecordRow } from "@/components/users/UserAgreementsSection";
+import { buildPinnedUserFiles } from "@/lib/user-pinned-files";
 import { formatAdminUserActivityTitle } from "@/lib/admin-user-activity-display";
-import { resolveDocumentHref } from "@/lib/media-url";
 import { roleLabel, type AdminRole, isAdminRole } from "@/lib/admin-roles";
 import { COUNTRY_OPTIONS } from "@/lib/country-options";
 import { COUNTRY_OTHER, mergeCountryValue, splitCountryValue } from "@/lib/country-form";
@@ -68,6 +69,7 @@ export default function ProfileSettingsPageInner() {
   const [addressProofUrl, setAddressProofUrl] = useState<string | null>(null);
   const [userFiles, setUserFiles] = useState<UserFileRow[]>([]);
   const [activity, setActivity] = useState<ActivityRow[]>([]);
+  const [agreementRecords, setAgreementRecords] = useState<AgreementRecordRow[]>([]);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -135,6 +137,8 @@ export default function ProfileSettingsPageInner() {
             ? user.profilePhotoUrl.trim()
             : null,
         );
+        const records = user.agreementRecords;
+        setAgreementRecords(Array.isArray(records) ? (records as AgreementRecordRow[]) : []);
         const activityData = await activityRes.json();
         setActivity((activityData.data as ActivityRow[]) ?? []);
       } finally {
@@ -587,40 +591,15 @@ export default function ProfileSettingsPageInner() {
         </section>
       </form>
 
-      {(agreementDocumentUrl || idProofUrl || addressProofUrl) ? (
-        <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-          <h3 className="mb-3 font-semibold text-gray-900 dark:text-gray-100">Agreement &amp; verification files</h3>
-          <ul className="list-inside list-disc space-y-1 text-sm text-blue-600 dark:text-blue-400">
-            {agreementDocumentUrl ? (
-              <li>
-                <a href={resolveDocumentHref(agreementDocumentUrl)} target="_blank" rel="noreferrer" className="hover:underline">
-                  Signed contract / agreement
-                </a>
-              </li>
-            ) : null}
-            {idProofUrl ? (
-              <li>
-                <a href={resolveDocumentHref(idProofUrl)} target="_blank" rel="noreferrer" className="hover:underline">ID proof</a>
-              </li>
-            ) : null}
-            {addressProofUrl ? (
-              <li>
-                <a href={resolveDocumentHref(addressProofUrl)} target="_blank" rel="noreferrer" className="hover:underline">
-                  Address proof
-                </a>
-              </li>
-            ) : null}
-          </ul>
-        </section>
-      ) : null}
+      <UserAgreementsSection records={agreementRecords} />
 
       <AdminUserFilesField
         files={userFiles}
-        pinnedFiles={
-          agreementDocumentUrl
-            ? [{ name: "Signed contract / agreement", url: agreementDocumentUrl }]
-            : []
-        }
+        pinnedFiles={buildPinnedUserFiles({
+          agreementDocumentUrl,
+          idProofUrl,
+          addressProofUrl,
+        })}
         allowUpload={role === "admin"}
         allowRemove={role === "admin"}
         onChange={(next) => {

@@ -22,3 +22,21 @@ export async function logAdminUserFieldChange(
     },
   });
 }
+
+export async function logAdminUserCreated(
+  tx: Tx,
+  adminUserId: string,
+  performedById: string | null,
+  detail?: string,
+) {
+  await tx.adminUserActivityLog.create({
+    data: {
+      adminUserId,
+      action: "USER_CREATED",
+      fieldName: null,
+      oldValue: null,
+      newValue: detail ?? null,
+      performedById,
+    },
+  });
+}
