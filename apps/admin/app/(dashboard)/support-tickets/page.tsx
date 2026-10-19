@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { TICKET_PRIORITY_LABELS, TICKET_STATUS_LABELS } from "@/lib/support-ticket-labels";
@@ -25,6 +26,24 @@ export default function SupportTicketsPage() {
   const [organizationId, setOrganizationId] = useState("");
   const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
   const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function deleteTicket(row: TicketRow) {
+    if (role !== "admin") return;
+    if (!window.confirm(`Delete ticket ${row.ticketNumber}? This cannot be undone.`)) return;
+    setDeletingId(row.id);
+    try {
+      const res = await adminFetch(`/api/admin/ticketing/tickets/${row.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to delete ticket");
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete ticket");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   useEffect(() => {
     void adminFetch("/api/admin/ticketing/organizations")
@@ -99,12 +118,13 @@ export default function SupportTicketsPage() {
               <th className="px-4 py-3">Priority</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Updated</th>
+              {role === "admin" ? <th className="px-4 py-3 w-12" aria-label="Actions" /> : null}
             </tr>
           </thead>
           <tbody className="divide-y dark:divide-gray-800">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">No tickets found.</td>
+                <td colSpan={role === "admin" ? 6 : 5} className="px-4 py-8 text-center text-gray-500">No tickets found.</td>
               </tr>
             ) : (
               rows.map((row) => (
@@ -121,6 +141,19 @@ export default function SupportTicketsPage() {
                     <TicketStatusBadge status={row.status} />
                   </td>
                   <td className="px-4 py-3 text-gray-500">{new Date(row.updatedAt).toLocaleString()}</td>
+                  {role === "admin" ? (
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        disabled={deletingId === row.id}
+                        onClick={() => void deleteTicket(row)}
+                        className="rounded border border-red-200 p-1.5 text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950/30"
+                        aria-label={`Delete ${row.ticketNumber}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  ) : null}
                 </tr>
               ))
             )}

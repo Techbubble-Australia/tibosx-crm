@@ -572,6 +572,24 @@ router.patch("/tickets/:id", async (req: TbosRequest, res) => {
   });
 });
 
+router.delete("/tickets/:id", requireTbosAdmin, async (req: TbosRequest, res) => {
+  const existing = await prisma.ticket.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ error: "Ticket not found" });
+
+  const [timesheetCount, entryCount] = await Promise.all([
+    prisma.timesheet.count({ where: { ticketId: existing.id } }),
+    prisma.timesheetEntry.count({ where: { ticketId: existing.id } }),
+  ]);
+  if (timesheetCount > 0 || entryCount > 0) {
+    return res.status(400).json({
+      error: "Cannot delete a ticket that is linked to timesheets. Remove timesheet links first.",
+    });
+  }
+
+  await prisma.ticket.delete({ where: { id: existing.id } });
+  res.json({ message: "Deleted" });
+});
+
 router.post("/tickets/:id/messages", async (req: TbosRequest, res) => {
   const tbosUser = req.tbosUser!;
   const parsed = messageSchema.safeParse(req.body);

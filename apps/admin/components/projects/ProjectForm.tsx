@@ -160,6 +160,10 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
   const [estimates, setEstimates] = useState<ProjectEstimateRow[]>(defaults.estimates ?? []);
   const [actuals, setActuals] = useState<ProjectActualRow[]>(defaults.actuals ?? []);
   const [members, setMembers] = useState<ProjectMemberRow[]>(defaults.members ?? []);
+
+  useEffect(() => {
+    setMembers(defaults.members ?? []);
+  }, [defaults.id, defaults.members]);
   const [fileUrls, setFileUrls] = useState<string[]>(defaults.fileUrls ?? []);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [contracts, setContracts] = useState<ContractOption[]>([]);

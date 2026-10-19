@@ -3,18 +3,26 @@ export const DOCUMENT_TEMPLATE_STYLES = `
 .template-canvas { position: relative; min-height: 480px; outline: none; padding: 32px 48px; box-sizing: border-box; }
 .template-canvas-editable:focus { box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.35); }
 body { margin: 0; padding: 24px; color: #111; }
-.template-canvas,
-.template-canvas p,
-.template-canvas li,
-.template-canvas td,
-.template-canvas th,
-.template-canvas h1,
-.template-canvas h2,
-.template-canvas h3 {
+.template-canvas {
   font-family: Arial, Helvetica, "Segoe UI", sans-serif;
   font-size: 11pt;
   line-height: 1.35;
   color: #111;
+}
+.template-canvas p,
+.template-canvas li,
+.template-canvas td,
+.template-canvas th {
+  font-family: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+.template-canvas h1,
+.template-canvas h2,
+.template-canvas h3 {
+  font-family: inherit;
+  line-height: 1.35;
+  color: inherit;
 }
 h1.docx-agreement-title,
 .docx-agreement-title {

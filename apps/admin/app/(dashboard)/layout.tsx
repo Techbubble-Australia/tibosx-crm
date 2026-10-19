@@ -96,7 +96,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/workspace/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["customer_support", "client"] },
       { href: "/workspace/tickets", label: "Tickets", icon: Ticket, roles: ["customer_support", "client"] },
-      { href: "/workspace/timesheets", label: "Approve/Reject Timesheets", icon: ClipboardCheck, roles: ["admin", "client"] },
+      { href: "/workspace/timesheets", label: "Approve/Reject Timesheets", icon: ClipboardCheck, roles: ["client"] },
       { href: "/support-tickets/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin"] },
       { href: "/support-tickets", label: "Tickets", icon: Ticket, roles: ["admin"] },
     ],
@@ -315,7 +315,6 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         return anyEffectiveRole(role, additionalRoles, item.roles) || canAccessProjectManagementTimesheets;
       }
       if (item.href === "/workspace/timesheets") {
-        if (anyEffectiveRole(role, additionalRoles, ["admin"])) return true;
         return canAccessWorkspaceTimesheets;
       }
       return anyEffectiveRole(role, additionalRoles, item.roles);

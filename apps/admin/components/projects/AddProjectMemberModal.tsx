@@ -38,14 +38,9 @@ export function AddProjectMemberModal({ projectId, onClose, onAdded }: Props) {
   const filtered = useMemo(() => users, [users]);
 
   useEffect(() => {
-    if (!filtered.length) {
-      setSelectedId("");
-      return;
-    }
-    if (!filtered.some((row) => row.id === selectedId)) {
-      setSelectedId(filtered[0]!.id);
-    }
-  }, [filtered, selectedId]);
+    setSelectedId("");
+    setQuery("");
+  }, [projectId]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

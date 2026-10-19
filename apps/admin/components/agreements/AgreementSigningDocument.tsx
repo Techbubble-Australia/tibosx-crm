@@ -132,7 +132,7 @@ export const AgreementSigningDocument = forwardRef<AgreementSigningDocumentHandl
       <div className="space-y-4">
         <div
           ref={hostRef}
-          className="agreement-signing-doc max-h-[55vh] overflow-y-auto rounded-lg border border-gray-200 bg-white p-4 text-sm dark:border-gray-700 dark:bg-gray-950 [&_.signature-block]:cursor-default [&_.signature-drag-handle]:hidden [&_.signature-resize-handle]:hidden"
+          className="agreement-signing-doc max-h-[55vh] overflow-y-auto rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-950 [&_.signature-block]:cursor-default [&_.signature-drag-handle]:hidden [&_.signature-resize-handle]:hidden"
           dangerouslySetInnerHTML={{ __html: html }}
         />
         <style>{`
