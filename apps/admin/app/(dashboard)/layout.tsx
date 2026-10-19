@@ -315,6 +315,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         return anyEffectiveRole(role, additionalRoles, item.roles) || canAccessProjectManagementTimesheets;
       }
       if (item.href === "/workspace/timesheets") {
+        if (anyEffectiveRole(role, additionalRoles, ["customer_support"])) return false;
         return canAccessWorkspaceTimesheets;
       }
       return anyEffectiveRole(role, additionalRoles, item.roles);

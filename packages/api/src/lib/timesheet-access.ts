@@ -39,7 +39,8 @@ export async function getTimesheetAccessForUser(
     select: { id: true },
   });
 
-  const workspaceTimesheets = roles.includes("client") && Boolean(approverLink);
+  const workspaceTimesheets =
+    roles.includes("client") && !roles.includes("customer_support") && Boolean(approverLink);
 
   return { projectManagementTimesheets, workspaceTimesheets };
 }

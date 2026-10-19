@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import { workspaceFetch } from "@/lib/workspace-fetch";
+import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { getEffectiveRoles } from "@/lib/admin-roles";
 import {
   CustomerSupportDashboard,
   type ActivityRow,
@@ -10,13 +12,9 @@ import {
 } from "@/components/customer-support/CustomerSupportDashboard";
 
 export default function DashboardPage() {
-  const [role, setRole] = useState<string>("CLIENT");
-
-  useEffect(() => {
-    void workspaceFetch("/auth/me")
-      .then((res) => res.json())
-      .then((data) => setRole((data.data as { role: string }).role));
-  }, []);
+  const { role, additionalRoles, canAccessWorkspaceTimesheets } = useAdminSession();
+  const effectiveRoles = getEffectiveRoles(role, additionalRoles);
+  const isCustomerSupport = effectiveRoles.includes("customer_support");
 
   const loadTickets = useCallback(async () => {
     const res = await workspaceFetch("/tickets");
@@ -36,13 +34,14 @@ export default function DashboardPage() {
     return (data.data as TimesheetSummary) ?? { total: 0, pendingApproval: 0 };
   }, []);
 
-  const showTimesheetSummary = role === "CLIENT" || role === "CONSULTANT";
+  const showTimesheetSummary = canAccessWorkspaceTimesheets && !isCustomerSupport;
+  const timesheetsHref = showTimesheetSummary ? "/workspace/timesheets" : "/timesheets";
 
   return (
     <CustomerSupportDashboard
       ticketDetailHref={(id) => `/workspace/tickets/${id}`}
       ticketsListHref="/workspace/tickets"
-      timesheetsHref="/workspace/timesheets"
+      timesheetsHref={timesheetsHref}
       loadTickets={loadTickets}
       loadActivity={loadActivity}
       loadTimesheetSummary={loadTimesheetSummary}

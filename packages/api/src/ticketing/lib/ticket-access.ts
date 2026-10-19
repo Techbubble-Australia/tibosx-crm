@@ -163,7 +163,11 @@ export async function scopeOrganizationIdsForPortal(
   }
   if (user.role === "CONSULTANT" && user.consultantVerified) {
     if (isTbosAdmin(user)) return null;
-    if (isCustomerSupportTbos(user)) return null;
+    if (isCustomerSupportTbos(user)) {
+      const adminId = user.tbosAdminUserId;
+      if (!adminId) return [];
+      return organizationIdsForTbosProjectMember(adminId, user.id);
+    }
     return assignedOrganizationIds(user.id);
   }
   return [];
@@ -200,7 +204,14 @@ export async function ticketOrganizationFilter(
   }
   if (user.role === "CONSULTANT" && user.consultantVerified) {
     if (isTbosAdmin(user)) return {};
-    if (isCustomerSupportTbos(user)) return {};
+    if (isCustomerSupportTbos(user)) {
+      const adminId = user.tbosAdminUserId;
+      if (!adminId) return { organizationId: { in: [] as string[] } };
+      const orgIds = await organizationIdsForTbosProjectMember(adminId, user.id);
+      if (orgIds.length === 0) return { organizationId: { in: [] as string[] } };
+      if (orgIds.length === 1) return { organizationId: orgIds[0] };
+      return { organizationId: { in: orgIds } };
+    }
     const orgIds = await assignedOrganizationIds(user.id);
     if (orgIds.length === 0) return { organizationId: { in: [] } };
     return { organizationId: { in: orgIds } };

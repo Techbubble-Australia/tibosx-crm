@@ -223,15 +223,16 @@ function BillableToggle({
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-label="Billable"
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 ${
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 disabled:opacity-50 ${
         checked ? "bg-green-500" : "bg-gray-200 dark:bg-gray-600"
       }`}
     >
       <span
-        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-          checked ? "translate-x-5" : "translate-x-0.5"
+        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+          checked ? "translate-x-4" : "translate-x-0.5"
         }`}
       />
     </button>
@@ -544,7 +545,7 @@ export function TimesheetForm({
               {weekDays.map((d) => (
                 <col key={d.key} className="w-[10%]" />
               ))}
-              <col className="w-[4.5rem]" />
+              <col className="w-[3.25rem]" />
             </colgroup>
             <thead>
               <tr>
@@ -557,7 +558,9 @@ export function TimesheetForm({
                     </th>
                   );
                 })}
-                <th className={`${thDay} w-[4.5rem]`} aria-label="Entry actions" />
+                <th className={`${thDay} w-[3.25rem] px-0.5`}>
+                  <span className="text-[10px] font-semibold leading-tight">Billable</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -616,8 +619,8 @@ export function TimesheetForm({
                           />
                         </td>
                       ))}
-                      <td className={tdDay}>
-                        <div className="flex flex-col items-center gap-1">
+                      <td className={`${tdDay} px-0.5`}>
+                        <div className="flex flex-col items-center gap-0.5">
                           <BillableToggle
                             checked={line.billable}
                             onChange={(v) => updateLine(line.key, { billable: v })}
@@ -630,7 +633,7 @@ export function TimesheetForm({
                               className="text-gray-400 hover:text-red-500"
                               aria-label="Remove entry"
                             >
-                              <X className="h-4 w-4" />
+                              <X className="h-3.5 w-3.5" />
                             </button>
                           ) : null}
                         </div>
