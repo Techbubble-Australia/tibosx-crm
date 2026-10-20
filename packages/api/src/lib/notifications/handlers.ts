@@ -10,10 +10,28 @@ import { supportTicketAdminUrl, timesheetAdminUrl, workspaceTicketUrl, workspace
 import type { NotificationPayloads } from "./types";
 import {
   loadTimesheetEmailContext,
-  resolveTimesheetApproverAdminEmails,
+  resolveTimesheetSubmissionApproverEmails,
   timesheetTargetLabel,
 } from "./timesheet-email";
+import {
+  resolveProjectTicketNotificationEmails,
+  resolveTicketProjectIdForNotifications,
+} from "./ticket-email-recipients";
 import { sendEmailIfEnabled } from "./send-if-enabled";
+
+const TICKET_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Draft",
+  OPEN: "Open",
+  IN_PROGRESS: "In progress",
+  PENDING_CLIENT: "Awaiting client info",
+  RESOLVED: "Resolved",
+  CLOSED: "Closed",
+  CANCELLED: "Cancelled",
+};
+
+function formatTicketStatusLabel(status: string): string {
+  return TICKET_STATUS_LABELS[status] ?? status.replace(/_/g, " ").toLowerCase();
+}
 
 function contactNotificationEmail(): string {
   return (
@@ -57,7 +75,7 @@ export const notificationHandlers: {
     if (!timesheet || timesheet.status !== "SUBMITTED") return;
     if (timesheet.approverKind === "CLIENT_CONTACT") return;
 
-    const recipients = await resolveTimesheetApproverAdminEmails(timesheetId);
+    const recipients = await resolveTimesheetSubmissionApproverEmails(timesheetId);
     if (!recipients.length) return;
 
     const memberName = timesheet.memberUser?.name || timesheet.memberUser?.email || "Team member";
@@ -113,32 +131,14 @@ export const notificationHandlers: {
     const ticket = await prisma.ticket.findUnique({
       where: { id: ticketId },
       include: {
-        organization: true,
-        assignedTo: { select: { email: true, name: true } },
         project: { select: { projectNumber: true, title: true } },
       },
     });
-    if (!ticket?.projectId) return;
+    const projectId = ticket ? await resolveTicketProjectIdForNotifications(ticketId) : null;
+    if (!ticket || !projectId) return;
 
-    const group = await prisma.projectSupportGroup.findUnique({
-      where: { projectId: ticket.projectId },
-      include: {
-        members: {
-          include: {
-            ticketingUser: { select: { email: true } },
-            adminUser: { select: { email: true } },
-          },
-        },
-      },
-    });
-    if (!group) return;
-
-    const recipients = new Set<string>();
-    for (const m of group.members) {
-      const email = m.ticketingUser?.email || m.adminUser?.email;
-      if (email) recipients.add(email);
-    }
-    if (ticket.assignedTo?.email) recipients.add(ticket.assignedTo.email);
+    const recipients = await resolveProjectTicketNotificationEmails(projectId);
+    if (!recipients.length) return;
 
     const subject = `[${ticket.ticketNumber}] ${ticket.subject}`;
     const body = `New support case on ${ticket.project?.projectNumber ?? "project"}: ${ticket.subject}\n\n${supportTicketAdminUrl(ticket.id)}`;
@@ -156,9 +156,11 @@ export const notificationHandlers: {
       include: {
         author: { select: { role: true, name: true, email: true } },
         ticket: {
-          include: {
-            createdBy: { select: { email: true, name: true, role: true } },
-            assignedTo: { select: { email: true, name: true } },
+          select: {
+            id: true,
+            ticketNumber: true,
+            subject: true,
+            projectId: true,
           },
         },
       },
@@ -166,20 +168,13 @@ export const notificationHandlers: {
     if (!message || message.ticketId !== ticketId || message.isInternal) return;
 
     const ticket = message.ticket;
-    const authorRole = message.author.role;
-    const recipients = new Set<string>();
+    const exclude = [message.author.email];
+    const projectId = await resolveTicketProjectIdForNotifications(ticketId);
+    const recipients = projectId
+      ? await resolveProjectTicketNotificationEmails(projectId, { excludeEmails: exclude })
+      : [];
 
-    if (authorRole === "CLIENT") {
-      if (ticket.assignedTo?.email) recipients.add(ticket.assignedTo.email);
-    } else if (authorRole === "CONSULTANT") {
-      if (ticket.createdBy?.role === "CLIENT" && ticket.createdBy.email) {
-        recipients.add(ticket.createdBy.email);
-      }
-    }
-
-    recipients.delete(message.author.email);
-
-    if (!recipients.size) return;
+    if (!recipients.length) return;
 
     const subject = `Re: [${ticket.ticketNumber}] ${ticket.subject}`;
     const preview = message.body.length > 280 ? `${message.body.slice(0, 280)}…` : message.body;
@@ -187,6 +182,29 @@ export const notificationHandlers: {
 
     for (const to of recipients) {
       await sendEmailIfEnabled("ticket.message", to, () =>
+        sendSupportTicketNotificationEmail({ to, subject, body }),
+      );
+    }
+  },
+
+  async "ticket.status.changed"({ ticketId, oldStatus, newStatus, actorEmail }) {
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: { project: { select: { projectNumber: true, title: true } } },
+    });
+    const projectId = ticket ? await resolveTicketProjectIdForNotifications(ticketId) : null;
+    if (!ticket || !projectId) return;
+
+    const recipients = await resolveProjectTicketNotificationEmails(projectId, {
+      excludeEmails: actorEmail ? [actorEmail] : [],
+    });
+    if (!recipients.length) return;
+
+    const subject = `[${ticket.ticketNumber}] Status: ${formatTicketStatusLabel(newStatus)}`;
+    const body = `Ticket ${ticket.ticketNumber} — ${ticket.subject}\n\nStatus changed from ${formatTicketStatusLabel(oldStatus)} to ${formatTicketStatusLabel(newStatus)}.\n\n${workspaceTicketUrl(ticket.id)}`;
+
+    for (const to of recipients) {
+      await sendEmailIfEnabled("ticket.status.changed", to, () =>
         sendSupportTicketNotificationEmail({ to, subject, body }),
       );
     }

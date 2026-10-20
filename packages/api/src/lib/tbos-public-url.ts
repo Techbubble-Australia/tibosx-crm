@@ -9,7 +9,7 @@ export function tbosAdminPublicBase(): string {
 }
 
 export function workspaceTimesheetsUrl(): string {
-  return `${tbosAdminPublicBase()}/workspace/timesheets`;
+  return `${tbosAdminPublicBase()}/workspace/timesheets/submitted`;
 }
 
 export function workspaceTicketUrl(ticketId: string): string {

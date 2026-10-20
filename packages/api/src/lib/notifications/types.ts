@@ -5,6 +5,12 @@ export type NotificationPayloads = {
   "timesheet.rejected": { timesheetId: string; reason: string };
   "ticket.created": { ticketId: string };
   "ticket.message": { ticketId: string; messageId: string };
+  "ticket.status.changed": {
+    ticketId: string;
+    oldStatus: string;
+    newStatus: string;
+    actorEmail?: string;
+  };
   "contact.submitted": { submissionId: string };
 };
 

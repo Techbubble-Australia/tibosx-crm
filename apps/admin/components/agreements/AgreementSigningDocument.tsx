@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
-import { SignaturePad } from "@/components/agreements/SignaturePad";
+import { SignatureCaptureDialog } from "@/components/agreements/SignatureCaptureDialog";
 import { DOCUMENT_TEMPLATE_STYLES } from "@/lib/document-template-styles";
 
 export type AgreementSigningDocumentHandle = {
@@ -115,11 +115,12 @@ export const AgreementSigningDocument = forwardRef<AgreementSigningDocumentHandl
       return () => host.removeEventListener("click", onClick);
     }, [captureIds, openCapture]);
 
-    function saveActiveSignature() {
-      if (!activeCaptureId || !draftSignature) return;
+    function saveActiveSignature(imageDataUrl?: string) {
+      const dataUrl = imageDataUrl ?? draftSignature;
+      if (!activeCaptureId || !dataUrl) return;
       const signedOn = formatSignedOnDate();
       setSignedOnByCapture((prev) => ({ ...prev, [activeCaptureId]: signedOn }));
-      const next = { ...signatures, [activeCaptureId]: draftSignature };
+      const next = { ...signatures, [activeCaptureId]: dataUrl };
       onSignaturesChange(next);
       const nextSigned = captureIds.filter((id) => Boolean(next[id]));
       onSignedCaptureIdsChange(nextSigned);
@@ -151,37 +152,15 @@ export const AgreementSigningDocument = forwardRef<AgreementSigningDocumentHandl
         .agreement-signature-target:hover { background: rgba(37, 99, 235, 0.12); }
       `}</style>
 
-        {activeCaptureId ? (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
-            <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900">
-              <h4 className="mb-2 font-medium text-gray-900 dark:text-gray-100">Draw your signature</h4>
-              <p className="mb-3 text-xs text-gray-500">
-                Signed on {formatSignedOnDate()} will appear below your signature.
-              </p>
-              <SignaturePad onChange={setDraftSignature} />
-              <div className="mt-3 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveCaptureId(null);
-                    setDraftSignature(null);
-                  }}
-                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm dark:border-gray-600"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={!draftSignature}
-                  onClick={saveActiveSignature}
-                  className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
-                >
-                  Save signature
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        <SignatureCaptureDialog
+          open={Boolean(activeCaptureId)}
+          title="Add your signature"
+          onClose={() => {
+            setActiveCaptureId(null);
+            setDraftSignature(null);
+          }}
+          onInsert={(dataUrl) => saveActiveSignature(dataUrl)}
+        />
       </div>
     );
   },

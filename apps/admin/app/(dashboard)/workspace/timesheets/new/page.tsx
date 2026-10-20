@@ -73,7 +73,7 @@ export default function NewMemberTimesheetPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(messageFromApiError(data, "Failed to save"));
-      router.push("/workspace/timesheets");
+      router.push("/workspace/timesheets/submitted");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
@@ -91,7 +91,7 @@ export default function NewMemberTimesheetPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <Link href="/workspace/timesheets" className="text-sm text-sky-600 hover:underline">← Timesheets</Link>
+      <Link href="/workspace/timesheets/submitted" className="text-sm text-sky-600 hover:underline">← Timesheets</Link>
       <h1 className="text-2xl font-semibold text-slate-900">New timesheet</h1>
       <p className="text-sm text-slate-500">Select a project or support case assigned to you.</p>
       {targets.length === 0 ? (

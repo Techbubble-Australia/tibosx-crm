@@ -382,6 +382,17 @@ router.post("/:id/lifecycle", async (req: TicketingRequest, res) => {
     metadata: { lifecycleAction: action },
   });
 
+  const actor = await prisma.ticketingUser.findUnique({
+    where: { id: user.id },
+    select: { email: true },
+  });
+  notifyAsync("ticket.status.changed", {
+    ticketId: existing.id,
+    oldStatus: existing.status,
+    newStatus: nextStatus,
+    actorEmail: actor?.email,
+  });
+
   res.json({ data: serializeTicket(updated) });
 });
 
@@ -487,6 +498,12 @@ router.post("/:id/messages", async (req: TicketingRequest, res) => {
       oldValue: ticket.status,
       newValue: statusPatch.status,
       metadata: { reason: "client_replied" },
+    });
+    notifyAsync("ticket.status.changed", {
+      ticketId: ticket.id,
+      oldStatus: ticket.status,
+      newStatus: statusPatch.status,
+      actorEmail: message.author.email,
     });
   }
 

@@ -109,11 +109,14 @@ export const NOTIFICATION_CATALOG: NotificationCatalogEntry[] = [
     env: ["RESEND_API_KEY", "MAIL_FROM", "ADMIN_PUBLIC_URL"],
   },
   {
-    id: "ticket.lifecycle",
+    id: "ticket.status.changed",
     channel: "email",
-    description: "Ticket status changes (resolved, awaiting client, closed).",
-    implemented: false,
-    triggers: ["POST /api/admin/workspace/tickets/:id/lifecycle"],
+    description: "Ticket status updated (open, in progress, resolved, closed, etc.).",
+    implemented: true,
+    triggers: [
+      "POST /api/admin/workspace/tickets/:id/lifecycle",
+      "POST /api/admin/tbos/tickets/:id/lifecycle",
+    ],
     env: ["RESEND_API_KEY", "MAIL_FROM", "ADMIN_PUBLIC_URL"],
   },
   {

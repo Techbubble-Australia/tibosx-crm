@@ -37,12 +37,11 @@ function getMailFrom(): string {
   return process.env.MAIL_FROM?.trim() || "TechBubble Careers <careers@techbubble.com.au>";
 }
 
+/** TBOS transactional mail (invites, password reset). Must use a domain verified in Resend. */
 function getTbosMailFrom(): string {
-  return (
-    process.env.TBOS_MAIL_FROM?.trim() ||
-    process.env.MAIL_FROM?.trim() ||
-    "TIBOSX <noreply@techbubble.com.au>"
-  );
+  const explicit = process.env.TBOS_MAIL_FROM?.trim();
+  if (explicit) return explicit;
+  return "TIBOSX <noreply@techbubble.net.au>";
 }
 
 function getHrEmail(): string {
@@ -230,7 +229,7 @@ If you need help, contact your administrator.`;
   }
 
   const { error } = await resend.emails.send({
-    from: getMailFrom(),
+    from: getTbosMailFrom(),
     to: [input.to],
     subject,
     text,
@@ -251,7 +250,7 @@ export async function sendUserInviteEmail(input: {
   const subject = "Your TechBubble account invitation";
   const text = `Hello ${input.name},
 
-An account has been created for you on TechBubble Business Operating System (TBOS).
+An account has been created for you on TechBubble's AI-powered Business Operating System (TIBOSX).
 
 Sign-in email: ${input.to}
 Temporary password: ${input.temporaryPassword}

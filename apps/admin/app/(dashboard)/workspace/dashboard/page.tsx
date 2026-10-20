@@ -35,7 +35,7 @@ export default function DashboardPage() {
   }, []);
 
   const showTimesheetSummary = canAccessWorkspaceTimesheets && !isCustomerSupport;
-  const timesheetsHref = showTimesheetSummary ? "/workspace/timesheets" : "/timesheets";
+  const timesheetsHref = showTimesheetSummary ? "/workspace/timesheets/submitted" : "/timesheets";
 
   return (
     <CustomerSupportDashboard

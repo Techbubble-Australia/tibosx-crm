@@ -72,6 +72,8 @@ router.get("/", async (req: TicketingRequest, res) => {
     where,
     include: {
       memberUser: { select: { name: true, email: true } },
+      project: { select: { projectNumber: true, title: true } },
+      ticket: { select: { ticketNumber: true, subject: true } },
     },
     orderBy: { updatedAt: "desc" },
     take: 100,
@@ -85,6 +87,11 @@ router.get("/", async (req: TicketingRequest, res) => {
       startDate: row.startDate.toISOString(),
       endDate: row.endDate.toISOString(),
       approverKind: row.approverKind,
+      targetLabel: row.ticket
+        ? `${row.ticket.ticketNumber} — ${row.ticket.subject}`
+        : row.project
+          ? `${row.project.projectNumber} — ${row.project.title}`
+          : "",
     })),
   });
 });

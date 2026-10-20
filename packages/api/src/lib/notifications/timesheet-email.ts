@@ -35,20 +35,24 @@ export function timesheetTargetLabel(row: {
   return row.opportunity?.name ?? "Timesheet";
 }
 
-export async function resolveTimesheetApproverAdminEmails(timesheetId: string): Promise<string[]> {
+/** Designated timesheet approver only (client contact or TBOS approver user). */
+export async function resolveTimesheetSubmissionApproverEmails(timesheetId: string): Promise<string[]> {
   const row = await loadTimesheetEmailContext(timesheetId);
   if (!row) return [];
 
-  const userIds = new Set<string>();
-  if (row.opportunity?.ownerId) userIds.add(row.opportunity.ownerId);
-  if (row.project?.timesheetApproverUserId) userIds.add(row.project.timesheetApproverUserId);
-  if (row.project?.projectManagerId) userIds.add(row.project.projectManagerId);
+  if (row.approverKind === "CLIENT_CONTACT" && row.projectClientContact) {
+    const to =
+      row.projectClientContact.ticketingUser?.email?.trim() ||
+      row.projectClientContact.contact.email?.trim();
+    return to ? [to] : [];
+  }
 
-  if (userIds.size === 0) return [];
+  const approverId = row.project?.timesheetApproverUserId;
+  if (!approverId) return [];
 
-  const users = await prisma.adminUser.findMany({
-    where: { id: { in: [...userIds] }, active: true },
+  const user = await prisma.adminUser.findFirst({
+    where: { id: approverId, active: true },
     select: { email: true },
   });
-  return users.map((u) => u.email).filter(Boolean);
+  return user?.email ? [user.email] : [];
 }

@@ -21,6 +21,7 @@ import {
   type TicketLifecycleAction,
 } from "../lib/ticket-lifecycle.js";
 import { autoCloseStaleResolvedTickets } from "../lib/auto-close-resolved-tickets.js";
+import { notifyAsync } from "../../lib/notifications/index.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -381,6 +382,13 @@ router.post("/tickets/:id/lifecycle", async (req: TbosRequest, res) => {
     metadata: { lifecycleAction: action },
   });
 
+  notifyAsync("ticket.status.changed", {
+    ticketId: existing.id,
+    oldStatus: existing.status,
+    newStatus: nextStatus,
+    actorEmail: tbosUser.email,
+  });
+
   res.json({
     data: {
       ...updated,
@@ -637,11 +645,21 @@ router.post("/tickets/:id/messages", async (req: TbosRequest, res) => {
       newValue: statusPatch.status,
       metadata: { reason: "client_replied" },
     });
+    notifyAsync("ticket.status.changed", {
+      ticketId: ticket.id,
+      oldStatus: ticket.status,
+      newStatus: statusPatch.status,
+      actorEmail: message.author.email,
+    });
   }
 
   await logTicketAudit(ticket.id, actorId, "MESSAGE_ADDED", {
     metadata: { messageId: message.id, isInternal: message.isInternal },
   });
+
+  if (!message.isInternal) {
+    notifyAsync("ticket.message", { ticketId: ticket.id, messageId: message.id });
+  }
 
   res.status(201).json({ data: message });
 });
