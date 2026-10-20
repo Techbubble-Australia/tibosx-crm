@@ -98,12 +98,10 @@ export function UserAgreementsSection({ records, emptyMessage, headerAction }: P
           <table className="w-full min-w-[36rem] text-left text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-xs uppercase text-gray-500 dark:border-gray-700">
-                <th className="py-2 pr-3">Template</th>
+                <th className="py-2 pr-3">Document</th>
                 <th className="py-2 pr-3">Start date</th>
-                <th className="py-2 pr-3">Expires</th>
-                <th className="py-2 pr-3">Signed</th>
+                <th className="py-2 pr-3">End date</th>
                 <th className="py-2 pr-3">Status</th>
-                <th className="py-2">Document</th>
               </tr>
             </thead>
             <tbody>
@@ -111,30 +109,31 @@ export function UserAgreementsSection({ records, emptyMessage, headerAction }: P
                 const status = agreementStatus(row);
                 return (
                   <tr key={row.id} className="border-b border-gray-100 dark:border-gray-800">
-                    <td className="py-2 pr-3 font-medium text-gray-900 dark:text-gray-100">{row.templateName}</td>
+                    <td className="py-2 pr-3">
+                      {row.documentUrl ? (
+                        <a
+                          href={resolveDocumentHref(row.documentUrl)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                        >
+                          {row.templateName}
+                        </a>
+                      ) : (
+                        <span className="font-medium text-gray-900 dark:text-gray-100">{row.templateName}</span>
+                      )}
+                      {row.signedAt ? (
+                        <p className="mt-0.5 text-xs text-gray-500">Signed {formatDate(row.signedAt)}</p>
+                      ) : null}
+                    </td>
                     <td className="py-2 pr-3 whitespace-nowrap">{formatDate(row.startDate, row.startDateDisplay)}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{formatDate(row.endDate, row.endDateDisplay)}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{formatDate(row.signedAt)}</td>
                     <td className="py-2 pr-3">
                       <span
                         className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${statusClass(status)}`}
                       >
                         {statusLabel(status)}
                       </span>
-                    </td>
-                    <td className="py-2">
-                      {row.documentUrl ? (
-                        <a
-                          href={resolveDocumentHref(row.documentUrl)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-blue-600 hover:underline dark:text-blue-400"
-                        >
-                          View
-                        </a>
-                      ) : (
-                        <span className="text-gray-400">Pending</span>
-                      )}
                     </td>
                   </tr>
                 );

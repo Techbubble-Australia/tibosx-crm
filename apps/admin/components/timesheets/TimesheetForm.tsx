@@ -150,9 +150,14 @@ function newLineKey() {
   return `line-${Math.random().toString(36).slice(2, 11)}`;
 }
 
-function caseKeyFromTargets(ticketId?: string | null, opportunityId?: string | null) {
+function caseKeyFromTargets(
+  ticketId?: string | null,
+  opportunityId?: string | null,
+  projectId?: string | null,
+) {
   if (ticketId) return `ticket:${ticketId}`;
   if (opportunityId) return `opportunity:${opportunityId}`;
+  if (projectId) return `project:${projectId}`;
   return "";
 }
 
@@ -167,11 +172,12 @@ function emptyDraftLine(): LineEntry {
 }
 
 function linesFromDefaults(defaults: Partial<TimesheetFormValues>): LineEntry[] {
+  const projectId = defaults.projectId ?? null;
   if (defaults.entries?.length) {
     return defaults.entries.map((row) => ({
       key: row.id ?? newLineKey(),
       id: row.id,
-      caseKey: caseKeyFromTargets(row.ticketId, row.opportunityId),
+      caseKey: caseKeyFromTargets(row.ticketId, row.opportunityId, projectId),
       label: row.label,
       dailyHours: (row.dailyHours as DailyHours) ?? emptyHours(),
       dailyComments: (row.dailyComments as DailyComments) ?? {},
@@ -184,7 +190,7 @@ function linesFromDefaults(defaults: Partial<TimesheetFormValues>): LineEntry[] 
       {
         key: defaults.id,
         id: defaults.id,
-        caseKey: caseKeyFromTargets(defaults.ticketId, defaults.opportunityId),
+        caseKey: caseKeyFromTargets(defaults.ticketId, defaults.opportunityId, projectId),
         label: defaults.targetLabel,
         dailyHours: hours,
         dailyComments: (defaults.dailyComments as DailyComments) ?? {},
@@ -298,8 +304,7 @@ export function TimesheetForm({
         ? "Timesheet is in draft — add your entry, save, then submit for approval."
         : `Status: ${TIMESHEET_STATUS_LABELS[status]}`;
 
-  const draftRowActive =
-    editable && (lines.length === 0 || draftHoursTotal > 0 || Boolean(draft.caseKey));
+  const draftRowActive = editable && lines.length === 0;
 
   const thBase =
     "border-b border-gray-200 bg-white px-2 py-2.5 text-xs font-semibold text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100";
@@ -308,11 +313,25 @@ export function TimesheetForm({
   const tdDay = "border-b border-l border-gray-200 bg-white p-1.5 text-center align-middle dark:border-gray-600 dark:bg-gray-900";
 
   useEffect(() => {
+    if (defaults.projectId) {
+      setProjectId(defaults.projectId);
+    }
+  }, [defaults.projectId]);
+
+  useEffect(() => {
     if (defaults.id) {
       setLines(linesFromDefaults(defaults));
       setDraft(emptyDraftLine());
     }
-  }, [defaults.id, defaults.entries, defaults.dailyHours, defaults.ticketId, defaults.opportunityId, defaults.targetLabel]);
+  }, [
+    defaults.id,
+    defaults.projectId,
+    defaults.entries,
+    defaults.dailyHours,
+    defaults.ticketId,
+    defaults.opportunityId,
+    defaults.targetLabel,
+  ]);
 
   useEffect(() => {
     if (defaults.approverKind === "CLIENT_CONTACT" && defaults.projectClientContactId) {
@@ -442,10 +461,12 @@ export function TimesheetForm({
     }
     const mon = new Date(`${weekMonday}T00:00:00.000Z`);
     const sun = sundayOfWeek(mon);
-    const entryRows = [...lines];
-    if (sumDailyHours(draft.dailyHours) > 0) {
-      entryRows.push(draft);
-    }
+    const entryRows =
+      lines.length > 0
+        ? [...lines, ...(sumDailyHours(draft.dailyHours) > 0 ? [draft] : [])]
+        : sumDailyHours(draft.dailyHours) > 0 || draft.caseKey
+          ? [draft]
+          : lines;
     const payload: Record<string, unknown> = {
       projectId,
       startDate: weekMonday,

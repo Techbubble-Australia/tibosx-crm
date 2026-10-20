@@ -31,7 +31,9 @@ export function TechBubbleLogo({
   const heightClass = compact ? "h-7" : useSidebarLogo ? "h-7" : "h-10";
 
   return (
-    <span className={`inline-flex min-w-0 items-center gap-2 ${className}`}>
+    <span
+      className={`inline-flex min-w-0 ${useSidebarLogo && showProductLabel && !compact ? "flex-col items-start gap-1" : "items-center gap-2"} ${className}`}
+    >
       <img
         src={asset.src}
         alt="TechBubble"
@@ -41,7 +43,9 @@ export function TechBubbleLogo({
         decoding="async"
       />
       {showProductLabel && !compact ? (
-        <span className="truncate text-sm font-bold tracking-wide text-gray-900 dark:text-gray-100">TIBOSX</span>
+        <span className="whitespace-nowrap text-sm font-bold leading-none tracking-wide text-gray-900 dark:text-gray-100">
+          TIBOSX
+        </span>
       ) : null}
     </span>
   );

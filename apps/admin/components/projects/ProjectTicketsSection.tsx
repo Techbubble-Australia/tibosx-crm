@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
-import { TICKET_STATUS_LABELS } from "@/lib/support-ticket-labels";
+import { TicketStatusBadge } from "@/lib/ticket-status-styles";
 
 type TicketRow = {
   id: string;
@@ -59,8 +59,8 @@ export function ProjectTicketsSection({ projectId }: Props) {
                   </Link>
                 </td>
                 <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{row.subject}</td>
-                <td className="py-2 pr-4 text-gray-600 dark:text-gray-400">
-                  {TICKET_STATUS_LABELS[row.status as keyof typeof TICKET_STATUS_LABELS] ?? row.status}
+                <td className="py-2 pr-4">
+                  <TicketStatusBadge status={row.status} />
                 </td>
                 <td className="py-2 text-gray-500">
                   {new Date(row.updatedAt).toLocaleDateString("en-AU", {

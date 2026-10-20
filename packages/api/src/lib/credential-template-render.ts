@@ -64,7 +64,12 @@ export function renderTemplateHtml(
   rendered = rendered.replace(/<span[^>]*table-col-resize-grip[^>]*>\s*<\/span>/gi, "");
 
   if (signatureDataUrl) {
-    const signatureImg = `<img src="${signatureDataUrl}" alt="Signature" style="max-height:80px;display:block;" />`;
+    const signedDate = new Date().toLocaleDateString("en-AU", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+    const signatureImg = `<img src="${signatureDataUrl}" alt="Signature" style="max-height:80px;display:block;" /><p style="font-size:11px;color:#444;margin:6px 0 0;">Signed on ${signedDate}</p>`;
     rendered = rendered.replace(
       /<div([^>]*data-signature-capture="[^"]+"[^>]*)>\s*<\/div>/gi,
       `<div$1>${signatureImg}</div>`,
@@ -89,7 +94,7 @@ export function renderTemplateHtmlWithSignatures(
 
   for (const [captureId, dataUrl] of Object.entries(signaturesByCaptureId)) {
     if (!dataUrl.startsWith("data:image/")) continue;
-    const signatureImg = `<img src="${dataUrl}" alt="Signature" style="max-height:80px;display:block;" />`;
+    const signatureImg = `<img src="${dataUrl}" alt="Signature" style="max-height:80px;display:block;" /><p style="font-size:11px;color:#444;margin:6px 0 0;">Signed on ${signedDate}</p>`;
     const escaped = captureId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     rendered = rendered.replace(
       new RegExp(`<div([^>]*data-signature-capture="${escaped}"[^>]*)>\\s*</div>`, "gi"),

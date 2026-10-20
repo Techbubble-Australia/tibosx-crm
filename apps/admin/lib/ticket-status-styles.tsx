@@ -8,13 +8,13 @@ export function ticketStatusBadgeClass(status: string): string {
     case "OPEN":
       return "bg-gray-300 text-gray-900";
     case "IN_PROGRESS":
-      return "bg-amber-300 text-amber-950";
+      return "bg-amber-300 text-gray-900";
     case "PENDING_CLIENT":
-      return "bg-blue-300 text-blue-950";
+      return "bg-blue-300 text-gray-900";
     case "RESOLVED":
-      return "bg-green-200 text-green-950";
+      return "bg-green-200 text-gray-900";
     case "CLOSED":
-      return "bg-gray-800 text-white ring-1 ring-gray-900/10";
+      return "bg-green-800 text-white";
     case "CANCELLED":
       return "bg-red-600 text-white";
     default:

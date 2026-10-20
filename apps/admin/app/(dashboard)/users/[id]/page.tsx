@@ -109,8 +109,20 @@ export default function EditUserPage() {
     setInviteLoading(true);
     try {
       const res = await adminFetch(`/api/admin/users/${id}/invite`, { method: "POST" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(messageFromApiError(data, "Failed to send invite"));
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        temporaryPassword?: string;
+        inviteEmailSent?: boolean;
+      };
+      if (!res.ok) {
+        if (data.temporaryPassword) {
+          alert(
+            `${messageFromApiError(data, "Failed to send invite")}\n\nTemporary password (share manually):\n${data.temporaryPassword}`,
+          );
+          return;
+        }
+        throw new Error(messageFromApiError(data, "Failed to send invite"));
+      }
       alert("Invite email sent. A new temporary password was set for this user.");
     } catch (e) {
       alert(e instanceof Error ? e.message : "Failed to send invite");

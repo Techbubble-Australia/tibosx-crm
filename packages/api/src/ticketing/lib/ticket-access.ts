@@ -32,12 +32,14 @@ export async function organizationIdsForClientPortal(
 ): Promise<string[]> {
   const projectIds = new Set<string>();
   const contactIds = new Set<string>();
+  let adminEmail: string | null = null;
 
   if (tbosAdminUserId) {
     const admin = await prisma.adminUser.findUnique({
       where: { id: tbosAdminUserId },
-      select: { mappedClientContactId: true },
+      select: { mappedClientContactId: true, email: true },
     });
+    adminEmail = admin?.email?.trim().toLowerCase() ?? null;
     if (admin?.mappedClientContactId) {
       contactIds.add(admin.mappedClientContactId);
     }
@@ -55,15 +57,22 @@ export async function organizationIdsForClientPortal(
     }
   }
 
+  const portalAccessOr = [{ portalAccess: true }, { canApproveTimesheets: true }] as const;
   const portalLinks = await prisma.projectClientContact.findMany({
     where: {
       OR: [
-        { ticketingUserId, portalAccess: true },
-        { ticketingUserId, canApproveTimesheets: true },
+        { ticketingUserId, OR: [...portalAccessOr] },
         ...(contactIds.size
           ? [
-              { contactId: { in: [...contactIds] }, portalAccess: true },
-              { contactId: { in: [...contactIds] }, canApproveTimesheets: true },
+              { contactId: { in: [...contactIds] }, OR: [...portalAccessOr] },
+            ]
+          : []),
+        ...(adminEmail
+          ? [
+              {
+                contact: { email: { equals: adminEmail, mode: "insensitive" as const } },
+                OR: [...portalAccessOr],
+              },
             ]
           : []),
       ],

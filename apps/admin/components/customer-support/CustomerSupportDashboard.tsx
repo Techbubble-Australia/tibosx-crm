@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ClipboardCheck } from "lucide-react";
-import { isOpenTicketStatus, TICKET_STATUS_LABELS, TICKET_TYPE_LABELS } from "@/lib/support-ticket-labels";
+import { isOpenTicketStatus, TICKET_TYPE_LABELS } from "@/lib/support-ticket-labels";
+import { TicketStatusBadge } from "@/lib/ticket-status-styles";
 import { EmptyTickets } from "@/components/workspace/EmptyTickets";
 
 export type TicketRow = {
@@ -163,8 +164,11 @@ export function CustomerSupportDashboard({
                   </Link>
                   <p className="text-gray-700 dark:text-gray-300">{row.subject}</p>
                   <p className="text-xs text-gray-500">
-                    {TICKET_TYPE_LABELS[row.type] ?? row.type} · {TICKET_STATUS_LABELS[row.status] ?? row.status}
+                    {TICKET_TYPE_LABELS[row.type] ?? row.type}
                   </p>
+                  <div className="mt-1">
+                    <TicketStatusBadge status={row.status} />
+                  </div>
                 </div>
                 <span className="text-xs text-gray-400">{new Date(row.updatedAt).toLocaleString()}</span>
               </li>

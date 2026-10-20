@@ -21,13 +21,15 @@ async function resolveClientTicketingUser(
   });
 
   const emailLower = email.trim().toLowerCase();
+  const portalAccessOr = [{ portalAccess: true }, { canApproveTimesheets: true }];
   const link = await prisma.projectClientContact.findFirst({
     where: {
-      portalAccess: true,
       project: { status: "ACTIVE" },
       OR: [
-        ...(admin?.mappedClientContactId ? [{ contactId: admin.mappedClientContactId }] : []),
-        { contact: { email: { equals: emailLower, mode: "insensitive" } } },
+        ...(admin?.mappedClientContactId
+          ? [{ contactId: admin.mappedClientContactId, OR: portalAccessOr }]
+          : []),
+        { contact: { email: { equals: emailLower, mode: "insensitive" } }, OR: portalAccessOr },
       ],
     },
     include: { ticketingUser: true, project: { select: { supportOrganization: { select: { id: true } } } } },
