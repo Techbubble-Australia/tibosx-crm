@@ -255,6 +255,8 @@ An account has been created for you on TechBubble's AI-powered Business Operatin
 Sign-in email: ${input.to}
 Temporary password: ${input.temporaryPassword}
 
+(This replaces any password previously set for your account. Sign in with this temporary password only.)
+
 Sign in here: ${input.loginUrl}
 
 You will be asked to set a new password and enroll in multi-factor authentication (MFA) on first sign-in.

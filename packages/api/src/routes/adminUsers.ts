@@ -430,7 +430,13 @@ router.post("/:id/invite", async (req: AuthRequest, res) => {
       });
     }
 
-    res.json({ message: "Invite email sent", passwordReset: true, inviteEmailSent: true });
+    res.json({
+      message:
+        "Invite email sent. A new temporary password replaced any previous password on this account.",
+      passwordReset: true,
+      passwordReplaced: true,
+      inviteEmailSent: true,
+    });
   } catch (error) {
     console.error("Error sending user invite:", error);
     const message = error instanceof Error ? error.message : "Failed to send invite email";

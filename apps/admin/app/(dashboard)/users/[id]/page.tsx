@@ -103,7 +103,11 @@ export default function EditUserPage() {
 
   async function inviteUser() {
     const ok = window.confirm(
-      "The user will be sent an email with temporary password. Do you want to continue?",
+      "Send invite email?\n\n" +
+        "• A new temporary password will be generated and will REPLACE any password already set for this user (including one you entered when creating their account).\n" +
+        "• They must sign in with that new temporary password, not their old one.\n" +
+        "• They will be asked to choose a new password after signing in.\n\n" +
+        "Continue?",
     );
     if (!ok) return;
     setInviteLoading(true);
@@ -111,19 +115,26 @@ export default function EditUserPage() {
       const res = await adminFetch(`/api/admin/users/${id}/invite`, { method: "POST" });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
+        message?: string;
         temporaryPassword?: string;
         inviteEmailSent?: boolean;
       };
       if (!res.ok) {
         if (data.temporaryPassword) {
           alert(
-            `${messageFromApiError(data, "Failed to send invite")}\n\nTemporary password (share manually):\n${data.temporaryPassword}`,
+            `${messageFromApiError(data, "Failed to send invite")}\n\n` +
+              "Their previous password was already replaced. Share this temporary password so they can sign in:\n\n" +
+              data.temporaryPassword,
           );
           return;
         }
         throw new Error(messageFromApiError(data, "Failed to send invite"));
       }
-      alert("Invite email sent. A new temporary password was set for this user.");
+      alert(
+        (data.message ||
+          "Invite email sent.") +
+          "\n\nAny password set earlier for this user no longer works. They must use the new temporary password from the invite email.",
+      );
     } catch (e) {
       alert(e instanceof Error ? e.message : "Failed to send invite");
     } finally {
@@ -340,15 +351,22 @@ export default function EditUserPage() {
           {defaults.mfaEnabled ? (
             <p className="text-xs text-gray-500">MFA is enabled. User manages it under Settings → Security.</p>
           ) : null}
-          <button
-            type="button"
-            disabled={inviteLoading || !defaults.active}
-            onClick={() => void inviteUser()}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
-          >
-            {inviteLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-            Invite user
-          </button>
+          <div className="space-y-2">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Sends a sign-in email with a <strong>new temporary password</strong>. This overwrites any password
+              already on the account (for example one set when you created the user). Use{" "}
+              <strong>New password</strong> above only if you are <em>not</em> sending an invite.
+            </p>
+            <button
+              type="button"
+              disabled={inviteLoading || !defaults.active}
+              onClick={() => void inviteUser()}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
+            >
+              {inviteLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              Invite user
+            </button>
+          </div>
         </section>
 
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
