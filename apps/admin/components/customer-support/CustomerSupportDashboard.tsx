@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ClipboardCheck } from "lucide-react";
-import { TICKET_STATUS_LABELS, TICKET_TYPE_LABELS } from "@/lib/support-ticket-labels";
+import { isOpenTicketStatus, TICKET_STATUS_LABELS, TICKET_TYPE_LABELS } from "@/lib/support-ticket-labels";
 import { EmptyTickets } from "@/components/workspace/EmptyTickets";
 
 export type TicketRow = {
@@ -63,7 +63,7 @@ export function CustomerSupportDashboard({
     }
   }, [loadTickets, loadActivity, loadTimesheetSummary, showTimesheetSummary]);
 
-  const open = rows.filter((r) => !["CLOSED", "RESOLVED"].includes(r.status));
+  const open = rows.filter((r) => isOpenTicketStatus(r.status));
 
   return (
     <div className="space-y-6">

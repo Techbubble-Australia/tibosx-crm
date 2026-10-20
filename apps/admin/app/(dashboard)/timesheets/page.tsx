@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Edit, Send } from "lucide-react";
+import { Plus, Edit, Send, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
@@ -12,6 +12,7 @@ import { TimesheetStatusBadge } from "@/lib/timesheet-status-styles";
 
 type TimesheetRow = {
   id: string;
+  memberUserId?: string;
   projectNumber: string;
   projectTitle: string;
   targetLabel?: string;
@@ -28,7 +29,7 @@ function formatDate(value: string) {
 }
 
 export default function TimesheetsPage() {
-  const { isEffectiveProjectMember, canManageProjects, canCreateTimesheets } = useAdminSession();
+  const { isEffectiveProjectMember, canManageProjects, canCreateTimesheets, userId } = useAdminSession();
   const showCreateTimesheet = canCreateTimesheets;
   const [rows, setRows] = useState<TimesheetRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -80,6 +81,21 @@ export default function TimesheetsPage() {
       await fetchRows();
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to submit");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function deleteOne(id: string) {
+    if (!window.confirm("Delete this timesheet? This cannot be undone.")) return;
+    setSubmitting(true);
+    try {
+      const res = await adminFetch(`/api/admin/timesheets/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(messageFromApiError(data, "Failed to delete"));
+      await fetchRows();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to delete");
     } finally {
       setSubmitting(false);
     }
@@ -218,6 +234,18 @@ export default function TimesheetsPage() {
                             className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-600"
                           >
                             Submit
+                          </button>
+                        ) : null}
+                        {row.memberUserId === userId &&
+                        (row.status === "DRAFT" || row.status === "SUBMITTED") ? (
+                          <button
+                            type="button"
+                            onClick={() => void deleteOne(row.id)}
+                            disabled={submitting}
+                            className="rounded-lg border border-gray-200 p-2 text-red-600 hover:bg-red-50 dark:border-gray-600 dark:hover:bg-red-950/30"
+                            aria-label="Delete timesheet"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         ) : null}
                       </div>

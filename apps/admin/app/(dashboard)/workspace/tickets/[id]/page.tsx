@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { workspaceFetch } from "@/lib/workspace-fetch";
 import {
+  isTerminalTicketStatus,
   TICKET_PRIORITIES,
   TICKET_PRIORITY_LABELS,
   TICKET_STATUS_LABELS,
@@ -142,7 +143,7 @@ export default function TicketDetailPage() {
   const canEditTypePriority = isClient || isConsultant;
   const canEditDescription = isClient || isConsultant;
   const typeOptions = isClient ? CLIENT_REQUEST_TYPES : TICKET_TYPES.map((t) => ({ value: t, label: TICKET_TYPE_LABELS[t] }));
-  const closedOrCancelled = ticket.status === "CLOSED" || ticket.status === "CANCELLED";
+  const closedOrCancelled = isTerminalTicketStatus(ticket.status);
 
   return (
     <div className="space-y-6">
@@ -152,13 +153,15 @@ export default function TicketDetailPage() {
         {ticket.organization ? <p className="text-sm text-gray-500">{ticket.organization.name}</p> : null}
       </div>
 
-      <TicketLifecycleActions
-        status={ticket.status}
-        role={me?.role ?? ""}
-        isCreator={isCreator}
-        disabled={saving}
-        onAction={runLifecycle}
-      />
+      {!closedOrCancelled ? (
+        <TicketLifecycleActions
+          status={ticket.status}
+          role={me?.role ?? ""}
+          isCreator={isCreator}
+          disabled={saving}
+          onAction={runLifecycle}
+        />
+      ) : null}
 
       <div className="grid gap-4 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-3">
         <div>
@@ -231,10 +234,12 @@ export default function TicketDetailPage() {
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-semibold">Attachments</h2>
-          <label className="cursor-pointer text-sm font-medium text-sky-600 hover:underline">
-            {uploading ? "Uploading…" : "Add file"}
-            <input type="file" className="hidden" onChange={onUploadFile} disabled={uploading} />
-          </label>
+          {!closedOrCancelled ? (
+            <label className="cursor-pointer text-sm font-medium text-sky-600 hover:underline">
+              {uploading ? "Uploading…" : "Add file"}
+              <input type="file" className="hidden" onChange={onUploadFile} disabled={uploading} />
+            </label>
+          ) : null}
         </div>
         <TicketAttachmentList ticketId={ticket.id} attachments={ticket.attachments} />
       </section>
@@ -252,23 +257,27 @@ export default function TicketDetailPage() {
             </li>
           ))}
         </ul>
-        <form onSubmit={sendMessage} className="space-y-2">
-          <textarea
-            required
-            rows={3}
-            value={reply}
-            onChange={(e) => setReply(e.target.value)}
-            className="w-full rounded-lg border px-3 py-2 text-sm"
-            placeholder="Write a reply…"
-          />
-          {isConsultant ? (
-            <label className="flex items-center gap-2 text-xs text-gray-600">
-              <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
-              Internal note (not visible to client)
-            </label>
-          ) : null}
-          <button type="submit" className="rounded-lg bg-black px-4 py-2 text-sm text-white">Send</button>
-        </form>
+        {closedOrCancelled ? (
+          <p className="text-sm text-gray-500">This ticket is closed or cancelled. No further replies are allowed.</p>
+        ) : (
+          <form onSubmit={sendMessage} className="space-y-2">
+            <textarea
+              required
+              rows={3}
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+              placeholder="Write a reply…"
+            />
+            {isConsultant ? (
+              <label className="flex items-center gap-2 text-xs text-gray-600">
+                <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
+                Internal note (not visible to client)
+              </label>
+            ) : null}
+            <button type="submit" className="rounded-lg bg-black px-4 py-2 text-sm text-white">Send</button>
+          </form>
+        )}
       </section>
 
       {ticket.auditLogs && ticket.auditLogs.length > 0 ? (

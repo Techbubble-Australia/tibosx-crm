@@ -95,7 +95,9 @@ router.get("/timesheets/summary", async (req: TbosRequest, res) => {
     return res.json({ data: { total: 0, pendingApproval: 0 } });
   }
   const [total, pendingApproval] = await Promise.all([
-    prisma.timesheet.count({ where: { projectId: { in: projectIds } } }),
+    prisma.timesheet.count({
+      where: { projectId: { in: projectIds }, status: { in: ["SUBMITTED", "APPROVED"] } },
+    }),
     prisma.timesheet.count({
       where: { projectId: { in: projectIds }, status: "SUBMITTED" },
     }),
@@ -534,6 +536,10 @@ router.patch("/tickets/:id", async (req: TbosRequest, res) => {
   });
   if (!existing) return res.status(404).json({ error: "Ticket not found" });
 
+  if (existing.status === TicketStatus.CLOSED || existing.status === TicketStatus.CANCELLED) {
+    return res.status(400).json({ error: "Cannot edit a closed or cancelled ticket" });
+  }
+
   const actorId = await resolveTbosActorUserId(tbosUser);
   const data: Record<string, unknown> = {};
   for (const [field, value] of Object.entries(parsed.data)) {
@@ -609,6 +615,10 @@ router.post("/tickets/:id/messages", async (req: TbosRequest, res) => {
   });
   if (!ticket) return res.status(404).json({ error: "Ticket not found" });
 
+  if (ticket.status === TicketStatus.CLOSED || ticket.status === TicketStatus.CANCELLED) {
+    return res.status(400).json({ error: "Cannot add messages to a closed or cancelled ticket" });
+  }
+
   const actorId = await resolveTbosActorUserId(tbosUser);
   const message = await prisma.ticketMessage.create({
     data: {
@@ -673,6 +683,10 @@ router.post("/tickets/:id/attachments/upload", upload.single("file"), async (req
     where: { id: req.params.id, ...orgScope },
   });
   if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+
+  if (ticket.status === TicketStatus.CLOSED || ticket.status === TicketStatus.CANCELLED) {
+    return res.status(400).json({ error: "Cannot upload files to a closed or cancelled ticket" });
+  }
 
   const actorId = await resolveTbosActorUserId(tbosUser);
   try {

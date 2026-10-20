@@ -410,14 +410,15 @@ router.patch("/:id", async (req: TicketingRequest, res) => {
     return res.status(400).json({ error: "Use lifecycle actions to change status" });
   }
 
+  if (existing.status === TicketStatus.CLOSED || existing.status === TicketStatus.CANCELLED) {
+    return res.status(400).json({ error: "Cannot edit a closed or cancelled ticket" });
+  }
+
   const isConsultant = user.role === "CONSULTANT" && user.consultantVerified;
   if (!isConsultant) {
     const allowed = Object.keys(parsed.data).every((k) => k === "description" || k === "type" || k === "priority");
     if (!allowed || parsed.data.assignedToId !== undefined || parsed.data.subject !== undefined) {
       return res.status(403).json({ error: "Clients can only update description, type, and priority" });
-    }
-    if (existing.status === TicketStatus.CLOSED || existing.status === TicketStatus.CANCELLED) {
-      return res.status(400).json({ error: "Cannot edit a closed or cancelled ticket" });
     }
   }
 
@@ -461,6 +462,10 @@ router.post("/:id/messages", async (req: TicketingRequest, res) => {
   const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
   if (!ticket || !(await canAccessTicketOrganization(user, ticket.organizationId))) {
     return res.status(404).json({ error: "Ticket not found" });
+  }
+
+  if (ticket.status === TicketStatus.CLOSED || ticket.status === TicketStatus.CANCELLED) {
+    return res.status(400).json({ error: "Cannot add messages to a closed or cancelled ticket" });
   }
 
   const isConsultant = user.role === "CONSULTANT" && user.consultantVerified;
@@ -525,6 +530,10 @@ router.post("/:id/attachments/upload", upload.single("file"), async (req: Ticket
   const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
   if (!ticket || !(await canAccessTicketOrganization(user, ticket.organizationId))) {
     return res.status(404).json({ error: "Ticket not found" });
+  }
+
+  if (ticket.status === TicketStatus.CLOSED || ticket.status === TicketStatus.CANCELLED) {
+    return res.status(400).json({ error: "Cannot upload files to a closed or cancelled ticket" });
   }
 
   try {

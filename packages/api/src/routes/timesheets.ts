@@ -244,6 +244,43 @@ function mapDetail(row: NonNullable<Awaited<ReturnType<typeof fetchTimesheet>>>)
   });
 }
 
+function mapDetailWithActions(
+  row: NonNullable<Awaited<ReturnType<typeof fetchTimesheet>>>,
+  actorId: string,
+  role: string,
+) {
+  const canApprove =
+    row.status === "SUBMITTED" &&
+    row.approverKind !== "CLIENT_CONTACT" &&
+    ((row.project && canActAsTimesheetApprover(actorId, role, row.project)) ||
+      row.opportunity?.ownerId === actorId);
+  const canSubmit = row.memberUserId === actorId && row.status === "DRAFT";
+  const canDelete =
+    row.memberUserId === actorId && (row.status === "DRAFT" || row.status === "SUBMITTED");
+  return {
+    ...mapDetail(row),
+    canApprove,
+    canSubmit,
+    canDelete,
+  };
+}
+
+async function listTimesheetTicketsForProject(projectId: string) {
+  const supportOrg = await prisma.organization.findFirst({
+    where: { projectId, active: true },
+    select: { id: true },
+  });
+  return prisma.ticket.findMany({
+    where: {
+      status: { notIn: ["CLOSED", "CANCELLED"] },
+      OR: [{ projectId }, ...(supportOrg ? [{ organizationId: supportOrg.id }] : [])],
+    },
+    select: { id: true, ticketNumber: true, subject: true },
+    orderBy: { updatedAt: "desc" },
+    take: 100,
+  });
+}
+
 async function timesheetAccessWhere(req: AuthRequest): Promise<Prisma.TimesheetWhereInput> {
   const role = req.user?.role ?? "";
   const actorId = getActorId(req);
@@ -310,37 +347,21 @@ router.get("/project-cases", async (req: AuthRequest, res) => {
     });
     if (!membership?.project) return res.status(403).json({ error: "Forbidden" });
 
+    const projectOption = {
+      kind: "project" as const,
+      id: projectId,
+      label: `${membership.project.projectNumber} — ${membership.project.title}`,
+    };
+    const tickets = await listTimesheetTicketsForProject(projectId);
+    const ticketOptions = tickets.map((row) => ({
+      kind: "ticket" as const,
+      id: row.id,
+      label: `${row.ticketNumber} — ${row.subject}`,
+    }));
+
     if (membership.project.kind === "SUPPORT") {
-      const supportOrg = await prisma.organization.findFirst({
-        where: { projectId, active: true },
-        select: { id: true },
-      });
-      const tickets = await prisma.ticket.findMany({
-        where: {
-          status: { in: ["OPEN", "IN_PROGRESS", "PENDING_CLIENT"] },
-          OR: [
-            { projectId },
-            ...(supportOrg ? [{ organizationId: supportOrg.id }] : []),
-          ],
-        },
-        select: { id: true, ticketNumber: true, subject: true },
-        orderBy: { updatedAt: "desc" },
-        take: 100,
-      });
-      const projectOption = {
-        kind: "project" as const,
-        id: projectId,
-        label: `${membership.project.projectNumber} — ${membership.project.title}`,
-      };
       return res.json({
-        data: [
-          projectOption,
-          ...tickets.map((row) => ({
-            kind: "ticket" as const,
-            id: row.id,
-            label: `${row.ticketNumber} — ${row.subject}`,
-          })),
-        ],
+        data: [projectOption, ...ticketOptions],
       });
     }
 
@@ -355,11 +376,15 @@ router.get("/project-cases", async (req: AuthRequest, res) => {
       take: 50,
     });
     res.json({
-      data: opportunities.map((row) => ({
-        kind: "opportunity" as const,
-        id: row.id,
-        label: row.name,
-      })),
+      data: [
+        projectOption,
+        ...ticketOptions,
+        ...opportunities.map((row) => ({
+          kind: "opportunity" as const,
+          id: row.id,
+          label: row.name,
+        })),
+      ],
     });
   } catch (error) {
     console.error("Error fetching project cases:", error);
@@ -593,18 +618,8 @@ router.get("/:id", async (req: AuthRequest, res) => {
     if (!allowed) return res.status(403).json({ error: "Forbidden" });
     const role = req.user?.role ?? "";
     const actorId = getActorId(req);
-    const canApprove =
-      row.status === "SUBMITTED" &&
-      row.approverKind !== "CLIENT_CONTACT" &&
-      ((row.project && canActAsTimesheetApprover(actorId, role, row.project)) ||
-        row.opportunity?.ownerId === actorId);
-    const canSubmit = row.memberUserId === actorId && row.status === "DRAFT";
     res.json({
-      data: {
-        ...mapDetail(row),
-        canApprove,
-        canSubmit,
-      },
+      data: mapDetailWithActions(row, actorId, role),
     });
   } catch (error) {
     console.error("Error fetching timesheet:", error);
@@ -796,7 +811,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
     });
 
     const detail = await fetchTimesheet(row.id);
-    res.json({ data: detail ? mapDetail(detail) : null });
+    res.json({ data: detail ? mapDetailWithActions(detail, actorId, role) : null });
   } catch (error) {
     if (error instanceof Error && error.message === "AGREEMENT_REQUIRED") {
       return res.status(403).json({ error: "Sign your agreement before editing timesheets" });
@@ -815,6 +830,30 @@ router.put("/:id", async (req: AuthRequest, res) => {
     }
     console.error("Error updating timesheet:", error);
     res.status(500).json({ error: "Failed to update timesheet" });
+  }
+});
+
+router.delete("/:id", async (req: AuthRequest, res) => {
+  try {
+    const actorId = getActorId(req);
+    const role = req.user?.role ?? "";
+    const roles = await effectiveRolesForUser(actorId, role);
+    if (!hasEffectiveRole(roles, "project_member")) {
+      return res.status(403).json({ error: "Only project members can delete timesheets" });
+    }
+    const existing = await prisma.timesheet.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: "Not found" });
+    if (existing.memberUserId !== actorId) {
+      return res.status(403).json({ error: "You can only delete your own timesheets" });
+    }
+    if (existing.status !== "DRAFT" && existing.status !== "SUBMITTED") {
+      return res.status(400).json({ error: "Only draft or submitted timesheets can be deleted" });
+    }
+    await prisma.timesheet.delete({ where: { id: existing.id } });
+    res.json({ data: { id: existing.id } });
+  } catch (error) {
+    console.error("Error deleting timesheet:", error);
+    res.status(500).json({ error: "Failed to delete timesheet" });
   }
 });
 

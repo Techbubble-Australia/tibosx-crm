@@ -1,12 +1,8 @@
-import { TICKET_STATUS_LABELS } from "@/lib/support-ticket-labels";
-
-function normalizeTicketStatus(status: string): string {
-  return status.trim().toUpperCase().replace(/\s+/g, "_");
-}
+import { TICKET_STATUS_LABELS, normalizeTicketStatusKey } from "@/lib/support-ticket-labels";
 
 /** Badge classes for ticket status — background color is the primary cue (not font color). */
 export function ticketStatusBadgeClass(status: string): string {
-  switch (normalizeTicketStatus(status)) {
+  switch (normalizeTicketStatusKey(status)) {
     case "DRAFT":
       return "bg-gray-200 text-gray-900";
     case "OPEN":
@@ -18,7 +14,7 @@ export function ticketStatusBadgeClass(status: string): string {
     case "RESOLVED":
       return "bg-green-200 text-green-950";
     case "CLOSED":
-      return "bg-green-800 text-white";
+      return "bg-gray-800 text-white ring-1 ring-gray-900/10";
     case "CANCELLED":
       return "bg-red-600 text-white";
     default:
@@ -27,11 +23,13 @@ export function ticketStatusBadgeClass(status: string): string {
 }
 
 export function TicketStatusBadge({ status }: { status: string }) {
-  const key = normalizeTicketStatus(status);
-  const label = TICKET_STATUS_LABELS[key] ?? status;
+  const key = normalizeTicketStatusKey(status);
+  const label =
+    TICKET_STATUS_LABELS[key] ??
+    (status?.trim() ? status.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) : "—");
   return (
     <span
-      className={`inline-flex rounded-md px-2.5 py-1 text-xs font-semibold ${ticketStatusBadgeClass(status)}`}
+      className={`inline-flex min-h-[1.5rem] items-center rounded-md px-2.5 py-1 text-xs font-semibold ${ticketStatusBadgeClass(status)}`}
     >
       {label}
     </span>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { adminFetch } from "@/lib/admin-api";
 import {
+  isTerminalTicketStatus,
   TICKET_PRIORITIES,
   TICKET_PRIORITY_LABELS,
   TICKET_TYPE_LABELS,
@@ -134,6 +135,8 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
     return <p className="text-gray-500">Loading…</p>;
   }
 
+  const closedOrCancelled = isTerminalTicketStatus(ticket.status);
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <Link href="/support-tickets" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
@@ -161,7 +164,7 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
         </Field>
         <Field label="Priority">
           <select
-            disabled={saving}
+            disabled={saving || closedOrCancelled}
             value={ticket.priority}
             onChange={(e) => void patch({ priority: e.target.value })}
             className="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
@@ -173,7 +176,7 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
         </Field>
         <Field label="Type">
           <select
-            disabled={saving}
+            disabled={saving || closedOrCancelled}
             value={ticket.type}
             onChange={(e) => void patch({ type: e.target.value })}
             className="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
@@ -185,7 +188,7 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
         </Field>
         <Field label="Assigned to">
           <select
-            disabled={saving}
+            disabled={saving || closedOrCancelled}
             value={ticket.assignedToId ?? ""}
             onChange={(e) => void patch({ assignedToId: e.target.value || null })}
             className="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
@@ -206,10 +209,12 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
       <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-semibold">Attachments</h2>
-          <label className="cursor-pointer text-sm font-medium text-blue-600 hover:underline dark:text-blue-400">
-            {uploading ? "Uploading…" : "Add file"}
-            <input type="file" className="hidden" onChange={onUpload} disabled={uploading} />
-          </label>
+          {closedOrCancelled ? null : (
+            <label className="cursor-pointer text-sm font-medium text-blue-600 hover:underline dark:text-blue-400">
+              {uploading ? "Uploading…" : "Add file"}
+              <input type="file" className="hidden" onChange={onUpload} disabled={uploading} />
+            </label>
+          )}
         </div>
         <TicketAttachmentList ticketId={ticket.id} attachments={ticket.attachments} />
       </section>
@@ -234,25 +239,31 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
             ))}
           </ul>
         )}
-        <form onSubmit={sendReply} className="space-y-2 border-t border-gray-100 pt-4 dark:border-gray-800">
-          <textarea
-            rows={4}
-            value={reply}
-            onChange={(e) => setReply(e.target.value)}
-            placeholder="Reply to client or add an internal note…"
-            className="w-full rounded-lg border px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
-          />
-          <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-            <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
-            Internal note (not visible to client)
-          </label>
-          <button
-            type="submit"
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900"
-          >
-            Send message
-          </button>
-        </form>
+        {closedOrCancelled ? (
+          <p className="border-t border-gray-100 pt-4 text-sm text-gray-500 dark:border-gray-800">
+            This ticket is closed or cancelled. No further replies or uploads are allowed.
+          </p>
+        ) : (
+          <form onSubmit={sendReply} className="space-y-2 border-t border-gray-100 pt-4 dark:border-gray-800">
+            <textarea
+              rows={4}
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              placeholder="Reply to client or add an internal note…"
+              className="w-full rounded-lg border px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
+            />
+            <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+              <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
+              Internal note (not visible to client)
+            </label>
+            <button
+              type="submit"
+              className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900"
+            >
+              Send message
+            </button>
+          </form>
+        )}
       </section>
 
       {ticket.auditLogs && ticket.auditLogs.length > 0 ? (

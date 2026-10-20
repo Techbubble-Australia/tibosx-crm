@@ -41,8 +41,12 @@ router.get("/summary", async (req: TicketingRequest, res) => {
     return res.json({ data: { total: 0, pendingApproval: 0 } });
   }
 
+  const submittedWhere = {
+    projectId: { in: projectIds },
+    status: { in: ["SUBMITTED", "APPROVED"] },
+  };
   const [total, pendingApproval] = await Promise.all([
-    prisma.timesheet.count({ where: { projectId: { in: projectIds } } }),
+    prisma.timesheet.count({ where: submittedWhere }),
     prisma.timesheet.count({
       where: {
         projectId: { in: projectIds },

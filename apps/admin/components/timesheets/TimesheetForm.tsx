@@ -1,7 +1,6 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
@@ -249,7 +248,6 @@ export function TimesheetForm({
   submitForApprovalLoading = false,
   showSubmitForApproval = false,
 }: Props) {
-  const router = useRouter();
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [projectId, setProjectId] = useState(defaults.projectId ?? "");
   const [cases, setCases] = useState<CaseOption[]>([]);
@@ -263,9 +261,10 @@ export function TimesheetForm({
   const [selectedApprover, setSelectedApprover] = useState("");
   const [fileUrls, setFileUrls] = useState<string[]>(defaults.fileUrls ?? []);
   const [uploading, setUploading] = useState(false);
+  const [weekConflict, setWeekConflict] = useState(false);
 
   const status = defaults.status ?? "DRAFT";
-  const editable = !readOnly && status === "DRAFT";
+  const editable = !readOnly && status === "DRAFT" && !weekConflict;
 
   const weekSun = useMemo(() => {
     const mon = new Date(`${weekMonday}T00:00:00.000Z`);
@@ -291,12 +290,16 @@ export function TimesheetForm({
     !managerRequired &&
     status === "DRAFT";
 
-  const weekBanner =
-    status === "DRAFT" && !defaults.id
+  const weekBanner = weekConflict
+    ? "There's already a Timesheet for this project and week. Select a different project or week to proceed further."
+    : status === "DRAFT" && !defaults.id
       ? "No timesheet found for this week."
       : status === "DRAFT"
         ? "Timesheet is in draft — add your entry, save, then submit for approval."
         : `Status: ${TIMESHEET_STATUS_LABELS[status]}`;
+
+  const draftRowActive =
+    editable && (lines.length === 0 || draftHoursTotal > 0 || Boolean(draft.caseKey));
 
   const thBase =
     "border-b border-gray-200 bg-white px-2 py-2.5 text-xs font-semibold text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100";
@@ -363,19 +366,28 @@ export function TimesheetForm({
   }, [projectId, editable]);
 
   useEffect(() => {
-    if (!editable || defaults.id || !projectId || !weekMonday) return;
+    if (defaults.id || !projectId || !weekMonday) {
+      setWeekConflict(false);
+      return;
+    }
     void adminFetch(
       `/api/admin/timesheets/for-week?projectId=${encodeURIComponent(projectId)}&startDate=${encodeURIComponent(weekMonday)}`,
     )
       .then((r) => r.json())
       .then((data) => {
         const existing = data.data as { id?: string } | null;
-        if (existing?.id) {
-          router.replace(`/timesheets/${existing.id}`);
-        }
+        setWeekConflict(Boolean(existing?.id));
       })
-      .catch(() => undefined);
-  }, [editable, defaults.id, projectId, weekMonday, router]);
+      .catch(() => setWeekConflict(false));
+  }, [defaults.id, projectId, weekMonday]);
+
+  useEffect(() => {
+    if (defaults.id) return;
+    setLines([]);
+    setDraft(emptyDraftLine());
+    setComments("");
+    setFileUrls([]);
+  }, [projectId, weekMonday, defaults.id]);
 
   function updateLine(key: string, patch: Partial<LineEntry>) {
     setLines((prev) => prev.map((line) => (line.key === key ? { ...line, ...patch } : line)));
@@ -518,8 +530,14 @@ export function TimesheetForm({
           </button>
         </div>
 
-        <div className="flex min-h-[2.75rem] flex-1 items-center gap-2 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900 xl:mx-2 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-100">
-          <Info className="h-4 w-4 shrink-0 text-sky-600" />
+        <div
+          className={`flex min-h-[2.75rem] flex-1 items-center gap-2 rounded border px-3 py-2 text-sm xl:mx-2 ${
+            weekConflict
+              ? "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+              : "border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-100"
+          }`}
+        >
+          <Info className={`h-4 w-4 shrink-0 ${weekConflict ? "text-amber-600" : "text-sky-600"}`} />
           <span>{weekBanner}</span>
         </div>
 
@@ -671,7 +689,7 @@ export function TimesheetForm({
                   </Fragment>
                 );
               })}
-              {editable ? (
+              {draftRowActive ? (
                 <>
                   <tr key="draft-hours">
                     <td className={`${tdBase} align-top`}>
