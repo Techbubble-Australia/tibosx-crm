@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ADMIN_SESSION_COOKIE } from "@/lib/auth-cookie";
+import { jwtSecretFingerprint } from "@/lib/jwt-fingerprint";
 import { adminSessionCookieOptions } from "@/lib/session";
 
 export async function POST(req: Request) {
@@ -17,6 +18,31 @@ export async function POST(req: Request) {
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    try {
+      const checkRes = await fetch(`${apiUrl.replace(/\/$/, "")}/api/auth/link-check`, {
+        cache: "no-store",
+      });
+      const check = (await checkRes.json().catch(() => ({}))) as {
+        data?: {
+          jwtSecretFingerprint?: string;
+          bootstrapUserExists?: boolean;
+          bootstrapEmail?: string;
+        };
+      };
+      const apiFp = check.data?.jwtSecretFingerprint ?? "unreachable";
+      const adminFp = jwtSecretFingerprint();
+      console.warn("[admin login] API rejected credentials", {
+        apiUrl,
+        loginHttpStatus: res.status,
+        jwtFingerprintsMatch: apiFp !== "unreachable" && adminFp === apiFp,
+        adminJwtFingerprint: adminFp,
+        apiJwtFingerprint: apiFp,
+        bootstrapEmail: check.data?.bootstrapEmail,
+        bootstrapUserExists: check.data?.bootstrapUserExists,
+      });
+    } catch (linkErr) {
+      console.warn("[admin login] Could not reach API link-check", { apiUrl, linkErr });
+    }
     return NextResponse.json(
       { error: typeof data.error === "string" ? data.error : "Login failed" },
       { status: res.status },

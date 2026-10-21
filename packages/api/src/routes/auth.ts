@@ -39,8 +39,27 @@ import {
 } from "../lib/password-reset";
 import { sendPasswordResetEmail } from "../lib/mail";
 import { tbosLoginUrl } from "../lib/user-invite";
+import { jwtSecretFingerprint } from "../lib/jwt-fingerprint";
 
 const router: IRouter = Router();
+
+/** Public ops check: confirms API env + bootstrap user (no secrets). */
+router.get("/link-check", async (_req, res) => {
+  const bootstrapEmail = getBootstrapAdminEmail();
+  const user = await prisma.adminUser.findUnique({
+    where: { email: bootstrapEmail },
+    select: { id: true, active: true },
+  });
+  res.json({
+    data: {
+      service: "api",
+      bootstrapEmail,
+      bootstrapUserExists: Boolean(user),
+      bootstrapUserActive: user?.active ?? false,
+      jwtSecretFingerprint: jwtSecretFingerprint(),
+    },
+  });
+});
 
 const loginSchema = z.object({
   email: z.string().email(),
