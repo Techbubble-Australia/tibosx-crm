@@ -5,6 +5,7 @@ import { authMiddleware, type TicketingRequest } from "../middleware/auth.js";
 import { resolveClientTimesheetProjectIds } from "../lib/client-timesheet-projects.js";
 import { formatZodError } from "../../lib/zod-error.js";
 import { notifyAsync } from "../../lib/notifications";
+import { fetchTimesheet, mapDetail } from "../../routes/timesheets.js";
 
 const router: IRouter = Router();
 
@@ -144,6 +145,38 @@ router.get("/pending-approval", async (req: TicketingRequest, res) => {
 
 const decisionSchema = z.object({
   reason: z.string().max(5000).optional(),
+});
+
+router.get("/:id", async (req: TicketingRequest, res) => {
+  const user = req.ticketingUser!;
+  if (user.role !== "CLIENT") return res.status(403).json({ error: "Forbidden" });
+
+  const links = await prisma.projectClientContact.findMany({
+    where: { ticketingUserId: user.id, canApproveTimesheets: true },
+    select: { id: true },
+  });
+  const linkIds = links.map((row) => row.id);
+  if (!linkIds.length) return res.status(403).json({ error: "Forbidden" });
+
+  const timesheetId = req.params.id;
+  if (!timesheetId) return res.status(400).json({ error: "Invalid id" });
+
+  const timesheet = await fetchTimesheet(timesheetId);
+  if (!timesheet) return res.status(404).json({ error: "Not found" });
+
+  if (
+    timesheet.approverKind !== "CLIENT_CONTACT" ||
+    !timesheet.projectClientContactId ||
+    !linkIds.includes(timesheet.projectClientContactId)
+  ) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  if (!["SUBMITTED", "APPROVED", "REJECTED"].includes(timesheet.status)) {
+    return res.status(404).json({ error: "Not found" });
+  }
+
+  res.json({ data: mapDetail(timesheet) });
 });
 
 router.post("/:id/approve", async (req: TicketingRequest, res) => {

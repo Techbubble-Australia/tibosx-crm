@@ -1102,4 +1102,4 @@ router.post("/:id/reject", async (req: AuthRequest, res) => {
   }
 });
 
-export { router as timesheetRoutes };
+export { router as timesheetRoutes, fetchTimesheet, mapDetail };

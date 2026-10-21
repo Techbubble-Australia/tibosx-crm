@@ -270,7 +270,8 @@ export function TimesheetForm({
   const [weekConflict, setWeekConflict] = useState(false);
 
   const status = defaults.status ?? "DRAFT";
-  const editable = !readOnly && status === "DRAFT" && !weekConflict;
+  const formEditable = !readOnly && status === "DRAFT";
+  const entryEditable = formEditable && !weekConflict;
 
   const weekSun = useMemo(() => {
     const mon = new Date(`${weekMonday}T00:00:00.000Z`);
@@ -285,10 +286,26 @@ export function TimesheetForm({
   );
   const hoursTotal = committedHoursTotal + draftHoursTotal;
 
-  const managerRequired = editable && approvers.length > 0 && !selectedApprover;
+  const managerRequired = entryEditable && approvers.length > 0 && !selectedApprover;
   const hasAnyHours = hoursTotal > 0;
-  const canAddEntry = editable && Boolean(projectId) && draftHoursTotal > 0;
-  const canSave = editable && Boolean(projectId) && hasAnyHours && !managerRequired;
+  const entryRowsForSave = useMemo(() => {
+    if (lines.length > 0) {
+      return [...lines, ...(sumDailyHours(draft.dailyHours) > 0 ? [draft] : [])];
+    }
+    if (sumDailyHours(draft.dailyHours) > 0 || draft.caseKey) return [draft];
+    return lines;
+  }, [lines, draft]);
+  const entryTasksComplete = useMemo(
+    () =>
+      entryRowsForSave.every(
+        (line) => sumDailyHours(line.dailyHours) === 0 || Boolean(line.caseKey.trim()),
+      ),
+    [entryRowsForSave],
+  );
+  const canAddEntry =
+    entryEditable && Boolean(projectId) && draftHoursTotal > 0 && Boolean(draft.caseKey.trim());
+  const canSave =
+    entryEditable && Boolean(projectId) && hasAnyHours && !managerRequired && entryTasksComplete;
   const canSubmitForApproval =
     showSubmitForApproval &&
     Boolean(defaults.id) &&
@@ -304,7 +321,7 @@ export function TimesheetForm({
         ? "Timesheet is in draft — add your entry, save, then submit for approval."
         : `Status: ${TIMESHEET_STATUS_LABELS[status]}`;
 
-  const draftRowActive = editable && lines.length === 0;
+  const draftRowActive = entryEditable && lines.length === 0;
 
   const thBase =
     "border-b border-gray-200 bg-white px-2 py-2.5 text-xs font-semibold text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100";
@@ -363,7 +380,7 @@ export function TimesheetForm({
     void adminFetch(`/api/admin/timesheets/project-cases?projectId=${encodeURIComponent(projectId)}`)
       .then((r) => r.json())
       .then((data) => setCases((data.data as CaseOption[]) ?? []));
-  }, [projectId, editable]);
+  }, [projectId]);
 
   useEffect(() => {
     if (!projectId) {
@@ -376,13 +393,13 @@ export function TimesheetForm({
         const list = (data.data as { approvers?: ApproverOption[] })?.approvers ?? [];
         setApprovers(list);
         const first = list[0];
-        if (editable && first) {
+        if (formEditable && first) {
           const defaultKey = `${first.kind}:${first.id}`;
           setSelectedApprover((prev) => prev || defaultKey);
         }
       })
       .catch(() => setApprovers([]));
-  }, [projectId, editable]);
+  }, [projectId, formEditable]);
 
   useEffect(() => {
     if (defaults.id || !projectId || !weekMonday) {
@@ -401,14 +418,14 @@ export function TimesheetForm({
   }, [defaults.id, projectId, weekMonday]);
 
   useEffect(() => {
-    if (!editable) return;
+    if (!formEditable) return;
     const loadedMonday = snapToMondayInput(toDateInput(defaults.startDate));
     if (weekMonday === loadedMonday) return;
     setLines([]);
     setDraft(emptyDraftLine());
     setComments("");
     setFileUrls([]);
-  }, [weekMonday, editable, defaults.startDate]);
+  }, [weekMonday, formEditable, defaults.startDate]);
 
   useEffect(() => {
     if (defaults.id || !projectId || !weekMonday) return;
@@ -427,7 +444,7 @@ export function TimesheetForm({
   }
 
   function clearDraftRow() {
-    if (!editable) return;
+    if (!entryEditable) return;
     setDraft(emptyDraftLine());
   }
 
@@ -438,7 +455,7 @@ export function TimesheetForm({
   }
 
   async function uploadFiles(files: FileList | null) {
-    if (!files?.length || !editable) return;
+    if (!files?.length || !entryEditable) return;
     setUploading(true);
     try {
       const nextUrls = [...fileUrls];
@@ -469,14 +486,13 @@ export function TimesheetForm({
       alert("Choose a manager to approve your timesheet.");
       return;
     }
+    const entryRows = entryRowsForSave;
+    if (entryRows.some((line) => sumDailyHours(line.dailyHours) > 0 && !line.caseKey.trim())) {
+      alert("Select a project or ticket for each row with hours.");
+      return;
+    }
     const mon = new Date(`${weekMonday}T00:00:00.000Z`);
     const sun = sundayOfWeek(mon);
-    const entryRows =
-      lines.length > 0
-        ? [...lines, ...(sumDailyHours(draft.dailyHours) > 0 ? [draft] : [])]
-        : sumDailyHours(draft.dailyHours) > 0 || draft.caseKey
-          ? [draft]
-          : lines;
     const payload: Record<string, unknown> = {
       projectId,
       startDate: weekMonday,
@@ -506,26 +522,26 @@ export function TimesheetForm({
             <label className="mb-1 block text-sm font-medium text-gray-800 dark:text-gray-200">Select first day of week</label>
             <input
               type="date"
-              className={`${inputClass} w-[11rem] ${editable ? "" : readOnlyClass}`}
+              className={`${inputClass} w-[11rem] ${formEditable ? "" : readOnlyClass}`}
               value={weekMonday}
               onChange={(e) => setWeekMonday(snapToMondayInput(e.target.value))}
-              readOnly={!editable}
+              readOnly={!formEditable}
             />
           </div>
-          {editable || defaults.projectId ? (
+          {formEditable || defaults.projectId ? (
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-800 dark:text-gray-200">
                 Search project <span className="text-red-500">*</span>
               </label>
               <select
-                className={`${selectClass} w-full min-w-[12rem] max-w-[18rem] ${editable ? "" : readOnlyClass}`}
+                className={`${selectClass} w-full min-w-[12rem] max-w-[18rem] ${formEditable ? "" : readOnlyClass}`}
                 value={projectId}
                 onChange={(e) => {
                   setProjectId(e.target.value);
                   setLines([]);
                   setDraft(emptyDraftLine());
                 }}
-                disabled={!editable}
+                disabled={!formEditable}
                 required
               >
                 <option value="">Search project…</option>
@@ -541,7 +557,7 @@ export function TimesheetForm({
           <button
             type="button"
             className="rounded border border-gray-200 p-1 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600"
-            disabled={!editable}
+            disabled={!formEditable}
             onClick={() => setWeekMonday((w) => shiftWeek(w, -7))}
             aria-label="Previous week"
           >
@@ -553,7 +569,7 @@ export function TimesheetForm({
           <button
             type="button"
             className="rounded border border-gray-200 p-1 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600"
-            disabled={!editable}
+            disabled={!formEditable}
             onClick={() => setWeekMonday((w) => shiftWeek(w, 7))}
             aria-label="Next week"
           >
@@ -598,7 +614,9 @@ export function TimesheetForm({
             </colgroup>
             <thead>
               <tr>
-                <th className={`${thBase} text-left`}>Project/Ticket Task</th>
+                <th className={`${thBase} text-left`}>
+                  Project/Ticket Task <span className="text-red-500">*</span>
+                </th>
                 {weekDays.map((d) => {
                   const dow = d.label.split(" ")[0] ?? d.key;
                   return (
@@ -613,9 +631,9 @@ export function TimesheetForm({
               </tr>
             </thead>
             <tbody>
-              {(editable ? lines : lines.length ? lines : linesFromDefaults(defaults)).map((line) => {
+              {(entryEditable ? lines : lines.length ? lines : linesFromDefaults(defaults)).map((line) => {
                 const lineTotal = sumDailyHours(line.dailyHours);
-                const lineEditable = editable;
+                const lineEditable = entryEditable;
                 const caseLabel =
                   line.label ||
                   (line.caseKey
@@ -632,8 +650,9 @@ export function TimesheetForm({
                             value={line.caseKey}
                             onChange={(e) => updateLine(line.key, { caseKey: e.target.value, label: undefined })}
                             disabled={!projectId}
+                            required={lineTotal > 0}
                           >
-                            <option value="">{projectId ? "Choose project or ticket" : "Select a project first"}</option>
+                            <option value="">{projectId ? "Choose project or ticket *" : "Select a project first"}</option>
                             {cases.map((row) => (
                               <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
                                 {row.label}
@@ -729,8 +748,9 @@ export function TimesheetForm({
                         value={draft.caseKey}
                         onChange={(e) => setDraft((prev) => ({ ...prev, caseKey: e.target.value }))}
                         disabled={!projectId}
+                        required={draftHoursTotal > 0}
                       >
-                        <option value="">{projectId ? "Choose project or ticket" : "Select a project first"}</option>
+                        <option value="">{projectId ? "Choose project or ticket *" : "Select a project first"}</option>
                         {cases.map((row) => (
                           <option key={`draft-${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
                             {row.label}
@@ -802,8 +822,8 @@ export function TimesheetForm({
                         <p className="flex min-w-0 flex-1 items-start gap-1 text-xs text-amber-700 dark:text-amber-400">
                           <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                           <span className="italic">
-                            Add each ticket or case as a line (optional). Use Add Entry for more lines, or Save to include
-                            the current row.
+                            Select a project or ticket for each row with hours. Use Add Entry for more lines, or Save to
+                            include the current row.
                           </span>
                         </p>
                         <div className="flex shrink-0 items-center gap-2">
@@ -836,18 +856,18 @@ export function TimesheetForm({
         <div className="border-t border-gray-200 px-4 py-4 dark:border-gray-700">
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Timesheet comments</label>
           <textarea
-            className={`${inputClass} min-h-[4.5rem] resize-y ${editable ? "" : readOnlyClass}`}
+            className={`${inputClass} min-h-[4.5rem] resize-y ${entryEditable ? "" : readOnlyClass}`}
             placeholder="Notes for this timesheet (rejection reasons are appended here when a manager rejects)"
             value={comments}
             onChange={(e) => setComments(e.target.value)}
-            readOnly={!editable}
+            readOnly={!entryEditable}
             rows={3}
           />
         </div>
 
         <div className="border-t border-gray-200 px-4 py-4 dark:border-gray-700">
           <p className="mb-1 text-sm font-bold text-gray-900 dark:text-gray-100">Select Approver (Manager)</p>
-          {editable ? (
+          {formEditable ? (
             <select
               className={inputClass}
               value={selectedApprover}
@@ -872,7 +892,7 @@ export function TimesheetForm({
               }
             />
           )}
-          {editable ? (
+          {formEditable ? (
             <p className="mt-1 text-xs text-red-600">
               * Manager selection is required before saving or submitting timesheet
             </p>
@@ -880,7 +900,7 @@ export function TimesheetForm({
 
           <div className="mt-5 flex flex-col items-stretch gap-2 sm:items-end">
             {footerActions ? <div className="flex flex-wrap justify-end gap-2">{footerActions}</div> : null}
-            {editable ? (
+            {entryEditable ? (
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
                 <button
                   type="submit"
@@ -916,7 +936,7 @@ export function TimesheetForm({
         <p className="mb-3 text-xs text-gray-500">
           Attach evidence (mandatory when the timesheet is approved by the end client outside of this system).
         </p>
-        {editable ? (
+        {entryEditable ? (
           <label
             className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500 transition hover:border-sky-300 hover:bg-sky-50/50 dark:border-gray-600 dark:hover:border-sky-700 dark:hover:bg-sky-950/20 ${
               uploading ? "pointer-events-none opacity-60" : ""
@@ -946,7 +966,7 @@ export function TimesheetForm({
                 >
                   {url.split("/").pop()}
                 </a>
-                {editable ? (
+                {entryEditable ? (
                   <button
                     type="button"
                     onClick={() => setFileUrls((prev) => prev.filter((_, i) => i !== index))}

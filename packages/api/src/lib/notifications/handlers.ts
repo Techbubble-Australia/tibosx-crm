@@ -141,7 +141,8 @@ export const notificationHandlers: {
     if (!recipients.length) return;
 
     const subject = `[${ticket.ticketNumber}] ${ticket.subject}`;
-    const body = `New support case on ${ticket.project?.projectNumber ?? "project"}: ${ticket.subject}\n\n${supportTicketAdminUrl(ticket.id)}`;
+    const link = supportTicketAdminUrl(ticket.id);
+    const body = `New ticket created: ${ticket.subject}\n\nTo know more click link below:\n${link}`;
 
     for (const to of recipients) {
       await sendEmailIfEnabled("ticket.created", to, () =>

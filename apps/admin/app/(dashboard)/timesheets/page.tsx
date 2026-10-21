@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Edit, Send, Trash2 } from "lucide-react";
+import { Plus, Send, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
@@ -199,19 +199,23 @@ export default function TimesheetsPage() {
                       </td>
                     ) : null}
                     <td className="px-4 py-3">
-                      {row.targetLabel || (
-                        <>
-                          <span className="font-mono text-xs text-gray-400">{row.projectNumber}</span>
-                          <br />
-                          {row.projectTitle}
-                        </>
-                      )}
+                      <Link href={`/timesheets/${row.id}`} className="text-sky-600 hover:underline dark:text-sky-400">
+                        {row.targetLabel || (
+                          <>
+                            <span className="font-mono text-xs text-gray-400">{row.projectNumber}</span>
+                            <br />
+                            {row.projectTitle}
+                          </>
+                        )}
+                      </Link>
                     </td>
                     {canManageProjects ? (
                       <td className="px-4 py-3 text-gray-500">{row.memberName}</td>
                     ) : null}
                     <td className="px-4 py-3 text-gray-500">
-                      {formatDate(row.startDate)} – {formatDate(row.endDate)}
+                      <Link href={`/timesheets/${row.id}`} className="hover:text-sky-600 hover:underline dark:hover:text-sky-400">
+                        {formatDate(row.startDate)} – {formatDate(row.endDate)}
+                      </Link>
                     </td>
                     <td className="px-4 py-3">
                       <TimesheetStatusBadge status={row.status} />
@@ -223,9 +227,6 @@ export default function TimesheetsPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex gap-2">
-                        <Link href={`/timesheets/${row.id}`} className="rounded-lg border border-gray-200 p-2 hover:bg-gray-50 dark:border-gray-600">
-                          <Edit className="h-4 w-4" />
-                        </Link>
                         {isEffectiveProjectMember && row.status === "DRAFT" ? (
                           <button
                             type="button"

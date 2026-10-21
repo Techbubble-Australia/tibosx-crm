@@ -210,9 +210,9 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
             <table className="min-w-full text-sm">
               <thead className="border-b border-gray-200 bg-gray-50 text-left text-gray-500 dark:border-gray-700 dark:bg-gray-800">
                 <tr>
+                  <th className="px-4 py-3 font-medium">Timesheet period</th>
                   <th className="px-4 py-3 font-medium">Member</th>
                   <th className="px-4 py-3 font-medium">Project / case</th>
-                  <th className="px-4 py-3 font-medium">Period</th>
                   {mode === "submitted" ? <th className="px-4 py-3 text-right font-medium">Actions</th> : null}
                 </tr>
               </thead>
@@ -226,11 +226,16 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
                 ) : (
                   filtered.map((row) => (
                     <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                        <Link
+                          href={`/workspace/timesheets/${row.id}`}
+                          className="font-medium text-sky-600 hover:underline dark:text-sky-400"
+                        >
+                          {formatDate(row.startDate)} – {formatDate(row.endDate)}
+                        </Link>
+                      </td>
                       <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{row.memberName}</td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{row.targetLabel || "—"}</td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
-                        {formatDate(row.startDate)} – {formatDate(row.endDate)}
-                      </td>
                       {mode === "submitted" ? (
                         <td className="px-4 py-3 text-right">
                           <div className="inline-flex gap-2">
