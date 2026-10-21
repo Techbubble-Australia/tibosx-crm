@@ -7,6 +7,7 @@ import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { COUNTRY_OPTIONS } from "@/lib/country-options";
 import { COUNTRY_OTHER, mergeCountryValue, splitCountryValue } from "@/lib/country-form";
 import { readUploadImageUrlFromJson } from "@/lib/upload-response";
+import { messageFromApiError } from "@/lib/api-error";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm dark:border-gray-600 dark:bg-gray-800";
@@ -125,8 +126,14 @@ export function MemberProfileCompletionGate() {
       return;
     }
     for (const row of filled) {
-      if (!row.email?.trim() || !row.phone?.trim()) {
+      const email = row.email?.trim() ?? "";
+      const phone = row.phone?.trim() ?? "";
+      if (!email || !phone) {
         alert("Each emergency contact needs name, email, and phone.");
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        alert(`Emergency contact email looks invalid: ${email}`);
         return;
       }
     }
@@ -166,7 +173,7 @@ export function MemberProfileCompletionGate() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save");
+      if (!res.ok) throw new Error(messageFromApiError(data, "Failed to save profile"));
       setOpen(false);
       window.location.reload();
     } catch (error) {

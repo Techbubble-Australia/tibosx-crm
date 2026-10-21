@@ -195,20 +195,20 @@ router.post("/mfa/verify", async (req, res) => {
 });
 
 const emergencyContactSchema = z.object({
-  name: z.string().min(1).max(200),
-  email: z.string().email(),
-  phone: z.string().min(1).max(50),
-  relation: z.string().max(100).optional(),
+  name: z.string().trim().min(1).max(200),
+  email: z.string().trim().email(),
+  phone: z.string().trim().min(1).max(50),
+  relation: z.string().trim().max(100).optional(),
 });
 
 const bankDetailsSchema = z.object({
-  bankName: z.string().min(1).max(200),
-  accountName: z.string().min(1).max(200),
-  accountNumber: z.string().min(1).max(100),
-  country: z.string().min(1).max(100),
-  swiftCode: z.string().max(50).optional(),
-  bsb: z.string().min(1).max(50),
-  notes: z.string().max(2000).optional(),
+  bankName: z.string().trim().min(1).max(200),
+  accountName: z.string().trim().min(1).max(200),
+  accountNumber: z.string().trim().min(1).max(100),
+  country: z.string().trim().min(1).max(100),
+  swiftCode: z.string().trim().max(50).optional(),
+  bsb: z.string().trim().min(1).max(50),
+  notes: z.string().trim().max(2000).optional(),
 });
 
 const profileUpdateSchema = z.object({

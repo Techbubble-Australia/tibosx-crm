@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Info, Loader2, Plus, Trash2 } from "lucide-react";
 import { UserPhotoField } from "@/components/users/UserPhotoField";
 import { adminFetch } from "@/lib/admin-api";
+import { messageFromApiError } from "@/lib/api-error";
 import { AdminUserFilesField, type UserFileRow } from "@/components/users/AdminUserFilesField";
 import { UserAgreementsSection, type AgreementRecordRow } from "@/components/users/UserAgreementsSection";
 import { buildPinnedUserFiles } from "@/lib/user-pinned-files";
@@ -215,7 +216,7 @@ export default function ProfileSettingsPageInner() {
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save profile");
+      if (!res.ok) throw new Error(messageFromApiError(data, "Failed to save profile"));
       await refreshSession();
       if (onboarding) {
         window.location.href = "/timesheets";
