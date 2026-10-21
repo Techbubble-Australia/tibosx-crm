@@ -14,6 +14,7 @@ import { TicketAttachmentList } from "@/components/support-tickets/TicketAttachm
 import { TicketLifecycleActions } from "@/components/workspace/TicketLifecycleActions";
 import { TicketStatusBadge } from "@/lib/ticket-status-styles";
 import { formatTicketAuditLine, type TicketAuditRow } from "@/lib/ticket-audit-display";
+import { useAdminSession } from "@/contexts/AdminSessionContext";
 
 type Assignee = { id: string; name: string; email: string };
 
@@ -45,6 +46,7 @@ type TicketDetail = {
 };
 
 export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
+  const { impersonation } = useAdminSession();
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
   const [assignees, setAssignees] = useState<Assignee[]>([]);
   const [reply, setReply] = useState("");
@@ -168,12 +170,18 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
   }
 
   const closedOrCancelled = isTerminalTicketStatus(ticket.status);
-  const portalRole =
-    session?.role === "CONSULTANT" && session.consultantVerified ? "CONSULTANT" : "CLIENT";
-  const isCreator = Boolean(
-    session?.ticketingUserId &&
-      (ticket.createdById === session.ticketingUserId || ticket.createdBy?.id === session.ticketingUserId),
-  );
+  const staffImpersonating = Boolean(impersonation);
+  const portalRole = staffImpersonating
+    ? "CONSULTANT"
+    : session?.role === "CONSULTANT" && session.consultantVerified
+      ? "CONSULTANT"
+      : "CLIENT";
+  const isCreator = staffImpersonating
+    ? false
+    : Boolean(
+        session?.ticketingUserId &&
+          (ticket.createdById === session.ticketingUserId || ticket.createdBy?.id === session.ticketingUserId),
+      );
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">

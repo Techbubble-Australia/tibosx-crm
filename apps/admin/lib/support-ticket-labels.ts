@@ -29,8 +29,17 @@ export const TICKET_STATUSES = Object.keys(TICKET_STATUS_LABELS);
 
 const TERMINAL_TICKET_STATUSES = new Set(["CLOSED", "CANCELLED"]);
 
-export function normalizeTicketStatusKey(status: string): string {
-  return status.trim().toUpperCase().replace(/\s+/g, "_");
+export function normalizeTicketStatusKey(status: string | null | undefined): string {
+  return (status ?? "").trim().toUpperCase().replace(/\s+/g, "_");
+}
+
+export function ticketStatusLabel(status: string | null | undefined): string {
+  const key = normalizeTicketStatusKey(status);
+  if (!key) return "—";
+  if (TICKET_STATUS_LABELS[key]) return TICKET_STATUS_LABELS[key];
+  const raw = (status ?? "").trim();
+  if (!raw) return "—";
+  return raw.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 }
 
 export function isTerminalTicketStatus(status: string): boolean {

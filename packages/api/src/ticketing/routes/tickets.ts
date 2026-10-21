@@ -20,8 +20,10 @@ import { streamTicketAttachmentFile } from "../lib/serve-ticket-attachment.js";
 import {
   canPerformLifecycleAction,
   nextStatusForLifecycleAction,
+  resolveTicketLifecycleActor,
   type TicketLifecycleAction,
 } from "../lib/ticket-lifecycle.js";
+import type { WorkspaceRequest } from "../middleware/tbos-workspace.js";
 import { autoCloseStaleResolvedTickets } from "../lib/auto-close-resolved-tickets.js";
 import { notifyAsync } from "../../lib/notifications";
 
@@ -343,9 +345,13 @@ router.post("/:id/lifecycle", async (req: TicketingRequest, res) => {
     return res.status(404).json({ error: "Ticket not found" });
   }
 
-  const role = user.role === "CONSULTANT" && user.consultantVerified ? "CONSULTANT" : "CLIENT";
+  const tbosUser = (req as WorkspaceRequest).user;
+  const { role, isCreator } = await resolveTicketLifecycleActor({
+    ticketingUser: user,
+    ticketCreatedById: existing.createdById,
+    impersonatorId: tbosUser?.impersonatorId,
+  });
   const action = parsed.data.action as TicketLifecycleAction;
-  const isCreator = existing.createdById === user.id;
   if (!canPerformLifecycleAction(role, action, { isCreator })) {
     return res.status(403).json({ error: "Not allowed to perform this action" });
   }

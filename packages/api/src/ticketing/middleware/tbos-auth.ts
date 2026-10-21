@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { verifyTbosAdminToken } from "./auth.js";
 
-export type TbosAuthUser = { id: string; email: string; role: string };
+export type TbosAuthUser = { id: string; email: string; role: string; impersonatorId?: string };
 
 export interface TbosRequest extends Request {
   tbosUser?: TbosAuthUser;

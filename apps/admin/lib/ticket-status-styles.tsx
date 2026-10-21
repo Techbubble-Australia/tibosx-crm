@@ -1,32 +1,29 @@
-import { TICKET_STATUS_LABELS, normalizeTicketStatusKey } from "@/lib/support-ticket-labels";
+import { normalizeTicketStatusKey, ticketStatusLabel } from "@/lib/support-ticket-labels";
 
 /** Badge classes for ticket status — background color is the primary cue (not font color). */
-export function ticketStatusBadgeClass(status: string): string {
+export function ticketStatusBadgeClass(status: string | null | undefined): string {
   switch (normalizeTicketStatusKey(status)) {
     case "DRAFT":
-      return "bg-gray-200 text-gray-900";
+      return "bg-gray-200 text-gray-900 ring-1 ring-gray-300";
     case "OPEN":
-      return "bg-gray-300 text-gray-900";
+      return "bg-sky-200 text-sky-950 ring-1 ring-sky-400";
     case "IN_PROGRESS":
-      return "bg-amber-300 text-gray-900";
+      return "bg-amber-300 text-amber-950 ring-1 ring-amber-500";
     case "PENDING_CLIENT":
-      return "bg-blue-300 text-gray-900";
+      return "bg-blue-200 text-blue-950 ring-1 ring-blue-400";
     case "RESOLVED":
-      return "bg-green-200 text-gray-900";
+      return "bg-emerald-200 text-emerald-950 ring-1 ring-emerald-500";
     case "CLOSED":
-      return "bg-green-800 text-white";
+      return "bg-emerald-700 text-white ring-1 ring-emerald-900";
     case "CANCELLED":
-      return "bg-red-600 text-white";
+      return "bg-red-600 text-white ring-1 ring-red-800";
     default:
-      return "bg-gray-200 text-gray-900";
+      return "bg-gray-200 text-gray-900 ring-1 ring-gray-300";
   }
 }
 
-export function TicketStatusBadge({ status }: { status: string }) {
-  const key = normalizeTicketStatusKey(status);
-  const label =
-    TICKET_STATUS_LABELS[key] ??
-    (status?.trim() ? status.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) : "—");
+export function TicketStatusBadge({ status }: { status: string | null | undefined }) {
+  const label = ticketStatusLabel(status);
   return (
     <span
       className={`inline-flex min-h-[1.5rem] items-center rounded-md px-2.5 py-1 text-xs font-semibold ${ticketStatusBadgeClass(status)}`}

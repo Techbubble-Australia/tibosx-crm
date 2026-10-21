@@ -16,6 +16,7 @@ import { TicketAttachmentList } from "@/components/workspace/TicketAttachmentLis
 import { TicketLifecycleActions } from "@/components/workspace/TicketLifecycleActions";
 import { TicketStatusBadge } from "@/lib/ticket-status-styles";
 import { formatTicketAuditLine, type TicketAuditRow } from "@/lib/ticket-audit-display";
+import { useAdminSession } from "@/contexts/AdminSessionContext";
 
 type Message = {
   id: string;
@@ -43,6 +44,7 @@ type TicketDetail = {
 export default function TicketDetailPage() {
   const params = useParams();
   const id = params.id as string;
+  const { impersonation } = useAdminSession();
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
   const [me, setMe] = useState<{ id: string; role: string } | null>(null);
   const [reply, setReply] = useState("");
@@ -137,9 +139,11 @@ export default function TicketDetailPage() {
     return <p className="text-gray-500">Loading…</p>;
   }
 
-  const isConsultant = me?.role === "CONSULTANT";
-  const isClient = me?.role === "CLIENT";
-  const isCreator = Boolean(me?.id && ticket.createdById === me.id);
+  const staffImpersonating = Boolean(impersonation);
+  const lifecycleRole = staffImpersonating ? "CONSULTANT" : (me?.role ?? "");
+  const isConsultant = lifecycleRole === "CONSULTANT";
+  const isClient = lifecycleRole === "CLIENT";
+  const isCreator = staffImpersonating ? false : Boolean(me?.id && ticket.createdById === me.id);
   const canEditTypePriority = isClient || isConsultant;
   const canEditDescription = isClient || isConsultant;
   const typeOptions = isClient ? CLIENT_REQUEST_TYPES : TICKET_TYPES.map((t) => ({ value: t, label: TICKET_TYPE_LABELS[t] }));
@@ -156,7 +160,7 @@ export default function TicketDetailPage() {
       {!closedOrCancelled ? (
         <TicketLifecycleActions
           status={ticket.status}
-          role={me?.role ?? ""}
+          role={lifecycleRole}
           isCreator={isCreator}
           disabled={saving}
           onAction={runLifecycle}

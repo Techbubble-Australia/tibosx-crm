@@ -103,11 +103,7 @@ export default function EditUserPage() {
 
   async function inviteUser() {
     const ok = window.confirm(
-      "Send invite email?\n\n" +
-        "• A new temporary password will be generated and will REPLACE any password already set for this user (including one you entered when creating their account).\n" +
-        "• They must sign in with that new temporary password, not their old one.\n" +
-        "• They will be asked to choose a new password after signing in.\n\n" +
-        "Continue?",
+      "Existing password will be overwritten by a temporary password. Do you want to continue?",
     );
     if (!ok) return;
     setInviteLoading(true);

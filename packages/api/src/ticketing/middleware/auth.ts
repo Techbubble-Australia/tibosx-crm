@@ -103,12 +103,18 @@ export function signTicketingToken(payload: TicketingAuthUser): string {
   return jwt.sign(payload, ticketingJwtSecret(), { expiresIn: "8h" });
 }
 
-export function verifyTbosAdminToken(token: string): { id: string; email: string; role: string } | null {
+export function verifyTbosAdminToken(token: string): {
+  id: string;
+  email: string;
+  role: string;
+  impersonatorId?: string;
+} | null {
   try {
     const decoded = jwt.verify(token, tbosJwtSecret()) as {
       id?: string;
       email?: string;
       role?: string;
+      impersonatorId?: string;
       purpose?: string;
     };
     if (!decoded.id || !decoded.email) return null;
@@ -119,7 +125,12 @@ export function verifyTbosAdminToken(token: string): { id: string; email: string
     ) {
       return null;
     }
-    return { id: decoded.id, email: decoded.email, role: decoded.role || "" };
+    return {
+      id: decoded.id,
+      email: decoded.email,
+      role: decoded.role || "",
+      ...(decoded.impersonatorId ? { impersonatorId: decoded.impersonatorId } : {}),
+    };
   } catch {
     return null;
   }

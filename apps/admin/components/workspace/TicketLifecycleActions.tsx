@@ -1,5 +1,7 @@
 "use client";
 
+import { normalizeTicketStatusKey } from "@/lib/support-ticket-labels";
+
 type Props = {
   status: string;
   role: string;
@@ -15,13 +17,14 @@ const LIFECYCLE_CONFIRM: Partial<Record<string, string>> = {
 };
 
 export function TicketLifecycleActions({ status, role, isCreator, disabled, onAction }: Props) {
+  const statusKey = normalizeTicketStatusKey(status);
   const isConsultant = role === "CONSULTANT";
   const isClient = role === "CLIENT";
   const canConsultantAct = isConsultant && !isCreator;
-  const canStartWork = isConsultant && (status === "OPEN" || status === "DRAFT");
+  const canStartWork = isConsultant && (statusKey === "OPEN" || statusKey === "DRAFT");
 
   const buttons: { action: string; label: string; show: boolean }[] = [
-    { action: "reopen", label: "Re-open", show: isClient && status === "RESOLVED" },
+    { action: "reopen", label: "Re-open", show: isClient && statusKey === "RESOLVED" },
     {
       action: "start_work",
       label: "Start work",
@@ -30,16 +33,19 @@ export function TicketLifecycleActions({ status, role, isCreator, disabled, onAc
     {
       action: "client_info_needed",
       label: "Client info needed",
-      show: canConsultantAct && status === "IN_PROGRESS",
+      show: canConsultantAct && statusKey === "IN_PROGRESS",
     },
-    { action: "resolve", label: "Resolve", show: canConsultantAct && status === "IN_PROGRESS" },
-    { action: "close", label: "Close", show: isClient && status === "RESOLVED" },
+    { action: "resolve", label: "Resolve", show: canConsultantAct && statusKey === "IN_PROGRESS" },
+    { action: "close", label: "Close", show: isClient && statusKey === "RESOLVED" },
     {
       action: "cancel",
       label: "Cancel",
       show:
         isClient &&
-        (status === "DRAFT" || status === "OPEN" || status === "IN_PROGRESS" || status === "PENDING_CLIENT"),
+        (statusKey === "DRAFT" ||
+          statusKey === "OPEN" ||
+          statusKey === "IN_PROGRESS" ||
+          statusKey === "PENDING_CLIENT"),
     },
   ];
 

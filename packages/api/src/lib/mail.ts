@@ -44,6 +44,11 @@ function getTbosMailFrom(): string {
   return "TIBOSX <noreply@techbubble.net.au>";
 }
 
+/** TIBOSX product notifications (tickets, timesheets, contact form). */
+function getNotificationMailFrom(): string {
+  return getTbosMailFrom();
+}
+
 function getHrEmail(): string {
   return process.env.CAREERS_HR_EMAIL?.trim() || "hr@techbubble.com.au";
 }
@@ -100,7 +105,7 @@ export async function sendTimesheetApprovalRequestEmail(input: {
     return;
   }
   const { error } = await resend.emails.send({
-    from: getMailFrom(),
+    from: getNotificationMailFrom(),
     to: [input.to],
     subject,
     text: body,
@@ -193,7 +198,7 @@ export async function sendSupportTicketNotificationEmail(input: {
   }
 
   const { error } = await resend.emails.send({
-    from: getMailFrom(),
+    from: getNotificationMailFrom(),
     to: [input.to],
     subject: input.subject,
     text: input.body,

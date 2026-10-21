@@ -18,6 +18,7 @@ import { listSupportPortalOrganizations } from "../lib/support-portal-orgs.js";
 import {
   canPerformLifecycleAction,
   nextStatusForLifecycleAction,
+  resolveTicketLifecycleActor,
   type TicketLifecycleAction,
 } from "../lib/ticket-lifecycle.js";
 import { autoCloseStaleResolvedTickets } from "../lib/auto-close-resolved-tickets.js";
@@ -364,13 +365,17 @@ router.post("/tickets/:id/lifecycle", async (req: TbosRequest, res) => {
   });
   if (!existing) return res.status(404).json({ error: "Ticket not found" });
 
-  const consultant = await prisma.ticketingUser.findFirst({
-    where: { tbosAdminUserId: tbosUser.id, role: "CONSULTANT", consultantVerified: true },
-  });
-  const role = consultant ? "CONSULTANT" : "CLIENT";
   const action = parsed.data.action as TicketLifecycleAction;
   const actorId = await resolveTbosActorUserId(tbosUser);
-  const isCreator = existing.createdById === actorId;
+  const actorTicketing = await prisma.ticketingUser.findUnique({
+    where: { id: actorId },
+    select: { id: true, role: true, consultantVerified: true },
+  });
+  const { role, isCreator } = await resolveTicketLifecycleActor({
+    ticketingUser: actorTicketing ?? { id: actorId, role: "CLIENT", consultantVerified: false },
+    ticketCreatedById: existing.createdById,
+    impersonatorId: tbosUser.impersonatorId,
+  });
   if (!canPerformLifecycleAction(role, action, { isCreator })) {
     return res.status(403).json({ error: "Not allowed to perform this action" });
   }
