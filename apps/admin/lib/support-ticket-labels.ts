@@ -30,7 +30,16 @@ export const TICKET_STATUSES = Object.keys(TICKET_STATUS_LABELS);
 const TERMINAL_TICKET_STATUSES = new Set(["CLOSED", "CANCELLED"]);
 
 export function normalizeTicketStatusKey(status: string | null | undefined): string {
-  return (status ?? "").trim().toUpperCase().replace(/\s+/g, "_");
+  const raw = (status ?? "").trim();
+  if (!raw) return "";
+  const key = raw.toUpperCase().replace(/\s+/g, "_");
+  if (TICKET_STATUS_LABELS[key]) return key;
+  const compact = key.replace(/_/g, "");
+  const alias: Record<string, string> = {
+    INPROGRESS: "IN_PROGRESS",
+    PENDINGCLIENT: "PENDING_CLIENT",
+  };
+  return alias[compact] ?? key;
 }
 
 export function ticketStatusLabel(status: string | null | undefined): string {

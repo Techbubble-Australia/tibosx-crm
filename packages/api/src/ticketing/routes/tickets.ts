@@ -295,6 +295,30 @@ router.get("/:id/attachments/:attachmentId/file", async (req: TicketingRequest, 
   await streamTicketAttachmentFile(attachment, res, { download });
 });
 
+router.get("/assignees", async (req: TicketingRequest, res) => {
+  const user = req.ticketingUser!;
+  if (user.role !== "CONSULTANT" || !user.consultantVerified) {
+    return res.json({ data: [] });
+  }
+  const ticketId = typeof req.query.ticketId === "string" ? req.query.ticketId : "";
+  if (!ticketId) return res.status(400).json({ error: "ticketId is required" });
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: ticketId },
+    select: { organizationId: true, projectId: true },
+  });
+  if (!ticket || !(await canAccessTicketOrganization(user, ticket.organizationId))) {
+    return res.status(404).json({ error: "Ticket not found" });
+  }
+  const org = await prisma.organization.findUnique({
+    where: { id: ticket.organizationId },
+    select: { projectId: true },
+  });
+  const projectId = ticket.projectId ?? org?.projectId ?? null;
+  const { listProjectTicketAssignees } = await import("../../lib/ticket-project-assignees.js");
+  const rows = await listProjectTicketAssignees(projectId);
+  res.json({ data: rows });
+});
+
 router.get("/:id", async (req: TicketingRequest, res) => {
   await autoCloseStaleResolvedTickets();
   const user = req.ticketingUser!;

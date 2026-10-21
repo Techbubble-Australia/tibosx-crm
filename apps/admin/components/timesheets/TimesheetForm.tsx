@@ -323,8 +323,8 @@ export function TimesheetForm({
     entryEditable &&
     weekInProject &&
     Boolean(projectId) &&
-    draftHoursTotal > 0 &&
-    Boolean(draft.caseKey.trim());
+    (draftHoursTotal > 0 || Boolean(draft.caseKey.trim()) || lines.length > 0) &&
+    (draftHoursTotal === 0 || Boolean(draft.caseKey.trim()));
   const canSave =
     entryEditable &&
     weekInProject &&
@@ -491,8 +491,16 @@ export function TimesheetForm({
   }
 
   function addEntry() {
-    if (!canAddEntry) return;
-    setLines((prev) => [...prev, { ...draft, key: newLineKey() }]);
+    if (!entryEditable || !weekInProject || !projectId) return;
+    if (draftHoursTotal > 0 && !draft.caseKey.trim()) {
+      alert("Select a project or ticket for the current row before adding another entry.");
+      return;
+    }
+    if (draftHoursTotal > 0 || draft.caseKey.trim()) {
+      setLines((prev) => [...prev, { ...draft, key: newLineKey() }]);
+      setDraft(emptyDraftLine());
+      return;
+    }
     setDraft(emptyDraftLine());
   }
 
@@ -859,7 +867,7 @@ export function TimesheetForm({
                         <div className="flex shrink-0 items-center gap-2">
                           <button
                             type="button"
-                            disabled={!canAddEntry}
+                            disabled={!entryEditable || !projectId || !weekInProject}
                             onClick={() => addEntry()}
                             className="inline-flex items-center justify-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                           >

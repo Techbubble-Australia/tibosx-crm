@@ -140,13 +140,20 @@ export const notificationHandlers: {
     const recipients = await resolveProjectTicketNotificationEmails(projectId);
     if (!recipients.length) return;
 
-    const subject = `[${ticket.ticketNumber}] ${ticket.subject}`;
     const link = supportTicketAdminUrl(ticket.id);
     const body = `New ticket created: ${ticket.subject}\n\nTo know more click link below:\n${link}`;
+    const bodyHtml = `<p>New ticket created: <strong>${ticket.subject.replace(/</g, "&lt;")}</strong></p><p>To know more click link below:<br/><a href="${link}">${link}</a></p>`;
 
     for (const to of recipients) {
       await sendEmailIfEnabled("ticket.created", to, () =>
-        sendSupportTicketNotificationEmail({ to, subject, body }),
+        sendSupportTicketNotificationEmail({
+          to,
+          headerTitle: "Ticket created!",
+          subjectLine: "Ticket created",
+          body,
+          bodyHtml,
+          greeting: "Hi Team,",
+        }),
       );
     }
   },
@@ -177,13 +184,22 @@ export const notificationHandlers: {
 
     if (!recipients.length) return;
 
-    const subject = `Re: [${ticket.ticketNumber}] ${ticket.subject}`;
     const preview = message.body.length > 280 ? `${message.body.slice(0, 280)}…` : message.body;
-    const body = `${message.author.name || message.author.email} wrote:\n\n${preview}\n\nView ticket: ${workspaceTicketUrl(ticket.id)}`;
+    const author = message.author.name || message.author.email;
+    const ticketUrl = workspaceTicketUrl(ticket.id);
+    const body = `${author} wrote:\n\n${preview}\n\nView ticket: ${ticketUrl}`;
+    const bodyHtml = `<p><strong>${author}</strong> wrote on ticket <strong>${ticket.ticketNumber}</strong>:</p><p style="white-space:pre-wrap;">${preview.replace(/</g, "&lt;")}</p><p><a href="${ticketUrl}">View ticket</a></p>`;
 
     for (const to of recipients) {
       await sendEmailIfEnabled("ticket.message", to, () =>
-        sendSupportTicketNotificationEmail({ to, subject, body }),
+        sendSupportTicketNotificationEmail({
+          to,
+          headerTitle: "Ticket updated!",
+          subjectLine: `Reply on ${ticket.ticketNumber}`,
+          body,
+          bodyHtml,
+          greeting: "Hi Team,",
+        }),
       );
     }
   },
@@ -201,12 +217,20 @@ export const notificationHandlers: {
     });
     if (!recipients.length) return;
 
-    const subject = `[${ticket.ticketNumber}] Status: ${formatTicketStatusLabel(newStatus)}`;
-    const body = `Ticket ${ticket.ticketNumber} — ${ticket.subject}\n\nStatus changed from ${formatTicketStatusLabel(oldStatus)} to ${formatTicketStatusLabel(newStatus)}.\n\n${workspaceTicketUrl(ticket.id)}`;
+    const ticketUrl = workspaceTicketUrl(ticket.id);
+    const body = `Ticket ${ticket.ticketNumber} — ${ticket.subject}\n\nStatus changed from ${formatTicketStatusLabel(oldStatus)} to ${formatTicketStatusLabel(newStatus)}.\n\n${ticketUrl}`;
+    const bodyHtml = `<p>Ticket <strong>${ticket.ticketNumber}</strong> — <strong>${ticket.subject.replace(/</g, "&lt;")}</strong></p><p>Status changed from <strong>${formatTicketStatusLabel(oldStatus)}</strong> to <strong>${formatTicketStatusLabel(newStatus)}</strong>.</p><p><a href="${ticketUrl}">View ticket</a></p>`;
 
     for (const to of recipients) {
       await sendEmailIfEnabled("ticket.status.changed", to, () =>
-        sendSupportTicketNotificationEmail({ to, subject, body }),
+        sendSupportTicketNotificationEmail({
+          to,
+          headerTitle: "Ticket status updated!",
+          subjectLine: "Ticket status updated",
+          body,
+          bodyHtml,
+          greeting: "Hi Team,",
+        }),
       );
     }
   },

@@ -26,6 +26,8 @@ type Message = {
   author: { name: string; role: string };
 };
 
+type Assignee = { id: string; name: string; email: string };
+
 type TicketDetail = {
   id: string;
   ticketNumber: string;
@@ -35,6 +37,8 @@ type TicketDetail = {
   priority: string;
   status: string;
   createdById: string;
+  assignedToId?: string | null;
+  assignedTo?: { id: string; name: string; email: string } | null;
   organization?: { name: string };
   messages: Message[];
   attachments: { id: string; fileName: string; fileUrl: string; fileSize?: number | null }[];
@@ -52,6 +56,7 @@ export default function TicketDetailPage() {
   const [uploading, setUploading] = useState(false);
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
+  const [assignees, setAssignees] = useState<Assignee[]>([]);
 
   function reload() {
     void workspaceFetch(`/tickets/${id}`)
@@ -68,6 +73,10 @@ export default function TicketDetailPage() {
     void workspaceFetch("/auth/me")
       .then((res) => res.json())
       .then((data) => setMe(data.data as { id: string; role: string }));
+    void workspaceFetch(`/tickets/assignees?ticketId=${encodeURIComponent(id)}`)
+      .then((res) => res.json())
+      .then((data) => setAssignees((data.data as Assignee[]) ?? []))
+      .catch(() => setAssignees([]));
   }, [id]);
 
   async function savePatch(body: Record<string, unknown>) {
@@ -146,6 +155,7 @@ export default function TicketDetailPage() {
   const isCreator = staffImpersonating ? false : Boolean(me?.id && ticket.createdById === me.id);
   const canEditTypePriority = isClient || isConsultant;
   const canEditDescription = isClient || isConsultant;
+  const canEditAssignee = isConsultant || staffImpersonating;
   const typeOptions = isClient ? CLIENT_REQUEST_TYPES : TICKET_TYPES.map((t) => ({ value: t, label: TICKET_TYPE_LABELS[t] }));
   const closedOrCancelled = isTerminalTicketStatus(ticket.status);
 
@@ -167,7 +177,7 @@ export default function TicketDetailPage() {
         />
       ) : null}
 
-      <div className="grid gap-4 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-3">
+      <div className="grid gap-4 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <p className="text-xs text-gray-500">Type</p>
           {canEditTypePriority && !closedOrCancelled ? (
@@ -208,6 +218,24 @@ export default function TicketDetailPage() {
             <TicketStatusBadge status={ticket.status} />
             <span className="sr-only">{TICKET_STATUS_LABELS[ticket.status]}</span>
           </div>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500">Assigned to</p>
+          {canEditAssignee && !closedOrCancelled ? (
+            <select
+              value={ticket.assignedToId ?? ""}
+              disabled={saving}
+              onChange={(e) => void savePatch({ assignedToId: e.target.value || null })}
+              className="mt-1 w-full rounded border px-2 py-1 text-sm"
+            >
+              <option value="">Unassigned</option>
+              {assignees.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          ) : (
+            <p className="mt-1 text-sm">{ticket.assignedTo?.name ?? "Unassigned"}</p>
+          )}
         </div>
       </div>
 

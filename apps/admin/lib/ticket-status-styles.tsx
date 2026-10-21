@@ -4,21 +4,21 @@ import { normalizeTicketStatusKey, ticketStatusLabel } from "@/lib/support-ticke
 export function ticketStatusBadgeClass(status: string | null | undefined): string {
   switch (normalizeTicketStatusKey(status)) {
     case "DRAFT":
-      return "bg-gray-200 text-gray-900 ring-1 ring-gray-300";
+      return "bg-gray-500 text-white";
     case "OPEN":
-      return "bg-sky-200 text-sky-950 ring-1 ring-sky-400";
+      return "bg-sky-600 text-white";
     case "IN_PROGRESS":
-      return "bg-amber-300 text-amber-950 ring-1 ring-amber-500";
+      return "bg-amber-600 text-white";
     case "PENDING_CLIENT":
-      return "bg-blue-200 text-blue-950 ring-1 ring-blue-400";
+      return "bg-blue-600 text-white";
     case "RESOLVED":
-      return "bg-emerald-200 text-emerald-950 ring-1 ring-emerald-500";
+      return "bg-emerald-600 text-white";
     case "CLOSED":
-      return "bg-emerald-700 text-white ring-1 ring-emerald-900";
+      return "bg-emerald-800 text-white";
     case "CANCELLED":
-      return "bg-red-600 text-white ring-1 ring-red-800";
+      return "bg-red-600 text-white";
     default:
-      return "bg-gray-200 text-gray-900 ring-1 ring-gray-300";
+      return "bg-gray-500 text-white";
   }
 }
 

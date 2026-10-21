@@ -1004,12 +1004,13 @@ router.delete("/:id", async (req: AuthRequest, res) => {
     const actorId = getActorId(req);
     const role = req.user?.role ?? "";
     const roles = await effectiveRolesForUser(actorId, role);
-    if (!hasEffectiveRole(roles, "project_member")) {
+    const canManageAll = canManageAllTimesheets(role);
+    if (!canManageAll && !hasEffectiveRole(roles, "project_member")) {
       return res.status(403).json({ error: "Only project members can delete timesheets" });
     }
     const existing = await prisma.timesheet.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: "Not found" });
-    if (existing.memberUserId !== actorId) {
+    if (!canManageAll && existing.memberUserId !== actorId) {
       return res.status(403).json({ error: "You can only delete your own timesheets" });
     }
     if (existing.status !== "DRAFT" && existing.status !== "SUBMITTED") {

@@ -46,7 +46,7 @@ type TicketDetail = {
 };
 
 export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
-  const { impersonation } = useAdminSession();
+  const { impersonation, canManageProjects } = useAdminSession();
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
   const [assignees, setAssignees] = useState<Assignee[]>([]);
   const [reply, setReply] = useState("");
@@ -176,6 +176,8 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
     : session?.role === "CONSULTANT" && session.consultantVerified
       ? "CONSULTANT"
       : "CLIENT";
+  const canManageAssignee =
+    canManageProjects || staffImpersonating || (portalRole === "CONSULTANT" && !closedOrCancelled);
   const isCreator = staffImpersonating
     ? false
     : Boolean(
@@ -243,17 +245,23 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
           </select>
         </Field>
         <Field label="Assigned to">
-          <select
-            disabled={saving || closedOrCancelled}
-            value={ticket.assignedToId ?? ""}
-            onChange={(e) => void patch({ assignedToId: e.target.value || null })}
-            className="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
-          >
-            <option value="">Unassigned</option>
-            {assignees.map((a) => (
-              <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
-          </select>
+          {canManageAssignee ? (
+            <select
+              disabled={saving || closedOrCancelled}
+              value={ticket.assignedToId ?? ""}
+              onChange={(e) => void patch({ assignedToId: e.target.value || null })}
+              className="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
+            >
+              <option value="">Unassigned</option>
+              {assignees.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          ) : (
+            <p className="mt-1 text-sm text-gray-800 dark:text-gray-200">
+              {ticket.assignedTo?.name ?? "Unassigned"}
+            </p>
+          )}
         </Field>
       </section>
 

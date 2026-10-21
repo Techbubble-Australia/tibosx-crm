@@ -15,7 +15,12 @@ const inputClass =
 type EmergencyContact = { name: string; email?: string; phone?: string; relation?: string };
 
 export function MemberProfileCompletionGate() {
-  const { sessionLoaded, memberOnboarding } = useAdminSession();
+  const { sessionLoaded, memberOnboarding, role, additionalRoles } = useAdminSession();
+  const isStaffUser =
+    role === "admin" ||
+    role === "project_manager" ||
+    additionalRoles.includes("admin") ||
+    additionalRoles.includes("project_manager");
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addressLine1, setAddressLine1] = useState("");
@@ -41,7 +46,9 @@ export function MemberProfileCompletionGate() {
   const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
 
   const needsProfileCompletion = Boolean(
-    memberOnboarding?.agreementSigned && !memberOnboarding.profileComplete,
+    !isStaffUser &&
+      memberOnboarding?.profileOnboardingRequired &&
+      memberOnboarding?.agreementSigned,
   );
 
   useEffect(() => {

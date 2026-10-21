@@ -418,6 +418,10 @@ router.post("/:id/invite", async (req: AuthRequest, res) => {
         temporaryPassword,
         context: user.role === "client" ? "client" : "project_member",
       });
+      if (user.role !== "client") {
+        const { recordTbUserInvite } = await import("../lib/user-profile-invite.js");
+        await recordTbUserInvite(userId);
+      }
     } catch (emailErr) {
       console.error("User invite email failed:", emailErr);
       const message =

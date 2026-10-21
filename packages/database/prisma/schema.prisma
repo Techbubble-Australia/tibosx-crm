@@ -983,6 +983,10 @@ model AdminUser {
   postcode      String?
   country       String?
   profileDetailsCompletedAt DateTime?
+  /// Incremented when the user is invited to TBOS (credentials email).
+  inviteCount Int @default(0)
+  /// Set on invite when full consultant profile is still required; cleared when profile is completed.
+  profileOnboardingRequiredAt DateTime?
   agreementDocumentUrl      String?  @db.Text
   bankDetails               Json?
   idProofUrl                String?  @db.Text

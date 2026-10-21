@@ -11,6 +11,8 @@ export type MemberOnboardingStatus = {
   agreementSigned: boolean;
   profileComplete: boolean;
   canSubmitTimesheets: boolean;
+  profileOnboardingRequired: boolean;
+  inviteCount: number;
 };
 
 export async function getMemberOnboardingStatus(userId: string): Promise<MemberOnboardingStatus> {
@@ -27,6 +29,8 @@ export async function getMemberOnboardingStatus(userId: string): Promise<MemberO
       idProofUrl: true,
       addressProofUrl: true,
       emergencyContacts: true,
+      profileOnboardingRequiredAt: true,
+      inviteCount: true,
     },
   });
 
@@ -42,11 +46,16 @@ export async function getMemberOnboardingStatus(userId: string): Promise<MemberO
       Boolean(user.addressProofUrl?.trim()),
   );
   const canSubmitTimesheets = agreementSigned && profileComplete;
+  const profileOnboardingRequired = Boolean(
+    user?.profileOnboardingRequiredAt && !user.profileDetailsCompletedAt,
+  );
 
   return {
     hasAgreementAssignment,
     agreementSigned,
     profileComplete,
     canSubmitTimesheets,
+    profileOnboardingRequired,
+    inviteCount: user?.inviteCount ?? 0,
   };
 }

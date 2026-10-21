@@ -91,28 +91,69 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+const TIBOSX_EMAIL_BLUE = "#2563eb";
+
+export function buildTibosxNotificationEmail(input: {
+  headerTitle: string;
+  subjectLine: string;
+  greeting?: string;
+  bodyHtml: string;
+  bodyText: string;
+}): { subject: string; html: string; text: string } {
+  const subject = input.subjectLine.includes("TIBOSX")
+    ? input.subjectLine
+    : `${input.subjectLine}. TIBOSX.AI`;
+  const greeting = input.greeting ?? "Hi Team,";
+  const disclaimer =
+    "Note: This is an automated message. Please do not reply to this email — it is sent from an unmonitored address.";
+  const html = `<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f4f6;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+          <tr>
+            <td style="background:${TIBOSX_EMAIL_BLUE};padding:16px 24px;">
+              <p style="margin:0;font-size:18px;font-weight:700;color:#ffffff;">${escapeHtml(input.headerTitle)}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px;color:#111827;font-size:15px;line-height:1.55;">
+              <p style="margin:0 0 16px;">${escapeHtml(greeting)}</p>
+              ${input.bodyHtml}
+              <p style="margin:24px 0 0;">Thanks,<br/><strong>TIBOSX</strong></p>
+              <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb;" />
+              <p style="margin:0;font-size:12px;color:#6b7280;">📢 <strong>Note:</strong> ${escapeHtml(disclaimer.replace(/^Note:\s*/, ""))}</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+  const text = [greeting, "", input.bodyText, "", "Thanks,", "TIBOSX", "", disclaimer].join("\n");
+  return { subject, html, text };
+}
+
 export async function sendTimesheetApprovalRequestEmail(input: {
   to: string;
   memberName: string;
   targetLabel: string;
   portalUrl: string;
 }): Promise<void> {
-  const resend = getResendClient();
-  const subject = `Timesheet awaiting your approval — ${input.memberName}`;
-  const body = `${input.memberName} submitted a timesheet for ${input.targetLabel || "a support project"}.\n\nSign in to TIBOSX to approve or reject:\n${input.portalUrl}\n`;
-  if (!resend) {
-    console.info("[timesheet-approval-email] RESEND not configured; would send to", input.to, subject);
-    return;
-  }
-  const { error } = await resend.emails.send({
-    from: getNotificationMailFrom(),
-    to: [input.to],
-    subject,
-    text: body,
+  const target = input.targetLabel || "a support project";
+  const bodyText = `${input.memberName} submitted a timesheet for ${target}.\n\nSign in to TIBOSX to approve or reject:\n${input.portalUrl}`;
+  const bodyHtml = `<p><strong>${escapeHtml(input.memberName)}</strong> submitted a timesheet for <strong>${escapeHtml(target)}</strong>.</p><p>Sign in to <strong>TIBOSX</strong> to approve or reject:<br/><a href="${escapeHtml(input.portalUrl)}">${escapeHtml(input.portalUrl)}</a></p>`;
+  await sendSupportTicketNotificationEmail({
+    to: input.to,
+    headerTitle: "Timesheet awaiting approval!",
+    subjectLine: "Timesheet awaiting approval",
+    body: bodyText,
+    bodyHtml,
+    greeting: "Hi Team,",
   });
-  if (error) {
-    throw new Error(error.message || "Failed to send timesheet approval email");
-  }
 }
 
 export async function sendTimesheetPmApprovalRequestEmail(input: {
@@ -121,9 +162,17 @@ export async function sendTimesheetPmApprovalRequestEmail(input: {
   targetLabel: string;
   reviewUrl: string;
 }): Promise<void> {
-  const subject = `Timesheet to review — ${input.memberName}`;
-  const text = `${input.memberName} submitted a timesheet for ${input.targetLabel || "a project"}.\n\nReview and approve in TBOS:\n${input.reviewUrl}\n`;
-  await sendSupportTicketNotificationEmail({ to: input.to, subject, body: text });
+  const target = input.targetLabel || "a project";
+  const bodyText = `${input.memberName} submitted a timesheet for ${target}.\n\nReview and approve in TBOS:\n${input.reviewUrl}`;
+  const bodyHtml = `<p><strong>${escapeHtml(input.memberName)}</strong> submitted a timesheet for <strong>${escapeHtml(target)}</strong>.</p><p>Review and approve in <strong>TBOS</strong>:<br/><a href="${escapeHtml(input.reviewUrl)}">${escapeHtml(input.reviewUrl)}</a></p>`;
+  await sendSupportTicketNotificationEmail({
+    to: input.to,
+    headerTitle: "Timesheet to review!",
+    subjectLine: "Timesheet to review",
+    body: bodyText,
+    bodyHtml,
+    greeting: "Hi Team,",
+  });
 }
 
 export async function sendTimesheetMemberDecisionEmail(input: {
@@ -135,7 +184,6 @@ export async function sendTimesheetMemberDecisionEmail(input: {
   reason?: string;
 }): Promise<void> {
   const verb = input.decision === "approved" ? "approved" : "rejected";
-  const subject = `Your timesheet was ${verb}`;
   const lines = [
     `Hello ${input.memberName},`,
     "",
@@ -145,10 +193,15 @@ export async function sendTimesheetMemberDecisionEmail(input: {
     lines.push("", `Reason: ${input.reason.trim()}`);
   }
   lines.push("", `Open timesheet: ${input.reviewUrl}`);
+  const bodyText = lines.join("\n");
+  const bodyHtml = `<p>Your timesheet for <strong>${escapeHtml(input.targetLabel || "your project")}</strong> was <strong>${verb}</strong>.</p>${input.decision === "rejected" && input.reason?.trim() ? `<p>Reason: ${escapeHtml(input.reason.trim())}</p>` : ""}<p><a href="${escapeHtml(input.reviewUrl)}">Open timesheet</a></p>`;
   await sendSupportTicketNotificationEmail({
     to: input.to,
-    subject,
-    body: lines.join("\n"),
+    headerTitle: `Timesheet ${verb}!`,
+    subjectLine: `Timesheet ${verb}`,
+    body: bodyText,
+    bodyHtml,
+    greeting: `Hello ${input.memberName},`,
   });
 }
 
@@ -183,25 +236,47 @@ export async function sendContactFormNotificationEmail(input: {
   ]
     .filter(Boolean)
     .join("\n");
-  await sendSupportTicketNotificationEmail({ to: input.to, subject, body: text });
+  const bodyHtml = `<p>New contact form submission from <strong>${escapeHtml(name)}</strong> (${escapeHtml(s.email)}).</p><pre style="white-space:pre-wrap;font-family:inherit;">${escapeHtml(text)}</pre>`;
+  await sendSupportTicketNotificationEmail({
+    to: input.to,
+    headerTitle: "Contact form received!",
+    subjectLine: "Contact form received",
+    body: text,
+    bodyHtml,
+    greeting: "Hi Team,",
+  });
 }
 
 export async function sendSupportTicketNotificationEmail(input: {
   to: string;
-  subject: string;
+  subject?: string;
   body: string;
+  headerTitle?: string;
+  subjectLine?: string;
+  bodyHtml?: string;
+  greeting?: string;
 }): Promise<void> {
   const resend = getResendClient();
+  const built = buildTibosxNotificationEmail({
+    headerTitle: input.headerTitle ?? input.subjectLine ?? "Notification",
+    subjectLine: input.subjectLine ?? input.subject ?? "Notification",
+    greeting: input.greeting,
+    bodyHtml:
+      input.bodyHtml ??
+      `<p style="margin:0;white-space:pre-wrap;">${escapeHtml(input.body).replace(/\n/g, "<br/>")}</p>`,
+    bodyText: input.body,
+  });
   if (!resend) {
-    console.info("[support-ticket-email] RESEND not configured; would send to", input.to, input.subject);
+    console.info("[support-ticket-email] RESEND not configured; would send to", input.to, built.subject);
     return;
   }
 
   const { error } = await resend.emails.send({
     from: getNotificationMailFrom(),
     to: [input.to],
-    subject: input.subject,
-    text: input.body,
+    subject: built.subject,
+    text: built.text,
+    html: built.html,
   });
 
   if (error) {
@@ -215,29 +290,28 @@ export async function sendPasswordResetEmail(input: {
   resetUrl: string;
 }): Promise<void> {
   const resend = getResendClient();
-  const subject = "Reset your TIBOSX.AI password";
   const greeting = input.name.trim() ? `Hello ${input.name.trim()},` : "Hello,";
-  const text = `${greeting}
-
-We received a request to reset the password for your TechBubble Business Operating System (TIBOSX.AI) account.
-
-Reset your password here (link expires in 1 hour):
-${input.resetUrl}
-
-If you did not request this, you can ignore this email. Your password will not change until you use the link above.
-
-If you need help, contact your administrator.`;
+  const text = `We received a request to reset the password for your TIBOSX account.\n\nReset your password here (link expires in 1 hour):\n${input.resetUrl}\n\nIf you did not request this, you can ignore this email.`;
+  const bodyHtml = `<p>We received a request to reset the password for your <strong>TIBOSX</strong> account.</p><p><a href="${escapeHtml(input.resetUrl)}">Reset your password</a> (link expires in 1 hour).</p><p>If you did not request this, you can ignore this email.</p>`;
+  const built = buildTibosxNotificationEmail({
+    headerTitle: "Password reset",
+    subjectLine: "Password reset",
+    greeting,
+    bodyHtml,
+    bodyText: text,
+  });
 
   if (!resend) {
-    console.info("[password-reset-email] RESEND not configured; would send to", input.to, subject, input.resetUrl);
+    console.info("[password-reset-email] RESEND not configured; would send to", input.to, built.subject, input.resetUrl);
     return;
   }
 
   const { error } = await resend.emails.send({
     from: getTbosMailFrom(),
     to: [input.to],
-    subject,
-    text,
+    subject: built.subject,
+    text: built.text,
+    html: built.html,
   });
   if (error) {
     throw new Error(error.message || "Failed to send password reset email");
@@ -252,28 +326,23 @@ export async function sendUserInviteEmail(input: {
   extraText?: string;
 }): Promise<void> {
   const resend = requireResendClient();
-  const subject = "Your TechBubble account invitation";
-  const text = `Hello ${input.name},
-
-An account has been created for you on TechBubble's AI-powered Business Operating System (TIBOSX).
-
-Sign-in email: ${input.to}
-Temporary password: ${input.temporaryPassword}
-
-(This replaces any password previously set for your account. Sign in with this temporary password only.)
-
-Sign in here: ${input.loginUrl}
-
-You will be asked to set a new password and enroll in multi-factor authentication (MFA) on first sign-in.
-${input.extraText ?? ""}
-
-If you did not expect this email, please contact your administrator.`;
+  const greeting = `Hello ${input.name},`;
+  const text = `An account has been created for you on TIBOSX.\n\nSign-in email: ${input.to}\nTemporary password: ${input.temporaryPassword}\n\nSign in: ${input.loginUrl}${input.extraText ?? ""}`;
+  const bodyHtml = `<p>An account has been created for you on <strong>TIBOSX</strong>.</p><p>Sign-in email: <strong>${escapeHtml(input.to)}</strong><br/>Temporary password: <strong>${escapeHtml(input.temporaryPassword)}</strong></p><p><a href="${escapeHtml(input.loginUrl)}">Sign in to TIBOSX</a></p><p>You will set a new password and enroll in MFA on first sign-in.</p>`;
+  const built = buildTibosxNotificationEmail({
+    headerTitle: "Welcome to TIBOSX!",
+    subjectLine: "Your account invitation",
+    greeting,
+    bodyHtml,
+    bodyText: text,
+  });
 
   const { error } = await resend.emails.send({
     from: getTbosMailFrom(),
     to: [input.to],
-    subject,
-    text,
+    subject: built.subject,
+    text: built.text,
+    html: built.html,
   });
   if (error) {
     throw new Error(error.message || "Failed to send invite email");

@@ -254,7 +254,7 @@ export default function TimesheetsPage() {
                       <TimesheetStatusBadge status={row.status} />
                       {row.status === "SUBMITTED" && row.approverKind === "CLIENT_CONTACT" ? (
                         <span className="mt-0.5 block text-xs text-sky-600 dark:text-sky-400">
-                          Awaiting client{row.approverLabel ? `: ${row.approverLabel}` : ""}
+                          Awaiting approval
                         </span>
                       ) : null}
                     </td>
@@ -270,8 +270,9 @@ export default function TimesheetsPage() {
                             Submit
                           </button>
                         ) : null}
-                        {row.memberUserId === userId &&
-                        (row.status === "DRAFT" || row.status === "SUBMITTED") ? (
+                        {(canManageProjects ||
+                          (row.memberUserId === userId &&
+                            (row.status === "DRAFT" || row.status === "SUBMITTED"))) ? (
                           <button
                             type="button"
                             onClick={() => void deleteOne(row.id)}

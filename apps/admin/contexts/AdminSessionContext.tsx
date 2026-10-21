@@ -26,6 +26,8 @@ export type MemberOnboardingState = {
   agreementSigned: boolean;
   profileComplete: boolean;
   canSubmitTimesheets: boolean;
+  profileOnboardingRequired: boolean;
+  inviteCount: number;
 };
 
 export type ImpersonationState = {
@@ -124,6 +126,8 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
           agreementSigned: Boolean(onboarding.agreementSigned),
           profileComplete: Boolean(onboarding.profileComplete),
           canSubmitTimesheets: Boolean(onboarding.canSubmitTimesheets),
+          profileOnboardingRequired: Boolean(onboarding.profileOnboardingRequired),
+          inviteCount: typeof onboarding.inviteCount === "number" ? onboarding.inviteCount : 0,
         });
       } else {
         setMemberOnboarding(null);

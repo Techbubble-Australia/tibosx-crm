@@ -1485,6 +1485,8 @@ router.post("/:id/members/:memberId/generate-credentials", async (req: AuthReque
         context: "project_member",
       });
       inviteEmailSent = true;
+      const { recordTbUserInvite } = await import("../lib/user-profile-invite.js");
+      await recordTbUserInvite(adminUser.id);
     } catch (error) {
       console.error("Invite email failed:", error);
     }

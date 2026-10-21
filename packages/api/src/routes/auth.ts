@@ -503,8 +503,9 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
       Boolean(mergedForComplete.idProofUrl?.trim()) &&
       Boolean(mergedForComplete.addressProofUrl?.trim());
 
-    if (input.markProfileComplete && hasFullProfile) {
-      patch.profileDetailsCompletedAt = new Date();
+    if (hasFullProfile && (input.markProfileComplete || existing.profileDetailsCompletedAt)) {
+      patch.profileDetailsCompletedAt = existing.profileDetailsCompletedAt ?? new Date();
+      patch.profileOnboardingRequiredAt = null;
     }
 
     const updated = await prisma.$transaction(async (tx) => {
