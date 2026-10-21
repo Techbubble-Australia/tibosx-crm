@@ -272,7 +272,7 @@ async function listTimesheetTicketsForProject(projectId: string) {
   });
   return prisma.ticket.findMany({
     where: {
-      status: { notIn: ["CLOSED", "CANCELLED"] },
+      status: { notIn: ["CANCELLED"] },
       OR: [{ projectId }, ...(supportOrg ? [{ organizationId: supportOrg.id }] : [])],
     },
     select: { id: true, ticketNumber: true, subject: true },

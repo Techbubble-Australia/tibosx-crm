@@ -578,19 +578,7 @@ router.post("/", async (req: AuthRequest, res) => {
       await logAdminUserCreated(tx, created.id, actorId, created.email);
       return created;
     });
-    let inviteEmailSent = false;
-    try {
-      await emailTbosUserInvite({
-        to: row.email,
-        name: row.name || row.email,
-        temporaryPassword: data.password,
-      });
-      inviteEmailSent = true;
-    } catch (emailErr) {
-      console.error("User invite email failed:", emailErr);
-    }
-
-    res.status(201).json({ data: { ...sanitizeUser(row), inviteEmailSent } });
+    res.status(201).json({ data: { ...sanitizeUser(row), inviteEmailSent: false } });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });

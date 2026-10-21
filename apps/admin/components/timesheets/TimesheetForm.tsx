@@ -401,7 +401,17 @@ export function TimesheetForm({
   }, [defaults.id, projectId, weekMonday]);
 
   useEffect(() => {
-    if (defaults.id) return;
+    if (!editable) return;
+    const loadedMonday = snapToMondayInput(toDateInput(defaults.startDate));
+    if (weekMonday === loadedMonday) return;
+    setLines([]);
+    setDraft(emptyDraftLine());
+    setComments("");
+    setFileUrls([]);
+  }, [weekMonday, editable, defaults.startDate]);
+
+  useEffect(() => {
+    if (defaults.id || !projectId || !weekMonday) return;
     setLines([]);
     setDraft(emptyDraftLine());
     setComments("");

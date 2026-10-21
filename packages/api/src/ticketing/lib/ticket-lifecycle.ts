@@ -40,8 +40,12 @@ export function nextStatusForLifecycleAction(
 export function canPerformLifecycleAction(
   role: "CLIENT" | "CONSULTANT",
   action: TicketLifecycleAction,
+  options?: { isCreator?: boolean },
 ): boolean {
   if (role === "CONSULTANT") {
+    if (options?.isCreator && action !== "start_work") {
+      return false;
+    }
     return action === "start_work" || action === "client_info_needed" || action === "resolve";
   }
   return action === "reopen" || action === "close" || action === "cancel";

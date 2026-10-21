@@ -55,6 +55,23 @@ const router: IRouter = Router();
 
 router.use(tbosAuthMiddleware);
 
+router.get("/session", async (req: TbosRequest, res) => {
+  const tbosUser = req.tbosUser!;
+  const actorId = await resolveTbosActorUserId(tbosUser);
+  const ticketingUser = await prisma.ticketingUser.findUnique({
+    where: { id: actorId },
+    select: { id: true, role: true, consultantVerified: true, email: true, name: true },
+  });
+  res.json({
+    data: {
+      ticketingUserId: actorId,
+      role: ticketingUser?.role ?? null,
+      consultantVerified: Boolean(ticketingUser?.consultantVerified),
+      tbosRole: tbosUser.role,
+    },
+  });
+});
+
 function isTbosAdminRole(role: string) {
   return role.trim().toLowerCase() === "admin";
 }
@@ -244,10 +261,9 @@ router.post("/tickets", async (req: TbosRequest, res) => {
   });
 
   if (projectId) {
-    const { assignTicketToSupportGroup, notifySupportGroupOfTicket } = await import(
-      "../../lib/support-project.js"
-    );
-    await assignTicketToSupportGroup(ticket.id, projectId);
+    const { notifySupportGroupOfTicket } = await import("../../lib/support-project.js");
+    const { autoAssignTicketToProjectSupport } = await import("../../lib/ticket-project-assignees.js");
+    await autoAssignTicketToProjectSupport(ticket.id, projectId);
     void notifySupportGroupOfTicket(ticket.id);
     const refreshed = await prisma.ticket.findUnique({
       where: { id: ticket.id },
@@ -353,13 +369,10 @@ router.post("/tickets/:id/lifecycle", async (req: TbosRequest, res) => {
   });
   const role = consultant ? "CONSULTANT" : "CLIENT";
   const action = parsed.data.action as TicketLifecycleAction;
-  if (!canPerformLifecycleAction(role, action)) {
-    return res.status(403).json({ error: "Not allowed to perform this action" });
-  }
-
   const actorId = await resolveTbosActorUserId(tbosUser);
-  if (consultant && existing.createdById === actorId) {
-    return res.status(403).json({ error: "The ticket creator cannot change status" });
+  const isCreator = existing.createdById === actorId;
+  if (!canPerformLifecycleAction(role, action, { isCreator })) {
+    return res.status(403).json({ error: "Not allowed to perform this action" });
   }
 
   const nextStatus = nextStatusForLifecycleAction(existing.status, action);
@@ -506,6 +519,19 @@ router.put("/consultants/:consultantId/organizations", requireTbosAdmin, async (
 
 router.get("/assignees", async (req: TbosRequest, res) => {
   const tbosUser = req.tbosUser!;
+  const ticketId = typeof req.query.ticketId === "string" ? req.query.ticketId : "";
+  if (ticketId) {
+    const orgScope = await orgFilterForTbos(tbosUser);
+    const ticket = await prisma.ticket.findFirst({
+      where: { id: ticketId, ...orgScope },
+      select: { projectId: true, organization: { select: { projectId: true } } },
+    });
+    if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+    const projectId = ticket.projectId ?? ticket.organization?.projectId ?? null;
+    const { listProjectTicketAssignees } = await import("../../lib/ticket-project-assignees.js");
+    const rows = await listProjectTicketAssignees(projectId);
+    return res.json({ data: rows });
+  }
   if (isTbosAdminRole(tbosUser.role)) {
     const rows = await prisma.ticketingUser.findMany({
       where: { role: "CONSULTANT", consultantVerified: true, active: true },
@@ -514,12 +540,7 @@ router.get("/assignees", async (req: TbosRequest, res) => {
     });
     return res.json({ data: rows });
   }
-  const actorId = await resolveTbosActorUserId(tbosUser);
-  const self = await prisma.ticketingUser.findUnique({
-    where: { id: actorId },
-    select: { id: true, name: true, email: true },
-  });
-  res.json({ data: self ? [self] : [] });
+  res.json({ data: [] });
 });
 
 router.patch("/tickets/:id", async (req: TbosRequest, res) => {
@@ -541,6 +562,21 @@ router.patch("/tickets/:id", async (req: TbosRequest, res) => {
   }
 
   const actorId = await resolveTbosActorUserId(tbosUser);
+  if (parsed.data.assignedToId !== undefined) {
+    const projectId = existing.projectId ?? existing.organizationId
+      ? (
+          await prisma.organization.findUnique({
+            where: { id: existing.organizationId },
+            select: { projectId: true },
+          })
+        )?.projectId
+      : null;
+    const { isValidProjectTicketAssignee } = await import("../../lib/ticket-project-assignees.js");
+    const ok = await isValidProjectTicketAssignee(projectId, parsed.data.assignedToId);
+    if (!ok) {
+      return res.status(400).json({ error: "Assignee must be a member of the project support team" });
+    }
+  }
   const data: Record<string, unknown> = {};
   for (const [field, value] of Object.entries(parsed.data)) {
     if (value === undefined) continue;

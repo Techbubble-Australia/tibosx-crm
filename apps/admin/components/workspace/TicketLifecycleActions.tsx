@@ -18,13 +18,14 @@ export function TicketLifecycleActions({ status, role, isCreator, disabled, onAc
   const isConsultant = role === "CONSULTANT";
   const isClient = role === "CLIENT";
   const canConsultantAct = isConsultant && !isCreator;
+  const canStartWork = isConsultant && (status === "OPEN" || status === "DRAFT");
 
   const buttons: { action: string; label: string; show: boolean }[] = [
     { action: "reopen", label: "Re-open", show: isClient && status === "RESOLVED" },
     {
       action: "start_work",
       label: "Start work",
-      show: canConsultantAct && (status === "OPEN" || status === "DRAFT"),
+      show: canStartWork,
     },
     {
       action: "client_info_needed",

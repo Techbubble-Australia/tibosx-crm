@@ -11,6 +11,7 @@ import {
   TICKET_TYPES,
 } from "@/lib/support-ticket-labels";
 import { TicketAttachmentList } from "@/components/support-tickets/TicketAttachmentList";
+import { TicketLifecycleActions } from "@/components/workspace/TicketLifecycleActions";
 import { TicketStatusBadge } from "@/lib/ticket-status-styles";
 import { formatTicketAuditLine, type TicketAuditRow } from "@/lib/ticket-audit-display";
 
@@ -24,11 +25,12 @@ type TicketDetail = {
   type: string;
   priority: string;
   status: string;
+  createdById?: string;
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
   organization?: { id: string; name: string };
-  createdBy?: { name: string; email: string };
+  createdBy?: { id?: string; name: string; email: string };
   assignedTo?: { id: string; name: string; email: string } | null;
   assignedToId?: string | null;
   messages: {
@@ -50,6 +52,11 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [session, setSession] = useState<{
+    ticketingUserId: string;
+    role: string | null;
+    consultantVerified: boolean;
+  } | null>(null);
 
   const reload = useCallback(() => {
     void adminFetch(`/api/admin/ticketing/tickets/${ticketId}`)
@@ -64,10 +71,35 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
 
   useEffect(() => {
     reload();
-    void adminFetch("/api/admin/ticketing/assignees")
+    void adminFetch("/api/admin/ticketing/session")
+      .then((res) => res.json())
+      .then((data) => {
+        const row = data.data as { ticketingUserId: string; role: string | null; consultantVerified: boolean };
+        setSession(row);
+      })
+      .catch(() => setSession(null));
+    void adminFetch(`/api/admin/ticketing/assignees?ticketId=${encodeURIComponent(ticketId)}`)
       .then((res) => res.json())
       .then((data) => setAssignees((data.data as Assignee[]) ?? []));
-  }, [reload]);
+  }, [reload, ticketId]);
+
+  async function runLifecycle(action: string) {
+    setSaving(true);
+    try {
+      const res = await adminFetch(`/api/admin/ticketing/tickets/${ticketId}/lifecycle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Action failed");
+      reload();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Action failed");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function patch(fields: Record<string, unknown>) {
     setSaving(true);
@@ -136,6 +168,12 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
   }
 
   const closedOrCancelled = isTerminalTicketStatus(ticket.status);
+  const portalRole =
+    session?.role === "CONSULTANT" && session.consultantVerified ? "CONSULTANT" : "CLIENT";
+  const isCreator = Boolean(
+    session?.ticketingUserId &&
+      (ticket.createdById === session.ticketingUserId || ticket.createdBy?.id === session.ticketingUserId),
+  );
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -155,6 +193,16 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
           {ticket.closedAt ? ` · Closed ${new Date(ticket.closedAt).toLocaleString()}` : ""}
         </p>
       </div>
+
+      {!closedOrCancelled ? (
+        <TicketLifecycleActions
+          status={ticket.status}
+          role={portalRole}
+          isCreator={isCreator}
+          disabled={saving}
+          onAction={runLifecycle}
+        />
+      ) : null}
 
       <section className="grid gap-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Status">

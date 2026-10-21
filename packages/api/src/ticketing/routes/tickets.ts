@@ -257,10 +257,9 @@ router.post("/", async (req: TicketingRequest, res) => {
   });
 
   if (projectId) {
-    const { assignTicketToSupportGroup, notifySupportGroupOfTicket } = await import(
-      "../../lib/support-project.js"
-    );
-    await assignTicketToSupportGroup(ticket.id, projectId);
+    const { notifySupportGroupOfTicket } = await import("../../lib/support-project.js");
+    const { autoAssignTicketToProjectSupport } = await import("../../lib/ticket-project-assignees.js");
+    await autoAssignTicketToProjectSupport(ticket.id, projectId);
     void notifySupportGroupOfTicket(ticket.id);
     const refreshed = await prisma.ticket.findUnique({
       where: { id: ticket.id },
@@ -346,11 +345,9 @@ router.post("/:id/lifecycle", async (req: TicketingRequest, res) => {
 
   const role = user.role === "CONSULTANT" && user.consultantVerified ? "CONSULTANT" : "CLIENT";
   const action = parsed.data.action as TicketLifecycleAction;
-  if (!canPerformLifecycleAction(role, action)) {
+  const isCreator = existing.createdById === user.id;
+  if (!canPerformLifecycleAction(role, action, { isCreator })) {
     return res.status(403).json({ error: "Not allowed to perform this action" });
-  }
-  if (role === "CONSULTANT" && existing.createdById === user.id) {
-    return res.status(403).json({ error: "The ticket creator cannot change status" });
   }
 
   const nextStatus = nextStatusForLifecycleAction(existing.status, action);
@@ -419,6 +416,19 @@ router.patch("/:id", async (req: TicketingRequest, res) => {
     const allowed = Object.keys(parsed.data).every((k) => k === "description" || k === "type" || k === "priority");
     if (!allowed || parsed.data.assignedToId !== undefined || parsed.data.subject !== undefined) {
       return res.status(403).json({ error: "Clients can only update description, type, and priority" });
+    }
+  }
+
+  if (parsed.data.assignedToId !== undefined) {
+    const org = await prisma.organization.findUnique({
+      where: { id: existing.organizationId },
+      select: { projectId: true },
+    });
+    const projectId = existing.projectId ?? org?.projectId ?? null;
+    const { isValidProjectTicketAssignee } = await import("../../lib/ticket-project-assignees.js");
+    const ok = await isValidProjectTicketAssignee(projectId, parsed.data.assignedToId);
+    if (!ok) {
+      return res.status(400).json({ error: "Assignee must be a member of the project support team" });
     }
   }
 
