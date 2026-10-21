@@ -1,7 +1,12 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { isBootstrapSuperAdminEmail, prisma } from "@techbubble/database";
+import {
+  ensureBootstrapAdminUser,
+  getBootstrapAdminEmail,
+  isBootstrapSuperAdminEmail,
+  prisma,
+} from "@techbubble/database";
 import {
   authMiddleware,
   generateToken,
@@ -87,11 +92,32 @@ function publicUser(user: {
   };
 }
 
+async function findAdminUserByEmail(email: string) {
+  const normalized = email.trim().toLowerCase();
+  let user = await prisma.adminUser.findUnique({ where: { email: normalized } });
+  if (user) return user;
+  const legacy = await prisma.adminUser.findFirst({
+    where: { email: { equals: normalized, mode: "insensitive" } },
+  });
+  if (!legacy) return null;
+  if (legacy.email === normalized) return legacy;
+  return prisma.adminUser.update({
+    where: { id: legacy.id },
+    data: { email: normalized },
+  });
+}
+
 router.post("/login", async (req, res) => {
   try {
-    const { email, password } = loginSchema.parse(req.body);
+    const parsed = loginSchema.parse(req.body);
+    const email = parsed.email.trim().toLowerCase();
+    const password = parsed.password;
 
-    const user = await prisma.adminUser.findUnique({ where: { email } });
+    let user = await findAdminUserByEmail(email);
+    if (!user?.passwordHash && isBootstrapSuperAdminEmail(email)) {
+      await ensureBootstrapAdminUser();
+      user = await findAdminUserByEmail(getBootstrapAdminEmail());
+    }
     if (!user?.passwordHash) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
@@ -99,7 +125,15 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Account is disabled" });
     }
 
-    const valid = await bcrypt.compare(password, user.passwordHash);
+    let valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid && isBootstrapSuperAdminEmail(email)) {
+      await ensureBootstrapAdminUser();
+      const refreshed = await findAdminUserByEmail(getBootstrapAdminEmail());
+      if (refreshed?.passwordHash) {
+        valid = await bcrypt.compare(password, refreshed.passwordHash);
+        if (valid) user = refreshed;
+      }
+    }
     if (!valid) {
       return res.status(401).json({ error: "Invalid credentials" });
     }

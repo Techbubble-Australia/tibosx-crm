@@ -4,5 +4,6 @@ export { COUNTRY_CITIES, getCitiesForCountryCode } from "./country-cities";
 export {
   ensureBootstrapAdminUser,
   getBootstrapAdminEmail,
+  getBootstrapAdminPassword,
   isBootstrapSuperAdminEmail,
 } from "./bootstrap-admin";

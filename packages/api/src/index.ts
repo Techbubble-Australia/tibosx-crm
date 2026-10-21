@@ -3,7 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import dotenv from "dotenv";
-import { ensureBootstrapAdminUser } from "@techbubble/database";
+import { ensureBootstrapAdminUser, getBootstrapAdminEmail } from "@techbubble/database";
 import path from "path";
 import fs from "fs";
 import { createUploadsMiddleware } from "./middleware/serve-uploads";
@@ -221,6 +221,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 
 void ensureBootstrapAdminUser()
   .then(() => {
+    console.log(`✅ Bootstrap admin synced for ${getBootstrapAdminEmail()}`);
     app.listen(Number(PORT), HOST, () => {
       console.log(`🚀 API server listening on http://${HOST}:${PORT}`);
     });

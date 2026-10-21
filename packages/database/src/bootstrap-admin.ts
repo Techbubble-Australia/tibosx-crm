@@ -1,11 +1,16 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "./client";
+import { readEnvString } from "./env-string";
 
 const SALT_ROUNDS = 12;
 
 /** Email for the first super-admin (from env). Login skips MFA and onboarding gates. */
 export function getBootstrapAdminEmail(): string {
-  return (process.env.ADMIN_EMAIL ?? "admin@techbubble.com").trim().toLowerCase();
+  return readEnvString("ADMIN_EMAIL", "admin@techbubble.com").toLowerCase();
+}
+
+export function getBootstrapAdminPassword(): string {
+  return readEnvString("ADMIN_PASSWORD", "admin123");
 }
 
 export function isBootstrapSuperAdminEmail(email: string): boolean {
@@ -18,7 +23,7 @@ export function isBootstrapSuperAdminEmail(email: string): boolean {
  */
 export async function ensureBootstrapAdminUser(): Promise<void> {
   const email = getBootstrapAdminEmail();
-  const password = process.env.ADMIN_PASSWORD ?? "admin123";
+  const password = getBootstrapAdminPassword();
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
   await prisma.adminUser.upsert({
