@@ -21,10 +21,6 @@ export function MfaEnrollmentGuard({ children }: { children: React.ReactNode }) 
           setAllowed(true);
           return;
         }
-        if (user?.isBootstrapSuperAdmin === true) {
-          setAllowed(true);
-          return;
-        }
         if (user?.passwordNeedsReset === true) {
           window.location.assign("/change-password");
           return;

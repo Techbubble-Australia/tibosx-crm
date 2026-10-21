@@ -29,8 +29,6 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/techbubble
       - JWT_SECRET=your-secret-key-change-in-production
-      - ADMIN_EMAIL=admin@techbubble.com
-      - ADMIN_PASSWORD=admin123
       - PORT=3001
       - UPLOAD_DIR=/app/uploads
       # Optional: Railway Bucket / S3-compatible (omit to use the uploads volume + local disk)

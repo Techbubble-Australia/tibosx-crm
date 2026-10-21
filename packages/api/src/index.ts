@@ -3,7 +3,6 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import dotenv from "dotenv";
-import { ensureBootstrapAdminUser, getBootstrapAdminEmail } from "@techbubble/database";
 import path from "path";
 import fs from "fs";
 import { createUploadsMiddleware } from "./middleware/serve-uploads";
@@ -219,14 +218,6 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 const HOST = process.env.HOST || "0.0.0.0";
 
-void ensureBootstrapAdminUser()
-  .then(() => {
-    console.log(`✅ Bootstrap admin synced for ${getBootstrapAdminEmail()}`);
-    app.listen(Number(PORT), HOST, () => {
-      console.log(`🚀 API server listening on http://${HOST}:${PORT}`);
-    });
-  })
-  .catch((error) => {
-    console.error("Failed to ensure bootstrap admin user:", error);
-    process.exit(1);
-  });
+app.listen(Number(PORT), HOST, () => {
+  console.log(`🚀 API server listening on http://${HOST}:${PORT}`);
+});

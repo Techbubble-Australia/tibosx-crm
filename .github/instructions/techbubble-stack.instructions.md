@@ -48,8 +48,7 @@ description: "Use when working in the TechBubble monorepo, especially for web/ad
   - `DATABASE_URL`
   - `API_URL`
   - `PORT`
-  - `ADMIN_EMAIL`
-  - `ADMIN_PASSWORD`
+  - `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` (packages/database — `db:seed-admin` only)
   - `JWT_SECRET`
   - `UPLOAD_DIR` (local uploads when `OBJECT_STORAGE_*` is unset)
   - `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_REGION`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY_ID`, `OBJECT_STORAGE_SECRET_ACCESS_KEY` (optional; S3-compatible bucket on API)

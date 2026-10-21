@@ -1,12 +1,7 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import {
-  ensureBootstrapAdminUser,
-  getBootstrapAdminEmail,
-  isBootstrapSuperAdminEmail,
-  prisma,
-} from "@techbubble/database";
+import { prisma } from "@techbubble/database";
 import {
   authMiddleware,
   generateToken,
@@ -39,27 +34,7 @@ import {
 } from "../lib/password-reset";
 import { sendPasswordResetEmail } from "../lib/mail";
 import { tbosLoginUrl } from "../lib/user-invite";
-import { jwtSecretFingerprint } from "../lib/jwt-fingerprint";
-
 const router: IRouter = Router();
-
-/** Public ops check: confirms API env + bootstrap user (no secrets). */
-router.get("/link-check", async (_req, res) => {
-  const bootstrapEmail = getBootstrapAdminEmail();
-  const user = await prisma.adminUser.findUnique({
-    where: { email: bootstrapEmail },
-    select: { id: true, active: true },
-  });
-  res.json({
-    data: {
-      service: "api",
-      bootstrapEmail,
-      bootstrapUserExists: Boolean(user),
-      bootstrapUserActive: user?.active ?? false,
-      jwtSecretFingerprint: jwtSecretFingerprint(),
-    },
-  });
-});
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -107,23 +82,7 @@ function publicUser(user: {
     role: user.role,
     mfaEnabled: user.mfaEnabled,
     passwordNeedsReset: user.passwordNeedsReset ?? false,
-    isBootstrapSuperAdmin: isBootstrapSuperAdminEmail(user.email),
   };
-}
-
-async function findAdminUserByEmail(email: string) {
-  const normalized = email.trim().toLowerCase();
-  let user = await prisma.adminUser.findUnique({ where: { email: normalized } });
-  if (user) return user;
-  const legacy = await prisma.adminUser.findFirst({
-    where: { email: { equals: normalized, mode: "insensitive" } },
-  });
-  if (!legacy) return null;
-  if (legacy.email === normalized) return legacy;
-  return prisma.adminUser.update({
-    where: { id: legacy.id },
-    data: { email: normalized },
-  });
 }
 
 router.post("/login", async (req, res) => {
@@ -132,11 +91,7 @@ router.post("/login", async (req, res) => {
     const email = parsed.email.trim().toLowerCase();
     const password = parsed.password;
 
-    let user = await findAdminUserByEmail(email);
-    if (!user?.passwordHash && isBootstrapSuperAdminEmail(email)) {
-      await ensureBootstrapAdminUser();
-      user = await findAdminUserByEmail(getBootstrapAdminEmail());
-    }
+    const user = await prisma.adminUser.findUnique({ where: { email } });
     if (!user?.passwordHash) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
@@ -144,25 +99,9 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Account is disabled" });
     }
 
-    let valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid && isBootstrapSuperAdminEmail(email)) {
-      await ensureBootstrapAdminUser();
-      const refreshed = await findAdminUserByEmail(getBootstrapAdminEmail());
-      if (refreshed?.passwordHash) {
-        valid = await bcrypt.compare(password, refreshed.passwordHash);
-        if (valid) user = refreshed;
-      }
-    }
+    const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
       return res.status(401).json({ error: "Invalid credentials" });
-    }
-
-    if (isBootstrapSuperAdminEmail(user.email)) {
-      const token = generateToken(sessionAuthUser(user));
-      return res.json({
-        message: "Login successful",
-        data: { token, user: publicUser(user) },
-      });
     }
 
     if (user.passwordNeedsReset) {

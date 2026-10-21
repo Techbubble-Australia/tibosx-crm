@@ -112,8 +112,6 @@ Set the following environment variables for each service:
 **API Service:**
 - `DATABASE_URL` - Connection string from Railway PostgreSQL
 - `JWT_SECRET` - Random secret for JWT
-- `ADMIN_EMAIL` - Admin login email
-- `ADMIN_PASSWORD` - Admin login password
 - **File storage (pick one):**
   - **Railway Bucket / S3-compatible (production):** set `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_REGION` (e.g. `auto`), `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY_ID`, and `OBJECT_STORAGE_SECRET_ACCESS_KEY`. Optional: `OBJECT_STORAGE_FORCE_PATH_STYLE` (`true` by default). Uploads are stored in the bucket; the API still serves them at `GET /uploads/...` for the web and admin proxies.
   - **Local disk (default / local dev):** set `UPLOAD_DIR` (e.g. `/app/uploads` in Docker). Omit all `OBJECT_STORAGE_*` variables.
@@ -153,15 +151,14 @@ npm run db:studio
 
 # Seed database
 npm run db:seed
+
+# Seed only the first admin (set SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD in packages/database/.env)
+pnpm --filter @techbubble/database db:seed-admin
 ```
 
 ## Admin Panel
 
-Default login credentials:
-- **Email:** admin@techbubble.com
-- **Password:** admin123
-
-Change these in production via environment variables.
+Create the first admin with `db:seed-admin` (see `packages/database/.env.example`). New users complete MFA setup on first login.
 
 ## Features
 

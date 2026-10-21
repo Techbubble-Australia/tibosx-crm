@@ -1,5 +1,5 @@
 import { Response, NextFunction } from "express";
-import { isBootstrapSuperAdminEmail, prisma } from "@techbubble/database";
+import { prisma } from "@techbubble/database";
 import { AuthRequest } from "./auth";
 
 /** Blocks access until the user has completed MFA enrollment. */
@@ -7,10 +7,6 @@ export async function requireMfaEnrolled(req: AuthRequest, res: Response, next: 
   const userId = req.user?.id;
   if (!userId) {
     return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  if (req.user?.email && isBootstrapSuperAdminEmail(req.user.email)) {
-    return next();
   }
 
   const user = await prisma.adminUser.findUnique({
