@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Send, Trash2 } from "lucide-react";
+import { Download, Plus, Send, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
@@ -35,6 +35,7 @@ export default function TimesheetsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   async function fetchRows() {
     try {
@@ -101,6 +102,28 @@ export default function TimesheetsPage() {
     }
   }
 
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      const res = await adminFetch("/api/admin/timesheets/export");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(messageFromApiError(data, "Failed to export timesheets"));
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "timesheets.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to export");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   async function submitOne(id: string) {
     setSubmitting(true);
     try {
@@ -130,6 +153,16 @@ export default function TimesheetsPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            {rows.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => void exportCsv()}
+                disabled={exporting}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600"
+              >
+                <Download className="h-4 w-4" /> Export CSV
+              </button>
+            ) : null}
             {isEffectiveProjectMember && selected.size > 0 ? (
               <button
                 type="button"

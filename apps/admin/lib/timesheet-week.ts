@@ -46,3 +46,55 @@ export function snapToMondayInput(value: string): string {
 export function sumDailyHours(hours: DailyHours): number {
   return WEEKDAY_KEYS.reduce((sum, key) => sum + (Number(hours[key]) || 0), 0);
 }
+
+/** Strip non-numeric characters; allow at most one decimal point. */
+export function sanitizeHoursInput(raw: string): string {
+  if (!raw) return "";
+  let out = "";
+  let dot = false;
+  for (const ch of raw) {
+    if (ch >= "0" && ch <= "9") out += ch;
+    else if (ch === "." && !dot) {
+      out += ch;
+      dot = true;
+    }
+  }
+  return out;
+}
+
+export function hoursInputToNumber(raw: string): number | undefined {
+  const s = sanitizeHoursInput(raw);
+  if (!s || s === ".") return undefined;
+  const n = Number(s);
+  if (!Number.isFinite(n) || n < 0) return undefined;
+  return n;
+}
+
+export function weekOverlapsProjectRange(
+  weekMondayIso: string,
+  projectStartIso: string,
+  projectEndIso: string,
+): boolean {
+  const mon = new Date(`${weekMondayIso}T00:00:00.000Z`);
+  const weekEndIso = toDateInputUtc(sundayOfWeek(mon));
+  return weekMondayIso <= projectEndIso && weekEndIso >= projectStartIso;
+}
+
+export function projectWeekMondayBounds(projectStartIso: string, projectEndIso: string) {
+  const min = snapToMondayInput(projectStartIso);
+  let max = snapToMondayInput(projectEndIso);
+  if (!weekOverlapsProjectRange(max, projectStartIso, projectEndIso)) {
+    let cur = max;
+    for (let i = 0; i < 260; i++) {
+      const prev = new Date(`${cur}T00:00:00.000Z`);
+      prev.setUTCDate(prev.getUTCDate() - 7);
+      cur = toDateInputUtc(prev);
+      if (weekOverlapsProjectRange(cur, projectStartIso, projectEndIso)) {
+        max = cur;
+        break;
+      }
+      if (cur < min) break;
+    }
+  }
+  return { min, max };
+}

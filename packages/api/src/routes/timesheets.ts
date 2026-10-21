@@ -29,7 +29,12 @@ import {
   resolveTimesheetTargets,
   sumDailyHours,
   timesheetEntryInputSchema,
+  WEEKDAY_KEYS,
 } from "../lib/timesheet-entries";
+import {
+  assertTimesheetWithinProjectDates,
+  projectDateBoundsIso,
+} from "../lib/timesheet-project-dates";
 
 const router: IRouter = Router();
 
@@ -475,11 +480,16 @@ router.get("/target-meta", async (req: AuthRequest, res) => {
       });
       if (!ticket) return res.status(404).json({ error: "Support case not found" });
       const approvers = await buildProjectApprovers(ticket.projectId);
+      const projectDates = ticket.project
+        ? projectDateBoundsIso(ticket.project)
+        : null;
       return res.json({
         data: {
           kind: "ticket",
           managerName: ticket.project?.projectManager?.name || ticket.project?.projectManager?.email || "",
           approvers,
+          startDate: projectDates?.startDate ?? null,
+          endDate: projectDates?.endDate ?? null,
         },
       });
     }
@@ -491,11 +501,14 @@ router.get("/target-meta", async (req: AuthRequest, res) => {
       });
       if (!project) return res.status(404).json({ error: "Project not found" });
       const approvers = project.kind === "SUPPORT" ? await buildProjectApprovers(projectId) : [];
+      const { startDate, endDate } = projectDateBoundsIso(project);
       return res.json({
         data: {
           kind: "project",
           managerName: project.projectManager?.name || project.projectManager?.email || "",
           approvers,
+          startDate,
+          endDate,
         },
       });
     }
@@ -580,6 +593,137 @@ router.get("/for-week", async (req: AuthRequest, res) => {
   }
 });
 
+function csvEscape(value: string | number | null | undefined) {
+  const s = value == null ? "" : String(value);
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+async function assertTimesheetProjectDateRules(
+  projectId: string,
+  startDate: Date,
+  resolved: ReturnType<typeof resolveTimesheetTargets>,
+) {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { startDate: true, endDate: true },
+  });
+  if (!project) throw new Error("PROJECT_NOT_FOUND");
+  const weekMondayIso = startDate.toISOString().slice(0, 10);
+  assertTimesheetWithinProjectDates(
+    project,
+    weekMondayIso,
+    resolved.entryRows,
+    resolved.dailyHours ?? null,
+  );
+}
+
+router.get("/export", async (req: AuthRequest, res) => {
+  try {
+    const accessWhere = await timesheetAccessWhere(req);
+    const timesheetId =
+      typeof req.query.timesheetId === "string" && req.query.timesheetId.trim()
+        ? req.query.timesheetId.trim()
+        : "";
+    const where = timesheetId ? { ...accessWhere, id: timesheetId } : accessWhere;
+    const rows = await prisma.timesheet.findMany({
+      where,
+      include: {
+        project: { select: { projectNumber: true, title: true } },
+        memberUser: { select: { name: true, email: true } },
+        entries: {
+          orderBy: { sortOrder: "asc" },
+          include: {
+            opportunity: { select: { name: true } },
+            ticket: { select: { ticketNumber: true, subject: true } },
+          },
+        },
+      },
+      orderBy: [{ startDate: "desc" }, { createdAt: "desc" }],
+    });
+
+    if (timesheetId && rows.length === 0) {
+      return res.status(404).json({ error: "Timesheet not found" });
+    }
+
+    const header = [
+      "Timesheet ID",
+      "Status",
+      "Member",
+      "Project Number",
+      "Project Title",
+      "Week Start",
+      "Week End",
+      "Entry",
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun",
+      "Entry Total Hours",
+      "Timesheet Comments",
+    ]
+      .map(csvEscape)
+      .join(",");
+
+    const lines: string[] = [header];
+    for (const ts of rows) {
+      const weekStart = ts.startDate.toISOString().slice(0, 10);
+      const weekEnd = ts.endDate.toISOString().slice(0, 10);
+      const member = ts.memberUser?.name || ts.memberUser?.email || "";
+      const status =
+        TIMESHEET_STATUS_LABELS[ts.status as keyof typeof TIMESHEET_STATUS_LABELS] ?? ts.status;
+      const comments = ts.comments ?? "";
+      const base = [
+        ts.id,
+        status,
+        member,
+        ts.project?.projectNumber ?? "",
+        ts.project?.title ?? "",
+        weekStart,
+        weekEnd,
+      ];
+
+      if (ts.entries.length === 0) {
+        const hours = (ts.dailyHours ?? {}) as Record<string, number>;
+        const total = sumDailyHours(hours);
+        const cols = [
+          ...base,
+          total > 0 ? "Project (no ticket)" : "",
+          ...WEEKDAY_KEYS.map((k) => hours[k] ?? ""),
+          total,
+          comments,
+        ];
+        lines.push(cols.map(csvEscape).join(","));
+        continue;
+      }
+
+      for (const entry of ts.entries) {
+        const hours = (entry.dailyHours ?? {}) as Record<string, number>;
+        const label = entryLabel(entry);
+        const total = sumDailyHours(hours);
+        const cols = [
+          ...base,
+          label,
+          ...WEEKDAY_KEYS.map((k) => hours[k] ?? ""),
+          total,
+          comments,
+        ];
+        lines.push(cols.map(csvEscape).join(","));
+      }
+    }
+
+    const filename = timesheetId ? `timesheet-${timesheetId}.csv` : "timesheets.csv";
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(lines.join("\n"));
+  } catch (error) {
+    console.error("Error exporting timesheets:", error);
+    res.status(500).json({ error: "Failed to export timesheets" });
+  }
+});
+
 router.get("/", async (req: AuthRequest, res) => {
   try {
     const where = await timesheetAccessWhere(req);
@@ -653,6 +797,7 @@ router.post("/", async (req: AuthRequest, res) => {
       if (!ok) {
         return res.status(400).json({ error: "You are not assigned to this active project" });
       }
+      await assertTimesheetProjectDateRules(resolved.projectId, data.startDate, resolved);
       if (resolved.entryRows.length > 0) {
         await assertValidTimesheetEntries(actorId, resolved.projectId, resolved.entryRows);
         const duplicate = await prisma.timesheet.findFirst({
@@ -736,6 +881,16 @@ router.post("/", async (req: AuthRequest, res) => {
     if (error instanceof Error && error.message === "INVALID_ENTRY_OPPORTUNITY") {
       return res.status(400).json({ error: "One or more cases are invalid or not owned by you" });
     }
+    if (error instanceof Error && error.message === "TIMESHEET_WEEK_OUTSIDE_PROJECT") {
+      return res.status(400).json({
+        error: "This week falls outside the project start and end dates",
+      });
+    }
+    if (error instanceof Error && error.message === "TIMESHEET_HOURS_OUTSIDE_PROJECT") {
+      return res.status(400).json({
+        error: "Hours can only be logged on days within the project start and end dates",
+      });
+    }
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: formatZodError(error), details: error.errors });
     }
@@ -776,6 +931,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
       if (!ok) {
         return res.status(400).json({ error: "You are not assigned to this active project" });
       }
+      await assertTimesheetProjectDateRules(resolved.projectId, data.startDate, resolved);
       if (resolved.entryRows.length > 0) {
         await assertValidTimesheetEntries(actorId, resolved.projectId, resolved.entryRows);
       }
@@ -824,6 +980,16 @@ router.put("/:id", async (req: AuthRequest, res) => {
     }
     if (error instanceof Error && error.message === "INVALID_ENTRY_OPPORTUNITY") {
       return res.status(400).json({ error: "One or more cases are invalid or not owned by you" });
+    }
+    if (error instanceof Error && error.message === "TIMESHEET_WEEK_OUTSIDE_PROJECT") {
+      return res.status(400).json({
+        error: "This week falls outside the project start and end dates",
+      });
+    }
+    if (error instanceof Error && error.message === "TIMESHEET_HOURS_OUTSIDE_PROJECT") {
+      return res.status(400).json({
+        error: "Hours can only be logged on days within the project start and end dates",
+      });
     }
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: formatZodError(error), details: error.errors });

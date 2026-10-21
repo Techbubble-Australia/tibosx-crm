@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
@@ -71,6 +71,7 @@ export default function TimesheetDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [showReject, setShowReject] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     setLoadError(null);
@@ -137,6 +138,30 @@ export default function TimesheetDetailPage() {
     }
   }
 
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      const res = await adminFetch(
+        `/api/admin/timesheets/export?timesheetId=${encodeURIComponent(id)}`,
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(messageFromApiError(data, "Failed to export timesheet"));
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `timesheet-${id}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to export");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   async function approve() {
     if (!window.confirm("Do you want to continue to approve?")) return;
     setActionLoading(true);
@@ -184,7 +209,19 @@ export default function TimesheetDetailPage() {
           <ArrowLeft className="h-4 w-4" /> Back to timesheets
         </Link>
 
-        <h2 className="mb-6 text-lg font-semibold text-gray-900 dark:text-gray-100">Timesheet</h2>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Timesheet</h2>
+          {timesheet ? (
+            <button
+              type="button"
+              onClick={() => void exportCsv()}
+              disabled={exporting}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600"
+            >
+              <Download className="h-4 w-4" /> Export CSV
+            </button>
+          ) : null}
+        </div>
 
         {awaitingClient ? (
           <div className="mb-6 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">

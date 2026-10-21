@@ -28,6 +28,10 @@ import {
   WEEKDAY_KEYS,
   mondayOfWeek,
   sundayOfWeek,
+  hoursInputToNumber,
+  sanitizeHoursInput,
+  weekOverlapsProjectRange,
+  projectWeekMondayBounds,
 } from "@/lib/timesheet-week";
 
 const inputClass =
@@ -214,34 +218,17 @@ function linePayload(line: LineEntry) {
   return entry;
 }
 
-function BillableToggle({
-  checked,
-  onChange,
-  disabled,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label="Billable"
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 disabled:opacity-50 ${
-        checked ? "bg-green-500" : "bg-gray-200 dark:bg-gray-600"
-      }`}
-    >
-      <span
-        className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
-          checked ? "translate-x-3.5" : "translate-x-0.5"
-        }`}
-      />
-    </button>
-  );
+function setDailyHour(
+  hours: DailyHours,
+  key: (typeof WEEKDAY_KEYS)[number],
+  raw: string,
+): DailyHours {
+  const sanitized = sanitizeHoursInput(raw);
+  if (!sanitized || sanitized === ".") {
+    return { ...hours, [key]: undefined };
+  }
+  const n = hoursInputToNumber(sanitized);
+  return { ...hours, [key]: n };
 }
 
 export function TimesheetForm({
@@ -268,6 +255,7 @@ export function TimesheetForm({
   const [fileUrls, setFileUrls] = useState<string[]>(defaults.fileUrls ?? []);
   const [uploading, setUploading] = useState(false);
   const [weekConflict, setWeekConflict] = useState(false);
+  const [projectBounds, setProjectBounds] = useState<{ start: string; end: string } | null>(null);
 
   const status = defaults.status ?? "DRAFT";
   const formEditable = !readOnly && status === "DRAFT";
@@ -279,6 +267,35 @@ export function TimesheetForm({
   }, [weekMonday]);
 
   const weekDays = useMemo(() => weekDatesFromMonday(weekMonday), [weekMonday]);
+  const weekMondayBounds = useMemo(() => {
+    if (!projectBounds) return null;
+    return projectWeekMondayBounds(projectBounds.start, projectBounds.end);
+  }, [projectBounds]);
+  const weekInProject = useMemo(() => {
+    if (!projectBounds) return true;
+    return weekOverlapsProjectRange(weekMonday, projectBounds.start, projectBounds.end);
+  }, [projectBounds, weekMonday]);
+  const canShiftWeekPrev = useMemo(() => {
+    if (!formEditable || !weekMondayBounds) return formEditable;
+    const prev = shiftWeek(weekMonday, -7);
+    return (
+      prev >= weekMondayBounds.min &&
+      weekOverlapsProjectRange(prev, projectBounds!.start, projectBounds!.end)
+    );
+  }, [formEditable, weekMonday, weekMondayBounds, projectBounds]);
+  const canShiftWeekNext = useMemo(() => {
+    if (!formEditable || !weekMondayBounds) return formEditable;
+    const next = shiftWeek(weekMonday, 7);
+    return (
+      next <= weekMondayBounds.max &&
+      weekOverlapsProjectRange(next, projectBounds!.start, projectBounds!.end)
+    );
+  }, [formEditable, weekMonday, weekMondayBounds, projectBounds]);
+
+  function dayWithinProject(iso: string) {
+    if (!projectBounds) return true;
+    return iso >= projectBounds.start && iso <= projectBounds.end;
+  }
   const draftHoursTotal = useMemo(() => sumDailyHours(draft.dailyHours), [draft.dailyHours]);
   const committedHoursTotal = useMemo(
     () => lines.reduce((sum, line) => sum + sumDailyHours(line.dailyHours), 0),
@@ -303,9 +320,18 @@ export function TimesheetForm({
     [entryRowsForSave],
   );
   const canAddEntry =
-    entryEditable && Boolean(projectId) && draftHoursTotal > 0 && Boolean(draft.caseKey.trim());
+    entryEditable &&
+    weekInProject &&
+    Boolean(projectId) &&
+    draftHoursTotal > 0 &&
+    Boolean(draft.caseKey.trim());
   const canSave =
-    entryEditable && Boolean(projectId) && hasAnyHours && !managerRequired && entryTasksComplete;
+    entryEditable &&
+    weekInProject &&
+    Boolean(projectId) &&
+    hasAnyHours &&
+    !managerRequired &&
+    entryTasksComplete;
   const canSubmitForApproval =
     showSubmitForApproval &&
     Boolean(defaults.id) &&
@@ -315,13 +341,15 @@ export function TimesheetForm({
 
   const weekBanner = weekConflict
     ? "There's already a Timesheet for this project and week. Select a different project or week to proceed further."
-    : status === "DRAFT" && !defaults.id
+    : projectBounds && !weekInProject
+      ? `This week is outside the project period (${formatDashDate(projectBounds.start)} – ${formatDashDate(projectBounds.end)}). Choose a different week.`
+      : status === "DRAFT" && !defaults.id
       ? "No timesheet found for this week."
       : status === "DRAFT"
         ? "Timesheet is in draft — add your entry, save, then submit for approval."
         : `Status: ${TIMESHEET_STATUS_LABELS[status]}`;
 
-  const draftRowActive = entryEditable && lines.length === 0;
+  const draftRowActive = entryEditable;
 
   const thBase =
     "border-b border-gray-200 bg-white px-2 py-2.5 text-xs font-semibold text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100";
@@ -385,20 +413,34 @@ export function TimesheetForm({
   useEffect(() => {
     if (!projectId) {
       setApprovers([]);
+      setProjectBounds(null);
       return;
     }
     void adminFetch(`/api/admin/timesheets/target-meta?projectId=${encodeURIComponent(projectId)}`)
       .then((r) => r.json())
       .then((data) => {
-        const list = (data.data as { approvers?: ApproverOption[] })?.approvers ?? [];
+        const payload = data.data as {
+          approvers?: ApproverOption[];
+          startDate?: string | null;
+          endDate?: string | null;
+        };
+        const list = payload?.approvers ?? [];
         setApprovers(list);
+        if (payload?.startDate && payload?.endDate) {
+          setProjectBounds({ start: payload.startDate, end: payload.endDate });
+        } else {
+          setProjectBounds(null);
+        }
         const first = list[0];
         if (formEditable && first) {
           const defaultKey = `${first.kind}:${first.id}`;
           setSelectedApprover((prev) => prev || defaultKey);
         }
       })
-      .catch(() => setApprovers([]));
+      .catch(() => {
+        setApprovers([]);
+        setProjectBounds(null);
+      });
   }, [projectId, formEditable]);
 
   useEffect(() => {
@@ -524,6 +566,8 @@ export function TimesheetForm({
               type="date"
               className={`${inputClass} w-[11rem] ${formEditable ? "" : readOnlyClass}`}
               value={weekMonday}
+              min={weekMondayBounds?.min}
+              max={weekMondayBounds?.max}
               onChange={(e) => setWeekMonday(snapToMondayInput(e.target.value))}
               readOnly={!formEditable}
             />
@@ -557,7 +601,7 @@ export function TimesheetForm({
           <button
             type="button"
             className="rounded border border-gray-200 p-1 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600"
-            disabled={!formEditable}
+            disabled={!canShiftWeekPrev}
             onClick={() => setWeekMonday((w) => shiftWeek(w, -7))}
             aria-label="Previous week"
           >
@@ -569,7 +613,7 @@ export function TimesheetForm({
           <button
             type="button"
             className="rounded border border-gray-200 p-1 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600"
-            disabled={!formEditable}
+            disabled={!canShiftWeekNext}
             onClick={() => setWeekMonday((w) => shiftWeek(w, 7))}
             aria-label="Next week"
           >
@@ -579,12 +623,14 @@ export function TimesheetForm({
 
         <div
           className={`flex min-h-[2.75rem] flex-1 items-center gap-2 rounded border px-3 py-2 text-sm xl:mx-2 ${
-            weekConflict
+            weekConflict || (projectBounds && !weekInProject)
               ? "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
               : "border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-100"
           }`}
         >
-          <Info className={`h-4 w-4 shrink-0 ${weekConflict ? "text-amber-600" : "text-sky-600"}`} />
+          <Info
+            className={`h-4 w-4 shrink-0 ${weekConflict || (projectBounds && !weekInProject) ? "text-amber-600" : "text-sky-600"}`}
+          />
           <span>{weekBanner}</span>
         </div>
 
@@ -610,7 +656,6 @@ export function TimesheetForm({
               {weekDays.map((d) => (
                 <col key={d.key} className="w-[11.5%]" />
               ))}
-              <col style={{ width: 40 }} />
             </colgroup>
             <thead>
               <tr>
@@ -625,9 +670,6 @@ export function TimesheetForm({
                     </th>
                   );
                 })}
-                <th className={`${thDay} px-0`} style={{ width: 40 }}>
-                  <span className="block text-[9px] font-semibold leading-none">Bill</span>
-                </th>
               </tr>
             </thead>
             <tbody>
@@ -644,71 +686,72 @@ export function TimesheetForm({
                   <Fragment key={line.key}>
                     <tr>
                       <td className={`${tdBase} align-top`}>
-                        {lineEditable ? (
-                          <select
-                            className={`${selectClass} w-full`}
-                            value={line.caseKey}
-                            onChange={(e) => updateLine(line.key, { caseKey: e.target.value, label: undefined })}
-                            disabled={!projectId}
-                            required={lineTotal > 0}
-                          >
-                            <option value="">{projectId ? "Choose project or ticket *" : "Select a project first"}</option>
-                            {cases.map((row) => (
-                              <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
-                                {row.label}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <p className="text-sm text-gray-900 dark:text-gray-100">{caseLabel}</p>
-                        )}
-                      </td>
-                      {WEEKDAY_KEYS.map((key) => (
-                        <td key={key} className={tdDay}>
-                          <input
-                            type="number"
-                            min={0}
-                            step={0.25}
-                            inputMode="decimal"
-                            className={`${dayInputClass} mx-auto ${lineEditable ? "" : readOnlyClass}`}
-                            value={line.dailyHours[key] ?? ""}
-                            placeholder="0"
-                            disabled={!lineEditable}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              updateLine(line.key, {
-                                dailyHours: {
-                                  ...line.dailyHours,
-                                  [key]: v === "" ? undefined : Number(v),
-                                },
-                              });
-                            }}
-                            readOnly={!lineEditable}
-                          />
-                        </td>
-                      ))}
-                      <td className={`${tdDay} px-0`} style={{ width: 40 }}>
-                        <div className="flex flex-col items-center gap-0.5">
-                          <BillableToggle
-                            checked={line.billable}
-                            onChange={(v) => updateLine(line.key, { billable: v })}
-                            disabled={!lineEditable}
-                          />
+                        <div className="flex items-start gap-1">
+                          <div className="min-w-0 flex-1">
+                            {lineEditable ? (
+                              <select
+                                className={`${selectClass} w-full`}
+                                value={line.caseKey}
+                                onChange={(e) =>
+                                  updateLine(line.key, { caseKey: e.target.value, label: undefined })
+                                }
+                                disabled={!projectId}
+                                required={lineTotal > 0}
+                              >
+                                <option value="">
+                                  {projectId ? "Choose project or ticket *" : "Select a project first"}
+                                </option>
+                                {cases.map((row) => (
+                                  <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
+                                    {row.label}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <p className="text-sm text-gray-900 dark:text-gray-100">{caseLabel}</p>
+                            )}
+                          </div>
                           {lineEditable ? (
                             <button
                               type="button"
                               onClick={() => removeLine(line.key)}
-                              className="text-gray-400 hover:text-red-500"
+                              className="mt-1 shrink-0 text-gray-400 hover:text-red-500"
                               aria-label="Remove entry"
                             >
-                              <X className="h-3 w-3" />
+                              <X className="h-3.5 w-3.5" />
                             </button>
                           ) : null}
                         </div>
                       </td>
+                      {weekDays.map(({ key, iso }) => {
+                        const dayAllowed = dayWithinProject(iso);
+                        return (
+                          <td key={key} className={tdDay}>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              className={`${dayInputClass} mx-auto ${lineEditable && dayAllowed ? "" : readOnlyClass}`}
+                              value={line.dailyHours[key] ?? ""}
+                              placeholder="0"
+                              disabled={!lineEditable || !dayAllowed}
+                              onChange={(e) => {
+                                updateLine(line.key, {
+                                  dailyHours: setDailyHour(line.dailyHours, key, e.target.value),
+                                });
+                              }}
+                              readOnly={!lineEditable || !dayAllowed}
+                            />
+                          </td>
+                        );
+                      })}
                     </tr>
                     <tr>
-                      <td className={`${tdBase} text-xs font-medium text-gray-600 dark:text-gray-400`}>Task comments</td>
+                      <td className={`${tdBase} text-xs font-medium text-gray-600 dark:text-gray-400`}>
+                        Task comments
+                        <span className="mt-0.5 block font-semibold tabular-nums text-gray-800 dark:text-gray-200">
+                          Total {lineTotal.toFixed(1)}h
+                        </span>
+                      </td>
                       {WEEKDAY_KEYS.map((key) => (
                         <td key={`comment-${line.key}-${key}`} className={tdDay}>
                           <input
@@ -730,11 +773,6 @@ export function TimesheetForm({
                           />
                         </td>
                       ))}
-                      <td className={`${tdDay} px-0`} style={{ width: 40 }}>
-                        <span className="block text-center text-[10px] font-semibold tabular-nums text-gray-600 dark:text-gray-400">
-                          {lineTotal.toFixed(1)}h
-                        </span>
-                      </td>
                     </tr>
                   </Fragment>
                 );
@@ -758,38 +796,35 @@ export function TimesheetForm({
                         ))}
                       </select>
                     </td>
-                    {WEEKDAY_KEYS.map((key) => (
-                      <td key={`draft-${key}`} className={tdDay}>
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.25}
-                          inputMode="decimal"
-                          className={dayInputClass}
-                          value={draft.dailyHours[key] ?? ""}
-                          placeholder="0"
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setDraft((prev) => ({
-                              ...prev,
-                              dailyHours: {
-                                ...prev.dailyHours,
-                                [key]: v === "" ? undefined : Number(v),
-                              },
-                            }));
-                          }}
-                        />
-                      </td>
-                    ))}
-                    <td className={`${tdDay} px-0`} style={{ width: 40 }}>
-                      <BillableToggle
-                        checked={draft.billable}
-                        onChange={(v) => setDraft((prev) => ({ ...prev, billable: v }))}
-                      />
-                    </td>
+                    {weekDays.map(({ key, iso }) => {
+                      const dayAllowed = dayWithinProject(iso);
+                      return (
+                        <td key={`draft-${key}`} className={tdDay}>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            className={dayInputClass}
+                            value={draft.dailyHours[key] ?? ""}
+                            placeholder="0"
+                            disabled={!dayAllowed}
+                            onChange={(e) => {
+                              setDraft((prev) => ({
+                                ...prev,
+                                dailyHours: setDailyHour(prev.dailyHours, key, e.target.value),
+                              }));
+                            }}
+                          />
+                        </td>
+                      );
+                    })}
                   </tr>
                   <tr key="draft-comments">
-                    <td className={`${tdBase} text-xs font-medium text-gray-600 dark:text-gray-400`}>Task comments</td>
+                    <td className={`${tdBase} text-xs font-medium text-gray-600 dark:text-gray-400`}>
+                      Task comments
+                      <span className="mt-0.5 block font-semibold tabular-nums text-gray-800 dark:text-gray-200">
+                        Total {draftHoursTotal.toFixed(1)}h
+                      </span>
+                    </td>
                     {WEEKDAY_KEYS.map((key) => (
                       <td key={`draft-comment-${key}`} className={tdDay}>
                         <input
@@ -810,14 +845,9 @@ export function TimesheetForm({
                         />
                       </td>
                     ))}
-                    <td className={`${tdDay} px-0`} style={{ width: 40 }}>
-                      <span className="block text-center text-[10px] font-semibold tabular-nums text-gray-600 dark:text-gray-400">
-                        {draftHoursTotal.toFixed(1)}h
-                      </span>
-                    </td>
                   </tr>
                   <tr>
-                    <td colSpan={9} className="border-b border-gray-200 bg-white px-2 pb-3 pt-1 dark:border-gray-600 dark:bg-gray-900">
+                    <td colSpan={8} className="border-b border-gray-200 bg-white px-2 pb-3 pt-1 dark:border-gray-600 dark:bg-gray-900">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="flex min-w-0 flex-1 items-start gap-1 text-xs text-amber-700 dark:text-amber-400">
                           <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0" />
