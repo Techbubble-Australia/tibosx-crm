@@ -209,9 +209,8 @@ export default function TimesheetDetailPage() {
           <ArrowLeft className="h-4 w-4" /> Back to timesheets
         </Link>
 
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Timesheet</h2>
-          {timesheet ? (
+        {timesheet ? (
+          <div className="mb-4 flex justify-end">
             <button
               type="button"
               onClick={() => void exportCsv()}
@@ -220,8 +219,8 @@ export default function TimesheetDetailPage() {
             >
               <Download className="h-4 w-4" /> Export CSV
             </button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
         {awaitingClient ? (
           <div className="mb-6 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">

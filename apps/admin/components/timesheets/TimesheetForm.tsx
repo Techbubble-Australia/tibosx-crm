@@ -1,12 +1,13 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  Calendar,
+  Check,
   ChevronLeft,
   ChevronRight,
-  Info,
-  Lightbulb,
   Loader2,
+  MessageSquare,
   Plus,
   Save,
   Send,
@@ -18,9 +19,11 @@ import { readUploadImageUrlFromJson } from "@/lib/upload-response";
 import { resolveDocumentHref } from "@/lib/media-url";
 import { TIMESHEET_STATUS_LABELS, type TimesheetStatus } from "@/lib/project-types";
 import { formatTimesheetActivityTitle } from "@/lib/timesheet-activity-display";
+import { TimesheetStatusBadge } from "@/lib/timesheet-status-styles";
 import {
   type DailyComments,
   type DailyHours,
+  type WeekdayKey,
   snapToMondayInput,
   sumDailyHours,
   toDateInputUtc,
@@ -33,16 +36,6 @@ import {
   weekOverlapsProjectRange,
   projectWeekMondayBounds,
 } from "@/lib/timesheet-week";
-
-const inputClass =
-  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
-const readOnlyClass = "bg-gray-50 dark:bg-gray-900 cursor-not-allowed";
-const dayInputClass =
-  "h-9 w-full min-w-[2.75rem] rounded-lg border border-gray-200 bg-white px-1 py-1 text-center text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800";
-const dayCommentInputClass =
-  "h-9 w-full min-w-[4.5rem] rounded-lg border border-gray-200 bg-white px-1.5 py-1 text-left text-[11px] leading-tight focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800";
-const selectClass =
-  "h-9 w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
 
 export type TimesheetEntryValues = {
   id?: string;
@@ -91,12 +84,27 @@ type Props = {
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
   isSaving: boolean;
   readOnly?: boolean;
-  /** PM approve / reject actions */
+  title?: string;
   footerActions?: ReactNode;
   onSubmitForApproval?: () => void | Promise<void>;
   submitForApprovalLoading?: boolean;
   showSubmitForApproval?: boolean;
 };
+
+type LineEntry = {
+  key: string;
+  id?: string;
+  caseKey: string;
+  label?: string;
+  dailyHours: DailyHours;
+  dailyComments: DailyComments;
+  billable: boolean;
+};
+
+type CellSelection = { lineKey: string; dayKey: WeekdayKey };
+
+const selectClass =
+  "h-10 w-full rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100";
 
 function toDateInput(value?: string | null) {
   if (!value) return "";
@@ -115,19 +123,50 @@ function formatActivityDate(value: string) {
   });
 }
 
-function formatDashDate(iso: string) {
-  const d = new Date(`${iso}T00:00:00.000Z`);
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const yyyy = d.getUTCFullYear();
-  return `${dd}-${mm}-${yyyy}`;
+function formatWeekRange(mondayIso: string, sundayIso: string) {
+  const fmt = (iso: string) => {
+    const d = new Date(`${iso}T00:00:00.000Z`);
+    return d.toLocaleDateString("en-AU", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  };
+  return `${fmt(mondayIso)} – ${fmt(sundayIso)}`;
 }
 
-function formatDayColumnLabel(dow: string, iso: string) {
+function formatDayHeader(iso: string, shortDow: string) {
   const d = new Date(`${iso}T00:00:00.000Z`);
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  return `${dow} ${dd}/${mm}`;
+  const day = d.getUTCDate();
+  const month = d.toLocaleString("en-AU", { month: "short", timeZone: "UTC" });
+  return `${shortDow} (${day} ${month})`;
+}
+
+function formatLongDate(iso: string) {
+  const d = new Date(`${iso}T00:00:00.000Z`);
+  return d.toLocaleDateString("en-AU", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function formatHoursCell(value: number | undefined) {
+  if (value === undefined || value === 0) return "";
+  return value.toFixed(2);
+}
+
+function hoursDurationHint(raw: string) {
+  const n = hoursInputToNumber(raw);
+  if (n === undefined || n <= 0) return null;
+  const whole = Math.floor(n);
+  const minutes = Math.round((n - whole) * 60);
+  const hPart = `${whole} hour${whole === 1 ? "" : "s"}`;
+  if (minutes === 0) return `${raw} = ${hPart}`;
+  return `${raw} = ${hPart} ${minutes} minute${minutes === 1 ? "" : "s"}`;
 }
 
 function shiftWeek(mondayIso: string, deltaDays: number) {
@@ -139,16 +178,6 @@ function shiftWeek(mondayIso: string, deltaDays: number) {
 function emptyHours(): DailyHours {
   return {};
 }
-
-type LineEntry = {
-  key: string;
-  id?: string;
-  caseKey: string;
-  label?: string;
-  dailyHours: DailyHours;
-  dailyComments: DailyComments;
-  billable: boolean;
-};
 
 function newLineKey() {
   return `line-${Math.random().toString(36).slice(2, 11)}`;
@@ -165,7 +194,7 @@ function caseKeyFromTargets(
   return "";
 }
 
-function emptyDraftLine(): LineEntry {
+function emptyLine(): LineEntry {
   return {
     key: newLineKey(),
     caseKey: "",
@@ -220,7 +249,7 @@ function linePayload(line: LineEntry) {
 
 function setDailyHour(
   hours: DailyHours,
-  key: (typeof WEEKDAY_KEYS)[number],
+  key: WeekdayKey,
   raw: string,
 ): DailyHours {
   const sanitized = sanitizeHoursInput(raw);
@@ -231,11 +260,47 @@ function setDailyHour(
   return { ...hours, [key]: n };
 }
 
+function approverDisplayName(label: string) {
+  const match = label.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+  if (match) return { name: match[1]!.trim(), role: match[2]!.trim() };
+  return { name: label, role: "" };
+}
+
+function BillableToggle({
+  checked,
+  disabled,
+  onChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+        checked ? "bg-blue-600" : "bg-gray-200"
+      } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+    >
+      <span
+        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+          checked ? "translate-x-5" : "translate-x-0.5"
+        }`}
+      />
+    </button>
+  );
+}
+
 export function TimesheetForm({
   defaults,
   onSubmit,
   isSaving,
   readOnly = false,
+  title,
   footerActions,
   onSubmitForApproval,
   submitForApprovalLoading = false,
@@ -245,7 +310,6 @@ export function TimesheetForm({
   const [projectId, setProjectId] = useState(defaults.projectId ?? "");
   const [cases, setCases] = useState<CaseOption[]>([]);
   const [lines, setLines] = useState<LineEntry[]>(() => linesFromDefaults(defaults));
-  const [draft, setDraft] = useState<LineEntry>(() => emptyDraftLine());
   const [weekMonday, setWeekMonday] = useState(
     snapToMondayInput(toDateInput(defaults.startDate) || toDateInputUtc(mondayOfWeek())),
   );
@@ -256,10 +320,15 @@ export function TimesheetForm({
   const [uploading, setUploading] = useState(false);
   const [weekConflict, setWeekConflict] = useState(false);
   const [projectBounds, setProjectBounds] = useState<{ start: string; end: string } | null>(null);
+  const [selection, setSelection] = useState<CellSelection | null>(null);
+  const [panelHours, setPanelHours] = useState("");
+  const [panelComment, setPanelComment] = useState("");
+  const weekDateInputRef = useRef<HTMLInputElement>(null);
 
   const status = defaults.status ?? "DRAFT";
   const formEditable = !readOnly && status === "DRAFT";
   const entryEditable = formEditable && !weekConflict;
+  const pageTitle = title ?? (defaults.id ? "Timesheet" : "New Timesheet");
 
   const weekSun = useMemo(() => {
     const mon = new Date(`${weekMonday}T00:00:00.000Z`);
@@ -275,6 +344,7 @@ export function TimesheetForm({
     if (!projectBounds) return true;
     return weekOverlapsProjectRange(weekMonday, projectBounds.start, projectBounds.end);
   }, [projectBounds, weekMonday]);
+
   const canShiftWeekPrev = useMemo(() => {
     if (!formEditable || !weekMondayBounds) return formEditable;
     const prev = shiftWeek(weekMonday, -7);
@@ -283,6 +353,7 @@ export function TimesheetForm({
       weekOverlapsProjectRange(prev, projectBounds!.start, projectBounds!.end)
     );
   }, [formEditable, weekMonday, weekMondayBounds, projectBounds]);
+
   const canShiftWeekNext = useMemo(() => {
     if (!formEditable || !weekMondayBounds) return formEditable;
     const next = shiftWeek(weekMonday, 7);
@@ -292,26 +363,32 @@ export function TimesheetForm({
     );
   }, [formEditable, weekMonday, weekMondayBounds, projectBounds]);
 
+  const projectLabel = projects.find((p) => p.id === projectId)?.label ?? "";
+
   function dayWithinProject(iso: string) {
     if (!projectBounds) return true;
     return iso >= projectBounds.start && iso <= projectBounds.end;
   }
-  const draftHoursTotal = useMemo(() => sumDailyHours(draft.dailyHours), [draft.dailyHours]);
-  const committedHoursTotal = useMemo(
+
+  const hoursTotal = useMemo(
     () => lines.reduce((sum, line) => sum + sumDailyHours(line.dailyHours), 0),
     [lines],
   );
-  const hoursTotal = committedHoursTotal + draftHoursTotal;
+
+  const dailyTotals = useMemo(() => {
+    const totals: Partial<Record<WeekdayKey, number>> = {};
+    for (const key of WEEKDAY_KEYS) {
+      totals[key] = lines.reduce((sum, line) => sum + (Number(line.dailyHours[key]) || 0), 0);
+    }
+    return totals;
+  }, [lines]);
 
   const managerRequired = entryEditable && approvers.length > 0 && !selectedApprover;
   const hasAnyHours = hoursTotal > 0;
-  const entryRowsForSave = useMemo(() => {
-    if (lines.length > 0) {
-      return [...lines, ...(sumDailyHours(draft.dailyHours) > 0 ? [draft] : [])];
-    }
-    if (sumDailyHours(draft.dailyHours) > 0 || draft.caseKey) return [draft];
-    return lines;
-  }, [lines, draft]);
+  const entryRowsForSave = useMemo(
+    () => lines.filter((line) => sumDailyHours(line.dailyHours) > 0 || line.caseKey.trim()),
+    [lines],
+  );
   const entryTasksComplete = useMemo(
     () =>
       entryRowsForSave.every(
@@ -319,12 +396,6 @@ export function TimesheetForm({
       ),
     [entryRowsForSave],
   );
-  const canAddEntry =
-    entryEditable &&
-    weekInProject &&
-    Boolean(projectId) &&
-    (draftHoursTotal > 0 || Boolean(draft.caseKey.trim()) || lines.length > 0) &&
-    (draftHoursTotal === 0 || Boolean(draft.caseKey.trim()));
   const canSave =
     entryEditable &&
     weekInProject &&
@@ -339,34 +410,25 @@ export function TimesheetForm({
     !managerRequired &&
     status === "DRAFT";
 
-  const weekBanner = weekConflict
-    ? "There's already a Timesheet for this project and week. Select a different project or week to proceed further."
-    : projectBounds && !weekInProject
-      ? `This week is outside the project period (${formatDashDate(projectBounds.start)} – ${formatDashDate(projectBounds.end)}). Choose a different week.`
-      : status === "DRAFT" && !defaults.id
-      ? "No timesheet found for this week."
-      : status === "DRAFT"
-        ? "Timesheet is in draft — add your entry, save, then submit for approval."
-        : `Status: ${TIMESHEET_STATUS_LABELS[status]}`;
+  const selectedApproverLabel =
+    defaults.approverLabel ||
+    approvers.find((a) => selectedApprover === `${a.kind}:${a.id}`)?.label ||
+    "";
+  const approverParts = approverDisplayName(selectedApproverLabel);
 
-  const draftRowActive = entryEditable;
-
-  const thBase =
-    "border-b border-gray-200 bg-white px-2 py-2.5 text-xs font-semibold text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100";
-  const thDay = `${thBase} border-l text-center whitespace-nowrap`;
-  const tdBase = "border-b border-gray-200 bg-white p-2 align-middle dark:border-gray-600 dark:bg-gray-900";
-  const tdDay = "border-b border-l border-gray-200 bg-white p-1.5 text-center align-middle dark:border-gray-600 dark:bg-gray-900";
+  const selectedLine = selection ? lines.find((l) => l.key === selection.lineKey) : null;
+  const selectedDayIso = selection
+    ? weekDays.find((d) => d.key === selection.dayKey)?.iso
+    : undefined;
 
   useEffect(() => {
-    if (defaults.projectId) {
-      setProjectId(defaults.projectId);
-    }
+    if (defaults.projectId) setProjectId(defaults.projectId);
   }, [defaults.projectId]);
 
   useEffect(() => {
     if (defaults.id) {
-      setLines(linesFromDefaults(defaults));
-      setDraft(emptyDraftLine());
+      const loaded = linesFromDefaults(defaults);
+      setLines(loaded.length ? loaded : [emptyLine()]);
     }
   }, [
     defaults.id,
@@ -377,6 +439,12 @@ export function TimesheetForm({
     defaults.opportunityId,
     defaults.targetLabel,
   ]);
+
+  useEffect(() => {
+    if (entryEditable && lines.length === 0) {
+      setLines([emptyLine()]);
+    }
+  }, [entryEditable, lines.length]);
 
   useEffect(() => {
     if (defaults.approverKind === "CLIENT_CONTACT" && defaults.projectClientContactId) {
@@ -392,11 +460,8 @@ export function TimesheetForm({
       .then((data) => {
         const list = (data.data as ProjectOption[]) ?? [];
         setProjects(list);
-        if (!projectId && defaults.projectId) {
-          setProjectId(defaults.projectId);
-        } else if (!projectId && list.length === 1) {
-          setProjectId(list[0]!.id);
-        }
+        if (!projectId && defaults.projectId) setProjectId(defaults.projectId);
+        else if (!projectId && list.length === 1) setProjectId(list[0]!.id);
       });
   }, [defaults.projectId, projectId]);
 
@@ -433,8 +498,7 @@ export function TimesheetForm({
         }
         const first = list[0];
         if (formEditable && first) {
-          const defaultKey = `${first.kind}:${first.id}`;
-          setSelectedApprover((prev) => prev || defaultKey);
+          setSelectedApprover((prev) => prev || `${first.kind}:${first.id}`);
         }
       })
       .catch(() => {
@@ -463,18 +527,18 @@ export function TimesheetForm({
     if (!formEditable) return;
     const loadedMonday = snapToMondayInput(toDateInput(defaults.startDate));
     if (weekMonday === loadedMonday) return;
-    setLines([]);
-    setDraft(emptyDraftLine());
+    setLines([emptyLine()]);
     setComments("");
     setFileUrls([]);
+    setSelection(null);
   }, [weekMonday, formEditable, defaults.startDate]);
 
   useEffect(() => {
     if (defaults.id || !projectId || !weekMonday) return;
-    setLines([]);
-    setDraft(emptyDraftLine());
+    setLines([emptyLine()]);
     setComments("");
     setFileUrls([]);
+    setSelection(null);
   }, [projectId, weekMonday, defaults.id]);
 
   function updateLine(key: string, patch: Partial<LineEntry>) {
@@ -482,26 +546,42 @@ export function TimesheetForm({
   }
 
   function removeLine(key: string) {
-    setLines((prev) => prev.filter((line) => line.key !== key));
+    setLines((prev) => {
+      const next = prev.filter((line) => line.key !== key);
+      return next.length ? next : [emptyLine()];
+    });
+    if (selection?.lineKey === key) setSelection(null);
   }
 
-  function clearDraftRow() {
-    if (!entryEditable) return;
-    setDraft(emptyDraftLine());
-  }
-
-  function addEntry() {
+  function addTaskLine() {
     if (!entryEditable || !weekInProject || !projectId) return;
-    if (draftHoursTotal > 0 && !draft.caseKey.trim()) {
-      alert("Select a project or ticket for the current row before adding another entry.");
-      return;
-    }
-    if (draftHoursTotal > 0 || draft.caseKey.trim()) {
-      setLines((prev) => [...prev, { ...draft, key: newLineKey() }]);
-      setDraft(emptyDraftLine());
-      return;
-    }
-    setDraft(emptyDraftLine());
+    setLines((prev) => [...prev, emptyLine()]);
+  }
+
+  function openCell(lineKey: string, dayKey: WeekdayKey) {
+    if (!entryEditable) return;
+    const line = lines.find((l) => l.key === lineKey);
+    const iso = weekDays.find((d) => d.key === dayKey)?.iso;
+    if (!line || !iso || !dayWithinProject(iso)) return;
+    setSelection({ lineKey, dayKey });
+    const h = line.dailyHours[dayKey];
+    setPanelHours(h !== undefined && h > 0 ? String(h) : "");
+    setPanelComment(line.dailyComments[dayKey] ?? "");
+  }
+
+  function savePanelEntry() {
+    if (!selection) return;
+    const { lineKey, dayKey } = selection;
+    const line = lines.find((l) => l.key === lineKey);
+    if (!line) return;
+    updateLine(lineKey, {
+      dailyHours: setDailyHour(line.dailyHours, dayKey, panelHours),
+      dailyComments: {
+        ...line.dailyComments,
+        [dayKey]: panelComment.trim() || undefined,
+      },
+    });
+    setSelection(null);
   }
 
   async function uploadFiles(files: FileList | null) {
@@ -529,16 +609,16 @@ export function TimesheetForm({
     e.preventDefault();
     if (!canSave) return;
     if (!projectId) {
-      alert("Select a project or board.");
+      alert("Select a project.");
       return;
     }
     if (approvers.length && !selectedApprover) {
-      alert("Choose a manager to approve your timesheet.");
+      alert("Choose an approver for your timesheet.");
       return;
     }
     const entryRows = entryRowsForSave;
     if (entryRows.some((line) => sumDailyHours(line.dailyHours) > 0 && !line.caseKey.trim())) {
-      alert("Select a project or ticket for each row with hours.");
+      alert("Select a task or ticket for each row with hours.");
       return;
     }
     const mon = new Date(`${weekMonday}T00:00:00.000Z`);
@@ -551,7 +631,6 @@ export function TimesheetForm({
       entries: entryRows.map(linePayload),
       comments: comments.trim() || null,
     };
-
     if (approvers.length && selectedApprover) {
       const [approverKind, approverId] = selectedApprover.split(":");
       payload.approverKind = approverKind;
@@ -560,155 +639,159 @@ export function TimesheetForm({
     await onSubmit(payload);
   }
 
-  const footerBtnClass =
-    "inline-flex min-w-[12rem] flex-1 items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-medium sm:flex-none sm:min-w-[14rem]";
+  const conflictMessage = weekConflict
+    ? "There's already a timesheet for this project and week. Choose a different project or week."
+    : projectBounds && !weekInProject
+      ? "This week is outside the project contract dates."
+      : null;
+
+  const shortDows = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   return (
-    <form onSubmit={(e) => void handleSave(e)} className="space-y-4">
-      {/* Reference header — outside entry card */}
-      <div className="mb-3 grid grid-cols-1 items-end gap-3 xl:grid-cols-[auto_auto_minmax(0,1fr)_auto]">
-        <div className="shrink-0 space-y-3">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-800 dark:text-gray-200">Select first day of week</label>
-            <input
-              type="date"
-              className={`${inputClass} w-[11rem] ${formEditable ? "" : readOnlyClass}`}
-              value={weekMonday}
-              min={weekMondayBounds?.min}
-              max={weekMondayBounds?.max}
-              onChange={(e) => setWeekMonday(snapToMondayInput(e.target.value))}
-              readOnly={!formEditable}
-            />
+    <form onSubmit={(e) => void handleSave(e)} className="flex flex-col xl:flex-row xl:items-start">
+      <div className="min-w-0 flex-1">
+        {conflictMessage ? (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {conflictMessage}
           </div>
-          {formEditable || defaults.projectId ? (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-800 dark:text-gray-200">
-                Search project <span className="text-red-500">*</span>
-              </label>
-              <select
-                className={`${selectClass} w-full min-w-[12rem] max-w-[18rem] ${formEditable ? "" : readOnlyClass}`}
-                value={projectId}
-                onChange={(e) => {
-                  setProjectId(e.target.value);
-                  setLines([]);
-                  setDraft(emptyDraftLine());
-                }}
-                disabled={!formEditable}
-                required
-              >
-                <option value="">Search project…</option>
-                {projects.map((row) => (
-                  <option key={row.id} value={row.id}>{row.label}</option>
-                ))}
-              </select>
+        ) : null}
+
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-950">
+          <div className="border-b border-gray-100 px-6 py-5 dark:border-gray-800">
+            <div className="flex items-start justify-between gap-4">
+              <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{pageTitle}</h1>
+              <TimesheetStatusBadge status={status} />
             </div>
-          ) : null}
-        </div>
 
-        <div className="flex shrink-0 items-center gap-1 pb-2 text-sm text-gray-800 dark:text-gray-100">
-          <button
-            type="button"
-            className="rounded border border-gray-200 p-1 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600"
-            disabled={!canShiftWeekPrev}
-            onClick={() => setWeekMonday((w) => shiftWeek(w, -7))}
-            aria-label="Previous week"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="whitespace-nowrap font-medium">
-            Week of {formatDashDate(weekMonday)} - {formatDashDate(weekSun)}
-          </span>
-          <button
-            type="button"
-            className="rounded border border-gray-200 p-1 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600"
-            disabled={!canShiftWeekNext}
-            onClick={() => setWeekMonday((w) => shiftWeek(w, 7))}
-            aria-label="Next week"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
+            <div className="mt-6 grid gap-6 md:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Project <span className="text-red-500">*</span>
+                </label>
+                <select
+                  className={`${selectClass} ${formEditable ? "" : "cursor-not-allowed bg-gray-50"}`}
+                  value={projectId}
+                  onChange={(e) => {
+                    setProjectId(e.target.value);
+                    setLines([emptyLine()]);
+                    setSelection(null);
+                  }}
+                  disabled={!formEditable}
+                  required
+                >
+                  <option value="">Select project…</option>
+                  {projects.map((row) => (
+                    <option key={row.id} value={row.id}>{row.label}</option>
+                  ))}
+                </select>
+              </div>
 
-        <div
-          className={`flex min-h-[2.75rem] flex-1 items-center gap-2 rounded border px-3 py-2 text-sm xl:mx-2 ${
-            weekConflict || (projectBounds && !weekInProject)
-              ? "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
-              : "border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-100"
-          }`}
-        >
-          <Info
-            className={`h-4 w-4 shrink-0 ${weekConflict || (projectBounds && !weekInProject) ? "text-amber-600" : "text-sky-600"}`}
-          />
-          <span>{weekBanner}</span>
-        </div>
-
-        <div className="shrink-0 pb-1 text-right text-sm">
-          <p className="font-bold text-gray-900 dark:text-gray-100">Total: {hoursTotal}h</p>
-          <div className="mt-1 flex flex-col items-end gap-0.5 text-xs text-gray-600 dark:text-gray-400">
-            <span className="inline-flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-green-500" aria-hidden /> Tracked (Timer)
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-orange-400" aria-hidden /> Manual Entry
-            </span>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Timesheet week <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600"
+                    disabled={!canShiftWeekPrev}
+                    onClick={() => setWeekMonday((w) => shiftWeek(w, -7))}
+                    aria-label="Previous week"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <div className="relative min-w-0 flex-1">
+                    <input
+                      ref={weekDateInputRef}
+                      type="date"
+                      className="sr-only"
+                      value={weekMonday}
+                      min={weekMondayBounds?.min}
+                      max={weekMondayBounds?.max}
+                      onChange={(e) => setWeekMonday(snapToMondayInput(e.target.value))}
+                      tabIndex={-1}
+                      aria-hidden
+                    />
+                    <button
+                      type="button"
+                      disabled={!formEditable}
+                      onClick={() => weekDateInputRef.current?.showPicker?.() ?? weekDateInputRef.current?.click()}
+                      className="flex h-10 w-full items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                    >
+                      <span className="truncate">{formatWeekRange(weekMonday, weekSun)}</span>
+                      <Calendar className="h-4 w-4 shrink-0 text-gray-400" />
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600"
+                    disabled={!canShiftWeekNext}
+                    onClick={() => setWeekMonday((w) => shiftWeek(w, 7))}
+                    aria-label="Next week"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Main entry card — table matches reference */}
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-        <div className="overflow-x-auto">
-          <table className="w-full table-fixed border-collapse text-sm">
-            <colgroup>
-              <col className="w-[11%]" />
-              {weekDays.map((d) => (
-                <col key={d.key} className="w-[11.5%]" />
-              ))}
-            </colgroup>
-            <thead>
-              <tr>
-                <th className={`${thBase} text-left`}>
-                  Project/Ticket Task <span className="text-red-500">*</span>
-                </th>
-                {weekDays.map((d) => {
-                  const dow = d.label.split(" ")[0] ?? d.key;
-                  return (
-                    <th key={d.key} className={thDay}>
-                      {formatDayColumnLabel(dow, d.iso)}
+          <div className="px-6 py-4">
+            <div className="mb-3 flex items-end justify-between gap-4">
+              <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Time Entries</h2>
+              <div className="text-right">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Weekly Total</p>
+                <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-gray-100">
+                  {hoursTotal.toFixed(2)} <span className="text-base font-semibold">hrs</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+              <table className="w-full min-w-[720px] border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50/80 dark:border-gray-700 dark:bg-gray-900/50">
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">
+                      Task / Ticket
                     </th>
-                  );
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {(entryEditable ? lines : lines.length ? lines : linesFromDefaults(defaults)).map((line) => {
-                const lineTotal = sumDailyHours(line.dailyHours);
-                const lineEditable = entryEditable;
-                const caseLabel =
-                  line.label ||
-                  (line.caseKey
-                    ? cases.find((c) => `${c.kind}:${c.id}` === line.caseKey)?.label
-                    : undefined) ||
-                  (line.caseKey ? line.caseKey : "Project (no ticket)");
-                return (
-                  <Fragment key={line.key}>
-                    <tr>
-                      <td className={`${tdBase} align-top`}>
-                        <div className="flex items-start gap-1">
-                          <div className="min-w-0 flex-1">
-                            {lineEditable ? (
+                    {weekDays.map((d, i) => (
+                      <th
+                        key={d.key}
+                        className="border-l border-gray-200 px-1 py-2.5 text-center text-xs font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-300"
+                      >
+                        {formatDayHeader(d.iso, shortDows[i]!)}
+                      </th>
+                    ))}
+                    <th className="border-l border-gray-200 px-2 py-2.5 text-center text-xs font-semibold text-gray-700 dark:border-gray-700">
+                      Total
+                    </th>
+                    <th className="border-l border-gray-200 px-2 py-2.5 text-center text-xs font-semibold text-gray-700 dark:border-gray-700">
+                      Billable
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((line) => {
+                    const lineTotal = sumDailyHours(line.dailyHours);
+                    const caseLabel =
+                      line.label ||
+                      (line.caseKey
+                        ? cases.find((c) => `${c.kind}:${c.id}` === line.caseKey)?.label
+                        : undefined);
+                    return (
+                      <tr key={line.key} className="border-b border-gray-100 dark:border-gray-800">
+                        <td className="px-2 py-2 align-middle">
+                          <div className="flex items-center gap-1">
+                            {entryEditable ? (
                               <select
-                                className={`${selectClass} w-full`}
+                                className={`${selectClass} h-9 min-w-[10rem] text-xs`}
                                 value={line.caseKey}
                                 onChange={(e) =>
                                   updateLine(line.key, { caseKey: e.target.value, label: undefined })
                                 }
                                 disabled={!projectId}
-                                required={lineTotal > 0}
                               >
-                                <option value="">
-                                  {projectId ? "Choose project or ticket *" : "Select a project first"}
-                                </option>
+                                <option value="">Select task…</option>
                                 {cases.map((row) => (
                                   <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
                                     {row.label}
@@ -716,336 +799,378 @@ export function TimesheetForm({
                                 ))}
                               </select>
                             ) : (
-                              <p className="text-sm text-gray-900 dark:text-gray-100">{caseLabel}</p>
+                              <span className="text-sm text-gray-900 dark:text-gray-100">
+                                {caseLabel || "—"}
+                              </span>
                             )}
+                            {entryEditable && lines.length > 1 ? (
+                              <button
+                                type="button"
+                                onClick={() => removeLine(line.key)}
+                                className="text-gray-400 hover:text-red-500"
+                                aria-label="Remove row"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            ) : null}
                           </div>
-                          {lineEditable ? (
-                            <button
-                              type="button"
-                              onClick={() => removeLine(line.key)}
-                              className="mt-1 shrink-0 text-gray-400 hover:text-red-500"
-                              aria-label="Remove entry"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          ) : null}
-                        </div>
-                      </td>
-                      {weekDays.map(({ key, iso }) => {
-                        const dayAllowed = dayWithinProject(iso);
-                        return (
-                          <td key={key} className={tdDay}>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              className={`${dayInputClass} mx-auto ${lineEditable && dayAllowed ? "" : readOnlyClass}`}
-                              value={line.dailyHours[key] ?? ""}
-                              placeholder="0"
-                              disabled={!lineEditable || !dayAllowed}
-                              onChange={(e) => {
-                                updateLine(line.key, {
-                                  dailyHours: setDailyHour(line.dailyHours, key, e.target.value),
-                                });
-                              }}
-                              readOnly={!lineEditable || !dayAllowed}
+                        </td>
+                        {weekDays.map(({ key, iso }) => {
+                          const value = line.dailyHours[key];
+                          const hasComment = Boolean(line.dailyComments[key]?.trim());
+                          const isSelected =
+                            selection?.lineKey === line.key && selection.dayKey === key;
+                          const dayAllowed = dayWithinProject(iso);
+                          return (
+                            <td key={key} className="border-l border-gray-100 p-1 dark:border-gray-800">
+                              <button
+                                type="button"
+                                disabled={!entryEditable || !dayAllowed}
+                                onClick={() => openCell(line.key, key)}
+                                className={`relative flex h-11 w-full flex-col items-center justify-center rounded-md text-sm tabular-nums transition-colors ${
+                                  isSelected
+                                    ? "border-2 border-blue-500 bg-blue-50/50 ring-1 ring-blue-200"
+                                    : "border border-transparent hover:bg-gray-50 dark:hover:bg-gray-900"
+                                } ${!entryEditable || !dayAllowed ? "cursor-default opacity-60" : ""}`}
+                              >
+                                <span className="font-medium text-gray-900 dark:text-gray-100">
+                                  {formatHoursCell(value)}
+                                </span>
+                                {hasComment ? (
+                                  <MessageSquare
+                                    className="absolute right-1 top-1 h-3 w-3 text-blue-500"
+                                    aria-label="Has comment"
+                                  />
+                                ) : null}
+                              </button>
+                            </td>
+                          );
+                        })}
+                        <td className="border-l border-gray-100 px-2 py-2 text-center font-semibold tabular-nums text-gray-900 dark:border-gray-800 dark:text-gray-100">
+                          {lineTotal > 0 ? lineTotal.toFixed(2) : "—"}
+                        </td>
+                        <td className="border-l border-gray-100 px-2 py-2 text-center dark:border-gray-800">
+                          <div className="flex justify-center">
+                            <BillableToggle
+                              checked={line.billable}
+                              disabled={!entryEditable}
+                              onChange={(v) => updateLine(line.key, { billable: v })}
                             />
-                          </td>
-                        );
-                      })}
-                    </tr>
-                    <tr>
-                      <td className={`${tdBase} text-xs font-medium text-gray-600 dark:text-gray-400`}>
-                        Task comments
-                        <span className="mt-0.5 block font-semibold tabular-nums text-gray-800 dark:text-gray-200">
-                          Total {lineTotal.toFixed(1)}h
-                        </span>
-                      </td>
-                      {WEEKDAY_KEYS.map((key) => (
-                        <td key={`comment-${line.key}-${key}`} className={tdDay}>
-                          <input
-                            type="text"
-                            className={`${dayCommentInputClass} ${lineEditable ? "" : readOnlyClass}`}
-                            placeholder="—"
-                            value={line.dailyComments[key] ?? ""}
-                            disabled={!lineEditable}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              updateLine(line.key, {
-                                dailyComments: {
-                                  ...line.dailyComments,
-                                  [key]: v.trim() ? v : undefined,
-                                },
-                              });
-                            }}
-                            readOnly={!lineEditable}
-                          />
+                          </div>
                         </td>
-                      ))}
-                    </tr>
-                  </Fragment>
-                );
-              })}
-              {draftRowActive ? (
-                <>
-                  <tr key="draft-hours">
-                    <td className={`${tdBase} align-top`}>
-                      <select
-                        className={`${selectClass} w-full`}
-                        value={draft.caseKey}
-                        onChange={(e) => setDraft((prev) => ({ ...prev, caseKey: e.target.value }))}
-                        disabled={!projectId}
-                        required={draftHoursTotal > 0}
-                      >
-                        <option value="">{projectId ? "Choose project or ticket *" : "Select a project first"}</option>
-                        {cases.map((row) => (
-                          <option key={`draft-${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
-                            {row.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    {weekDays.map(({ key, iso }) => {
-                      const dayAllowed = dayWithinProject(iso);
-                      return (
-                        <td key={`draft-${key}`} className={tdDay}>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            className={dayInputClass}
-                            value={draft.dailyHours[key] ?? ""}
-                            placeholder="0"
-                            disabled={!dayAllowed}
-                            onChange={(e) => {
-                              setDraft((prev) => ({
-                                ...prev,
-                                dailyHours: setDailyHour(prev.dailyHours, key, e.target.value),
-                              }));
-                            }}
-                          />
-                        </td>
-                      );
-                    })}
-                  </tr>
-                  <tr key="draft-comments">
-                    <td className={`${tdBase} text-xs font-medium text-gray-600 dark:text-gray-400`}>
-                      Task comments
-                      <span className="mt-0.5 block font-semibold tabular-nums text-gray-800 dark:text-gray-200">
-                        Total {draftHoursTotal.toFixed(1)}h
-                      </span>
+                      </tr>
+                    );
+                  })}
+                  <tr className="bg-gray-50/60 dark:bg-gray-900/40">
+                    <td className="px-3 py-2.5 text-sm font-semibold text-gray-800 dark:text-gray-200">
+                      Daily Total
                     </td>
                     {WEEKDAY_KEYS.map((key) => (
-                      <td key={`draft-comment-${key}`} className={tdDay}>
-                        <input
-                          type="text"
-                          className={dayCommentInputClass}
-                          placeholder="—"
-                          value={draft.dailyComments[key] ?? ""}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setDraft((prev) => ({
-                              ...prev,
-                              dailyComments: {
-                                ...prev.dailyComments,
-                                [key]: v.trim() ? v : undefined,
-                              },
-                            }));
-                          }}
-                        />
+                      <td
+                        key={`total-${key}`}
+                        className="border-l border-gray-100 px-1 py-2.5 text-center text-sm font-semibold tabular-nums text-gray-900 dark:border-gray-800 dark:text-gray-100"
+                      >
+                        {(dailyTotals[key] ?? 0) > 0 ? (dailyTotals[key] ?? 0).toFixed(2) : "—"}
                       </td>
                     ))}
-                  </tr>
-                  <tr>
-                    <td colSpan={8} className="border-b border-gray-200 bg-white px-2 pb-3 pt-1 dark:border-gray-600 dark:bg-gray-900">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="flex min-w-0 flex-1 items-start gap-1 text-xs text-amber-700 dark:text-amber-400">
-                          <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                          <span className="italic">
-                            Select a project or ticket for each row with hours. Use Add Entry for more lines, or Save to
-                            include the current row.
-                          </span>
-                        </p>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <button
-                            type="button"
-                            disabled={!entryEditable || !projectId || !weekInProject}
-                            onClick={() => addEntry()}
-                            className="inline-flex items-center justify-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                          >
-                            <Plus className="h-3.5 w-3.5" /> Add Entry
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => clearDraftRow()}
-                            className="rounded p-1 text-gray-400 hover:text-gray-600"
-                            aria-label="Clear draft row"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
+                    <td className="border-l border-gray-100 px-2 py-2.5 text-center text-sm font-bold tabular-nums dark:border-gray-800">
+                      {hoursTotal.toFixed(2)}
                     </td>
+                    <td className="border-l border-gray-100 dark:border-gray-800" />
                   </tr>
-                </>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+                </tbody>
+              </table>
+            </div>
 
-        <div className="border-t border-gray-200 px-4 py-4 dark:border-gray-700">
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Timesheet comments</label>
-          <textarea
-            className={`${inputClass} min-h-[4.5rem] resize-y ${entryEditable ? "" : readOnlyClass}`}
-            placeholder="Notes for this timesheet (rejection reasons are appended here when a manager rejects)"
-            value={comments}
-            onChange={(e) => setComments(e.target.value)}
-            readOnly={!entryEditable}
-            rows={3}
-          />
-        </div>
-
-        <div className="border-t border-gray-200 px-4 py-4 dark:border-gray-700">
-          <p className="mb-1 text-sm font-bold text-gray-900 dark:text-gray-100">Select Approver (Manager)</p>
-          {formEditable ? (
-            <select
-              className={inputClass}
-              value={selectedApprover}
-              onChange={(e) => setSelectedApprover(e.target.value)}
-              disabled={!approvers.length}
-            >
-              <option value="">Choose a manager to approve your timesheet</option>
-              {approvers.map((row) => (
-                <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
-                  {row.label}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              className={`${inputClass} ${readOnlyClass}`}
-              readOnly
-              value={
-                defaults.approverLabel ||
-                approvers.find((a) => selectedApprover === `${a.kind}:${a.id}`)?.label ||
-                "—"
-              }
-            />
-          )}
-          {formEditable ? (
-            <p className="mt-1 text-xs text-red-600">
-              * Manager selection is required before saving or submitting timesheet
-            </p>
-          ) : null}
-
-          <div className="mt-5 flex flex-col items-stretch gap-2 sm:items-end">
-            {footerActions ? <div className="flex flex-wrap justify-end gap-2">{footerActions}</div> : null}
             {entryEditable ? (
-              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
-                <button
-                  type="submit"
-                  disabled={!canSave || isSaving}
-                  className={`${footerBtnClass} w-full border border-gray-200 bg-[#f3f4f6] text-gray-500 sm:w-auto disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400`}
-                >
-                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  {canSave ? "Save timesheet" : "Add timesheet entries first"}
-                </button>
-                {showSubmitForApproval ? (
-                  <button
-                    type="button"
-                    disabled={!canSubmitForApproval || submitForApprovalLoading}
-                    onClick={() => void onSubmitForApproval?.()}
-                    className={`${footerBtnClass} w-full border border-gray-200 bg-[#f3f4f6] text-gray-500 sm:w-auto disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400`}
-                  >
-                    {submitForApprovalLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                    {canSubmitForApproval ? "Submit for approval" : "Add entries to submit"}
-                  </button>
-                ) : null}
-              </div>
+              <button
+                type="button"
+                onClick={() => addTaskLine()}
+                disabled={!projectId || !weekInProject}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 py-2.5 text-sm font-medium text-gray-700 hover:border-blue-400 hover:bg-blue-50/30 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-300"
+              >
+                <Plus className="h-4 w-4" /> Add Task / Ticket
+              </button>
             ) : null}
           </div>
+
+          <div className="border-t border-gray-100 px-6 py-5 dark:border-gray-800">
+            <h2 className="mb-4 text-base font-semibold text-gray-900 dark:text-gray-100">
+              Submission Details
+            </h2>
+
+            <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Assigned Approver</p>
+            {formEditable && approvers.length > 1 ? (
+              <select
+                className={`${selectClass} mb-4 max-w-md`}
+                value={selectedApprover}
+                onChange={(e) => setSelectedApprover(e.target.value)}
+              >
+                <option value="">Select approver…</option>
+                {approvers.map((row) => (
+                  <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
+                    {row.label}
+                  </option>
+                ))}
+              </select>
+            ) : selectedApproverLabel ? (
+              <div className="mb-4 flex max-w-md items-center gap-3 rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/50">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
+                  {approverParts.name
+                    .split(/\s+/)
+                    .map((w) => w[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    {approverParts.name}
+                    {approverParts.role ? (
+                      <span className="font-normal text-gray-500"> ({approverParts.role})</span>
+                    ) : null}
+                  </p>
+                  <p className="text-xs text-gray-500">Automatically assigned from project</p>
+                </div>
+              </div>
+            ) : (
+              <p className="mb-4 text-sm text-gray-500">Select a project to see the approver.</p>
+            )}
+
+            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              General timesheet comments <span className="font-normal text-gray-400">(optional)</span>
+            </label>
+            <textarea
+              className="min-h-[5rem] w-full resize-y rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900"
+              placeholder="Add any general notes for this timesheet submission…"
+              value={comments}
+              onChange={(e) => setComments(e.target.value)}
+              readOnly={!entryEditable}
+              rows={3}
+            />
+          </div>
+
+          <div className="flex flex-col gap-4 border-t border-gray-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800">
+            <div>
+              <p className="text-lg font-bold tabular-nums text-gray-900 dark:text-gray-100">
+                Total: {hoursTotal.toFixed(2)} hrs
+              </p>
+              <p className="text-xs text-gray-500">
+                {TIMESHEET_STATUS_LABELS[status]} timesheet
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {footerActions}
+              {entryEditable ? (
+                <>
+                  <button
+                    type="submit"
+                    disabled={!canSave || isSaving}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                  >
+                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Save Draft
+                  </button>
+                  {showSubmitForApproval ? (
+                    <button
+                      type="button"
+                      disabled={!canSubmitForApproval || submitForApprovalLoading}
+                      onClick={() => void onSubmitForApproval?.()}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {submitForApprovalLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                      Submit for Approval
+                    </button>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          </div>
         </div>
+
+        <section className="mt-6 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-950">
+          <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">Files</h3>
+          <p className="mb-3 text-xs text-gray-500">
+            Attach evidence when required for client approval outside TBOS.
+          </p>
+          {entryEditable ? (
+            <label
+              className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500 hover:border-blue-300 dark:border-gray-600 ${
+                uploading ? "pointer-events-none opacity-60" : ""
+              }`}
+            >
+              <span className="font-medium text-gray-700 dark:text-gray-300">Upload files</span>
+              <input
+                type="file"
+                multiple
+                className="sr-only"
+                onChange={(e) => void uploadFiles(e.target.files)}
+                disabled={uploading}
+              />
+            </label>
+          ) : null}
+          {fileUrls.length > 0 ? (
+            <ul className="mt-3 space-y-2">
+              {fileUrls.map((url, index) => (
+                <li key={url} className="flex items-center justify-between gap-2 text-sm">
+                  <a
+                    href={resolveDocumentHref(url)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="truncate text-blue-600 hover:underline"
+                  >
+                    {url.split("/").pop()}
+                  </a>
+                  {entryEditable ? (
+                    <button
+                      type="button"
+                      onClick={() => setFileUrls((prev) => prev.filter((_, i) => i !== index))}
+                      className="text-gray-400 hover:text-red-500"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-gray-400">No files attached.</p>
+          )}
+        </section>
+
+        {defaults.rejectReason ? (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            Reject reason: {defaults.rejectReason}
+          </div>
+        ) : null}
+
+        <section className="mt-6 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-950">
+          <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-gray-100">Activity log</h3>
+          {defaults.activityLogs && defaults.activityLogs.length > 0 ? (
+            <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+              {defaults.activityLogs.map((log) => (
+                <li key={log.id} className="py-3 text-sm">
+                  <p className="font-medium text-gray-900 dark:text-gray-100">
+                    {formatTimesheetActivityTitle(log.action)}
+                  </p>
+                  {log.reason ? <p className="text-gray-600">{log.reason}</p> : null}
+                  <p className="mt-1 text-xs text-gray-400">
+                    {formatActivityDate(log.createdAt)}
+                    {log.performedByName ? ` · ${log.performedByName}` : ""}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-gray-400">No activity yet.</p>
+          )}
+        </section>
       </div>
 
-      <section className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-        <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">Files</h3>
-        <p className="mb-3 text-xs text-gray-500">
-          Attach evidence (mandatory when the timesheet is approved by the end client outside of this system).
-        </p>
-        {entryEditable ? (
-          <label
-            className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500 transition hover:border-sky-300 hover:bg-sky-50/50 dark:border-gray-600 dark:hover:border-sky-700 dark:hover:bg-sky-950/20 ${
-              uploading ? "pointer-events-none opacity-60" : ""
-            }`}
-          >
-            <span className="font-medium text-gray-700 dark:text-gray-300">Upload files</span>
-            <span className="mt-1 text-xs">PDF, images, or documents</span>
-            <input
-              type="file"
-              multiple
-              className="sr-only"
-              onChange={(e) => void uploadFiles(e.target.files)}
-              disabled={uploading}
-            />
-          </label>
-        ) : null}
-        {uploading ? <p className="mt-2 text-xs text-gray-500">Uploading…</p> : null}
-        {fileUrls.length > 0 ? (
-          <ul className="mt-3 space-y-2">
-            {fileUrls.map((url, index) => (
-              <li key={url} className="flex items-center justify-between gap-2 text-sm">
-                <a
-                  href={resolveDocumentHref(url)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="truncate text-blue-600 hover:underline dark:text-blue-400"
-                >
-                  {url.split("/").pop()}
-                </a>
-                {entryEditable ? (
-                  <button
-                    type="button"
-                    onClick={() => setFileUrls((prev) => prev.filter((_, i) => i !== index))}
-                    className="text-gray-400 hover:text-red-500"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-gray-400">No files attached.</p>
-        )}
-      </section>
+      {selection && selectedLine && selectedDayIso ? (
+        <aside
+          className="mt-6 w-full shrink-0 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-950 xl:mt-0 xl:w-[22rem] xl:border-l xl:shadow-[-4px_0_24px_rgba(0,0,0,0.06)]"
+        >
+          <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Daily Entry</h2>
+            <button
+              type="button"
+              onClick={() => setSelection(null)}
+              className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="space-y-5 px-5 py-5">
+            <div>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                {formatLongDate(selectedDayIso)}
+              </p>
+              <p className="text-xs text-gray-500">{projectLabel || "Project"}</p>
+            </div>
 
-      {defaults.rejectReason ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
-          Reject reason: {defaults.rejectReason}
-        </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Selected Task
+              </label>
+              <select
+                className={selectClass}
+                value={selectedLine.caseKey}
+                onChange={(e) => updateLine(selectedLine.key, { caseKey: e.target.value, label: undefined })}
+              >
+                <option value="">Select task…</option>
+                {cases.map((row) => (
+                  <option key={`panel-${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
+                    {row.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Hours worked
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm tabular-nums focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900"
+                value={panelHours}
+                onChange={(e) => setPanelHours(sanitizeHoursInput(e.target.value))}
+                placeholder="0.00"
+              />
+              {hoursDurationHint(panelHours) ? (
+                <p className="mt-1 text-xs text-gray-500">{hoursDurationHint(panelHours)}</p>
+              ) : null}
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Daily task comments
+              </label>
+              <textarea
+                className="min-h-[6rem] w-full resize-y rounded-md border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
+                placeholder="Describe work completed on this task for the day…"
+                value={panelComment}
+                onChange={(e) => setPanelComment(e.target.value)}
+                rows={4}
+              />
+            </div>
+
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={selectedLine.billable}
+                onChange={(e) => updateLine(selectedLine.key, { billable: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600"
+              />
+              Billable hours
+            </label>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => savePanelEntry()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                <Check className="h-4 w-4" /> Save Entry
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelection(null)}
+                className="inline-flex w-full items-center justify-center rounded-lg border border-gray-300 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-100"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </aside>
       ) : null}
-
-      <section className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-        <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-gray-100">Activity log</h3>
-        {defaults.activityLogs && defaults.activityLogs.length > 0 ? (
-          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-            {defaults.activityLogs.map((log) => (
-              <li key={log.id} className="py-3 text-sm">
-                <p className="font-medium text-gray-900 dark:text-gray-100">{formatTimesheetActivityTitle(log.action)}</p>
-                {log.reason ? <p className="text-gray-600 dark:text-gray-400">Reason: {log.reason}</p> : null}
-                <p className="mt-1 text-xs text-gray-400">
-                  {formatActivityDate(log.createdAt)}
-                  {log.performedByName ? ` · ${log.performedByName}` : ""}
-                </p>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-gray-400">No activity yet.</p>
-        )}
-      </section>
     </form>
   );
 }

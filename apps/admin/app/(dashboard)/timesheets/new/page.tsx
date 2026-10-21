@@ -57,11 +57,13 @@ export default function NewTimesheetPage() {
   return (
     <ProjectManagementGuard>
       <div>
-        <Link href="/timesheets" className="mb-4 inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100">
+        <Link
+          href="/timesheets"
+          className="mb-4 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+        >
           <ArrowLeft className="h-4 w-4" /> Back to timesheets
         </Link>
-        <h2 className="mb-6 text-lg font-semibold text-gray-900 dark:text-gray-100">New timesheet</h2>
-        <TimesheetForm defaults={{}} onSubmit={handleSubmit} isSaving={isSaving} />
+        <TimesheetForm title="New Timesheet" defaults={{}} onSubmit={handleSubmit} isSaving={isSaving} />
       </div>
     </ProjectManagementGuard>
   );
