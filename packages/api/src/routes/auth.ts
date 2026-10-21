@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { prisma } from "@techbubble/database";
+import { isBootstrapSuperAdminEmail, prisma } from "@techbubble/database";
 import {
   authMiddleware,
   generateToken,
@@ -83,6 +83,7 @@ function publicUser(user: {
     role: user.role,
     mfaEnabled: user.mfaEnabled,
     passwordNeedsReset: user.passwordNeedsReset ?? false,
+    isBootstrapSuperAdmin: isBootstrapSuperAdminEmail(user.email),
   };
 }
 
@@ -101,6 +102,14 @@ router.post("/login", async (req, res) => {
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
       return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    if (isBootstrapSuperAdminEmail(user.email)) {
+      const token = generateToken(sessionAuthUser(user));
+      return res.json({
+        message: "Login successful",
+        data: { token, user: publicUser(user) },
+      });
     }
 
     if (user.passwordNeedsReset) {
