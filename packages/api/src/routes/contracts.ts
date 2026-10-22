@@ -619,17 +619,17 @@ function serializeContract(row: {
   updatedAt: Date;
   client?: { id: string; name: string } | null;
   owner?: { id: string; name: string | null; email: string } | null;
-    variations?: Array<{
-    id: string;
-    contractId: string;
+  variations?: Array<{
+    id?: string;
+    contractId?: string;
     variationDate: Date;
     variationEndDate: Date | null;
-    comments: string;
+    comments?: string;
     qty?: { toString(): string } | number | null;
-    unit: string | null;
-    rate: { toString(): string } | number | null;
-    variationValue: { toString(): string } | number;
-    createdAt: Date;
+    unit?: string | null;
+    rate?: { toString(): string } | number | null;
+    variationValue?: { toString(): string } | number;
+    createdAt?: Date;
   }>;
   milestones?: Array<{
     id: string;
@@ -694,10 +694,10 @@ function serializeContract(row: {
   }>;
   careerApplication?: {
     id: string;
-    firstName: string;
-    lastName: string;
-    position: string;
-    status: string;
+    firstName?: string;
+    lastName?: string;
+    position?: string;
+    status?: string;
     jobListing?: { title: string | null } | null;
   } | null;
 }) {
@@ -708,6 +708,27 @@ function serializeContract(row: {
   const fileUrls = Array.isArray(row.fileUrls)
     ? row.fileUrls.filter((url): url is string => typeof url === "string")
     : [];
+  const variationRows = row.variations ?? [];
+  const { latestVariationStartDate, latestVariationEndDate } = latestVariationDates(variationRows);
+  const hasCareerApplication = Boolean(row.careerApplication?.id);
+  const fullVariationRows = variationRows.filter(
+    (
+      v,
+    ): v is (typeof variationRows)[number] & {
+      id: string;
+      contractId: string;
+      comments: string;
+      unit: string | null;
+      rate: { toString(): string } | number | null;
+      variationValue: { toString(): string } | number;
+      createdAt: Date;
+    } =>
+      v != null &&
+      "variationValue" in v &&
+      "id" in v &&
+      typeof v.id === "string" &&
+      v.createdAt instanceof Date,
+  );
 
   return {
     id: row.id,
@@ -738,13 +759,17 @@ function serializeContract(row: {
       row.workUnitMonths
         ?.filter((w) => w.segmentKey === "base")
         .map(serializeWorkUnitMonth) ?? [],
+    latestVariationStartDate,
+    latestVariationEndDate,
     variations:
-      row.variations?.map((variation) =>
-        serializeVariation(
-          variation,
-          row.workUnitMonths?.filter((w) => w.segmentKey === variation.id),
-        ),
-      ) ?? undefined,
+      fullVariationRows.length > 0
+        ? fullVariationRows.map((variation) =>
+            serializeVariation(
+              variation,
+              row.workUnitMonths?.filter((w) => w.segmentKey === variation.id),
+            ),
+          )
+        : undefined,
     milestones: row.milestones?.map(serializeMilestone) ?? undefined,
     invoices: row.invoices?.map(serializeInvoice) ?? undefined,
     activityLogs: row.activityLogs?.map(serializeActivityLog) ?? undefined,
@@ -780,17 +805,19 @@ function serializeContract(row: {
       row.type,
       fileUrls,
       row.contractProfiles?.length ?? 0,
+      hasCareerApplication,
     ),
-    careerApplication: row.careerApplication
-      ? {
-          id: row.careerApplication.id,
-          firstName: row.careerApplication.firstName,
-          lastName: row.careerApplication.lastName,
-          position: row.careerApplication.position,
-          status: row.careerApplication.status,
-          jobTitle: row.careerApplication.jobListing?.title ?? null,
-        }
-      : null,
+    careerApplication:
+      row.careerApplication && row.careerApplication.firstName && row.careerApplication.lastName
+        ? {
+            id: row.careerApplication.id,
+            firstName: row.careerApplication.firstName,
+            lastName: row.careerApplication.lastName,
+            position: row.careerApplication.position ?? "",
+            status: row.careerApplication.status ?? "",
+            jobTitle: row.careerApplication.jobListing?.title ?? null,
+          }
+        : null,
   };
 }
 
@@ -798,7 +825,29 @@ const contractInclude = {
   client: { select: { id: true, name: true } },
   owner: { select: { id: true, name: true, email: true } },
   contractProfiles: { select: { id: true } },
+  careerApplication: { select: { id: true } },
+  variations: {
+    orderBy: { createdAt: "desc" as const },
+    take: 1,
+    select: { variationDate: true, variationEndDate: true, createdAt: true },
+  },
 };
+
+function latestVariationDates(
+  variations?: Array<{ variationDate: Date; variationEndDate: Date | null; createdAt?: Date }>,
+) {
+  if (!variations?.length) {
+    return { latestVariationStartDate: null as string | null, latestVariationEndDate: null as string | null };
+  }
+  const sortKey = (v: { variationDate: Date; createdAt?: Date }) =>
+    v.createdAt?.getTime() ?? v.variationDate.getTime();
+  const sorted = [...variations].sort((a, b) => sortKey(b) - sortKey(a));
+  const latest = sorted[0]!;
+  return {
+    latestVariationStartDate: latest.variationDate.toISOString(),
+    latestVariationEndDate: latest.variationEndDate?.toISOString() ?? null,
+  };
+}
 
 const activityInclude = {
   performedBy: { select: { id: true, name: true, email: true } },
@@ -937,7 +986,9 @@ router.get("/", async (req, res) => {
       include: expiring
         ? {
             ...contractInclude,
-            variations: { select: { variationEndDate: true } },
+            variations: {
+              select: { variationEndDate: true, variationDate: true, createdAt: true },
+            },
           }
         : contractInclude,
       orderBy: [{ createdAt: "desc" }],

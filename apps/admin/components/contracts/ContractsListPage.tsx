@@ -39,6 +39,8 @@ interface ContractRow {
   remaining: number;
   ownerId: string | null;
   ownerName: string;
+  latestVariationStartDate?: string | null;
+  latestVariationEndDate?: string | null;
 }
 
 type SortKey = "contractNumber" | "title" | "clientName" | "type" | "status" | "contractValue" | "ownerName";
@@ -317,6 +319,12 @@ export function ContractsListPage({ activeFilter }: Props) {
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.ownerName || "—"}</td>
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatDate(row.startDate)}</td>
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatDate(row.endDate)}</td>
+        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+          {formatDate(row.latestVariationStartDate ?? null)}
+        </td>
+        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+          {formatDate(row.latestVariationEndDate ?? null)}
+        </td>
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.contractValue)}</td>
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.totalVariation)}</td>
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.consumed)}</td>
@@ -457,6 +465,12 @@ export function ContractsListPage({ activeFilter }: Props) {
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Start</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">End</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">
+                  Variation start
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">
+                  Variation end
+                </th>
                 <th className="px-4 py-3 text-left">
                   <SortHeader label="Contract value" sortKey="contractValue" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                 </th>
@@ -469,13 +483,13 @@ export function ContractsListPage({ activeFilter }: Props) {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={15} className="px-4 py-8 text-center text-gray-400">
                     No {activeFilter ? "active" : "inactive"} contracts yet.
                   </td>
                 </tr>
               ) : totalItems === 0 ? (
                 <tr>
-                  <td colSpan={13} className="px-4 py-8 text-center text-gray-400">No contracts match your search.</td>
+                  <td colSpan={15} className="px-4 py-8 text-center text-gray-400">No contracts match your search.</td>
                 </tr>
               ) : (
                 paginated.map((row) => renderTableRow(row))

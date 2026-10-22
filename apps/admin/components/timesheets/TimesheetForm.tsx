@@ -6,6 +6,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Info,
   Loader2,
   MessageSquare,
   Plus,
@@ -266,35 +267,6 @@ function approverDisplayName(label: string) {
   return { name: label, role: "" };
 }
 
-function BillableToggle({
-  checked,
-  disabled,
-  onChange,
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-        checked ? "bg-blue-600" : "bg-gray-200"
-      } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
-    >
-      <span
-        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-          checked ? "translate-x-5" : "translate-x-0.5"
-        }`}
-      />
-    </button>
-  );
-}
-
 export function TimesheetForm({
   defaults,
   onSubmit,
@@ -553,6 +525,11 @@ export function TimesheetForm({
     if (selection?.lineKey === key) setSelection(null);
   }
 
+  function deleteSelectedTicketRow() {
+    if (!selection) return;
+    removeLine(selection.lineKey);
+  }
+
   function addTaskLine() {
     if (!entryEditable || !weekInProject || !projectId) return;
     setLines((prev) => [...prev, emptyLine()]);
@@ -752,7 +729,7 @@ export function TimesheetForm({
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50/80 dark:border-gray-700 dark:bg-gray-900/50">
                     <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">
-                      Task / Ticket
+                      Ticket
                     </th>
                     {weekDays.map((d, i) => (
                       <th
@@ -766,7 +743,7 @@ export function TimesheetForm({
                       Total
                     </th>
                     <th className="border-l border-gray-200 px-2 py-2.5 text-center text-xs font-semibold text-gray-700 dark:border-gray-700">
-                      Billable
+                      Action
                     </th>
                   </tr>
                 </thead>
@@ -791,7 +768,7 @@ export function TimesheetForm({
                                 }
                                 disabled={!projectId}
                               >
-                                <option value="">Select task…</option>
+                                <option value="">Select ticket…</option>
                                 {cases.map((row) => (
                                   <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
                                     {row.label}
@@ -803,16 +780,6 @@ export function TimesheetForm({
                                 {caseLabel || "—"}
                               </span>
                             )}
-                            {entryEditable && lines.length > 1 ? (
-                              <button
-                                type="button"
-                                onClick={() => removeLine(line.key)}
-                                className="text-gray-400 hover:text-red-500"
-                                aria-label="Remove row"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            ) : null}
                           </div>
                         </td>
                         {weekDays.map(({ key, iso }) => {
@@ -850,13 +817,17 @@ export function TimesheetForm({
                           {lineTotal > 0 ? lineTotal.toFixed(2) : "—"}
                         </td>
                         <td className="border-l border-gray-100 px-2 py-2 text-center dark:border-gray-800">
-                          <div className="flex justify-center">
-                            <BillableToggle
-                              checked={line.billable}
-                              disabled={!entryEditable}
-                              onChange={(v) => updateLine(line.key, { billable: v })}
-                            />
-                          </div>
+                          {entryEditable ? (
+                            <button
+                              type="button"
+                              onClick={() => removeLine(line.key)}
+                              disabled={lines.length <= 1 && sumDailyHours(line.dailyHours) === 0 && !line.caseKey}
+                              className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
+                              aria-label="Delete ticket row"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          ) : null}
                         </td>
                       </tr>
                     );
@@ -889,7 +860,7 @@ export function TimesheetForm({
                 disabled={!projectId || !weekInProject}
                 className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 py-2.5 text-sm font-medium text-gray-700 hover:border-blue-400 hover:bg-blue-50/30 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-300"
               >
-                <Plus className="h-4 w-4" /> Add Task / Ticket
+                <Plus className="h-4 w-4" /> Add Ticket
               </button>
             ) : null}
           </div>
@@ -1076,7 +1047,7 @@ export function TimesheetForm({
           className="mt-6 w-full shrink-0 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-950 xl:mt-0 xl:w-[22rem] xl:border-l xl:shadow-[-4px_0_24px_rgba(0,0,0,0.06)]"
         >
           <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Daily Entry</h2>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Selected Ticket</h2>
             <button
               type="button"
               onClick={() => setSelection(null)}
@@ -1096,7 +1067,7 @@ export function TimesheetForm({
 
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Selected Task
+                Selected Ticket
               </label>
               <select
                 className={selectClass}
@@ -1131,7 +1102,7 @@ export function TimesheetForm({
 
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Daily task comments
+                Daily task comments <span className="font-normal text-gray-400">(optional)</span>
               </label>
               <textarea
                 className="min-h-[6rem] w-full resize-y rounded-md border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
@@ -1142,15 +1113,20 @@ export function TimesheetForm({
               />
             </div>
 
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input
-                type="checkbox"
-                checked={selectedLine.billable}
-                onChange={(e) => updateLine(selectedLine.key, { billable: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600"
-              />
-              Billable hours
-            </label>
+            <div className="flex items-start gap-2 rounded-lg border border-sky-100 bg-sky-50/80 px-3 py-2.5 text-xs text-sky-950 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" aria-hidden />
+              <p>
+                Ticket entries are created within this timesheet and do not affect the project task list.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => deleteSelectedTicketRow()}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30"
+            >
+              <Trash2 className="h-4 w-4" /> Delete this entry
+            </button>
 
             <div className="flex flex-col gap-2 pt-2">
               <button

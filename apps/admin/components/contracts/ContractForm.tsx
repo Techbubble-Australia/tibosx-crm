@@ -313,6 +313,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const [savingFiles, setSavingFiles] = useState(false);
   const [endDateError, setEndDateError] = useState<string | null>(null);
   const [savingEndDate, setSavingEndDate] = useState(false);
+  const [savedEndDate, setSavedEndDate] = useState(toDateInput(defaults.endDate));
 
   const isEditable = status === "DRAFT";
   const canEditEndDate = status === "DRAFT" || status === "ACTIVE";
@@ -327,6 +328,11 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   const canAddVariations = Boolean(defaults.id) && status === "ACTIVE";
   const canAddMilestones = Boolean(defaults.id) && status === "ACTIVE" && type !== "T_AND_M";
   const canAddInvoices = Boolean(defaults.id) && (status === "ACTIVE" || status === "EXPIRED");
+  const activeEndDateDirty = status === "ACTIVE" && endDate !== savedEndDate;
+
+  useEffect(() => {
+    setSavedEndDate(toDateInput(defaults.endDate));
+  }, [defaults.endDate]);
   const showMilestones = type !== "T_AND_M";
 
   const invoicePreviewAmount = useMemo(() => {
@@ -696,6 +702,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       });
       const data = await res.json();
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to update end date");
+      setSavedEndDate(nextEndDate);
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to update end date");
     } finally {
@@ -1216,14 +1223,26 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                 setEndDateError(validateContractDates(startDate, next || null));
               }
             }}
-            onBlur={() => {
-              if (status === "ACTIVE") void saveActiveEndDate(endDate);
-            }}
             readOnly={!canEditEndDate}
             className={fieldClass(canEditEndDate)}
           />
+          {activeEndDateDirty ? (
+            <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+              Warning: You are changing the contract end date. Please ensure the project end date is also
+              updated to align with the new contract end date, if a project has been created.
+            </div>
+          ) : null}
+          {status === "ACTIVE" && activeEndDateDirty ? (
+            <button
+              type="button"
+              disabled={savingEndDate || Boolean(endDateError)}
+              onClick={() => void saveActiveEndDate(endDate)}
+              className="mt-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+            >
+              {savingEndDate ? "Saving…" : "Save end date"}
+            </button>
+          ) : null}
           {endDateError ? <p className="mt-1 text-xs text-red-600">{endDateError}</p> : null}
-          {savingEndDate ? <p className="mt-1 text-xs text-gray-500">Saving end date…</p> : null}
         </div>
       </div>
 

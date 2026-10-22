@@ -34,8 +34,9 @@ export function contractIsIncomplete(
   type: string,
   fileUrls: string[],
   profileCount: number,
+  hasLinkedCareerApplication = false,
 ): boolean {
   if (!fileUrls.length) return true;
-  if (type === "T_AND_M" && profileCount === 0) return true;
+  if (type === "T_AND_M" && profileCount === 0 && !hasLinkedCareerApplication) return true;
   return false;
 }
