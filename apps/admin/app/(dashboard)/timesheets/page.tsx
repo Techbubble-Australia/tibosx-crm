@@ -271,8 +271,7 @@ export default function TimesheetsPage() {
                           </button>
                         ) : null}
                         {(canManageProjects ||
-                          (row.memberUserId === userId &&
-                            (row.status === "DRAFT" || row.status === "SUBMITTED"))) ? (
+                          (row.memberUserId === userId && row.status === "DRAFT")) ? (
                           <button
                             type="button"
                             onClick={() => void deleteOne(row.id)}

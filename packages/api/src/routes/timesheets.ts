@@ -261,7 +261,9 @@ function mapDetailWithActions(
       row.opportunity?.ownerId === actorId);
   const canSubmit = row.memberUserId === actorId && row.status === "DRAFT";
   const canDelete =
-    row.memberUserId === actorId && (row.status === "DRAFT" || row.status === "SUBMITTED");
+    (canManageAllTimesheets(role) &&
+      (row.status === "DRAFT" || row.status === "SUBMITTED")) ||
+    (row.memberUserId === actorId && row.status === "DRAFT");
   return {
     ...mapDetail(row),
     canApprove,
@@ -316,6 +318,15 @@ async function assertMemberCanSubmitTimesheets(actorId: string, roles: string[])
   if (!onboarding.profileComplete) {
     throw new Error("PROFILE_REQUIRED");
   }
+}
+
+/** Log/edit own timesheets: project_member role, PM/admin, or active project membership. */
+async function actorMayLogTimesheets(actorId: string, role: string): Promise<boolean> {
+  if (canManageAllTimesheets(role)) return true;
+  const roles = await effectiveRolesForUser(actorId, role);
+  if (hasEffectiveRole(roles, "project_member")) return true;
+  const memberships = await listActiveProjectMembershipsForUser(actorId);
+  return memberships.length > 0;
 }
 
 router.get("/active-projects", async (req: AuthRequest, res) => {
@@ -776,7 +787,7 @@ router.post("/", async (req: AuthRequest, res) => {
     const role = req.user?.role ?? "";
     const actorId = getActorId(req);
     const roles = await effectiveRolesForUser(actorId, role);
-    if (!hasEffectiveRole(roles, "project_member")) {
+    if (!(await actorMayLogTimesheets(actorId, role))) {
       return res.status(403).json({ error: "Only project members can create timesheets" });
     }
     const data = timesheetSchema.parse(req.body);
@@ -905,7 +916,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
     const actorId = getActorId(req);
     const role = req.user?.role ?? "";
     const roles = await effectiveRolesForUser(actorId, role);
-    if (!hasEffectiveRole(roles, "project_member")) {
+    if (!(await actorMayLogTimesheets(actorId, role))) {
       return res.status(403).json({ error: "Only project members can edit timesheets" });
     }
     await assertMemberCanSubmitTimesheets(actorId, roles);
@@ -1003,19 +1014,33 @@ router.delete("/:id", async (req: AuthRequest, res) => {
   try {
     const actorId = getActorId(req);
     const role = req.user?.role ?? "";
-    const roles = await effectiveRolesForUser(actorId, role);
     const canManageAll = canManageAllTimesheets(role);
-    if (!canManageAll && !hasEffectiveRole(roles, "project_member")) {
-      return res.status(403).json({ error: "Only project members can delete timesheets" });
-    }
     const existing = await prisma.timesheet.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: "Not found" });
-    if (!canManageAll && existing.memberUserId !== actorId) {
+
+    if (canManageAll) {
+      if (existing.status !== "DRAFT" && existing.status !== "SUBMITTED") {
+        return res.status(400).json({ error: "Only draft or submitted timesheets can be deleted" });
+      }
+      await prisma.timesheet.delete({ where: { id: existing.id } });
+      return res.json({ data: { id: existing.id } });
+    }
+
+    if (existing.memberUserId !== actorId) {
       return res.status(403).json({ error: "You can only delete your own timesheets" });
     }
-    if (existing.status !== "DRAFT" && existing.status !== "SUBMITTED") {
-      return res.status(400).json({ error: "Only draft or submitted timesheets can be deleted" });
+    if (existing.status !== "DRAFT") {
+      return res.status(403).json({
+        error:
+          existing.status === "SUBMITTED"
+            ? "Submitted timesheets cannot be deleted while awaiting approval"
+            : "This timesheet cannot be deleted",
+      });
     }
+    if (!(await actorMayLogTimesheets(actorId, role))) {
+      return res.status(403).json({ error: "Only project members can delete timesheets" });
+    }
+
     await prisma.timesheet.delete({ where: { id: existing.id } });
     res.json({ data: { id: existing.id } });
   } catch (error) {
@@ -1055,7 +1080,7 @@ router.post("/submit", async (req: AuthRequest, res) => {
     const actorId = getActorId(req);
     const role = req.user?.role ?? "";
     const roles = await effectiveRolesForUser(actorId, role);
-    if (!hasEffectiveRole(roles, "project_member")) {
+    if (!(await actorMayLogTimesheets(actorId, role))) {
       return res.status(403).json({ error: "Only project members can submit timesheets" });
     }
     await assertMemberCanSubmitTimesheets(actorId, roles);
