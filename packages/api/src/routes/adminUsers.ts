@@ -597,6 +597,74 @@ router.post("/:id/agreements/offline", async (req: AuthRequest, res) => {
   }
 });
 
+const agreementRecordPatchSchema = z.object({
+  startDate: z.coerce.date().optional().nullable(),
+  endDate: z.coerce.date().optional().nullable(),
+  status: z.enum(["awaiting_signature", "signed"]).optional(),
+});
+
+router.patch("/:id/agreements/:recordId", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.params.id;
+    const recordId = req.params.recordId;
+    if (!userId || !recordId) return res.status(400).json({ error: "Invalid id" });
+    const input = agreementRecordPatchSchema.parse(req.body);
+
+    const record = await prisma.adminUserAgreementRecord.findFirst({
+      where: { id: recordId, adminUserId: userId },
+    });
+    if (!record) return res.status(404).json({ error: "Agreement record not found" });
+
+    const data: {
+      startDate?: Date | null;
+      endDate?: Date | null;
+      agreementSignedAt?: Date | null;
+      agreementDocumentUrl?: string | null;
+    } = {};
+    if (input.startDate !== undefined) data.startDate = input.startDate;
+    if (input.endDate !== undefined) data.endDate = input.endDate;
+    if (input.status === "awaiting_signature") {
+      data.agreementSignedAt = null;
+      data.agreementDocumentUrl = null;
+    } else if (input.status === "signed") {
+      if (!record.agreementDocumentUrl) {
+        return res.status(400).json({ error: "Upload a signed document before marking as signed" });
+      }
+      data.agreementSignedAt = record.agreementSignedAt ?? new Date();
+    }
+
+    await prisma.adminUserAgreementRecord.update({ where: { id: recordId }, data });
+    const agreementRecords = await buildAgreementRecordsForUser(userId);
+    res.json({ data: { agreementRecords } });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error updating agreement record:", error);
+    res.status(500).json({ error: "Failed to update agreement record" });
+  }
+});
+
+router.delete("/:id/agreements/:recordId", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.params.id;
+    const recordId = req.params.recordId;
+    if (!userId || !recordId) return res.status(400).json({ error: "Invalid id" });
+
+    const record = await prisma.adminUserAgreementRecord.findFirst({
+      where: { id: recordId, adminUserId: userId },
+    });
+    if (!record) return res.status(404).json({ error: "Agreement record not found" });
+
+    await prisma.adminUserAgreementRecord.delete({ where: { id: recordId } });
+    const agreementRecords = await buildAgreementRecordsForUser(userId);
+    res.json({ data: { agreementRecords } });
+  } catch (error) {
+    console.error("Error deleting agreement record:", error);
+    res.status(500).json({ error: "Failed to delete agreement record" });
+  }
+});
+
 router.post("/", async (req: AuthRequest, res) => {
   try {
     const data = createSchema.parse(req.body);

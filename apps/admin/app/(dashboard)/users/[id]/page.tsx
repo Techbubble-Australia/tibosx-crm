@@ -21,7 +21,7 @@ import type { AdminRole } from "@/lib/admin-roles";
 import { COUNTRY_OPTIONS } from "@/lib/country-options";
 import {
   BankDetailsFields,
-  bankDetailsFromApi,
+  bankDetailsFromUser,
   bankDetailsToApi,
   type BankDetailsFormValue,
 } from "@/components/users/BankDetailsFields";
@@ -102,7 +102,7 @@ export default function EditUserPage() {
   const [mappedProfileId, setMappedProfileId] = useState("");
   const [mappedProfileOption, setMappedProfileOption] = useState<ProfileMapOption | null>(null);
   const [userFiles, setUserFiles] = useState<UserFileRow[]>([]);
-  const [bankDetails, setBankDetails] = useState<BankDetailsFormValue>(bankDetailsFromApi(null));
+  const [bankDetails, setBankDetails] = useState<BankDetailsFormValue>(bankDetailsFromUser({}));
   const [inviteLoading, setInviteLoading] = useState(false);
 
   async function inviteUser() {
@@ -175,7 +175,7 @@ export default function EditUserPage() {
           : [],
       );
       setPhotoUrl(row.profilePhotoUrl);
-      setBankDetails(bankDetailsFromApi(row.bankDetails));
+      setBankDetails(bankDetailsFromUser({ bankDetails: row.bankDetails, taxNumber: row.taxNumber }));
       if (Array.isArray(row.emergencyContacts) && row.emergencyContacts.length) {
         setEmergencyContacts(row.emergencyContacts);
       }
@@ -245,7 +245,7 @@ export default function EditUserPage() {
       mappedProfileId: roles.includes("client") ? null : mappedProfileId.trim() || null,
       userFiles,
       bankDetails: bankDetailsToApi(bankDetails),
-      taxNumber: String(formData.get("taxNumber") ?? "").trim(),
+      taxNumber: bankDetails.taxNumber.trim(),
     };
     if (password) body.password = password;
     if (roles.includes("client")) {
@@ -325,17 +325,6 @@ export default function EditUserPage() {
               <input name="phone" required defaultValue={defaults.phone ?? ""} className={inputClass} />
             </div>
           </div>
-          {!isClientUser ? (
-            <div>
-              <label className="mb-1 block text-sm font-medium">Tax number *</label>
-              <input
-                name="taxNumber"
-                required
-                defaultValue={defaults.taxNumber ?? ""}
-                className={inputClass}
-              />
-            </div>
-          ) : null}
           <div>
             <label className="mb-2 block text-sm font-medium">Roles *</label>
             <AdminRolesMultiSelect
@@ -450,7 +439,7 @@ export default function EditUserPage() {
 
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
           <h3 className="mb-4 font-semibold">Bank details</h3>
-          <BankDetailsFields value={bankDetails} onChange={setBankDetails} />
+          <BankDetailsFields value={bankDetails} onChange={setBankDetails} showTaxNumber />
         </section>
 
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
@@ -513,6 +502,9 @@ export default function EditUserPage() {
 
         <UserAgreementsSection
           records={agreementRecords}
+          editableUserId={id}
+          onRecordsChange={setAgreementRecords}
+          onEditAgreement={() => setOfflineAgreementOpen(true)}
           emptyMessage="No agreements assigned yet. Assign a template or record an offline agreement."
           headerAction={
             canAssignTemplate ? (

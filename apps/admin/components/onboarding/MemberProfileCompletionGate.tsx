@@ -38,6 +38,7 @@ export function MemberProfileCompletionGate() {
   const [swiftCode, setSwiftCode] = useState("");
   const [bsb, setBsb] = useState("");
   const [bankNotes, setBankNotes] = useState("");
+  const [taxNumber, setTaxNumber] = useState("");
   const [idProofUrl, setIdProofUrl] = useState("");
   const [addressProofUrl, setAddressProofUrl] = useState("");
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([
@@ -57,6 +58,7 @@ export function MemberProfileCompletionGate() {
       .then((res) => res.json())
       .then((data) => {
         const user = data?.data?.user as Record<string, unknown>;
+        setTaxNumber(typeof user.taxNumber === "string" ? user.taxNumber : "");
         setAddressLine1(String(user.addressLine1 ?? ""));
         setCity(String(user.city ?? ""));
         setStateRegion(String(user.state ?? ""));
@@ -120,8 +122,15 @@ export function MemberProfileCompletionGate() {
       alert("Enter your country name when Other is selected.");
       return;
     }
-    if (!bankName.trim() || !accountName.trim() || !accountNumber.trim() || !bankCountry || !bsb.trim()) {
-      alert("Complete all required bank details (including BSB/Routing/IFSC).");
+    if (
+      !bankName.trim() ||
+      !accountName.trim() ||
+      !accountNumber.trim() ||
+      !bankCountry ||
+      !bsb.trim() ||
+      !taxNumber.trim()
+    ) {
+      alert("Complete all required bank details (including tax number and BSB/Routing/IFSC).");
       return;
     }
     if (bankCountrySelect === COUNTRY_OTHER && !bankCountryOther.trim()) {
@@ -164,6 +173,7 @@ export function MemberProfileCompletionGate() {
           state: stateRegion.trim(),
           postcode: postcode.trim(),
           country,
+          taxNumber: taxNumber.trim(),
           bankDetails: {
             bankName: bankName.trim(),
             accountName: accountName.trim(),
@@ -222,6 +232,13 @@ export function MemberProfileCompletionGate() {
               ) : null}
               <input className={inputClass} placeholder="SWIFT / BIC" value={swiftCode} onChange={(e) => setSwiftCode(e.target.value)} />
               <input className={inputClass} placeholder="BSB/Routing/IFSC etc. *" required value={bsb} onChange={(e) => setBsb(e.target.value)} />
+              <input
+                className={`${inputClass} sm:col-span-2`}
+                placeholder="Tax number *"
+                required
+                value={taxNumber}
+                onChange={(e) => setTaxNumber(e.target.value)}
+              />
               <textarea className={`${inputClass} sm:col-span-2`} rows={2} placeholder="Other bank details" value={bankNotes} onChange={(e) => setBankNotes(e.target.value)} />
             </div>
           </section>

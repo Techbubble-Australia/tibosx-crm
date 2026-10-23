@@ -1,10 +1,42 @@
 import { prisma } from "@techbubble/database";
-import { provisionSupportMemberConsultant } from "./support-project.js";
+import { ensureProjectSupportGroup, provisionSupportMemberConsultant } from "./support-project.js";
 
 export type TicketAssignee = { id: string; name: string; email: string };
 
+/** When support is enabled but no group members were configured, include all project members. */
+async function ensureSupportGroupHasProjectMembers(projectId: string) {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { kind: true },
+  });
+  if (project?.kind !== "SUPPORT") return;
+
+  const group = await ensureProjectSupportGroup(projectId);
+  const existing = await prisma.projectSupportGroupMember.count({ where: { groupId: group.id } });
+  if (existing > 0) return;
+
+  const members = await prisma.projectMember.findMany({
+    where: { projectId, adminUserId: { not: null } },
+    select: { id: true, adminUserId: true },
+  });
+  for (const member of members) {
+    if (!member.adminUserId) continue;
+    await prisma.projectSupportGroupMember.upsert({
+      where: { projectMemberId: member.id },
+      create: {
+        groupId: group.id,
+        projectMemberId: member.id,
+        adminUserId: member.adminUserId,
+      },
+      update: { groupId: group.id, adminUserId: member.adminUserId },
+    });
+  }
+}
+
 export async function listProjectTicketAssignees(projectId: string | null | undefined): Promise<TicketAssignee[]> {
   if (!projectId) return [];
+
+  await ensureSupportGroupHasProjectMembers(projectId);
 
   const group = await prisma.projectSupportGroup.findUnique({
     where: { projectId },

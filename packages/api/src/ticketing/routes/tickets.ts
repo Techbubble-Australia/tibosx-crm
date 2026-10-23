@@ -297,7 +297,11 @@ router.get("/:id/attachments/:attachmentId/file", async (req: TicketingRequest, 
 
 router.get("/assignees", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
-  if (user.role !== "CONSULTANT" || !user.consultantVerified) {
+  const mayListAssignees =
+    (user.role === "CONSULTANT" && user.consultantVerified) ||
+    user.tbosRole === "customer_support" ||
+    user.tbosRole === "admin";
+  if (!mayListAssignees) {
     return res.json({ data: [] });
   }
   const ticketId = typeof req.query.ticketId === "string" ? req.query.ticketId : "";

@@ -322,6 +322,12 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         if (anyEffectiveRole(role, additionalRoles, ["customer_support"])) return false;
         return canAccessWorkspaceTimesheets;
       }
+      if (
+        item.href.startsWith("/workspace/") &&
+        anyEffectiveRole(role, additionalRoles, ["admin"])
+      ) {
+        return false;
+      }
       return anyEffectiveRole(role, additionalRoles, item.roles);
     }
     return navGroups

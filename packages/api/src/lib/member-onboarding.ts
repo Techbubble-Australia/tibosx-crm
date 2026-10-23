@@ -52,7 +52,7 @@ export async function getMemberOnboardingStatus(userId: string): Promise<MemberO
       Boolean(user.addressProofUrl?.trim()),
   );
   const profileComplete = consultantProfileExempt || consultantProfileComplete;
-  const canSubmitTimesheets = agreementSigned && profileComplete;
+  const canSubmitTimesheets = agreementSigned;
   const profileOnboardingRequired =
     !consultantProfileExempt &&
     Boolean(user?.profileOnboardingRequiredAt && !user.profileDetailsCompletedAt);

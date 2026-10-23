@@ -316,9 +316,6 @@ async function assertMemberCanSubmitTimesheets(actorId: string, roles: string[])
   if (!onboarding.agreementSigned) {
     throw new Error("AGREEMENT_REQUIRED");
   }
-  if (!onboarding.profileComplete) {
-    throw new Error("PROFILE_REQUIRED");
-  }
 }
 
 /** Log/edit own timesheets: project_member role, PM/admin, or active project membership. */

@@ -42,7 +42,17 @@ export function RecordOfflineAgreementModal({ userId, open, onClose, onSaved }: 
       const formData = new FormData();
       formData.append("document", file);
       const res = await adminFetch("/api/upload/document", { method: "POST", body: formData });
-      const json = await res.json();
+      const text = await res.text();
+      let json: unknown;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        throw new Error(
+          res.ok
+            ? "Upload failed"
+            : "Document upload failed. If this persists, check API_URL and object storage on the server.",
+        );
+      }
       if (!res.ok) throw new Error((json as { error?: string }).error || "Upload failed");
       const url = readUploadImageUrlFromJson(json);
       if (!url) throw new Error("Upload failed");
@@ -73,8 +83,14 @@ export function RecordOfflineAgreementModal({ userId, open, onClose, onSaved }: 
           endDate: endDate || null,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save");
+      const saveText = await res.text();
+      let data: { data?: { agreementRecords?: AgreementRecordRow[] }; error?: string };
+      try {
+        data = JSON.parse(saveText) as typeof data;
+      } catch {
+        throw new Error("Failed to save agreement. The server returned an unexpected response.");
+      }
+      if (!res.ok) throw new Error(data.error || "Failed to save");
       onSaved((data.data?.agreementRecords as AgreementRecordRow[]) ?? []);
       onClose();
     } catch (error) {

@@ -16,7 +16,7 @@ import { COUNTRY_OTHER, mergeCountryValue, splitCountryValue } from "@/lib/count
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import {
   BankDetailsFields,
-  bankDetailsFromApi,
+  bankDetailsFromUser,
   bankDetailsToApi,
   type BankDetailsFormValue,
 } from "@/components/users/BankDetailsFields";
@@ -63,7 +63,7 @@ export default function ProfileSettingsPageInner() {
   const [stateRegion, setStateRegion] = useState("");
   const [countrySelect, setCountrySelect] = useState("");
   const [countryOther, setCountryOther] = useState("");
-  const [bankDetails, setBankDetails] = useState<BankDetailsFormValue>(bankDetailsFromApi(null));
+  const [bankDetails, setBankDetails] = useState<BankDetailsFormValue>(bankDetailsFromUser({}));
   const [savingBank, setSavingBank] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([{ name: "", email: "", phone: "" }]);
@@ -116,7 +116,12 @@ export default function ProfileSettingsPageInner() {
         const addressCountry = splitCountryValue(String(user.country ?? ""));
         setCountrySelect(addressCountry.select);
         setCountryOther(addressCountry.other);
-        setBankDetails(bankDetailsFromApi(user.bankDetails));
+        setBankDetails(
+          bankDetailsFromUser({
+            bankDetails: user.bankDetails,
+            taxNumber: typeof user.taxNumber === "string" ? user.taxNumber : null,
+          }),
+        );
         const contacts = user.emergencyContacts;
         if (Array.isArray(contacts) && contacts.length) {
           setEmergencyContacts(contacts as EmergencyContact[]);
@@ -563,7 +568,7 @@ export default function ProfileSettingsPageInner() {
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
         <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Bank details</h3>
-        <BankDetailsFields value={bankDetails} onChange={setBankDetails} />
+        <BankDetailsFields value={bankDetails} onChange={setBankDetails} showTaxNumber />
         <div className="mt-4 flex justify-end">
           <button
             type="button"
@@ -583,7 +588,10 @@ export default function ProfileSettingsPageInner() {
                   const res = await adminFetch("/api/auth/profile", {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ bankDetails: payload }),
+                    body: JSON.stringify({
+                      bankDetails: payload,
+                      taxNumber: bankDetails.taxNumber.trim() || null,
+                    }),
                   });
                   const data = await res.json();
                   if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save");

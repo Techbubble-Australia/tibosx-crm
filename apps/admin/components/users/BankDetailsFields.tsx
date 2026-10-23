@@ -13,6 +13,7 @@ export type BankDetailsFormValue = {
   swiftCode: string;
   bsb: string;
   notes: string;
+  taxNumber: string;
 };
 
 const inputClass =
@@ -33,6 +34,18 @@ export function bankDetailsFromApi(value: unknown): BankDetailsFormValue {
     swiftCode: typeof row.swiftCode === "string" ? row.swiftCode : "",
     bsb: typeof row.bsb === "string" ? row.bsb : "",
     notes: typeof row.notes === "string" ? row.notes : "",
+    taxNumber: "",
+  };
+}
+
+export function bankDetailsFromUser(user: {
+  bankDetails?: unknown;
+  taxNumber?: string | null;
+}): BankDetailsFormValue {
+  const base = bankDetailsFromApi(user.bankDetails);
+  return {
+    ...base,
+    taxNumber: typeof user.taxNumber === "string" ? user.taxNumber : "",
   };
 }
 
@@ -60,9 +73,10 @@ type Props = {
   value: BankDetailsFormValue;
   onChange: (next: BankDetailsFormValue) => void;
   readOnly?: boolean;
+  showTaxNumber?: boolean;
 };
 
-export function BankDetailsFields({ value, onChange, readOnly }: Props) {
+export function BankDetailsFields({ value, onChange, readOnly, showTaxNumber }: Props) {
   function patch(p: Partial<BankDetailsFormValue>) {
     onChange({ ...value, ...p });
   }
@@ -138,6 +152,18 @@ export function BankDetailsFields({ value, onChange, readOnly }: Props) {
           onChange={(e) => patch({ bsb: e.target.value })}
         />
       </div>
+      {showTaxNumber ? (
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-sm font-medium">Tax number *</label>
+          <input
+            className={readOnly ? `${inputClass} bg-gray-50 dark:bg-gray-950` : inputClass}
+            value={value.taxNumber}
+            readOnly={readOnly}
+            required={!readOnly}
+            onChange={(e) => patch({ taxNumber: e.target.value })}
+          />
+        </div>
+      ) : null}
       <div className="sm:col-span-2">
         <label className="mb-1 block text-sm font-medium">
           Other details, including superannuation and other payroll compliance requirements.
