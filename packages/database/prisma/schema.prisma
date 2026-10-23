@@ -1029,7 +1029,7 @@ model CustomerUser {
   passwordHash           String
   active                 Boolean        @default(true)
   profilePhotoUrl        String?
-  mfaEnabled             Boolean        @default(false)
+  mfaEnabled             Boolean        @default(true)
   mfaEnrolledAt          DateTime?
   totpSecretEnc          String?
   passwordNeedsReset     Boolean        @default(false)

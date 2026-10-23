@@ -232,7 +232,13 @@ export function MemberProfileCompletionGate() {
                 value={taxNumber}
                 onChange={(e) => setTaxNumber(e.target.value)}
               />
-              <textarea className={`${inputClass} sm:col-span-2`} rows={2} placeholder="Other bank details" value={bankNotes} onChange={(e) => setBankNotes(e.target.value)} />
+              <textarea
+                className={`${inputClass} sm:col-span-2`}
+                rows={2}
+                placeholder="Country-specific superannuation or payroll compliance details."
+                value={bankNotes}
+                onChange={(e) => setBankNotes(e.target.value)}
+              />
             </div>
           </section>
 
@@ -265,10 +271,54 @@ export function MemberProfileCompletionGate() {
             <h3 className="mb-3 font-medium">Emergency contact *</h3>
             {emergencyContacts.map((contact, index) => (
               <div key={index} className="mb-3 grid gap-2 sm:grid-cols-2">
-                <input className={inputClass} placeholder="Name *" value={contact.name} onChange={(e) => setEmergencyContacts((prev) => prev.map((row, i) => (i === index ? { ...row, name: e.target.value } : row)))} />
-                <input className={inputClass} placeholder="Relation" value={contact.relation ?? ""} onChange={(e) => setEmergencyContacts((prev) => prev.map((row, i) => (i === index ? { ...row, relation: e.target.value } : row)))} />
-                <input className={inputClass} placeholder="Email *" value={contact.email ?? ""} onChange={(e) => setEmergencyContacts((prev) => prev.map((row, i) => (i === index ? { ...row, email: e.target.value } : row)))} />
-                <input className={inputClass} placeholder="Phone *" value={contact.phone ?? ""} onChange={(e) => setEmergencyContacts((prev) => prev.map((row, i) => (i === index ? { ...row, phone: e.target.value } : row)))} />
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Name *</label>
+                  <input
+                    className={inputClass}
+                    value={contact.name}
+                    onChange={(e) =>
+                      setEmergencyContacts((prev) =>
+                        prev.map((row, i) => (i === index ? { ...row, name: e.target.value } : row)),
+                      )
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Relation</label>
+                  <input
+                    className={inputClass}
+                    value={contact.relation ?? ""}
+                    onChange={(e) =>
+                      setEmergencyContacts((prev) =>
+                        prev.map((row, i) => (i === index ? { ...row, relation: e.target.value } : row)),
+                      )
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Email *</label>
+                  <input
+                    className={inputClass}
+                    value={contact.email ?? ""}
+                    onChange={(e) =>
+                      setEmergencyContacts((prev) =>
+                        prev.map((row, i) => (i === index ? { ...row, email: e.target.value } : row)),
+                      )
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Phone *</label>
+                  <input
+                    className={inputClass}
+                    value={contact.phone ?? ""}
+                    onChange={(e) =>
+                      setEmergencyContacts((prev) =>
+                        prev.map((row, i) => (i === index ? { ...row, phone: e.target.value } : row)),
+                      )
+                    }
+                  />
+                </div>
               </div>
             ))}
           </section>

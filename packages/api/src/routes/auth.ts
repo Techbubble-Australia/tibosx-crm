@@ -19,6 +19,7 @@ import {
 } from "../lib/mfa";
 import { getMemberOnboardingStatus } from "../lib/member-onboarding";
 import { createFullSessionTokenForUserId, sessionAuthUser } from "../lib/admin-session-token.js";
+import { findMfaAccountById, mfaSessionUser, syncClientAdminMfa } from "../lib/mfa-account.js";
 import { logAdminUserFieldChange } from "../lib/admin-user-activity";
 import { adminUserFieldLabel } from "../lib/admin-user-field-labels";
 import { effectiveRoleList, effectiveRolesForUser, hasEffectiveRole } from "../lib/admin-roles";
@@ -86,7 +87,18 @@ router.post("/login", async (req, res) => {
     const email = parsed.email.trim().toLowerCase();
     const password = parsed.password;
 
-    const customer = await prisma.customerUser.findUnique({ where: { email } });
+    const customer = await prisma.customerUser.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        active: true,
+        passwordHash: true,
+        passwordNeedsReset: true,
+        mfaEnabled: true,
+        totpSecretEnc: true,
+      },
+    });
     if (customer?.passwordHash) {
       if (customer.active === false) {
         return res.status(401).json({ error: "Account is disabled" });
@@ -95,6 +107,7 @@ router.post("/login", async (req, res) => {
       if (!validCustomer) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
+      const customerPublic = publicUser({ ...customer, role: "client" });
       if (customer.passwordNeedsReset) {
         const resetToken = generatePasswordResetRequiredToken({
           id: customer.id,
@@ -106,17 +119,36 @@ router.post("/login", async (req, res) => {
           data: {
             requiresPasswordReset: true,
             token: resetToken,
-            user: publicUser({ ...customer, role: "client", mfaEnabled: false }),
+            user: customerPublic,
           },
         });
       }
-      const token = await createFullSessionTokenForUserId(customer.id);
-      if (!token) return res.status(401).json({ error: "Account is disabled" });
+      if (customer.mfaEnabled && customer.totpSecretEnc) {
+        const mfaToken = generateMfaPendingToken({
+          id: customer.id,
+          email: customer.email,
+          role: "client",
+        });
+        return res.json({
+          message: "MFA required",
+          data: {
+            requiresMfa: true,
+            mfaToken,
+            user: customerPublic,
+          },
+        });
+      }
+      const setupToken = generateMfaSetupRequiredToken({
+        id: customer.id,
+        email: customer.email,
+        role: "client",
+      });
       return res.json({
-        message: "Login successful",
+        message: "MFA setup required",
         data: {
-          token,
-          user: publicUser({ ...customer, role: "client", mfaEnabled: false }),
+          requiresMfaSetup: true,
+          token: setupToken,
+          user: customerPublic,
         },
       });
     }
@@ -197,23 +229,32 @@ router.post("/mfa/verify", async (req, res) => {
       return res.status(401).json({ error: "MFA session expired. Sign in again." });
     }
 
-    const user = await prisma.adminUser.findUnique({ where: { id: pending.id } });
-    if (!user || user.active === false || !user.mfaEnabled || !user.totpSecretEnc) {
+    const account = await findMfaAccountById(pending.id);
+    if (
+      !account ||
+      account.user.active === false ||
+      !account.user.mfaEnabled ||
+      !account.user.totpSecretEnc
+    ) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const validCode = await verifyUserTotpCode(user.totpSecretEnc, code);
+    const validCode = await verifyUserTotpCode(account.user.totpSecretEnc, code);
     if (!validCode) {
       return res.status(401).json({ error: "Invalid verification code" });
     }
 
-    const token = generateToken(sessionAuthUser(user));
+    const token = generateToken(mfaSessionUser(account));
+    const user =
+      account.kind === "admin"
+        ? publicUser({ ...account.user, role: account.user.role })
+        : publicUser({ ...account.user, role: "client" });
 
     res.json({
       message: "Login successful",
       data: {
         token,
-        user: publicUser(user),
+        user,
       },
     });
   } catch (error) {
@@ -371,6 +412,8 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
         profilePhotoUrl: true,
         passwordNeedsReset: true,
         mfaEnabled: true,
+        mfaEnrolledAt: true,
+        totpSecretEnc: true,
       },
     });
     if (!customer) {
@@ -383,8 +426,10 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
         impersonation: null,
         user: {
           ...publicUser({ ...customer, role: "client", mfaEnabled: customer.mfaEnabled }),
-          requiresMfaEnrollment: false,
-          mfaEnrolledAt: null,
+          requiresMfaEnrollment:
+            req.sessionPurpose === MFA_SETUP_REQUIRED_PURPOSE ||
+            (customer.mfaEnabled && !customer.totpSecretEnc),
+          mfaEnrolledAt: customer.mfaEnrolledAt?.toISOString() ?? null,
           phone: customer.phone,
           profilePhotoUrl: customer.profilePhotoUrl ?? null,
           additionalRoles: [],
@@ -788,32 +833,24 @@ router.post("/mfa/resume-session", authMiddleware, async (req: AuthRequest, res)
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const user = await prisma.adminUser.findUnique({
-    where: { id: u.id },
-    select: {
-      id: true,
-      email: true,
-      role: true,
-      additionalRoles: true,
-      mfaEnabled: true,
-      totpSecretEnc: true,
-      active: true,
-      passwordNeedsReset: true,
-    },
-  });
-  if (!user || user.active === false) {
+  const account = await findMfaAccountById(u.id);
+  if (!account || account.user.active === false) {
     return res.status(401).json({ error: "Unauthorized" });
   }
-  if (!user.mfaEnabled || !user.totpSecretEnc) {
+  if (!account.user.mfaEnabled || !account.user.totpSecretEnc) {
     return res.status(400).json({ error: "MFA enrollment is not complete" });
   }
 
-  const token = generateToken(sessionAuthUser(user));
+  const token = generateToken(mfaSessionUser(account));
+  const user =
+    account.kind === "admin"
+      ? publicUser({ ...account.user, role: account.user.role })
+      : publicUser({ ...account.user, role: "client" });
 
   res.json({
     data: {
       token,
-      user: publicUser(user),
+      user,
     },
   });
 });
@@ -825,22 +862,27 @@ router.post("/mfa/restart-enrollment", authMiddleware, async (req: AuthRequest, 
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const user = await prisma.adminUser.findUnique({
-    where: { id: u.id },
-    select: { mfaEnabled: true, totpSecretEnc: true, active: true },
-  });
-  if (!user || user.active === false) {
+  const account = await findMfaAccountById(u.id);
+  if (!account || account.user.active === false) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   const forceReEnroll = req.sessionPurpose === MFA_SETUP_REQUIRED_PURPOSE;
-  if (user.mfaEnabled && user.totpSecretEnc && !forceReEnroll) {
+  if (account.user.mfaEnabled && account.user.totpSecretEnc && !forceReEnroll) {
     return res.status(400).json({ error: "MFA is already enabled" });
   }
 
-  await prisma.adminUser.update({
-    where: { id: u.id },
-    data: { mfaEnabled: false, totpSecretEnc: null, mfaEnrolledAt: null },
-  });
+  if (account.kind === "customer") {
+    await prisma.customerUser.update({
+      where: { id: u.id },
+      data: { mfaEnabled: false, totpSecretEnc: null, mfaEnrolledAt: null },
+    });
+    await syncClientAdminMfa(u.id, { mfaEnabled: false, totpSecretEnc: null, mfaEnrolledAt: null });
+  } else {
+    await prisma.adminUser.update({
+      where: { id: u.id },
+      data: { mfaEnabled: false, totpSecretEnc: null, mfaEnrolledAt: null },
+    });
+  }
 
   res.json({ data: { ok: true } });
 });
@@ -851,22 +893,38 @@ router.post("/mfa/setup", authMiddleware, async (req: AuthRequest, res) => {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const user = await prisma.adminUser.findUnique({ where: { id: u.id } });
-  if (!user) {
+  const account = await findMfaAccountById(u.id);
+  if (!account) {
     return res.status(404).json({ error: "User not found" });
   }
 
-  const { secret, otpauthUrl } = createTotpEnrollment(user.email);
+  const { secret, otpauthUrl } = createTotpEnrollment(account.user.email);
   const totpSecretEnc = encryptTotpSecret(secret);
 
-  await prisma.adminUser.update({
-    where: { id: user.id },
-    data: {
+  if (account.kind === "customer") {
+    await prisma.customerUser.update({
+      where: { id: account.user.id },
+      data: {
+        totpSecretEnc,
+        mfaEnabled: false,
+        mfaEnrolledAt: null,
+      },
+    });
+    await syncClientAdminMfa(account.user.id, {
       totpSecretEnc,
       mfaEnabled: false,
       mfaEnrolledAt: null,
-    },
-  });
+    });
+  } else {
+    await prisma.adminUser.update({
+      where: { id: account.user.id },
+      data: {
+        totpSecretEnc,
+        mfaEnabled: false,
+        mfaEnrolledAt: null,
+      },
+    });
+  }
 
   res.json({
     data: {
@@ -884,44 +942,61 @@ router.post("/mfa/confirm", authMiddleware, async (req: AuthRequest, res) => {
     }
 
     const { code } = mfaCodeSchema.parse(req.body);
-    const user = await prisma.adminUser.findUnique({ where: { id: u.id } });
-    if (!user?.totpSecretEnc) {
+    const account = await findMfaAccountById(u.id);
+    if (!account?.user.totpSecretEnc) {
       return res.status(400).json({ error: "Start MFA setup first" });
     }
 
-    const validCode = await verifyUserTotpCode(user.totpSecretEnc, code);
+    const validCode = await verifyUserTotpCode(account.user.totpSecretEnc, code);
     if (!validCode) {
       return res.status(400).json({ error: "Invalid verification code" });
     }
 
-    const updated = await prisma.adminUser.update({
-      where: { id: user.id },
-      data: {
+    const enrolledAt = new Date();
+    if (account.kind === "customer") {
+      await prisma.customerUser.update({
+        where: { id: account.user.id },
+        data: {
+          mfaEnabled: true,
+          mfaEnrolledAt: enrolledAt,
+        },
+      });
+      await syncClientAdminMfa(account.user.id, {
         mfaEnabled: true,
-        mfaEnrolledAt: new Date(),
-      },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        additionalRoles: true,
-        mfaEnabled: true,
-        mfaEnrolledAt: true,
-      },
-    });
+        mfaEnrolledAt: enrolledAt,
+      });
+    } else {
+      await prisma.adminUser.update({
+        where: { id: account.user.id },
+        data: {
+          mfaEnabled: true,
+          mfaEnrolledAt: enrolledAt,
+        },
+      });
+    }
 
-    const token = generateToken(sessionAuthUser(updated));
+    const updated = await findMfaAccountById(u.id);
+    if (!updated) {
+      return res.status(500).json({ error: "Failed to load user after MFA enrollment" });
+    }
+
+    const token = generateToken(mfaSessionUser(updated));
+
+    const enrolledUser =
+      updated.kind === "admin"
+        ? publicUser({ ...updated.user, role: updated.user.role })
+        : publicUser({ ...updated.user, role: "client" });
 
     res.json({
       message: "MFA enabled",
       data: {
         token,
         user: {
-          ...publicUser(updated),
-          mfaEnrolledAt: updated.mfaEnrolledAt?.toISOString() ?? null,
+          ...enrolledUser,
+          mfaEnrolledAt: updated.user.mfaEnrolledAt?.toISOString() ?? null,
         },
-        mfaEnabled: updated.mfaEnabled,
-        mfaEnrolledAt: updated.mfaEnrolledAt?.toISOString() ?? null,
+        mfaEnabled: updated.user.mfaEnabled,
+        mfaEnrolledAt: updated.user.mfaEnrolledAt?.toISOString() ?? null,
       },
     });
   } catch (error) {

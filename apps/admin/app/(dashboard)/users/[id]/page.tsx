@@ -23,6 +23,7 @@ import {
   BankDetailsFields,
   bankDetailsFromUser,
   bankDetailsToApi,
+  validateBankDetailsForm,
   type BankDetailsFormValue,
 } from "@/components/users/BankDetailsFields";
 import { COUNTRY_OTHER } from "@/lib/country-form";
@@ -220,9 +221,12 @@ export default function EditUserPage() {
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!validateEmergencyContacts(emergencyContacts)) return;
-    if (bankDetails.countrySelect === COUNTRY_OTHER && !bankDetails.countryOther.trim()) {
-      alert("Enter bank country name when Other is selected.");
-      return;
+    if (!roles.includes("client")) {
+      const bankError = validateBankDetailsForm(bankDetails);
+      if (bankError) {
+        alert(bankError);
+        return;
+      }
     }
     setIsLoading(true);
     const formData = new FormData(e.currentTarget);
@@ -478,47 +482,55 @@ export default function EditUserPage() {
           <div className="space-y-4">
             {emergencyContacts.map((contact, index) => (
               <div key={index} className="grid gap-3 rounded-lg border border-gray-100 p-4 dark:border-gray-800 sm:grid-cols-2">
-                <input
-                  className={inputClass}
-                  placeholder="Name *"
-                  value={contact.name}
-                  onChange={(e) =>
-                    setEmergencyContacts((prev) =>
-                      prev.map((row, i) => (i === index ? { ...row, name: e.target.value } : row)),
-                    )
-                  }
-                />
-                <input
-                  className={inputClass}
-                  placeholder="Relation"
-                  value={contact.relation ?? ""}
-                  onChange={(e) =>
-                    setEmergencyContacts((prev) =>
-                      prev.map((row, i) => (i === index ? { ...row, relation: e.target.value } : row)),
-                    )
-                  }
-                />
-                <input
-                  className={inputClass}
-                  placeholder="Email *"
-                  type="email"
-                  value={contact.email ?? ""}
-                  onChange={(e) =>
-                    setEmergencyContacts((prev) =>
-                      prev.map((row, i) => (i === index ? { ...row, email: e.target.value } : row)),
-                    )
-                  }
-                />
-                <input
-                  className={inputClass}
-                  placeholder="Phone *"
-                  value={contact.phone ?? ""}
-                  onChange={(e) =>
-                    setEmergencyContacts((prev) =>
-                      prev.map((row, i) => (i === index ? { ...row, phone: e.target.value } : row)),
-                    )
-                  }
-                />
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Name *</label>
+                  <input
+                    className={inputClass}
+                    value={contact.name}
+                    onChange={(e) =>
+                      setEmergencyContacts((prev) =>
+                        prev.map((row, i) => (i === index ? { ...row, name: e.target.value } : row)),
+                      )
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Relation</label>
+                  <input
+                    className={inputClass}
+                    value={contact.relation ?? ""}
+                    onChange={(e) =>
+                      setEmergencyContacts((prev) =>
+                        prev.map((row, i) => (i === index ? { ...row, relation: e.target.value } : row)),
+                      )
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Email *</label>
+                  <input
+                    className={inputClass}
+                    type="email"
+                    value={contact.email ?? ""}
+                    onChange={(e) =>
+                      setEmergencyContacts((prev) =>
+                        prev.map((row, i) => (i === index ? { ...row, email: e.target.value } : row)),
+                      )
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Phone *</label>
+                  <input
+                    className={inputClass}
+                    value={contact.phone ?? ""}
+                    onChange={(e) =>
+                      setEmergencyContacts((prev) =>
+                        prev.map((row, i) => (i === index ? { ...row, phone: e.target.value } : row)),
+                      )
+                    }
+                  />
+                </div>
               </div>
             ))}
           </div>

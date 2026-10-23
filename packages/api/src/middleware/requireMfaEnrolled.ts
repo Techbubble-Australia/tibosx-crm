@@ -11,9 +11,15 @@ export async function requireMfaEnrolled(req: AuthRequest, res: Response, next: 
 
   const customer = await prisma.customerUser.findUnique({
     where: { id: userId },
-    select: { id: true },
+    select: { mfaEnabled: true, totpSecretEnc: true },
   });
   if (customer) {
+    if (!customer.mfaEnabled || !customer.totpSecretEnc) {
+      return res.status(403).json({
+        error: "MFA setup is required before you can access TBOS",
+        code: "MFA_SETUP_REQUIRED",
+      });
+    }
     return next();
   }
 

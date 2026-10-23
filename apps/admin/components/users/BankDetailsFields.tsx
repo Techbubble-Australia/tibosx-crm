@@ -16,6 +16,18 @@ export type BankDetailsFormValue = {
   taxNumber: string;
 };
 
+export function validateBankDetailsForm(value: BankDetailsFormValue): string | null {
+  if (!value.bankName.trim()) return "Bank name is required.";
+  if (!value.accountName.trim()) return "Account name is required.";
+  if (!value.accountNumber.trim()) return "Account number is required.";
+  if (!value.countrySelect.trim()) return "Bank country is required.";
+  if (value.countrySelect === COUNTRY_OTHER && !value.countryOther.trim()) {
+    return "Enter bank country name when Other is selected.";
+  }
+  if (!value.bsb.trim()) return "BSB / Routing / IFSC is required.";
+  return null;
+}
+
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
 
@@ -84,38 +96,42 @@ export function BankDetailsFields({ value, onChange, readOnly, showTaxNumber }: 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <div>
-        <label className="mb-1 block text-sm font-medium">Bank name</label>
+        <label className="mb-1 block text-sm font-medium">Bank name *</label>
         <input
           className={readOnly ? `${inputClass} bg-gray-50 dark:bg-gray-950` : inputClass}
           value={value.bankName}
           readOnly={readOnly}
+          required={!readOnly}
           onChange={(e) => patch({ bankName: e.target.value })}
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Account name</label>
+        <label className="mb-1 block text-sm font-medium">Account name *</label>
         <input
           className={readOnly ? `${inputClass} bg-gray-50 dark:bg-gray-950` : inputClass}
           value={value.accountName}
           readOnly={readOnly}
+          required={!readOnly}
           onChange={(e) => patch({ accountName: e.target.value })}
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Account number</label>
+        <label className="mb-1 block text-sm font-medium">Account number *</label>
         <input
           className={readOnly ? `${inputClass} bg-gray-50 dark:bg-gray-950` : inputClass}
           value={value.accountNumber}
           readOnly={readOnly}
+          required={!readOnly}
           onChange={(e) => patch({ accountNumber: e.target.value })}
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Bank country</label>
+        <label className="mb-1 block text-sm font-medium">Bank country *</label>
         <select
           className={readOnly ? `${inputClass} bg-gray-50 dark:bg-gray-950` : inputClass}
           value={value.countrySelect}
           disabled={readOnly}
+          required={!readOnly}
           onChange={(e) => patch({ countrySelect: e.target.value })}
         >
           <option value="">Select country…</option>
@@ -144,11 +160,12 @@ export function BankDetailsFields({ value, onChange, readOnly, showTaxNumber }: 
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">BSB / Routing / IFSC</label>
+        <label className="mb-1 block text-sm font-medium">BSB / Routing / IFSC *</label>
         <input
           className={readOnly ? `${inputClass} bg-gray-50 dark:bg-gray-950` : inputClass}
           value={value.bsb}
           readOnly={readOnly}
+          required={!readOnly}
           onChange={(e) => patch({ bsb: e.target.value })}
         />
       </div>
@@ -166,7 +183,7 @@ export function BankDetailsFields({ value, onChange, readOnly, showTaxNumber }: 
       ) : null}
       <div className="sm:col-span-2">
         <label className="mb-1 block text-sm font-medium">
-          Other details, including superannuation and other payroll compliance requirements.
+          Country-specific superannuation or payroll compliance details.
         </label>
         <textarea
           className={readOnly ? `${inputClass} bg-gray-50 dark:bg-gray-950` : inputClass}

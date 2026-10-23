@@ -18,6 +18,7 @@ import {
   BankDetailsFields,
   bankDetailsFromUser,
   bankDetailsToApi,
+  validateBankDetailsForm,
   type BankDetailsFormValue,
 } from "@/components/users/BankDetailsFields";
 
@@ -565,12 +566,18 @@ export default function ProfileSettingsPageInner() {
             disabled={savingBank}
             onClick={() => {
               void (async () => {
+                const bankError = validateBankDetailsForm(bankDetails);
+                if (bankError) {
+                  alert(bankError);
+                  return;
+                }
                 const payload = bankDetailsToApi(bankDetails);
-                if (
-                  bankDetails.countrySelect === COUNTRY_OTHER &&
-                  !bankDetails.countryOther.trim()
-                ) {
-                  alert("Enter bank country name when Other is selected.");
+                if (!payload) {
+                  alert("Complete all required bank details.");
+                  return;
+                }
+                if (!bankDetails.taxNumber.trim()) {
+                  alert("Tax number is required.");
                   return;
                 }
                 setSavingBank(true);
@@ -615,32 +622,43 @@ export default function ProfileSettingsPageInner() {
           <div className="space-y-4">
             {emergencyContacts.map((contact, index) => (
               <div key={index} className="grid gap-3 rounded-lg border border-gray-100 p-4 dark:border-gray-800 sm:grid-cols-2">
-                <input
-                  className={inputClass}
-                  placeholder="Name *"
-                  value={contact.name}
-                  onChange={(e) => updateContact(index, { name: e.target.value })}
-                />
-                <input
-                  className={inputClass}
-                  placeholder="Relation"
-                  value={contact.relation ?? ""}
-                  onChange={(e) => updateContact(index, { relation: e.target.value })}
-                />
-                <input
-                  className={inputClass}
-                  placeholder="Email *"
-                  type="email"
-                  value={contact.email ?? ""}
-                  onChange={(e) => updateContact(index, { email: e.target.value })}
-                />
-                <div className="flex gap-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Name *</label>
                   <input
                     className={inputClass}
-                    placeholder="Phone *"
-                    value={contact.phone ?? ""}
-                    onChange={(e) => updateContact(index, { phone: e.target.value })}
+                    value={contact.name}
+                    required
+                    onChange={(e) => updateContact(index, { name: e.target.value })}
                   />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Relation</label>
+                  <input
+                    className={inputClass}
+                    value={contact.relation ?? ""}
+                    onChange={(e) => updateContact(index, { relation: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Email *</label>
+                  <input
+                    className={inputClass}
+                    type="email"
+                    required
+                    value={contact.email ?? ""}
+                    onChange={(e) => updateContact(index, { email: e.target.value })}
+                  />
+                </div>
+                <div className="flex gap-2 items-end">
+                  <div className="min-w-0 flex-1">
+                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Phone *</label>
+                    <input
+                      className={inputClass}
+                      required
+                      value={contact.phone ?? ""}
+                      onChange={(e) => updateContact(index, { phone: e.target.value })}
+                    />
+                  </div>
                   {emergencyContacts.length > 1 ? (
                     <button
                       type="button"

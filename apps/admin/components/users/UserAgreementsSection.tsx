@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import { resolveDocumentHref } from "@/lib/media-url";
 import { adminFetch } from "@/lib/admin-api";
 
@@ -13,6 +13,7 @@ export type AgreementRecordRow = {
   startDateDisplay?: string | null;
   endDateDisplay?: string | null;
   signedAt: string | null;
+  createdAt?: string | null;
   documentUrl: string | null;
 };
 
@@ -163,6 +164,7 @@ export function UserAgreementsSection({
             <thead>
               <tr className="border-b border-gray-200 text-xs uppercase text-gray-500 dark:border-gray-700">
                 <th className="py-2 pr-3">Document</th>
+                <th className="py-2 pr-3">Created</th>
                 <th className="py-2 pr-3">Start date</th>
                 <th className="py-2 pr-3">End date</th>
                 <th className="py-2 pr-3">Status</th>
@@ -191,6 +193,9 @@ export function UserAgreementsSection({
                       {row.signedAt ? (
                         <p className="mt-0.5 text-xs text-gray-500">Signed {formatDate(row.signedAt)}</p>
                       ) : null}
+                    </td>
+                    <td className="py-2 pr-3 whitespace-nowrap text-gray-700 dark:text-gray-300">
+                      {formatDate(row.createdAt ?? null)}
                     </td>
                     <td className="py-2 pr-3 whitespace-nowrap">
                       {editable ? (
@@ -256,9 +261,11 @@ export function UserAgreementsSection({
                           type="button"
                           disabled={busy}
                           onClick={() => void deleteForEdit(row)}
-                          className="text-sm text-blue-600 hover:underline disabled:opacity-50 dark:text-blue-400"
+                          className="rounded-lg p-1.5 text-red-600 hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/40"
+                          aria-label="Delete agreement"
+                          title="Delete agreement"
                         >
-                          Edit agreement
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </td>
                     ) : null}

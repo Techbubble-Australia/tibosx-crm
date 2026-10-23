@@ -138,7 +138,7 @@ router.post("/contacts/:contactId/create-user", async (req: AuthRequest, res) =>
           active: true,
           passwordHash,
           passwordNeedsReset: true,
-          mfaEnabled: false,
+          mfaEnabled: true,
           mappedClientContactId: contact.id,
         },
       });
@@ -152,7 +152,7 @@ router.post("/contacts/:contactId/create-user", async (req: AuthRequest, res) =>
           active: true,
           passwordHash,
           passwordNeedsReset: true,
-          mfaEnabled: false,
+          mfaEnabled: true,
           mappedClientContactId: contact.id,
         },
       });

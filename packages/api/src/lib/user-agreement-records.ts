@@ -85,6 +85,7 @@ export async function listAgreementRecordsForUser(adminUserId: string) {
       startDate: true,
       endDate: true,
       assignedAt: true,
+      createdAt: true,
       agreementSignedAt: true,
       agreementDocumentUrl: true,
       project: { select: { projectNumber: true, title: true } },
@@ -139,6 +140,7 @@ export type SerializedAgreementRecord = {
   startDateDisplay: string | null;
   endDateDisplay: string | null;
   assignedAt: string;
+  createdAt: string;
   signedAt: string | null;
   documentUrl: string | null;
 };
@@ -150,6 +152,7 @@ function serializeRow(
     startDate: Date | null;
     endDate: Date | null;
     assignedAt: Date;
+    createdAt: Date;
     agreementSignedAt: Date | null;
     agreementDocumentUrl: string | null;
     project?: { projectNumber: string; title: string } | null;
@@ -165,6 +168,7 @@ function serializeRow(
     startDateDisplay: extras?.startDateDisplay ?? null,
     endDateDisplay: extras?.endDateDisplay ?? null,
     assignedAt: row.assignedAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
     signedAt: row.agreementSignedAt?.toISOString() ?? null,
     documentUrl: extras?.documentUrl ?? row.agreementDocumentUrl,
   };
@@ -226,6 +230,7 @@ export async function buildAgreementRecordsForUser(adminUserId: string): Promise
           startDate: null,
           endDate: null,
           assignedAt: assignment.createdAt,
+          createdAt: assignment.createdAt,
           agreementSignedAt: assignment.agreementSignedAt,
           agreementDocumentUrl: assignment.agreementSignedAt ? user.agreementDocumentUrl : null,
           project: null,
@@ -269,6 +274,7 @@ export async function buildAgreementRecordsForUser(adminUserId: string): Promise
           startDate: null,
           endDate: null,
           assignedAt: member.createdAt,
+          createdAt: member.createdAt,
           agreementSignedAt: member.agreementSignedAt,
           agreementDocumentUrl: signedDoc,
           project: member.project,
