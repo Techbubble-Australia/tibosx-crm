@@ -1,11 +1,11 @@
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile.admin"
-watchPatterns = ["apps/admin/**", "packages/ui/**", "packages/database/**", "packages/config/**", "pnpm-lock.yaml", "pnpm-workspace.yaml", "package.json", "Dockerfile.admin"]
+dockerfilePath = "Dockerfile.api"
+watchPatterns = ["packages/api/**", "packages/database/**", "packages/config/**", "pnpm-lock.yaml", "pnpm-workspace.yaml", "package.json", "Dockerfile.api"]
 
 [deploy]
-startCommand = "node apps/admin/server.js"
-healthcheckPath = "/login"
+startCommand = "sh packages/api/scripts/start-production.sh"
+healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3

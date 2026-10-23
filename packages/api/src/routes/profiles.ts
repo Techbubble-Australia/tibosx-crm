@@ -134,13 +134,7 @@ const documentUpload = multer({
   limits: { fileSize: 5 * 1024 * 1024, files: 10 },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    const allowedExt = /\.(pdf|doc|docx)$/i.test(ext);
-    const mt = (file.mimetype || "").toLowerCase();
-    const allowedMt =
-      mt === "application/pdf" ||
-      mt === "application/msword" ||
-      mt === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-    if (allowedExt && allowedMt) {
+    if (/\.(pdf|doc|docx)$/i.test(ext)) {
       return cb(null, true);
     }
     cb(new Error("Only PDF, DOC, and DOCX files are allowed"));
@@ -616,7 +610,20 @@ router.delete("/:id", async (req: AuthRequest, res) => {
 
 router.post(
   "/upload-documents",
-  documentUpload.array("documents", 10),
+  (req, res, next) => {
+    documentUpload.array("documents", 10)(req, res, (err) => {
+      if (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : (err as { code?: string }).code === "LIMIT_FILE_SIZE"
+              ? "Each file must be 5MB or smaller"
+              : "Upload failed";
+        return res.status(400).json({ error: message });
+      }
+      next();
+    });
+  },
   async (req, res, next) => {
     try {
       const files = req.files as Express.Multer.File[] | undefined;
@@ -628,7 +635,12 @@ router.post(
         files.map(async (file) => {
           const filename = makeStoredFilename(file.fieldname, file.originalname);
           await persistUploadedFile(file, filename);
-          const extractedText = await extractTextFromDocument(file.buffer, file.originalname);
+          let extractedText = "";
+          try {
+            extractedText = await extractTextFromDocument(file.buffer, file.originalname);
+          } catch (extractErr) {
+            console.warn("Resume text extraction failed for", file.originalname, extractErr);
+          }
           return {
             url: `/uploads/${filename}`,
             filename,

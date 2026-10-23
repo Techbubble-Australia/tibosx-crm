@@ -269,7 +269,11 @@ export function ProfileForm({
         });
         const uploadJson = await uploadRes.json();
         if (!uploadRes.ok) {
-          throw new Error(uploadJson.error || "Document upload failed");
+          const detail =
+            typeof uploadJson.message === "string" && uploadJson.message.trim()
+              ? uploadJson.message.trim()
+              : null;
+          throw new Error(detail || uploadJson.error || "Document upload failed");
         }
         const uploadedFiles = uploadJson.data?.files as Array<{ url: string }> | undefined;
         const urls = uploadedFiles?.map((f) => f.url).filter(Boolean) ?? [];
