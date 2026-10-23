@@ -149,7 +149,7 @@ export default function TimesheetsPage() {
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Timesheets</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Create timesheets against projects or support tickets.
+              Create timesheets against projects or support tasks.
             </p>
           </div>
           <div className="flex gap-2">
@@ -193,14 +193,6 @@ export default function TimesheetsPage() {
                 ? "No timesheets to review yet. Team members submit timesheets from their project member accounts."
                 : "No timesheets yet."}
             </p>
-            {showCreateTimesheet ? (
-              <Link
-                href="/timesheets/new"
-                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
-              >
-                <Plus className="h-4 w-4" /> Create timesheet
-              </Link>
-            ) : null}
           </div>
         ) : (
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">

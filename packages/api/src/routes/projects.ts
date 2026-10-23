@@ -804,7 +804,7 @@ router.post("/", async (req: AuthRequest, res) => {
           title: data.title.trim(),
           description: data.description.trim(),
           clientId: data.clientId,
-          kind: data.kind ?? "DELIVERY",
+          kind: data.forCustomerSupport ? "SUPPORT" : (data.kind ?? "DELIVERY"),
           status: data.status ?? "DRAFT",
           projectManagerId: data.projectManagerId,
           timesheetApproverUserId,
@@ -1734,13 +1734,25 @@ router.get("/:id/support/available-contacts", async (req: AuthRequest, res) => {
       orderBy: { order: "asc" },
       select: { id: true, name: true, email: true, position: true },
     });
-    const mappedUsers = await prisma.adminUser.findMany({
-      where: { mappedClientContactId: { in: contacts.map((c) => c.id) } },
-      select: { id: true, email: true, mappedClientContactId: true },
-    });
-    const userByContact = new Map(
-      mappedUsers.map((u) => [u.mappedClientContactId!, { id: u.id, email: u.email }]),
-    );
+    const [adminUsers, customerUsers] = await Promise.all([
+      prisma.adminUser.findMany({
+        where: { mappedClientContactId: { in: contacts.map((c) => c.id) } },
+        select: { id: true, email: true, mappedClientContactId: true },
+      }),
+      prisma.customerUser.findMany({
+        where: { mappedClientContactId: { in: contacts.map((c) => c.id) } },
+        select: { id: true, email: true, mappedClientContactId: true },
+      }),
+    ]);
+    const userByContact = new Map<string, { id: string; email: string }>();
+    for (const row of customerUsers) {
+      if (row.mappedClientContactId) userByContact.set(row.mappedClientContactId, { id: row.id, email: row.email });
+    }
+    for (const row of adminUsers) {
+      if (row.mappedClientContactId && !userByContact.has(row.mappedClientContactId)) {
+        userByContact.set(row.mappedClientContactId, { id: row.id, email: row.email });
+      }
+    }
     res.json({
       data: contacts.map((c) => ({
         ...c,

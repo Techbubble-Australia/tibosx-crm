@@ -66,6 +66,19 @@ router.post("/contacts/:contactId/create-user", async (req: AuthRequest, res) =>
     if (!contact) return res.status(404).json({ error: "Contact not found" });
 
     const email = contact.email.trim().toLowerCase();
+    const mappedCustomer = await prisma.customerUser.findFirst({
+      where: { mappedClientContactId: contact.id },
+      select: { id: true, email: true },
+    });
+    if (mappedCustomer) {
+      return res.json({
+        data: {
+          adminUserId: mappedCustomer.id,
+          email: mappedCustomer.email,
+          alreadyExists: true,
+        },
+      });
+    }
     const mappedUser = await prisma.adminUser.findFirst({
       where: { mappedClientContactId: contact.id },
       select: { id: true, email: true },
@@ -148,17 +161,20 @@ router.post("/contacts/:contactId/create-user", async (req: AuthRequest, res) =>
       return created;
     });
 
+    const sendInvite = Boolean(req.body && typeof req.body === "object" && (req.body as { sendInvite?: boolean }).sendInvite);
     let inviteEmailSent = false;
-    try {
-      await emailTbosUserInvite({
-        to: user.email,
-        name: user.name || user.email,
-        temporaryPassword: tempPassword,
-        context: "client",
-      });
-      inviteEmailSent = true;
-    } catch (error) {
-      console.error("Client invite email failed:", error);
+    if (sendInvite) {
+      try {
+        await emailTbosUserInvite({
+          to: user.email,
+          name: user.name || user.email,
+          temporaryPassword: tempPassword,
+          context: "client",
+        });
+        inviteEmailSent = true;
+      } catch (error) {
+        console.error("Client invite email failed:", error);
+      }
     }
 
     res.status(201).json({
@@ -246,6 +262,46 @@ router.patch("/:id/order", async (req, res) => {
     }
     console.error("Error updating client order:", error);
     res.status(500).json({ error: "Failed to update client order" });
+  }
+});
+
+router.get("/:id/support-available-contacts", async (req: AuthRequest, res) => {
+  try {
+    const clientId = req.params.id;
+    if (!clientId) return res.status(400).json({ error: "Invalid id" });
+    const contacts = await prisma.clientContact.findMany({
+      where: { clientId },
+      orderBy: { order: "asc" },
+      select: { id: true, name: true, email: true, position: true },
+    });
+    const [adminUsers, customerUsers] = await Promise.all([
+      prisma.adminUser.findMany({
+        where: { mappedClientContactId: { in: contacts.map((c) => c.id) } },
+        select: { id: true, email: true, mappedClientContactId: true },
+      }),
+      prisma.customerUser.findMany({
+        where: { mappedClientContactId: { in: contacts.map((c) => c.id) } },
+        select: { id: true, email: true, mappedClientContactId: true },
+      }),
+    ]);
+    const userByContact = new Map<string, { id: string; email: string }>();
+    for (const row of customerUsers) {
+      if (row.mappedClientContactId) userByContact.set(row.mappedClientContactId, { id: row.id, email: row.email });
+    }
+    for (const row of adminUsers) {
+      if (row.mappedClientContactId && !userByContact.has(row.mappedClientContactId)) {
+        userByContact.set(row.mappedClientContactId, { id: row.id, email: row.email });
+      }
+    }
+    res.json({
+      data: contacts.map((c) => ({
+        ...c,
+        userRecord: userByContact.get(c.id) ?? null,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching client support contacts:", error);
+    res.status(500).json({ error: "Failed to fetch contacts" });
   }
 });
 

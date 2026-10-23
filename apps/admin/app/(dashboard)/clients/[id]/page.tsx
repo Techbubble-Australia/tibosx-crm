@@ -82,12 +82,18 @@ export default function EditClientPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to create user");
+      const tempPassword = (data.data as { temporaryPassword?: string }).temporaryPassword;
+      if (tempPassword) {
+        alert(
+          "Portal user created. No invite email was sent — use Customer users → Invite user when you are ready, or share the temporary password shown in the API response.",
+        );
+      }
       const adminUserId = (data.data as { adminUserId?: string }).adminUserId;
       if (adminUserId) {
         setContacts((prev) =>
           prev.map((row, i) => (i === index ? { ...row, adminUserId } : row)),
         );
-        router.push(`/users/${adminUserId}`);
+        router.push(`/customer-users/${adminUserId}`);
       }
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to create user");

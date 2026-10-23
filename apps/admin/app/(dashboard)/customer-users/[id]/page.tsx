@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Mail } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { messageFromApiError } from "@/lib/api-error";
 import { UserPhotoField } from "@/components/users/UserPhotoField";
@@ -30,6 +30,7 @@ export default function EditCustomerUserPage() {
   const id = params.id as string;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [inviteLoading, setInviteLoading] = useState(false);
   const [detail, setDetail] = useState<CustomerDetail | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
@@ -118,13 +119,41 @@ export default function EditCustomerUserPage() {
           <input name="active" type="checkbox" defaultChecked={detail.active} className="h-4 w-4 rounded" />
           Active
         </label>
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-lg bg-black px-5 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
-        >
-          {saving ? "Saving…" : "Save changes"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded-lg bg-black px-5 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+          >
+            {saving ? "Saving…" : "Save changes"}
+          </button>
+          <button
+            type="button"
+            disabled={inviteLoading || !detail.active}
+            onClick={() => {
+              void (async () => {
+                setInviteLoading(true);
+                try {
+                  const res = await adminFetch(`/api/admin/customer-users/${id}/invite`, { method: "POST" });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to send invite");
+                  alert(
+                    (data as { message?: string }).message ||
+                      "Invite email sent with a new temporary password.",
+                  );
+                } catch (error) {
+                  alert(error instanceof Error ? error.message : "Failed to send invite");
+                } finally {
+                  setInviteLoading(false);
+                }
+              })();
+            }}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600"
+          >
+            {inviteLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+            Invite user
+          </button>
+        </div>
       </form>
     </div>
   );

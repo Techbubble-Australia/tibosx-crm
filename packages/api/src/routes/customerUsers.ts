@@ -1,9 +1,11 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 import { prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth";
 import { assertMappedContactAvailable } from "../lib/admin-user-contact-map";
+import { emailTbosUserInvite } from "../lib/user-invite";
 
 const router: IRouter = Router();
 
@@ -161,6 +163,48 @@ router.patch("/:id", async (req: AuthRequest, res) => {
     }
     console.error("Error updating customer user:", error);
     res.status(500).json({ error: "Failed to update customer user" });
+  }
+});
+
+router.post("/:id/invite", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.params.id;
+    if (!userId) return res.status(400).json({ error: "Invalid id" });
+    const user = await prisma.customerUser.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true, active: true },
+    });
+    if (!user) return res.status(404).json({ error: "Not found" });
+    if (!user.active) return res.status(400).json({ error: "User is inactive" });
+
+    const temporaryPassword = randomBytes(12).toString("base64url");
+    const passwordHash = await bcrypt.hash(temporaryPassword, 10);
+    await prisma.$transaction([
+      prisma.customerUser.update({
+        where: { id: userId },
+        data: { passwordHash, passwordNeedsReset: true },
+      }),
+      prisma.adminUser.updateMany({
+        where: { id: userId, role: "client" },
+        data: { passwordHash, passwordNeedsReset: true },
+      }),
+    ]);
+
+    await emailTbosUserInvite({
+      to: user.email,
+      name: user.name || user.email,
+      temporaryPassword,
+      context: "client",
+    });
+
+    res.json({
+      message: "Invite email sent. A new temporary password replaced any previous password on this account.",
+      inviteEmailSent: true,
+    });
+  } catch (error) {
+    console.error("Error sending customer user invite:", error);
+    const message = error instanceof Error ? error.message : "Failed to send invite email";
+    res.status(502).json({ error: message });
   }
 });
 

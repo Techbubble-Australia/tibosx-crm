@@ -47,14 +47,24 @@ export function sumDailyHours(hours: DailyHours): number {
   return WEEKDAY_KEYS.reduce((sum, key) => sum + (Number(hours[key]) || 0), 0);
 }
 
-/** Strip non-numeric characters; allow at most one decimal point. */
+/** Allow up to 2 digits before the decimal and 2 after (e.g. 12.34). */
 export function sanitizeHoursInput(raw: string): string {
   if (!raw) return "";
   let out = "";
   let dot = false;
+  let digitsBeforeDot = 0;
+  let digitsAfterDot = 0;
   for (const ch of raw) {
-    if (ch >= "0" && ch <= "9") out += ch;
-    else if (ch === "." && !dot) {
+    if (ch >= "0" && ch <= "9") {
+      if (!dot) {
+        if (digitsBeforeDot >= 2) continue;
+        digitsBeforeDot += 1;
+      } else {
+        if (digitsAfterDot >= 2) continue;
+        digitsAfterDot += 1;
+      }
+      out += ch;
+    } else if (ch === "." && !dot) {
       out += ch;
       dot = true;
     }

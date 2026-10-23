@@ -595,7 +595,7 @@ export function TimesheetForm({
     }
     const entryRows = entryRowsForSave;
     if (entryRows.some((line) => sumDailyHours(line.dailyHours) > 0 && !line.caseKey.trim())) {
-      alert("Select a task or ticket for each row with hours.");
+      alert("Select a task for each row with hours.");
       return;
     }
     const mon = new Date(`${weekMonday}T00:00:00.000Z`);
@@ -729,7 +729,7 @@ export function TimesheetForm({
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50/80 dark:border-gray-700 dark:bg-gray-900/50">
                     <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">
-                      Ticket
+                      Task
                     </th>
                     {weekDays.map((d, i) => (
                       <th
@@ -768,7 +768,7 @@ export function TimesheetForm({
                                 }
                                 disabled={!projectId}
                               >
-                                <option value="">Select ticket…</option>
+                                <option value="">Select task…</option>
                                 {cases.map((row) => (
                                   <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
                                     {row.label}
@@ -823,7 +823,7 @@ export function TimesheetForm({
                               onClick={() => removeLine(line.key)}
                               disabled={lines.length <= 1 && sumDailyHours(line.dailyHours) === 0 && !line.caseKey}
                               className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
-                              aria-label="Delete ticket row"
+                              aria-label="Delete task row"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -860,7 +860,7 @@ export function TimesheetForm({
                 disabled={!projectId || !weekInProject}
                 className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 py-2.5 text-sm font-medium text-gray-700 hover:border-blue-400 hover:bg-blue-50/30 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-300"
               >
-                <Plus className="h-4 w-4" /> Add Ticket
+                <Plus className="h-4 w-4" /> Add Task
               </button>
             ) : null}
           </div>
@@ -937,7 +937,7 @@ export function TimesheetForm({
                   <button
                     type="submit"
                     disabled={!canSave || isSaving}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-black px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-200"
                   >
                     {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                     Save Draft
@@ -1047,7 +1047,7 @@ export function TimesheetForm({
           className="mt-6 w-full shrink-0 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-950 xl:mt-0 xl:w-[22rem] xl:border-l xl:shadow-[-4px_0_24px_rgba(0,0,0,0.06)]"
         >
           <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Selected Ticket</h2>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Selected Task</h2>
             <button
               type="button"
               onClick={() => setSelection(null)}
@@ -1067,7 +1067,7 @@ export function TimesheetForm({
 
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Selected Ticket
+                Selected Task
               </label>
               <select
                 className={selectClass}
@@ -1116,7 +1116,7 @@ export function TimesheetForm({
             <div className="flex items-start gap-2 rounded-lg border border-sky-100 bg-sky-50/80 px-3 py-2.5 text-xs text-sky-950 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" aria-hidden />
               <p>
-                Ticket entries are created within this timesheet and do not affect the project task list.
+                Task entries are created within this timesheet and do not affect the project task list.
               </p>
             </div>
 

@@ -37,11 +37,14 @@ export function ProjectCustomerSupportSettings({
   const [available, setAvailable] = useState<AvailableContact[]>([]);
 
   useEffect(() => {
-    if (!projectId || !clientId) {
+    if (!clientId) {
       setAvailable([]);
       return;
     }
-    void adminFetch(`/api/admin/projects/${projectId}/support/available-contacts`)
+    const url = projectId
+      ? `/api/admin/projects/${projectId}/support/available-contacts`
+      : `/api/admin/clients/${clientId}/support-available-contacts`;
+    void adminFetch(url)
       .then((r) => r.json())
       .then((data) => setAvailable((data.data as AvailableContact[]) ?? []))
       .catch(() => setAvailable([]));
@@ -81,8 +84,8 @@ export function ProjectCustomerSupportSettings({
       {enabled ? (
         <div className="mt-6">
           <h4 className="mb-2 text-sm font-medium text-gray-800 dark:text-gray-200">Client access</h4>
-          {!projectId ? (
-            <p className="text-sm text-gray-500">Save the project first to configure client access.</p>
+          {!clientId ? (
+            <p className="text-sm text-gray-500">Select a client to configure client access.</p>
           ) : available.length === 0 ? (
             <p className="text-sm text-gray-500">No contacts on this client — add them under Sales → Clients.</p>
           ) : (
