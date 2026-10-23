@@ -27,6 +27,8 @@ export type MemberOnboardingState = {
   profileComplete: boolean;
   canSubmitTimesheets: boolean;
   profileOnboardingRequired: boolean;
+  requireProfileAfterFirstLogin: boolean;
+  profileKycStatus: string;
   inviteCount: number;
 };
 
@@ -127,6 +129,9 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
           profileComplete: Boolean(onboarding.profileComplete),
           canSubmitTimesheets: Boolean(onboarding.canSubmitTimesheets),
           profileOnboardingRequired: Boolean(onboarding.profileOnboardingRequired),
+          requireProfileAfterFirstLogin: Boolean(onboarding.requireProfileAfterFirstLogin),
+          profileKycStatus:
+            typeof onboarding.profileKycStatus === "string" ? onboarding.profileKycStatus : "INCOMPLETE",
           inviteCount: typeof onboarding.inviteCount === "number" ? onboarding.inviteCount : 0,
         });
       } else {

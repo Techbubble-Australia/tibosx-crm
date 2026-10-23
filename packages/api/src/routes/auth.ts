@@ -19,11 +19,6 @@ import {
 } from "../lib/mfa";
 import { getMemberOnboardingStatus } from "../lib/member-onboarding";
 import { createFullSessionTokenForUserId, sessionAuthUser } from "../lib/admin-session-token.js";
-import {
-  addressComplete,
-  bankDetailsComplete,
-  emergencyContactsComplete,
-} from "../lib/member-profile";
 import { logAdminUserFieldChange } from "../lib/admin-user-activity";
 import { adminUserFieldLabel } from "../lib/admin-user-field-labels";
 import { effectiveRoleList, effectiveRolesForUser, hasEffectiveRole } from "../lib/admin-roles";
@@ -405,12 +400,8 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
     "../lib/project-member-user.js"
   );
   await prepareMemberOnboardingForUser(user.id);
-  const qualifiesOnboarding = await userQualifiesForMemberOnboarding(
-    user.id,
-    user.role,
-    user.additionalRoles,
-  );
-  let onboarding = qualifiesOnboarding ? await getMemberOnboardingStatus(user.id) : null;
+  await userQualifiesForMemberOnboarding(user.id, user.role, user.additionalRoles);
+  const onboarding = await getMemberOnboardingStatus(user.id);
 
   if (onboarding?.hasAgreementAssignment) {
     const refreshed = await prisma.adminUser.findUnique({
@@ -540,7 +531,7 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
         patch[field] = input[field] as string | null;
       }
     }
-    if (isProjectMemberUser) {
+    if (existing.role !== "client") {
       if (input.bankDetails !== undefined) patch.bankDetails = input.bankDetails;
       if (input.idProofUrl !== undefined) patch.idProofUrl = input.idProofUrl;
       if (input.addressProofUrl !== undefined) patch.addressProofUrl = input.addressProofUrl;
@@ -568,16 +559,14 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
       idProofUrl: (input.idProofUrl ?? existing.idProofUrl) as string | null,
       addressProofUrl: (input.addressProofUrl ?? existing.addressProofUrl) as string | null,
       emergencyContacts: input.emergencyContacts ?? existing.emergencyContacts,
+      taxNumber: (input.taxNumber ?? existing.taxNumber) as string | null,
+      profileDetailsCompletedAt: existing.profileDetailsCompletedAt,
     };
-    const hasFullProfile =
-      addressComplete(mergedForComplete) &&
-      bankDetailsComplete(mergedForComplete.bankDetails) &&
-      emergencyContactsComplete(mergedForComplete.emergencyContacts) &&
-      Boolean(mergedForComplete.idProofUrl?.trim()) &&
-      Boolean(mergedForComplete.addressProofUrl?.trim());
-
-    if (hasFullProfile && (input.markProfileComplete || existing.profileDetailsCompletedAt)) {
-      patch.profileDetailsCompletedAt = existing.profileDetailsCompletedAt ?? new Date();
+    const { profileKycFieldsFromMergedProfile } = await import("../lib/admin-user-profile-kyc.js");
+    const kyc = profileKycFieldsFromMergedProfile(mergedForComplete);
+    patch.profileKycStatus = kyc.profileKycStatus;
+    patch.profileDetailsCompletedAt = kyc.profileDetailsCompletedAt;
+    if (kyc.profileKycStatus === "COMPLETE") {
       patch.profileOnboardingRequiredAt = null;
     }
 

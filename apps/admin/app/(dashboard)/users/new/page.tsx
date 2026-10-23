@@ -87,6 +87,7 @@ function NewUserPageInner() {
           mappedClientContactId: roles.includes("client") ? mappedClientContactId : null,
           mappedProfileId: mappedProfileId.trim() || null,
           taxNumber: String(formData.get("taxNumber") ?? "").trim(),
+          requireProfileAfterFirstLogin: formData.get("requireProfileAfterFirstLogin") === "on",
         }),
       });
       if (!res.ok) {
@@ -160,6 +161,14 @@ function NewUserPageInner() {
           <input name="active" type="checkbox" defaultChecked className="h-4 w-4 rounded" />
           Active (user can sign in)
         </label>
+        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <input name="requireProfileAfterFirstLogin" type="checkbox" defaultChecked className="h-4 w-4 rounded" />
+          User to add details after first login
+        </label>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Profile KYC status starts as <span className="font-medium text-red-600">Incomplete</span> until the user
+          completes their profile.
+        </p>
         <button
           type="submit"
           disabled={isLoading}

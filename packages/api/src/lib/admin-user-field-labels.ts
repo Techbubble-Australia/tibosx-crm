@@ -17,6 +17,9 @@ export const ADMIN_USER_FIELD_LABELS: Record<string, string> = {
   role: "Role",
   active: "Active",
   mappedClientContactId: "Mapped contact",
+  requireProfileAfterFirstLogin: "User to add details after first login",
+  profileKycStatus: "Profile KYC status",
+  profileDetailsCompletedAt: "Profile completed at",
 };
 
 export function adminUserFieldLabel(fieldName: string | null | undefined): string | null {

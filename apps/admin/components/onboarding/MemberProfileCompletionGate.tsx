@@ -15,12 +15,10 @@ const inputClass =
 type EmergencyContact = { name: string; email?: string; phone?: string; relation?: string };
 
 export function MemberProfileCompletionGate() {
-  const { sessionLoaded, memberOnboarding, role, additionalRoles } = useAdminSession();
-  const isStaffUser =
-    role === "admin" ||
-    role === "project_manager" ||
-    additionalRoles.includes("admin") ||
-    additionalRoles.includes("project_manager");
+  const { sessionLoaded, memberOnboarding, refreshSession } = useAdminSession();
+  const needsProfileCompletion = Boolean(
+    memberOnboarding?.profileOnboardingRequired && memberOnboarding?.agreementSigned,
+  );
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addressLine1, setAddressLine1] = useState("");
@@ -45,12 +43,6 @@ export function MemberProfileCompletionGate() {
     { name: "", email: "", phone: "" },
   ]);
   const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
-
-  const needsProfileCompletion = Boolean(
-    !isStaffUser &&
-      memberOnboarding?.profileOnboardingRequired &&
-      memberOnboarding?.agreementSigned,
-  );
 
   useEffect(() => {
     if (!sessionLoaded || !needsProfileCompletion) return;
@@ -191,6 +183,7 @@ export function MemberProfileCompletionGate() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(messageFromApiError(data, "Failed to save profile"));
+      await refreshSession();
       setOpen(false);
       window.location.reload();
     } catch (error) {

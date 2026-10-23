@@ -32,11 +32,15 @@ export async function seedAdminUser(): Promise<void> {
       totpSecretEnc: null,
       mfaEnrolledAt: null,
       profileOnboardingRequiredAt: null,
+      requireProfileAfterFirstLogin: false,
+      profileKycStatus: "COMPLETE",
     },
     update: {
       passwordHash,
       role: "admin",
       active: true,
+      requireProfileAfterFirstLogin: false,
+      profileKycStatus: "COMPLETE",
     },
   });
 

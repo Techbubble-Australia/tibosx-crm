@@ -24,6 +24,7 @@ import {
   credentialDefaultsForAdminUser,
 } from "../lib/assign-credential-template";
 import { buildAgreementRecordsForUser } from "../lib/user-agreement-records";
+import { profileKycFieldsFromMergedProfile } from "../lib/admin-user-profile-kyc";
 
 const router: IRouter = Router();
 
@@ -95,6 +96,7 @@ const createSchema = z.object({
   mappedClientContactId: z.string().min(1).optional().nullable(),
   mappedProfileId: z.string().min(1).optional().nullable(),
   taxNumber: z.string().min(1).max(50),
+  requireProfileAfterFirstLogin: z.boolean().optional().default(true),
 });
 
 const updateSchema = z.object({
@@ -124,6 +126,7 @@ const updateSchema = z.object({
   mappedClientContactId: z.string().min(1).optional().nullable(),
   mappedProfileId: z.string().min(1).optional().nullable(),
   taxNumber: z.string().min(1).max(50).optional(),
+  requireProfileAfterFirstLogin: z.boolean().optional(),
   userFiles: z
     .array(z.object({ name: z.string().min(1).max(500), url: z.string().min(1).max(2000) }))
     .max(50)
@@ -144,6 +147,8 @@ const listSelect = {
   passwordNeedsReset: true,
   createdAt: true,
   updatedAt: true,
+  requireProfileAfterFirstLogin: true,
+  profileKycStatus: true,
 } as const;
 
 function parseAdditionalRoles(value: unknown): string[] {
@@ -163,6 +168,8 @@ function sanitizeUser(row: {
   mfaEnabled: boolean;
   mfaEnrolledAt: Date | null;
   passwordNeedsReset: boolean;
+  requireProfileAfterFirstLogin: boolean;
+  profileKycStatus: string;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -178,6 +185,8 @@ function sanitizeUser(row: {
     mfaEnabled: row.mfaEnabled,
     mfaEnrolledAt: row.mfaEnrolledAt?.toISOString() ?? null,
     passwordNeedsReset: row.passwordNeedsReset,
+    requireProfileAfterFirstLogin: row.requireProfileAfterFirstLogin,
+    profileKycStatus: row.profileKycStatus,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -240,6 +249,8 @@ function sanitizeDetail(row: {
   addressProofUrl: string | null;
   userFiles: unknown;
   taxNumber?: string | null;
+  requireProfileAfterFirstLogin: boolean;
+  profileKycStatus: string;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -266,6 +277,8 @@ function sanitizeDetail(row: {
     agreementDocumentUrl: row.agreementDocumentUrl,
     profileDetailsCompletedAt: row.profileDetailsCompletedAt?.toISOString() ?? null,
     taxNumber: row.taxNumber ?? "",
+    requireProfileAfterFirstLogin: row.requireProfileAfterFirstLogin,
+    profileKycStatus: row.profileKycStatus,
   };
 }
 
@@ -711,6 +724,8 @@ router.post("/", async (req: AuthRequest, res) => {
           mappedProfileId,
           taxNumber: data.taxNumber.trim(),
           mfaEnabled: true,
+          requireProfileAfterFirstLogin: data.requireProfileAfterFirstLogin ?? true,
+          profileKycStatus: "INCOMPLETE",
         },
         select: listSelect,
       });
@@ -894,6 +909,45 @@ router.put("/:id", async (req: AuthRequest, res) => {
       if (data.mappedProfileId !== undefined && nextMappedProfileId !== existing.mappedProfileId) {
         updateData.mappedProfileId = nextMappedProfileId;
         await logField("mappedProfileId", existing.mappedProfileId, nextMappedProfileId);
+      }
+      if (
+        data.requireProfileAfterFirstLogin !== undefined &&
+        data.requireProfileAfterFirstLogin !== existing.requireProfileAfterFirstLogin
+      ) {
+        updateData.requireProfileAfterFirstLogin = data.requireProfileAfterFirstLogin;
+        await logField(
+          "requireProfileAfterFirstLogin",
+          String(existing.requireProfileAfterFirstLogin),
+          String(data.requireProfileAfterFirstLogin),
+        );
+      }
+
+      const mergedForKyc = {
+        addressLine1: (updateData.addressLine1 as string | null | undefined) ?? existing.addressLine1,
+        city: (updateData.city as string | null | undefined) ?? existing.city,
+        state: (updateData.state as string | null | undefined) ?? existing.state,
+        postcode: (updateData.postcode as string | null | undefined) ?? existing.postcode,
+        country: (updateData.country as string | null | undefined) ?? existing.country,
+        bankDetails: updateData.bankDetails !== undefined ? updateData.bankDetails : existing.bankDetails,
+        idProofUrl: existing.idProofUrl,
+        addressProofUrl: existing.addressProofUrl,
+        emergencyContacts:
+          updateData.emergencyContacts !== undefined
+            ? updateData.emergencyContacts
+            : existing.emergencyContacts,
+        taxNumber: (updateData.taxNumber as string | undefined) ?? existing.taxNumber,
+        profileDetailsCompletedAt: existing.profileDetailsCompletedAt,
+      };
+      const kyc = profileKycFieldsFromMergedProfile(mergedForKyc);
+      if (kyc.profileKycStatus !== existing.profileKycStatus) {
+        updateData.profileKycStatus = kyc.profileKycStatus;
+        await logField("profileKycStatus", existing.profileKycStatus, kyc.profileKycStatus);
+      }
+      const existingCompletedAt = existing.profileDetailsCompletedAt?.toISOString() ?? null;
+      const nextCompletedAt = kyc.profileDetailsCompletedAt?.toISOString() ?? null;
+      if (existingCompletedAt !== nextCompletedAt) {
+        updateData.profileDetailsCompletedAt = kyc.profileDetailsCompletedAt;
+        await logField("profileDetailsCompletedAt", existingCompletedAt, nextCompletedAt);
       }
 
       const updated = await tx.adminUser.update({

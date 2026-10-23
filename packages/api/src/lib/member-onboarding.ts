@@ -1,10 +1,5 @@
 import { prisma } from "@techbubble/database";
-import { isMemberConsultantProfileExempt } from "./admin-roles";
-import {
-  addressComplete,
-  bankDetailsComplete,
-  emergencyContactsComplete,
-} from "./member-profile";
+import { isProfileKycStatusComplete } from "./admin-user-profile-kyc";
 import { findUserCredentialAgreement } from "./project-member-user";
 
 export type MemberOnboardingStatus = {
@@ -13,6 +8,8 @@ export type MemberOnboardingStatus = {
   profileComplete: boolean;
   canSubmitTimesheets: boolean;
   profileOnboardingRequired: boolean;
+  requireProfileAfterFirstLogin: boolean;
+  profileKycStatus: string;
   inviteCount: number;
 };
 
@@ -20,19 +17,8 @@ export async function getMemberOnboardingStatus(userId: string): Promise<MemberO
   const user = await prisma.adminUser.findUnique({
     where: { id: userId },
     select: {
-      role: true,
-      additionalRoles: true,
-      profileDetailsCompletedAt: true,
-      addressLine1: true,
-      city: true,
-      state: true,
-      postcode: true,
-      country: true,
-      bankDetails: true,
-      idProofUrl: true,
-      addressProofUrl: true,
-      emergencyContacts: true,
-      profileOnboardingRequiredAt: true,
+      requireProfileAfterFirstLogin: true,
+      profileKycStatus: true,
       inviteCount: true,
     },
   });
@@ -40,29 +26,14 @@ export async function getMemberOnboardingStatus(userId: string): Promise<MemberO
   const agreement = await findUserCredentialAgreement(userId);
   const hasAgreementAssignment = Boolean(agreement);
   const agreementSigned = !hasAgreementAssignment || Boolean(agreement?.agreementSignedAt);
-  const consultantProfileExempt = user
-    ? isMemberConsultantProfileExempt(user.role, user.additionalRoles)
-    : false;
-  const consultantProfileComplete = Boolean(
-    user &&
-      addressComplete(user) &&
-      bankDetailsComplete(user.bankDetails) &&
-      emergencyContactsComplete(user.emergencyContacts) &&
-      Boolean(user.idProofUrl?.trim()) &&
-      Boolean(user.addressProofUrl?.trim()),
-  );
-  const profileComplete = consultantProfileExempt || consultantProfileComplete;
-  const canSubmitTimesheets = agreementSigned;
-  const profileOnboardingRequired =
-    !consultantProfileExempt &&
-    Boolean(user?.profileOnboardingRequiredAt && !user.profileDetailsCompletedAt);
 
-  if (consultantProfileExempt && user?.profileOnboardingRequiredAt) {
-    await prisma.adminUser.update({
-      where: { id: userId },
-      data: { profileOnboardingRequiredAt: null },
-    });
-  }
+  const requireProfileAfterFirstLogin = user?.requireProfileAfterFirstLogin ?? true;
+  const profileKycStatus = user?.profileKycStatus ?? "INCOMPLETE";
+  const profileComplete =
+    !requireProfileAfterFirstLogin || isProfileKycStatusComplete(profileKycStatus);
+  const profileOnboardingRequired =
+    requireProfileAfterFirstLogin && !isProfileKycStatusComplete(profileKycStatus);
+  const canSubmitTimesheets = agreementSigned;
 
   return {
     hasAgreementAssignment,
@@ -70,6 +41,8 @@ export async function getMemberOnboardingStatus(userId: string): Promise<MemberO
     profileComplete,
     canSubmitTimesheets,
     profileOnboardingRequired,
+    requireProfileAfterFirstLogin,
+    profileKycStatus,
     inviteCount: user?.inviteCount ?? 0,
   };
 }

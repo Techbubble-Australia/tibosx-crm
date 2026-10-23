@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Info, Loader2, Plus, Trash2 } from "lucide-react";
 import { UserPhotoField } from "@/components/users/UserPhotoField";
 import { adminFetch } from "@/lib/admin-api";
@@ -45,8 +45,7 @@ type ActivityRow = {
 };
 
 export default function ProfileSettingsPageInner() {
-  const { refreshSession, additionalRoles, role: sessionRole, memberOnboarding } = useAdminSession();
-  const router = useRouter();
+  const { refreshSession, memberOnboarding } = useAdminSession();
   const searchParams = useSearchParams();
   const onboarding = searchParams.get("onboarding") === "1";
   const [loading, setLoading] = useState(true);
@@ -78,27 +77,12 @@ export default function ProfileSettingsPageInner() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const staffExemptFromConsultantProfile =
-    sessionRole === "admin" ||
-    sessionRole === "project_manager" ||
-    role === "admin" ||
-    role === "project_manager" ||
-    additionalRoles.includes("admin") ||
-    additionalRoles.includes("project_manager");
   const isProjectMemberOnboarding = onboarding && role === "project_member";
   const showConsultantOnboardingBanner =
-    onboarding &&
-    !staffExemptFromConsultantProfile &&
-    !loading &&
-    !memberOnboarding?.profileComplete;
-  const addressFieldsRequired = role === "project_member" || isProjectMemberOnboarding;
+    onboarding && Boolean(memberOnboarding?.profileOnboardingRequired) && !loading;
+  const addressFieldsRequired =
+    Boolean(memberOnboarding?.profileOnboardingRequired) || role === "project_member" || isProjectMemberOnboarding;
   const canEditAccountFields = role === "admin";
-
-  useEffect(() => {
-    if (onboarding && staffExemptFromConsultantProfile) {
-      router.replace("/timesheets");
-    }
-  }, [onboarding, staffExemptFromConsultantProfile, router]);
 
   useEffect(() => {
     async function load() {

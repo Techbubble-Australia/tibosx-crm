@@ -984,9 +984,13 @@ model AdminUser {
   postcode      String?
   country       String?
   profileDetailsCompletedAt DateTime?
+  /// When true, user must complete consultant KYC (bank, address, proofs) after first login.
+  requireProfileAfterFirstLogin Boolean @default(true)
+  /// INCOMPLETE | COMPLETE — consultant profile / KYC on the internal user record.
+  profileKycStatus            String  @default("INCOMPLETE")
   /// Incremented when the user is invited to TBOS (credentials email).
   inviteCount Int @default(0)
-  /// Set on invite when full consultant profile is still required; cleared when profile is completed.
+  /// Legacy; superseded by requireProfileAfterFirstLogin + profileKycStatus.
   profileOnboardingRequiredAt DateTime?
   agreementDocumentUrl      String?  @db.Text
   bankDetails               Json?

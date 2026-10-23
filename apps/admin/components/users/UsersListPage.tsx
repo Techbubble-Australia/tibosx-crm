@@ -11,6 +11,7 @@ import { TablePagination } from "@/components/ui/TablePagination";
 import { useListView } from "@/hooks/useListView";
 import { buildSearchHaystack } from "@/lib/search-text";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { profileKycStatusBadgeClass, profileKycStatusLabel } from "@/lib/profile-kyc";
 
 interface UserRow {
   id: string;
@@ -20,6 +21,8 @@ interface UserRow {
   additionalRoles?: string[];
   active: boolean;
   mfaEnabled: boolean;
+  requireProfileAfterFirstLogin?: boolean;
+  profileKycStatus?: string;
 }
 
 type SortKey = "name" | "email" | "role" | "mfaEnabled" | "active";
@@ -227,6 +230,7 @@ export function UsersListPage({ activeOnly }: { activeOnly: boolean }) {
               <th className="px-4 py-3 text-left">
                 <SortHeader label="Role" sortKey="role" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
               </th>
+              <th className="px-4 py-3 text-left">Profile KYC</th>
               <th className="px-4 py-3 text-left">
                 <SortHeader label="MFA" sortKey="mfaEnabled" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
               </th>
@@ -236,13 +240,13 @@ export function UsersListPage({ activeOnly }: { activeOnly: boolean }) {
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {scopedRows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                   No {activeOnly ? "active" : "inactive"} users.
                 </td>
               </tr>
             ) : totalItems === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">No users match your search.</td>
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">No users match your search.</td>
               </tr>
             ) : (
               paginated.map((row) => (
@@ -255,6 +259,17 @@ export function UsersListPage({ activeOnly }: { activeOnly: boolean }) {
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.email}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                     {formatRolesLabel(row.role, row.additionalRoles)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {row.requireProfileAfterFirstLogin === false ? (
+                      <span className="text-xs text-gray-400">Not required</span>
+                    ) : (
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${profileKycStatusBadgeClass(row.profileKycStatus)}`}
+                      >
+                        {profileKycStatusLabel(row.profileKycStatus)}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span

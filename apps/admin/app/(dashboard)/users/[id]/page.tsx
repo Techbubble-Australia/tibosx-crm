@@ -26,6 +26,7 @@ import {
   type BankDetailsFormValue,
 } from "@/components/users/BankDetailsFields";
 import { COUNTRY_OTHER } from "@/lib/country-form";
+import { profileKycStatusBadgeClass, profileKycStatusLabel } from "@/lib/profile-kyc";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
@@ -72,6 +73,8 @@ type UserDetail = {
   agreementTemplate?: { templatesSent: number; templatesSigned: number };
   agreementRecords?: AgreementRecordRow[];
   taxNumber?: string | null;
+  requireProfileAfterFirstLogin: boolean;
+  profileKycStatus: string;
   agreementFiles?: UserFileRow[];
   projectMembership: {
     memberId: string;
@@ -104,6 +107,7 @@ export default function EditUserPage() {
   const [userFiles, setUserFiles] = useState<UserFileRow[]>([]);
   const [bankDetails, setBankDetails] = useState<BankDetailsFormValue>(bankDetailsFromUser({}));
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [requireProfileAfterFirstLogin, setRequireProfileAfterFirstLogin] = useState(true);
 
   async function inviteUser() {
     const ok = window.confirm(
@@ -180,6 +184,7 @@ export default function EditUserPage() {
         setEmergencyContacts(row.emergencyContacts);
       }
       setAgreementRecords(row.agreementRecords ?? []);
+      setRequireProfileAfterFirstLogin(row.requireProfileAfterFirstLogin ?? true);
       const activityData = await activityRes.json();
       setActivity((activityData.data as ActivityRow[]) ?? []);
     } catch (e) {
@@ -246,6 +251,7 @@ export default function EditUserPage() {
       userFiles,
       bankDetails: bankDetailsToApi(bankDetails),
       taxNumber: bankDetails.taxNumber.trim(),
+      requireProfileAfterFirstLogin,
     };
     if (password) body.password = password;
     if (roles.includes("client")) {
@@ -367,6 +373,31 @@ export default function EditUserPage() {
             <input name="active" type="checkbox" defaultChecked={defaults.active} className="h-4 w-4 rounded" />
             Active (user can sign in)
           </label>
+          {!isClientUser ? (
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/50">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Profile KYC</p>
+                <span
+                  className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${profileKycStatusBadgeClass(defaults.profileKycStatus)}`}
+                >
+                  {profileKycStatusLabel(defaults.profileKycStatus)}
+                </span>
+              </div>
+              <label className="mt-3 flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 rounded"
+                  checked={requireProfileAfterFirstLogin}
+                  onChange={(e) => setRequireProfileAfterFirstLogin(e.target.checked)}
+                />
+                <span>User to add details after first login</span>
+              </label>
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                When checked, the user must complete bank details, address, emergency contact, and proof documents after
+                signing in (Complete your profile).
+              </p>
+            </div>
+          ) : null}
           {defaults.mfaEnabled ? (
             <p className="text-xs text-gray-500">MFA is enabled. User manages it under Settings → Security.</p>
           ) : null}
