@@ -64,8 +64,8 @@ function NewUserPageInner() {
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (roles.includes("client") && !mappedClientContactId) {
-      alert("Map to contact record is required when the Client role is selected.");
+    if (roles.includes("client")) {
+      alert("Customer portal users are created from a client contact (Clients → contact → Create portal user).");
       return;
     }
     setIsLoading(true);
@@ -85,7 +85,8 @@ function NewUserPageInner() {
           active: formData.get("active") === "on",
           passwordNeedsReset: formData.get("passwordNeedsReset") === "on",
           mappedClientContactId: roles.includes("client") ? mappedClientContactId : null,
-          mappedProfileId: roles.includes("client") ? null : mappedProfileId.trim() || null,
+          mappedProfileId: mappedProfileId.trim() || null,
+          taxNumber: String(formData.get("taxNumber") ?? "").trim(),
         }),
       });
       if (!res.ok) {
@@ -123,6 +124,10 @@ function NewUserPageInner() {
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Phone *</label>
           <input name="phone" required className={inputClass} value={prefillPhone} onChange={(e) => setPrefillPhone(e.target.value)} />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Tax number *</label>
+          <input name="taxNumber" required className={inputClass} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Password *</label>

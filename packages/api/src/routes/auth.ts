@@ -91,6 +91,41 @@ router.post("/login", async (req, res) => {
     const email = parsed.email.trim().toLowerCase();
     const password = parsed.password;
 
+    const customer = await prisma.customerUser.findUnique({ where: { email } });
+    if (customer?.passwordHash) {
+      if (customer.active === false) {
+        return res.status(401).json({ error: "Account is disabled" });
+      }
+      const validCustomer = await bcrypt.compare(password, customer.passwordHash);
+      if (!validCustomer) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+      if (customer.passwordNeedsReset) {
+        const resetToken = generatePasswordResetRequiredToken({
+          id: customer.id,
+          email: customer.email,
+          role: "client",
+        });
+        return res.json({
+          message: "Password reset required",
+          data: {
+            requiresPasswordReset: true,
+            token: resetToken,
+            user: publicUser({ ...customer, role: "client", mfaEnabled: false }),
+          },
+        });
+      }
+      const token = await createFullSessionTokenForUserId(customer.id);
+      if (!token) return res.status(401).json({ error: "Account is disabled" });
+      return res.json({
+        message: "Login successful",
+        data: {
+          token,
+          user: publicUser({ ...customer, role: "client", mfaEnabled: false }),
+        },
+      });
+    }
+
     const user = await prisma.adminUser.findUnique({ where: { email } });
     if (!user?.passwordHash) {
       return res.status(401).json({ error: "Invalid credentials" });
@@ -229,6 +264,7 @@ const profileUpdateSchema = z.object({
   addressProofUrl: z.string().max(2000).optional().nullable(),
   emergencyContacts: z.array(emergencyContactSchema).max(5).optional(),
   markProfileComplete: z.boolean().optional(),
+  taxNumber: z.string().min(1).max(50).optional(),
   userFiles: z
     .array(z.object({ name: z.string().max(500), url: z.string().min(1).max(2000) }))
     .max(50)
@@ -326,10 +362,43 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
       addressProofUrl: true,
       userFiles: true,
       additionalRoles: true,
+      taxNumber: true,
     },
   });
   if (!user) {
-    return res.status(401).json({ error: "Unauthorized" });
+    const customer = await prisma.customerUser.findUnique({
+      where: { id: u.id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        profilePhotoUrl: true,
+        passwordNeedsReset: true,
+        mfaEnabled: true,
+      },
+    });
+    if (!customer) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const { getTimesheetAccessForUser } = await import("../lib/timesheet-access.js");
+    const timesheetAccess = await getTimesheetAccessForUser(customer.id, "client", []);
+    return res.json({
+      data: {
+        impersonation: null,
+        user: {
+          ...publicUser({ ...customer, role: "client", mfaEnabled: customer.mfaEnabled }),
+          requiresMfaEnrollment: false,
+          mfaEnrolledAt: null,
+          phone: customer.phone,
+          profilePhotoUrl: customer.profilePhotoUrl ?? null,
+          additionalRoles: [],
+          onboarding: null,
+          timesheetAccess,
+          agreementRecords: [],
+        },
+      },
+    });
   }
 
   const { prepareMemberOnboardingForUser, userQualifiesForMemberOnboarding } = await import(
@@ -484,6 +553,9 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
     }
     if (input.userFiles !== undefined) {
       patch.userFiles = input.userFiles;
+    }
+    if (input.taxNumber !== undefined && existing.role !== "client") {
+      patch.taxNumber = input.taxNumber.trim();
     }
 
     const mergedForComplete = {

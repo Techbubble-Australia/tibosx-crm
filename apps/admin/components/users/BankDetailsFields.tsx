@@ -139,7 +139,9 @@ export function BankDetailsFields({ value, onChange, readOnly }: Props) {
         />
       </div>
       <div className="sm:col-span-2">
-        <label className="mb-1 block text-sm font-medium">Other bank details</label>
+        <label className="mb-1 block text-sm font-medium">
+          Other details, including superannuation and other payroll compliance requirements.
+        </label>
         <textarea
           className={readOnly ? `${inputClass} bg-gray-50 dark:bg-gray-950` : inputClass}
           rows={2}

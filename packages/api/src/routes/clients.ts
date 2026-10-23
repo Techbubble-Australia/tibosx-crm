@@ -117,8 +117,21 @@ router.post("/contacts/:contactId/create-user", async (req: AuthRequest, res) =>
 
     const actorId = req.user?.impersonatorId ?? req.user?.id ?? null;
     const user = await prisma.$transaction(async (tx) => {
-      const created = await tx.adminUser.create({
+      const created = await tx.customerUser.create({
         data: {
+          email,
+          name: contact.name.trim(),
+          phone,
+          active: true,
+          passwordHash,
+          passwordNeedsReset: true,
+          mfaEnabled: false,
+          mappedClientContactId: contact.id,
+        },
+      });
+      await tx.adminUser.create({
+        data: {
+          id: created.id,
           email,
           name: contact.name.trim(),
           phone,

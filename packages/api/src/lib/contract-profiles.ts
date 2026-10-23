@@ -31,12 +31,10 @@ export async function releaseProfilesForEndedContract(contractId: string, tx: Pr
 }
 
 export function contractIsIncomplete(
-  type: string,
+  _type: string,
   fileUrls: string[],
-  profileCount: number,
-  hasLinkedCareerApplication = false,
+  _profileCount: number,
+  _hasLinkedCareerApplication = false,
 ): boolean {
-  if (!fileUrls.length) return true;
-  if (type === "T_AND_M" && profileCount === 0 && !hasLinkedCareerApplication) return true;
-  return false;
+  return !fileUrls.length;
 }

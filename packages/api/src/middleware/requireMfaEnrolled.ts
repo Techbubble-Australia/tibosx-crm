@@ -9,6 +9,14 @@ export async function requireMfaEnrolled(req: AuthRequest, res: Response, next: 
     return res.status(401).json({ error: "Unauthorized" });
   }
 
+  const customer = await prisma.customerUser.findUnique({
+    where: { id: userId },
+    select: { id: true },
+  });
+  if (customer) {
+    return next();
+  }
+
   const user = await prisma.adminUser.findUnique({
     where: { id: userId },
     select: { mfaEnabled: true },

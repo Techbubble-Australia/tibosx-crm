@@ -94,6 +94,7 @@ const createSchema = z.object({
   passwordNeedsReset: z.boolean().default(false),
   mappedClientContactId: z.string().min(1).optional().nullable(),
   mappedProfileId: z.string().min(1).optional().nullable(),
+  taxNumber: z.string().min(1).max(50),
 });
 
 const updateSchema = z.object({
@@ -122,6 +123,7 @@ const updateSchema = z.object({
     .optional(),
   mappedClientContactId: z.string().min(1).optional().nullable(),
   mappedProfileId: z.string().min(1).optional().nullable(),
+  taxNumber: z.string().min(1).max(50).optional(),
   userFiles: z
     .array(z.object({ name: z.string().min(1).max(500), url: z.string().min(1).max(2000) }))
     .max(50)
@@ -200,6 +202,7 @@ const detailSelect = {
   idProofUrl: true,
   addressProofUrl: true,
   userFiles: true,
+  taxNumber: true,
 } as const;
 
 function sanitizeDetail(row: {
@@ -236,6 +239,7 @@ function sanitizeDetail(row: {
   idProofUrl: string | null;
   addressProofUrl: string | null;
   userFiles: unknown;
+  taxNumber?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -261,12 +265,14 @@ function sanitizeDetail(row: {
     emergencyContacts: Array.isArray(row.emergencyContacts) ? row.emergencyContacts : [],
     agreementDocumentUrl: row.agreementDocumentUrl,
     profileDetailsCompletedAt: row.profileDetailsCompletedAt?.toISOString() ?? null,
+    taxNumber: row.taxNumber ?? "",
   };
 }
 
 router.get("/", async (_req, res) => {
   try {
     const rows = await prisma.adminUser.findMany({
+      where: { role: { not: "client" } },
       orderBy: { email: "asc" },
       select: listSelect,
     });
@@ -533,9 +539,72 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+router.post("/:id/agreements/offline", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.params.id;
+    if (!userId) return res.status(400).json({ error: "Invalid id" });
+    const input = z
+      .object({
+        credentialTemplateId: z.string().min(1),
+        templateName: z.string().min(1).max(200).optional(),
+        documentUrl: z.string().min(1),
+        signedAt: z.coerce.date().optional(),
+        startDate: z.coerce.date().optional().nullable(),
+        endDate: z.coerce.date().optional().nullable(),
+        projectId: z.string().optional().nullable(),
+        projectMemberId: z.string().optional().nullable(),
+      })
+      .parse(req.body);
+
+    const user = await prisma.adminUser.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const template = await prisma.credentialTemplate.findUnique({
+      where: { id: input.credentialTemplateId },
+      select: { id: true, name: true },
+    });
+    if (!template) return res.status(400).json({ error: "Template not found" });
+
+    const signedAt = input.signedAt ?? new Date();
+    await prisma.$transaction(async (tx) => {
+      await tx.adminUserAgreementRecord.create({
+        data: {
+          adminUserId: userId,
+          credentialTemplateId: template.id,
+          templateName: input.templateName?.trim() || template.name,
+          projectId: input.projectId ?? null,
+          projectMemberId: input.projectMemberId ?? null,
+          startDate: input.startDate ?? null,
+          endDate: input.endDate ?? null,
+          agreementSignedAt: signedAt,
+          agreementDocumentUrl: input.documentUrl,
+        },
+      });
+      await tx.adminUser.update({
+        where: { id: userId },
+        data: { agreementDocumentUrl: input.documentUrl },
+      });
+    });
+
+    const agreementRecords = await buildAgreementRecordsForUser(userId);
+    res.json({ data: { agreementRecords } });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error recording offline agreement:", error);
+    res.status(500).json({ error: "Failed to record offline agreement" });
+  }
+});
+
 router.post("/", async (req: AuthRequest, res) => {
   try {
     const data = createSchema.parse(req.body);
+    if (data.role === "client") {
+      return res.status(400).json({
+        error: "Client portal accounts are managed under Customer users. Create them from a client contact instead.",
+      });
+    }
     const additionalRoles = data.additionalRoles?.length ? data.additionalRoles : [];
     const needsContact = rolesIncludeClient(data.role, additionalRoles);
     const mappedId = data.mappedClientContactId?.trim() || null;
@@ -572,6 +641,7 @@ router.post("/", async (req: AuthRequest, res) => {
           passwordNeedsReset: data.passwordNeedsReset,
           mappedClientContactId: mappedId,
           mappedProfileId,
+          taxNumber: data.taxNumber.trim(),
           mfaEnabled: true,
         },
         select: listSelect,
@@ -659,6 +729,10 @@ router.put("/:id", async (req: AuthRequest, res) => {
       if (data.phone !== undefined && data.phone.trim() !== (existing.phone ?? "")) {
         updateData.phone = data.phone.trim();
         await logField("phone", existing.phone, data.phone.trim());
+      }
+      if (data.taxNumber !== undefined && data.taxNumber.trim() !== (existing.taxNumber ?? "")) {
+        updateData.taxNumber = data.taxNumber.trim();
+        await logField("taxNumber", existing.taxNumber, data.taxNumber.trim());
       }
       if (data.role !== undefined && data.role !== existing.role) {
         updateData.role = data.role;

@@ -26,6 +26,7 @@ import { opportunityRoutes } from "./routes/opportunities";
 import { contractRoutes } from "./routes/contracts";
 import { profileRoutes } from "./routes/profiles";
 import { adminUserRoutes } from "./routes/adminUsers";
+import { customerUserRoutes } from "./routes/customerUsers";
 import { authMiddleware } from "./middleware/auth";
 import { requireMfaEnrolled } from "./middleware/requireMfaEnrolled";
 import { requireRole, requireModule, requireAnyModule, blockModuleMutations } from "./middleware/requireRole";
@@ -139,6 +140,13 @@ app.use("/api/admin/contracts", authMiddleware, requireMfaEnrolled, requireModul
 app.use("/api/admin/sales-dashboard", authMiddleware, requireMfaEnrolled, requireModule("sales"), salesDashboardRoutes);
 app.use("/api/admin/invoices", authMiddleware, requireMfaEnrolled, requireModule("sales"), invoiceRoutes);
 app.use("/api/admin/users", authMiddleware, requireMfaEnrolled, requireRole("admin"), adminUserRoutes);
+app.use(
+  "/api/admin/customer-users",
+  authMiddleware,
+  requireMfaEnrolled,
+  requireRole("admin"),
+  customerUserRoutes,
+);
 app.use(
   "/api/admin/workspace-groups",
   authMiddleware,

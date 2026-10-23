@@ -560,7 +560,8 @@ model ClientContact {
   order            Int           @default(0)
   opportunities    Opportunity[]
   projectLinks     ProjectClientContact[]
-  mappedAdminUser  AdminUser? @relation("AdminUserMappedContact")
+  mappedAdminUser     AdminUser?     @relation("AdminUserMappedContact")
+  mappedCustomerUser  CustomerUser?  @relation("CustomerUserMappedContact")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -993,6 +994,7 @@ model AdminUser {
   addressProofUrl           String?  @db.Text
   userFiles                 Json?
   emergencyContacts         Json?
+  taxNumber                 String?
   sourcedProfiles CandidateProfile[] @relation("ProfileSourcedBy")
   ownedContracts Contract[] @relation("ContractOwner")
   ownedOpportunities Opportunity[] @relation("OpportunityOwner")
@@ -1012,6 +1014,27 @@ model AdminUser {
   agreementRecords        AdminUserAgreementRecord[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+/// Client portal accounts (separate from internal AdminUser records).
+model CustomerUser {
+  id                     String         @id @default(cuid())
+  email                  String         @unique
+  name                   String?
+  phone                  String?
+  passwordHash           String
+  active                 Boolean        @default(true)
+  profilePhotoUrl        String?
+  mfaEnabled             Boolean        @default(false)
+  mfaEnrolledAt          DateTime?
+  totpSecretEnc          String?
+  passwordNeedsReset     Boolean        @default(false)
+  passwordResetTokenHash String?
+  passwordResetExpiresAt DateTime?
+  mappedClientContactId  String?        @unique
+  mappedClientContact    ClientContact? @relation("CustomerUserMappedContact", fields: [mappedClientContactId], references: [id], onDelete: SetNull)
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
 }
 
 model AdminUserAgreementRecord {

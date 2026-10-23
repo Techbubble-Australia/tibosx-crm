@@ -141,7 +141,8 @@ const navGroups: NavGroup[] = [
       { href: "/settings/notifications", label: "Email notifications", icon: Mail, roles: ["admin"] },
       { href: "/settings/groups", label: "Groups", icon: Users, roles: ["admin"] },
       { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin"] },
-      { href: "/users/active", label: "Users", icon: UserCircle, roles: ["admin"] },
+      { href: "/users/active", label: "Internal users", icon: UserCircle, roles: ["admin"] },
+      { href: "/customer-users/active", label: "Customer users", icon: UserCircle, roles: ["admin"] },
     ],
   },
 ];
@@ -165,8 +166,11 @@ function headerTitle(pathname: string): string {
     if (pathname.startsWith("/support-tickets/assignments")) return "Consultant access";
     return "Tickets";
   }
+  if (pathname.startsWith("/customer-users")) {
+    return "Customer users";
+  }
   if (pathname.startsWith("/users")) {
-    return "Users";
+    return "Internal users";
   }
   if (isCareerApplicationsPath(pathname)) {
     return "Career Applications";

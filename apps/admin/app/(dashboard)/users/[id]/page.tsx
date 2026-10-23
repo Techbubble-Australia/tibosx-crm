@@ -16,6 +16,7 @@ import { AdminUserFilesField, type UserFileRow } from "@/components/users/AdminU
 import { formatAdminUserActivityTitle } from "@/lib/admin-user-activity-display";
 import { UserPhotoField } from "@/components/users/UserPhotoField";
 import { UserAssignCredentialsModal } from "@/components/users/UserAssignCredentialsModal";
+import { RecordOfflineAgreementModal } from "@/components/users/RecordOfflineAgreementModal";
 import type { AdminRole } from "@/lib/admin-roles";
 import { COUNTRY_OPTIONS } from "@/lib/country-options";
 import {
@@ -70,6 +71,7 @@ type UserDetail = {
   userFiles: { name?: string; url?: string }[];
   agreementTemplate?: { templatesSent: number; templatesSigned: number };
   agreementRecords?: AgreementRecordRow[];
+  taxNumber?: string | null;
   agreementFiles?: UserFileRow[];
   projectMembership: {
     memberId: string;
@@ -93,6 +95,8 @@ export default function EditUserPage() {
   const [defaults, setDefaults] = useState<UserDetail | null>(null);
   const [activity, setActivity] = useState<ActivityRow[]>([]);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [offlineAgreementOpen, setOfflineAgreementOpen] = useState(false);
+  const [agreementRecords, setAgreementRecords] = useState<AgreementRecordRow[]>([]);
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([{ name: "", email: "", phone: "" }]);
   const [mappedClientContactId, setMappedClientContactId] = useState("");
   const [mappedProfileId, setMappedProfileId] = useState("");
@@ -175,6 +179,7 @@ export default function EditUserPage() {
       if (Array.isArray(row.emergencyContacts) && row.emergencyContacts.length) {
         setEmergencyContacts(row.emergencyContacts);
       }
+      setAgreementRecords(row.agreementRecords ?? []);
       const activityData = await activityRes.json();
       setActivity((activityData.data as ActivityRow[]) ?? []);
     } catch (e) {
@@ -187,6 +192,12 @@ export default function EditUserPage() {
   useEffect(() => {
     void load();
   }, [id]);
+
+  useEffect(() => {
+    if (defaults?.role === "client") {
+      router.replace(`/customer-users/${id}`);
+    }
+  }, [defaults?.role, id, router]);
 
   function validateEmergencyContacts(rows: EmergencyContact[]) {
     const filled = rows.filter(
@@ -234,8 +245,20 @@ export default function EditUserPage() {
       mappedProfileId: roles.includes("client") ? null : mappedProfileId.trim() || null,
       userFiles,
       bankDetails: bankDetailsToApi(bankDetails),
+      taxNumber: String(formData.get("taxNumber") ?? "").trim(),
     };
     if (password) body.password = password;
+    if (roles.includes("client")) {
+      delete body.addressLine1;
+      delete body.addressLine2;
+      delete body.postcode;
+      delete body.city;
+      delete body.state;
+      delete body.country;
+      delete body.bankDetails;
+      delete body.emergencyContacts;
+      delete body.taxNumber;
+    }
 
     try {
       const res = await adminFetch(`/api/admin/users/${id}`, {
@@ -302,6 +325,17 @@ export default function EditUserPage() {
               <input name="phone" required defaultValue={defaults.phone ?? ""} className={inputClass} />
             </div>
           </div>
+          {!isClientUser ? (
+            <div>
+              <label className="mb-1 block text-sm font-medium">Tax number *</label>
+              <input
+                name="taxNumber"
+                required
+                defaultValue={defaults.taxNumber ?? ""}
+                className={inputClass}
+              />
+            </div>
+          ) : null}
           <div>
             <label className="mb-2 block text-sm font-medium">Roles *</label>
             <AdminRolesMultiSelect
@@ -365,6 +399,8 @@ export default function EditUserPage() {
           </div>
         </section>
 
+        {!isClientUser ? (
+        <>
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
           <h3 className="mb-4 font-semibold">Address</h3>
           <p className="mb-4 text-xs text-gray-500">Usually completed by the member during first login after signing their contract.</p>
@@ -476,24 +512,31 @@ export default function EditUserPage() {
         </section>
 
         <UserAgreementsSection
-          records={defaults.agreementRecords ?? []}
-          emptyMessage={
-            canAssignTemplate
-              ? "No agreements assigned yet. Use Assign template to send a contract for signing."
-              : "Agreement templates are not assigned to client portal users."
-          }
+          records={agreementRecords}
+          emptyMessage="No agreements assigned yet. Assign a template or record an offline agreement."
           headerAction={
             canAssignTemplate ? (
-              <button
-                type="button"
-                onClick={() => setAssignOpen(true)}
-                className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
-              >
-                Assign template
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOfflineAgreementOpen(true)}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                >
+                  Record offline agreement
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAssignOpen(true)}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                >
+                  Assign template
+                </button>
+              </div>
             ) : null
           }
         />
+        </>
+        ) : null}
 
         <AdminUserFilesField
           files={userFiles}
@@ -529,6 +572,16 @@ export default function EditUserPage() {
           Save changes
         </button>
       </form>
+
+      <RecordOfflineAgreementModal
+        userId={id}
+        open={offlineAgreementOpen}
+        onClose={() => setOfflineAgreementOpen(false)}
+        onSaved={(records) => {
+          setAgreementRecords(records);
+          setOfflineAgreementOpen(false);
+        }}
+      />
 
       {assignOpen && canAssignTemplate ? (
         <UserAssignCredentialsModal

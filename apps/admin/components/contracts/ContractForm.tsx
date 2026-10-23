@@ -317,6 +317,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
 
   const isEditable = status === "DRAFT";
   const canEditEndDate = status === "DRAFT" || status === "ACTIVE";
+  const canRecalcTmWorkUnits = type === "T_AND_M" && (isEditable || status === "ACTIVE");
   const canEditFiles = status !== "CANCELED";
   const showRate = type !== "FIXED_PRICE";
   const rateRequired = type === "T_AND_M";
@@ -403,7 +404,8 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       prev.startDate !== startDate || prev.endDate !== endDate || prev.unit !== unit;
     datesUnitRef.current = { startDate, endDate, unit };
 
-    if (type !== "T_AND_M" || !isEditable) return;
+    const canAutoWorkUnits = isEditable || status === "ACTIVE";
+    if (type !== "T_AND_M" || !canAutoWorkUnits) return;
     if (!startDate || !endDate || !unit) {
       if (changed) setWorkUnitMonths([]);
       return;
@@ -417,7 +419,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
         })),
       );
     }
-  }, [type, startDate, endDate, unit, isEditable, workUnitMonths.length]);
+  }, [type, startDate, endDate, unit, isEditable, status, workUnitMonths.length]);
 
   useEffect(() => {
     const prev = variationDatesRef.current;
@@ -702,7 +704,18 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       });
       const data = await res.json();
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to update end date");
+      const saved = data.data as {
+        endDate?: string;
+        workUnitMonths?: WorkUnitMonthInput[];
+        numberOfUnits?: number;
+        contractValue?: number;
+      };
       setSavedEndDate(nextEndDate);
+      if (saved.workUnitMonths?.length) {
+        setWorkUnitMonths(saved.workUnitMonths);
+        if (saved.numberOfUnits != null) setNumberOfUnits(String(saved.numberOfUnits));
+        if (saved.contractValue != null) setContractValue(String(saved.contractValue));
+      }
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to update end date");
     } finally {

@@ -1908,9 +1908,27 @@ router.patch("/:id/end-date", async (req: AuthRequest, res) => {
 
     const beforeSnapshot = contractSnapshotFromRow(existing);
     const row = await prisma.$transaction(async (tx) => {
+      let tmPatch: {
+        numberOfUnits?: number;
+        contractValue?: number;
+      } = {};
+      if (existing.type === "T_AND_M" && existing.unit && mergedEndDate) {
+        const workUnitMonths = resolveTmWorkUnitMonths(
+          existing.startDate,
+          mergedEndDate,
+          existing.unit,
+        );
+        const units = workUnitMonths.length ? sumWorkUnits(workUnitMonths) : 0;
+        const rate = toNumber(existing.rate);
+        tmPatch = {
+          numberOfUnits: units,
+          contractValue: units * rate,
+        };
+        await replaceWorkUnitMonths(tx, existing.id, "base", workUnitMonths);
+      }
       const updated = await tx.contract.update({
         where: { id: existing.id },
-        data: { endDate: mergedEndDate },
+        data: { endDate: mergedEndDate, ...tmPatch },
         include: contractInclude,
       });
       await logContractFieldChanges(

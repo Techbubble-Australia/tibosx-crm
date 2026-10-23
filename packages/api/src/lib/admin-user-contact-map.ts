@@ -15,15 +15,25 @@ export async function assertMappedContactAvailable(
   });
   if (!contact) return "Contact record not found";
 
-  const taken = await prisma.adminUser.findFirst({
+  const takenAdmin = await prisma.adminUser.findFirst({
     where: {
       mappedClientContactId: contactId,
       ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
     },
     select: { id: true, email: true },
   });
-  if (taken) {
-    return `Another user (${taken.email}) is already mapped to this contact`;
+  if (takenAdmin) {
+    return `Another user (${takenAdmin.email}) is already mapped to this contact`;
+  }
+  const takenCustomer = await prisma.customerUser.findFirst({
+    where: {
+      mappedClientContactId: contactId,
+      ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+    },
+    select: { id: true, email: true },
+  });
+  if (takenCustomer) {
+    return `Another customer user (${takenCustomer.email}) is already mapped to this contact`;
   }
   return null;
 }

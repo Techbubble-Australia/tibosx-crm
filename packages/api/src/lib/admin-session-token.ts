@@ -30,6 +30,14 @@ export async function createFullSessionTokenForUserId(
   userId: string,
   impersonatorId?: string,
 ): Promise<string | null> {
+  const customer = await prisma.customerUser.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, active: true },
+  });
+  if (customer) {
+    if (customer.active === false) return null;
+    return generateToken({ id: customer.id, email: customer.email, role: "client" });
+  }
   const user = await prisma.adminUser.findUnique({
     where: { id: userId },
     select: { id: true, email: true, role: true, additionalRoles: true, active: true },
