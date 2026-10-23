@@ -3,6 +3,18 @@ import { ensureProjectSupportGroup, provisionSupportMemberConsultant } from "./s
 
 export type TicketAssignee = { id: string; name: string; email: string };
 
+export async function resolveTicketProjectId(ticket: {
+  projectId: string | null;
+  organizationId: string;
+}): Promise<string | null> {
+  if (ticket.projectId) return ticket.projectId;
+  const org = await prisma.organization.findUnique({
+    where: { id: ticket.organizationId },
+    select: { projectId: true },
+  });
+  return org?.projectId ?? null;
+}
+
 function isEligibleAssignee(tu: {
   active: boolean;
   role: string;
@@ -14,7 +26,12 @@ function isEligibleAssignee(tu: {
   if (tu.consultantVerified) return true;
   if (tu.tbosAdminUserId) return true;
   const role = (tu.tbosRole ?? "").toLowerCase();
-  return role === "admin" || role === "customer_support" || role === "project_manager";
+  return (
+    role === "admin" ||
+    role === "customer_support" ||
+    role === "project_manager" ||
+    role === "project_member"
+  );
 }
 
 /** When support group is empty, seed it from all project members with TBOS accounts. */

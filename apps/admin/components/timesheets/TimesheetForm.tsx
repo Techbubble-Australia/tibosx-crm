@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import {
   Calendar,
   Check,
@@ -278,6 +279,7 @@ export function TimesheetForm({
   submitForApprovalLoading = false,
   showSubmitForApproval = false,
 }: Props) {
+  const router = useRouter();
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [projectId, setProjectId] = useState(defaults.projectId ?? "");
   const [cases, setCases] = useState<CaseOption[]>([]);
@@ -488,6 +490,19 @@ export function TimesheetForm({
   }, [projectId, formEditable]);
 
   useEffect(() => {
+    if (!projectBounds || !formEditable || defaults.id) return;
+    if (weekInProject) return;
+    const bounds = projectWeekMondayBounds(projectBounds.start, projectBounds.end);
+    const todayMonday = snapToMondayInput(toDateInputUtc(mondayOfWeek()));
+    let next = todayMonday;
+    if (next < bounds.min) next = bounds.min;
+    if (next > bounds.max) next = bounds.max;
+    if (next !== weekMonday) {
+      setWeekMonday(next);
+    }
+  }, [projectBounds, formEditable, defaults.id, weekInProject, weekMonday]);
+
+  useEffect(() => {
     if (defaults.id || !projectId || !weekMonday) {
       setWeekConflict(false);
       return;
@@ -498,10 +513,14 @@ export function TimesheetForm({
       .then((r) => r.json())
       .then((data) => {
         const existing = data.data as { id?: string } | null;
-        setWeekConflict(Boolean(existing?.id));
+        if (existing?.id) {
+          router.replace(`/timesheets/${existing.id}`);
+          return;
+        }
+        setWeekConflict(false);
       })
       .catch(() => setWeekConflict(false));
-  }, [defaults.id, projectId, weekMonday]);
+  }, [defaults.id, projectId, weekMonday, router]);
 
   useEffect(() => {
     if (!formEditable) return;

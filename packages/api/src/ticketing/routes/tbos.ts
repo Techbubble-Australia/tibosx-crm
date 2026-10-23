@@ -526,15 +526,10 @@ router.patch("/tickets/:id", async (req: TbosRequest, res) => {
 
   const actorId = await resolveTbosActorUserId(tbosUser);
   if (parsed.data.assignedToId !== undefined) {
-    const projectId = existing.projectId ?? existing.organizationId
-      ? (
-          await prisma.organization.findUnique({
-            where: { id: existing.organizationId },
-            select: { projectId: true },
-          })
-        )?.projectId
-      : null;
-    const { isValidProjectTicketAssignee } = await import("../../lib/ticket-project-assignees.js");
+    const { resolveTicketProjectId, isValidProjectTicketAssignee } = await import(
+      "../../lib/ticket-project-assignees.js"
+    );
+    const projectId = await resolveTicketProjectId(existing);
     const ok = await isValidProjectTicketAssignee(projectId, parsed.data.assignedToId);
     if (!ok) {
       return res.status(400).json({ error: "Assignee must be a member of the project support team" });
