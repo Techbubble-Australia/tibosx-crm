@@ -1,4 +1,5 @@
 import { prisma } from "@techbubble/database";
+import { isMemberConsultantProfileExempt } from "./admin-roles";
 import {
   addressComplete,
   bankDetailsComplete,
@@ -19,6 +20,8 @@ export async function getMemberOnboardingStatus(userId: string): Promise<MemberO
   const user = await prisma.adminUser.findUnique({
     where: { id: userId },
     select: {
+      role: true,
+      additionalRoles: true,
       profileDetailsCompletedAt: true,
       addressLine1: true,
       city: true,
@@ -37,7 +40,10 @@ export async function getMemberOnboardingStatus(userId: string): Promise<MemberO
   const agreement = await findUserCredentialAgreement(userId);
   const hasAgreementAssignment = Boolean(agreement);
   const agreementSigned = !hasAgreementAssignment || Boolean(agreement?.agreementSignedAt);
-  const profileComplete = Boolean(
+  const consultantProfileExempt = user
+    ? isMemberConsultantProfileExempt(user.role, user.additionalRoles)
+    : false;
+  const consultantProfileComplete = Boolean(
     user &&
       addressComplete(user) &&
       bankDetailsComplete(user.bankDetails) &&
@@ -45,10 +51,11 @@ export async function getMemberOnboardingStatus(userId: string): Promise<MemberO
       Boolean(user.idProofUrl?.trim()) &&
       Boolean(user.addressProofUrl?.trim()),
   );
+  const profileComplete = consultantProfileExempt || consultantProfileComplete;
   const canSubmitTimesheets = agreementSigned && profileComplete;
-  const profileOnboardingRequired = Boolean(
-    user?.profileOnboardingRequiredAt && !user.profileDetailsCompletedAt,
-  );
+  const profileOnboardingRequired =
+    !consultantProfileExempt &&
+    Boolean(user?.profileOnboardingRequiredAt && !user.profileDetailsCompletedAt);
 
   return {
     hasAgreementAssignment,

@@ -79,6 +79,12 @@ export function hasEffectiveRole(roles: string[], role: string): boolean {
   return roles.includes(role);
 }
 
+/** Admins and PMs logging timesheets as project members are not required to complete contractor KYC/bank profile. */
+export function isMemberConsultantProfileExempt(primary: string, additional?: unknown): boolean {
+  const roles = effectiveRoleList(primary, additional);
+  return roles.includes("admin") || roles.includes("project_manager");
+}
+
 export function canMutateContent(role: string): boolean {
   return isAdminRole(role);
 }

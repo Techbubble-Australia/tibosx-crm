@@ -311,6 +311,7 @@ async function timesheetAccessWhere(req: AuthRequest): Promise<Prisma.TimesheetW
 
 async function assertMemberCanSubmitTimesheets(actorId: string, roles: string[]) {
   if (!hasEffectiveRole(roles, "project_member")) return;
+  if (roles.includes("admin") || roles.includes("project_manager")) return;
   const onboarding = await getMemberOnboardingStatus(actorId);
   if (!onboarding.agreementSigned) {
     throw new Error("AGREEMENT_REQUIRED");

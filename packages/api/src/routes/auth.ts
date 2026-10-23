@@ -466,12 +466,12 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
       if (input.email !== undefined) patch.email = input.email.trim().toLowerCase();
     }
 
-    if (isProjectMemberUser) {
-      for (const field of addressFields) {
-        if (input[field] !== undefined) {
-          patch[field] = input[field] as string | null;
-        }
+    for (const field of addressFields) {
+      if (input[field] !== undefined) {
+        patch[field] = input[field] as string | null;
       }
+    }
+    if (isProjectMemberUser) {
       if (input.bankDetails !== undefined) patch.bankDetails = input.bankDetails;
       if (input.idProofUrl !== undefined) patch.idProofUrl = input.idProofUrl;
       if (input.addressProofUrl !== undefined) patch.addressProofUrl = input.addressProofUrl;
@@ -519,7 +519,7 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
         }
       }
       for (const field of addressFields) {
-        if (!isProjectMemberUser || input[field] === undefined) continue;
+        if (input[field] === undefined) continue;
         const oldVal = (existing[field] as string | null) ?? null;
         const newVal = (input[field] as string | null) ?? null;
         await logAdminUserFieldChange(tx, u.id, u.id, field, oldVal, newVal);

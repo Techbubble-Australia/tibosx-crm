@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { adminFetch } from "@/lib/admin-api";
+import { useAdminSession } from "@/contexts/AdminSessionContext";
 
 const ALLOWED_PREFIXES = [
   "/settings/profile",
@@ -19,9 +20,16 @@ function pathAllowed(pathname: string) {
 export function MemberOnboardingGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { role, additionalRoles } = useAdminSession();
+  const staffExemptFromConsultantProfile =
+    role === "admin" ||
+    role === "project_manager" ||
+    additionalRoles.includes("admin") ||
+    additionalRoles.includes("project_manager");
 
   useEffect(() => {
     if (pathAllowed(pathname)) return;
+    if (staffExemptFromConsultantProfile) return;
 
     void adminFetch("/api/auth/me")
       .then((res) => res.json())
@@ -39,7 +47,7 @@ export function MemberOnboardingGuard({ children }: { children: React.ReactNode 
         }
       })
       .catch(() => undefined);
-  }, [pathname, router]);
+  }, [pathname, router, staffExemptFromConsultantProfile]);
 
   return children;
 }

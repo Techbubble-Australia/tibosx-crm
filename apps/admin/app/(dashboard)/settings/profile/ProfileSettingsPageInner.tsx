@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Info, Loader2, Plus, Trash2 } from "lucide-react";
 import { UserPhotoField } from "@/components/users/UserPhotoField";
 import { adminFetch } from "@/lib/admin-api";
@@ -45,7 +45,8 @@ type ActivityRow = {
 };
 
 export default function ProfileSettingsPageInner() {
-  const { refreshSession } = useAdminSession();
+  const { refreshSession, additionalRoles } = useAdminSession();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const onboarding = searchParams.get("onboarding") === "1";
   const [loading, setLoading] = useState(true);
@@ -64,6 +65,7 @@ export default function ProfileSettingsPageInner() {
   const [countryOther, setCountryOther] = useState("");
   const [bankDetails, setBankDetails] = useState<BankDetailsFormValue>(bankDetailsFromApi(null));
   const [savingBank, setSavingBank] = useState(false);
+  const [savingAddress, setSavingAddress] = useState(false);
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([{ name: "", email: "", phone: "" }]);
   const [agreementDocumentUrl, setAgreementDocumentUrl] = useState<string | null>(null);
   const [idProofUrl, setIdProofUrl] = useState<string | null>(null);
@@ -76,8 +78,21 @@ export default function ProfileSettingsPageInner() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  const staffExemptFromConsultantProfile =
+    role === "admin" ||
+    role === "project_manager" ||
+    additionalRoles.includes("admin") ||
+    additionalRoles.includes("project_manager");
   const isProjectMemberOnboarding = onboarding && role === "project_member";
+  const showConsultantOnboardingBanner = onboarding && !staffExemptFromConsultantProfile;
+  const addressFieldsRequired = role === "project_member" || isProjectMemberOnboarding;
   const canEditAccountFields = role === "admin";
+
+  useEffect(() => {
+    if (onboarding && staffExemptFromConsultantProfile) {
+      router.replace("/timesheets");
+    }
+  }, [onboarding, staffExemptFromConsultantProfile, router]);
 
   useEffect(() => {
     async function load() {
@@ -153,6 +168,30 @@ export default function ProfileSettingsPageInner() {
     setEmergencyContacts((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
+  function buildAddressPayload(country: string) {
+    return {
+      addressLine1: addressLine1.trim(),
+      addressLine2: addressLine2.trim() || null,
+      postcode: postcode.trim(),
+      city: city.trim(),
+      state: stateRegion.trim(),
+      country,
+    };
+  }
+
+  function validateAddressFields(country: string) {
+    if (!addressFieldsRequired) return true;
+    if (!addressLine1.trim() || !city.trim() || !stateRegion.trim() || !postcode.trim() || !country) {
+      alert("Address line 1, city, state, postcode, and country are required.");
+      return false;
+    }
+    if (countrySelect === COUNTRY_OTHER && !countryOther.trim()) {
+      alert("Enter your country name when Other is selected.");
+      return false;
+    }
+    return true;
+  }
+
   function validateEmergencyContacts(rows: EmergencyContact[]) {
     const touched = rows.filter(
       (row) => row.name.trim() || row.email?.trim() || row.phone?.trim(),
@@ -175,16 +214,7 @@ export default function ProfileSettingsPageInner() {
     if (!validateEmergencyContacts(emergencyContacts)) return;
 
     const country = mergeCountryValue(countrySelect, countryOther);
-    if (isProjectMemberOnboarding) {
-      if (!addressLine1.trim() || !city.trim() || !stateRegion.trim() || !postcode.trim() || !country) {
-        alert("Address line 1, city, state, postcode, and country are required.");
-        return;
-      }
-      if (countrySelect === COUNTRY_OTHER && !countryOther.trim()) {
-        alert("Enter your country name when Other is selected.");
-        return;
-      }
-    }
+    if (isProjectMemberOnboarding && !validateAddressFields(country)) return;
 
     setSaving(true);
     try {
@@ -201,13 +231,8 @@ export default function ProfileSettingsPageInner() {
         body.phone = phone.trim() || null;
       }
       if (isProjectMemberOnboarding) {
-        body.addressLine1 = addressLine1.trim();
-        body.addressLine2 = addressLine2.trim() || null;
-        body.postcode = postcode.trim();
-        body.city = city.trim();
-        body.state = stateRegion.trim();
-        body.country = country;
         body.markProfileComplete = true;
+        Object.assign(body, buildAddressPayload(country));
       }
 
       const res = await adminFetch("/api/auth/profile", {
@@ -264,7 +289,7 @@ export default function ProfileSettingsPageInner() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
-      {onboarding ? (
+      {showConsultantOnboardingBanner ? (
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-100">
           Complete your personal details to access timesheets.
         </div>
@@ -434,6 +459,109 @@ export default function ProfileSettingsPageInner() {
       </form>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+        <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Address</h3>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className="mb-1 block text-sm font-medium">
+              Address line 1{addressFieldsRequired ? " *" : ""}
+            </label>
+            <input
+              className={inputClass}
+              value={addressLine1}
+              onChange={(e) => setAddressLine1(e.target.value)}
+              required={addressFieldsRequired}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="mb-1 block text-sm font-medium">Address line 2</label>
+            <input className={inputClass} value={addressLine2} onChange={(e) => setAddressLine2(e.target.value)} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Postcode{addressFieldsRequired ? " *" : ""}</label>
+            <input
+              className={inputClass}
+              value={postcode}
+              onChange={(e) => setPostcode(e.target.value)}
+              required={addressFieldsRequired}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">City{addressFieldsRequired ? " *" : ""}</label>
+            <input
+              className={inputClass}
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              required={addressFieldsRequired}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">State{addressFieldsRequired ? " *" : ""}</label>
+            <input
+              className={inputClass}
+              value={stateRegion}
+              onChange={(e) => setStateRegion(e.target.value)}
+              required={addressFieldsRequired}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Country{addressFieldsRequired ? " *" : ""}</label>
+            <select
+              className={inputClass}
+              value={countrySelect}
+              onChange={(e) => setCountrySelect(e.target.value)}
+              required={addressFieldsRequired}
+            >
+              <option value="">Select country…</option>
+              {COUNTRY_OPTIONS.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+            {countrySelect === COUNTRY_OTHER ? (
+              <input
+                className={`${inputClass} mt-2`}
+                placeholder="Enter country name *"
+                value={countryOther}
+                onChange={(e) => setCountryOther(e.target.value)}
+                required={addressFieldsRequired}
+              />
+            ) : null}
+          </div>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            disabled={savingAddress}
+            onClick={() => {
+              void (async () => {
+                const country = mergeCountryValue(countrySelect, countryOther);
+                if (!validateAddressFields(country)) return;
+                setSavingAddress(true);
+                try {
+                  const res = await adminFetch("/api/auth/profile", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(buildAddressPayload(country)),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save");
+                  await refreshSession();
+                  alert("Address saved.");
+                } catch (error) {
+                  alert(error instanceof Error ? error.message : "Failed to save address");
+                } finally {
+                  setSavingAddress(false);
+                }
+              })();
+            }}
+            className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+          >
+            {savingAddress ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Save address
+          </button>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
         <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Bank details</h3>
         <BankDetailsFields value={bankDetails} onChange={setBankDetails} />
         <div className="mt-4 flex justify-end">
@@ -475,57 +603,6 @@ export default function ProfileSettingsPageInner() {
       </section>
 
       <form onSubmit={(e) => void handleProfileSubmit(e)} className="space-y-6">
-        {isProjectMemberOnboarding ? (
-          <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-            <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Personal details</h3>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <label className="mb-1 block text-sm font-medium">Address line 1 *</label>
-                <input className={inputClass} value={addressLine1} onChange={(e) => setAddressLine1(e.target.value)} required />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="mb-1 block text-sm font-medium">Address line 2</label>
-                <input className={inputClass} value={addressLine2} onChange={(e) => setAddressLine2(e.target.value)} />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">Postcode *</label>
-                <input className={inputClass} value={postcode} onChange={(e) => setPostcode(e.target.value)} required />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">City *</label>
-                <input className={inputClass} value={city} onChange={(e) => setCity(e.target.value)} required />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">State *</label>
-                <input className={inputClass} value={stateRegion} onChange={(e) => setStateRegion(e.target.value)} required />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">Country *</label>
-                <select
-                  className={inputClass}
-                  value={countrySelect}
-                  onChange={(e) => setCountrySelect(e.target.value)}
-                  required
-                >
-                  <option value="">Select country…</option>
-                  {COUNTRY_OPTIONS.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-                {countrySelect === COUNTRY_OTHER ? (
-                  <input
-                    className={`${inputClass} mt-2`}
-                    placeholder="Enter country name *"
-                    value={countryOther}
-                    onChange={(e) => setCountryOther(e.target.value)}
-                    required
-                  />
-                ) : null}
-              </div>
-            </div>
-          </section>
-        ) : null}
-
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-semibold text-gray-900 dark:text-gray-100">Emergency contacts</h3>
