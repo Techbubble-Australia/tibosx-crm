@@ -15,8 +15,11 @@ type TicketRow = {
   type: string;
   priority: string;
   organization?: { name: string };
-  assignedTo?: { id: string; name: string; email: string } | null;
+  createdBy?: { name: string };
+  createdAt: string;
   updatedAt: string;
+  updatedBy?: { name: string } | null;
+  assignedTo?: { id: string; name: string; email: string } | null;
 };
 
 export default function TicketsPage() {
@@ -73,8 +76,11 @@ export default function TicketsPage() {
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Priority</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Assigned to</th>
+                <th className="px-4 py-3">Created by</th>
+                <th className="px-4 py-3">Created</th>
                 <th className="px-4 py-3">Updated</th>
+                <th className="px-4 py-3">Updated by</th>
+                <th className="px-4 py-3">Assigned to</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -92,8 +98,11 @@ export default function TicketsPage() {
                   <td className="px-4 py-3">
                     <TicketStatusBadge status={row.status} />
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{row.assignedTo?.name ?? "Unassigned"}</td>
+                  <td className="px-4 py-3 text-gray-600">{row.createdBy?.name ?? "—"}</td>
+                  <td className="px-4 py-3 text-gray-500">{new Date(row.createdAt).toLocaleString()}</td>
                   <td className="px-4 py-3 text-gray-500">{new Date(row.updatedAt).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-gray-600">{row.updatedBy?.name ?? "—"}</td>
+                  <td className="px-4 py-3 text-gray-600">{row.assignedTo?.name ?? "Unassigned"}</td>
                 </tr>
               ))}
             </tbody>

@@ -3,14 +3,22 @@ import { ensureProjectSupportGroup, provisionSupportMemberConsultant } from "./s
 
 export type TicketAssignee = { id: string; name: string; email: string };
 
-/** When support is enabled but no group members were configured, include all project members. */
-async function ensureSupportGroupHasProjectMembers(projectId: string) {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { kind: true },
-  });
-  if (project?.kind !== "SUPPORT") return;
+function isEligibleAssignee(tu: {
+  active: boolean;
+  role: string;
+  consultantVerified: boolean;
+  tbosAdminUserId: string | null;
+  tbosRole: string | null;
+}): boolean {
+  if (!tu.active || tu.role !== "CONSULTANT") return false;
+  if (tu.consultantVerified) return true;
+  if (tu.tbosAdminUserId) return true;
+  const role = (tu.tbosRole ?? "").toLowerCase();
+  return role === "admin" || role === "customer_support" || role === "project_manager";
+}
 
+/** When support group is empty, seed it from all project members with TBOS accounts. */
+async function ensureSupportGroupHasProjectMembers(projectId: string) {
   const group = await ensureProjectSupportGroup(projectId);
   const existing = await prisma.projectSupportGroupMember.count({ where: { groupId: group.id } });
   if (existing > 0) return;
@@ -33,8 +41,52 @@ async function ensureSupportGroupHasProjectMembers(projectId: string) {
   }
 }
 
+async function listFallbackProjectMemberAssignees(projectId: string): Promise<TicketAssignee[]> {
+  const members = await prisma.projectMember.findMany({
+    where: { projectId, adminUserId: { not: null } },
+    select: { id: true, adminUserId: true },
+  });
+  const out: TicketAssignee[] = [];
+  for (const member of members) {
+    if (!member.adminUserId) continue;
+    try {
+      await provisionSupportMemberConsultant(projectId, member.adminUserId, member.id);
+    } catch {
+      // continue — member may still have a ticketing user
+    }
+    const tu = await prisma.ticketingUser.findFirst({
+      where: { tbosAdminUserId: member.adminUserId, active: true },
+      select: { id: true, name: true, email: true, role: true, consultantVerified: true, tbosAdminUserId: true, tbosRole: true, active: true },
+    });
+    if (tu && isEligibleAssignee(tu)) {
+      out.push({ id: tu.id, name: tu.name || tu.email, email: tu.email });
+    }
+  }
+  return out;
+}
+
+export async function listGlobalTicketAssignees(): Promise<TicketAssignee[]> {
+  const rows = await prisma.ticketingUser.findMany({
+    where: {
+      active: true,
+      role: "CONSULTANT",
+      OR: [
+        { consultantVerified: true },
+        { tbosAdminUserId: { not: null } },
+      ],
+    },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, email: true, role: true, consultantVerified: true, tbosAdminUserId: true, tbosRole: true, active: true },
+  });
+  return rows
+    .filter((tu) => isEligibleAssignee(tu))
+    .map((tu) => ({ id: tu.id, name: tu.name || tu.email, email: tu.email }));
+}
+
 export async function listProjectTicketAssignees(projectId: string | null | undefined): Promise<TicketAssignee[]> {
-  if (!projectId) return [];
+  if (!projectId) {
+    return listGlobalTicketAssignees();
+  }
 
   await ensureSupportGroupHasProjectMembers(projectId);
 
@@ -44,36 +96,54 @@ export async function listProjectTicketAssignees(projectId: string | null | unde
       members: {
         include: {
           ticketingUser: {
-            select: { id: true, name: true, email: true, active: true, role: true, consultantVerified: true },
+            select: { id: true, name: true, email: true, active: true, role: true, consultantVerified: true, tbosAdminUserId: true, tbosRole: true },
           },
           projectMember: { select: { id: true, adminUserId: true } },
         },
       },
     },
   });
-  if (!group?.members.length) return [];
 
   const assignees: TicketAssignee[] = [];
-  for (const member of group.members) {
-    let tu = member.ticketingUser;
-    if (
-      (!tu || !tu.active || tu.role !== "CONSULTANT" || !tu.consultantVerified) &&
-      member.projectMember?.adminUserId
-    ) {
-      await provisionSupportMemberConsultant(projectId, member.projectMember.adminUserId, member.projectMember.id);
-      const refreshed = await prisma.projectSupportGroupMember.findUnique({
-        where: { id: member.id },
-        include: {
-          ticketingUser: {
-            select: { id: true, name: true, email: true, active: true, role: true, consultantVerified: true },
+  const seen = new Set<string>();
+
+  if (group?.members.length) {
+    for (const member of group.members) {
+      let tu = member.ticketingUser;
+      if (
+        (!tu || !isEligibleAssignee({ ...tu, tbosAdminUserId: tu.tbosAdminUserId ?? null, tbosRole: tu.tbosRole ?? null })) &&
+        member.projectMember?.adminUserId
+      ) {
+        await provisionSupportMemberConsultant(projectId, member.projectMember.adminUserId, member.projectMember.id);
+        const refreshed = await prisma.projectSupportGroupMember.findUnique({
+          where: { id: member.id },
+          include: {
+            ticketingUser: {
+              select: { id: true, name: true, email: true, active: true, role: true, consultantVerified: true, tbosAdminUserId: true, tbosRole: true },
+            },
           },
-        },
-      });
-      tu = refreshed?.ticketingUser ?? null;
+        });
+        tu = refreshed?.ticketingUser ?? null;
+      }
+      if (tu && isEligibleAssignee({ ...tu, tbosAdminUserId: tu.tbosAdminUserId ?? null, tbosRole: tu.tbosRole ?? null }) && !seen.has(tu.id)) {
+        seen.add(tu.id);
+        assignees.push({ id: tu.id, name: tu.name || tu.email, email: tu.email });
+      }
     }
-    if (tu?.active && tu.role === "CONSULTANT" && tu.consultantVerified) {
-      assignees.push({ id: tu.id, name: tu.name || tu.email, email: tu.email });
+  }
+
+  if (!assignees.length) {
+    const fallback = await listFallbackProjectMemberAssignees(projectId);
+    for (const row of fallback) {
+      if (!seen.has(row.id)) {
+        seen.add(row.id);
+        assignees.push(row);
+      }
     }
+  }
+
+  if (!assignees.length) {
+    return listGlobalTicketAssignees();
   }
 
   return assignees.sort((a, b) => a.name.localeCompare(b.name));

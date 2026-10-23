@@ -18,6 +18,7 @@ import { TicketLifecycleActions } from "@/components/workspace/TicketLifecycleAc
 import { TicketStatusBadge } from "@/lib/ticket-status-styles";
 import { formatTicketAuditLine, type TicketAuditRow } from "@/lib/ticket-audit-display";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { TicketRecordMeta } from "@/components/support-tickets/TicketRecordMeta";
 
 type Message = {
   id: string;
@@ -38,6 +39,10 @@ type TicketDetail = {
   priority: string;
   status: string;
   createdById: string;
+  createdBy?: { name: string; email: string };
+  createdAt: string;
+  updatedAt: string;
+  updatedBy?: { name: string; email: string } | null;
   assignedToId?: string | null;
   assignedTo?: { id: string; name: string; email: string } | null;
   organization?: { name: string };
@@ -256,6 +261,13 @@ export default function TicketDetailPage() {
         </div>
       </div>
 
+      <TicketRecordMeta
+        createdBy={ticket.createdBy}
+        createdAt={ticket.createdAt}
+        updatedAt={ticket.updatedAt}
+        updatedBy={ticket.updatedBy}
+      />
+
       <section className="rounded-xl border border-gray-200 bg-white p-4">
         <h2 className="mb-2 font-semibold">Description</h2>
         {canEditDescription && !closedOrCancelled ? (
@@ -328,6 +340,13 @@ export default function TicketDetailPage() {
           </form>
         )}
       </section>
+
+      {ticket.resolutionNotes?.trim() ? (
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <h2 className="mb-2 font-semibold">Resolution notes</h2>
+          <p className="whitespace-pre-wrap text-sm text-gray-700">{ticket.resolutionNotes}</p>
+        </section>
+      ) : null}
 
       {ticket.auditLogs && ticket.auditLogs.length > 0 ? (
         <section className="rounded-xl border border-gray-200 bg-white p-4">

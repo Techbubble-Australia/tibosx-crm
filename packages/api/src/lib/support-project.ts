@@ -163,8 +163,7 @@ export async function provisionSupportMemberConsultant(projectId: string, adminU
     where: { id: projectId },
     select: { kind: true, supportOrganization: { select: { id: true } } },
   });
-  if (!project || project.kind !== "SUPPORT") return;
-
+  if (!project) return;
   const orgId = project.supportOrganization?.id ?? (await ensureSupportOrganizationForProject(projectId)).id;
   const adminUser = await prisma.adminUser.findUnique({ where: { id: adminUserId } });
   if (!adminUser) return;

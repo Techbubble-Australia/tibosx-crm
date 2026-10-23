@@ -26,6 +26,7 @@ import {
 import type { WorkspaceRequest } from "../middleware/tbos-workspace.js";
 import { autoCloseStaleResolvedTickets } from "../lib/auto-close-resolved-tickets.js";
 import { notifyAsync } from "../../lib/notifications";
+import { serializeTicketRow, ticketDetailIncludes } from "../lib/serialize-ticket.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -92,51 +93,7 @@ const messageSchema = z.object({
 });
 
 
-function serializeTicket(row: {
-  id: string;
-  ticketNumber: string;
-  organizationId: string;
-  type: TicketType;
-  priority: TicketPriority;
-  status: TicketStatus;
-  subject: string;
-  description: string;
-  createdById: string;
-  assignedToId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  closedAt: Date | null;
-  resolutionNotes?: string | null;
-  organization?: { id: string; name: string; slug: string };
-  project?: { projectNumber: string; title: string } | null;
-  createdBy?: { id: string; name: string; email: string };
-  assignedTo?: { id: string; name: string; email: string } | null;
-}) {
-  const projectLabel =
-    row.project?.projectNumber && row.project?.title
-      ? `${row.project.projectNumber} — ${row.project.title}`
-      : null;
-  return {
-    id: row.id,
-    ticketNumber: row.ticketNumber,
-    organizationId: row.organizationId,
-    organization: row.organization,
-    projectLabel,
-    type: row.type,
-    priority: row.priority,
-    status: row.status,
-    subject: row.subject,
-    description: row.description,
-    resolutionNotes: row.resolutionNotes ?? null,
-    createdById: row.createdById,
-    createdBy: row.createdBy,
-    assignedToId: row.assignedToId,
-    assignedTo: row.assignedTo,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-    closedAt: row.closedAt?.toISOString() ?? null,
-  };
-}
+const serializeTicket = serializeTicketRow;
 
 router.get("/activity/recent", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
@@ -209,11 +166,7 @@ router.get("/", async (req: TicketingRequest, res) => {
   const rows = await prisma.ticket.findMany({
     where,
     orderBy: { updatedAt: "desc" },
-    include: {
-      organization: { select: { id: true, name: true, slug: true } },
-      createdBy: { select: { id: true, name: true, email: true } },
-      assignedTo: { select: { id: true, name: true, email: true } },
-    },
+    include: ticketDetailIncludes,
   });
 
   res.json({ data: rows.map(serializeTicket) });
@@ -255,12 +208,9 @@ router.post("/", async (req: TicketingRequest, res) => {
       subject: String(parsed.data.subject).trim(),
       description: String(parsed.data.description).trim(),
       createdById: user.id,
+      updatedById: user.id,
     },
-    include: {
-      organization: { select: { id: true, name: true, slug: true } },
-      createdBy: { select: { id: true, name: true, email: true } },
-      assignedTo: { select: { id: true, name: true, email: true } },
-    },
+    include: ticketDetailIncludes,
   });
 
   await logTicketAudit(ticket.id, user.id, "CREATED", {
@@ -274,11 +224,7 @@ router.post("/", async (req: TicketingRequest, res) => {
     void notifySupportGroupOfTicket(ticket.id);
     const refreshed = await prisma.ticket.findUnique({
       where: { id: ticket.id },
-      include: {
-        organization: { select: { id: true, name: true, slug: true } },
-        createdBy: { select: { id: true, name: true, email: true } },
-        assignedTo: { select: { id: true, name: true, email: true } },
-      },
+      include: ticketDetailIncludes,
     });
     if (refreshed) {
       return res.status(201).json({ data: serializeTicket(refreshed) });
@@ -306,10 +252,12 @@ router.get("/:id/attachments/:attachmentId/file", async (req: TicketingRequest, 
 
 router.get("/assignees", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
+  const staffTbosRole = (user.tbosRole ?? "").toLowerCase();
   const mayListAssignees =
-    (user.role === "CONSULTANT" && user.consultantVerified) ||
-    user.tbosRole === "customer_support" ||
-    user.tbosRole === "admin";
+    (user.role === "CONSULTANT" && (user.consultantVerified || Boolean(user.tbosAdminUserId))) ||
+    staffTbosRole === "customer_support" ||
+    staffTbosRole === "admin" ||
+    staffTbosRole === "project_manager";
   if (!mayListAssignees) {
     return res.json({ data: [] });
   }
@@ -338,10 +286,7 @@ router.get("/:id", async (req: TicketingRequest, res) => {
   const ticket = await prisma.ticket.findUnique({
     where: { id: req.params.id },
     include: {
-      organization: { select: { id: true, name: true, slug: true } },
-      project: { select: { projectNumber: true, title: true } },
-      createdBy: { select: { id: true, name: true, email: true } },
-      assignedTo: { select: { id: true, name: true, email: true } },
+      ...ticketDetailIncludes,
       attachments: { orderBy: { createdAt: "asc" } },
       auditLogs: { orderBy: { createdAt: "desc" }, take: 100, include: { actor: { select: { id: true, name: true } } } },
     },
@@ -420,13 +365,8 @@ router.post("/:id/lifecycle", async (req: TicketingRequest, res) => {
 
   const updated = await prisma.ticket.update({
     where: { id: existing.id },
-    data,
-    include: {
-      organization: { select: { id: true, name: true, slug: true } },
-      project: { select: { projectNumber: true, title: true } },
-      createdBy: { select: { id: true, name: true, email: true } },
-      assignedTo: { select: { id: true, name: true, email: true } },
-    },
+    data: { ...data, updatedById: user.id },
+    include: ticketDetailIncludes,
   });
 
   await logTicketAudit(existing.id, user.id, "UPDATED", {
@@ -497,12 +437,8 @@ router.patch("/:id", async (req: TicketingRequest, res) => {
 
   const updated = await prisma.ticket.update({
     where: { id: existing.id },
-    data,
-    include: {
-      organization: { select: { id: true, name: true, slug: true } },
-      createdBy: { select: { id: true, name: true, email: true } },
-      assignedTo: { select: { id: true, name: true, email: true } },
-    },
+    data: { ...data, updatedById: user.id },
+    include: ticketDetailIncludes,
   });
 
   for (const field of ["priority", "type", "assignedToId", "subject", "description"] as const) {
@@ -561,7 +497,7 @@ router.post("/:id/messages", async (req: TicketingRequest, res) => {
 
   await prisma.ticket.update({
     where: { id: ticket.id },
-    data: { updatedAt: new Date(), ...statusPatch },
+    data: { updatedAt: new Date(), updatedById: user.id, ...statusPatch },
   });
 
   if (statusPatch.status) {

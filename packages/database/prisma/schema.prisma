@@ -1148,6 +1148,7 @@ model TicketingUser {
 
   createdTickets          Ticket[]                 @relation("TicketCreatedBy")
   assignedTickets         Ticket[]                 @relation("TicketAssignedTo")
+  updatedTickets          Ticket[]                 @relation("TicketUpdatedBy")
   messages                TicketMessage[]
   auditLogs               TicketAuditLog[]         @relation("AuditActor")
   consultantOrganizations ConsultantOrganization[]
@@ -1187,6 +1188,8 @@ model Ticket {
   createdBy      TicketingUser  @relation("TicketCreatedBy", fields: [createdById], references: [id])
   assignedToId   String?
   assignedTo     TicketingUser? @relation("TicketAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  updatedById    String?
+  updatedBy      TicketingUser? @relation("TicketUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   closedAt         DateTime?

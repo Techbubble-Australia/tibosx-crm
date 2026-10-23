@@ -15,6 +15,7 @@ import { TicketLifecycleActions } from "@/components/workspace/TicketLifecycleAc
 import { TicketStatusBadge } from "@/lib/ticket-status-styles";
 import { formatTicketAuditLine, type TicketAuditRow } from "@/lib/ticket-audit-display";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { TicketRecordMeta } from "@/components/support-tickets/TicketRecordMeta";
 
 type Assignee = { id: string; name: string; email: string };
 
@@ -34,6 +35,7 @@ type TicketDetail = {
   projectLabel?: string | null;
   organization?: { id: string; name: string };
   createdBy?: { id?: string; name: string; email: string };
+  updatedBy?: { id?: string; name: string; email: string } | null;
   assignedTo?: { id: string; name: string; email: string } | null;
   assignedToId?: string | null;
   messages: {
@@ -48,7 +50,7 @@ type TicketDetail = {
 };
 
 export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
-  const { impersonation, canManageProjects } = useAdminSession();
+  const { impersonation, canManageProjects, role: sessionRole } = useAdminSession();
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
   const [assignees, setAssignees] = useState<Assignee[]>([]);
   const [reply, setReply] = useState("");
@@ -182,7 +184,11 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
       ? "CONSULTANT"
       : "CLIENT";
   const canManageAssignee =
-    canManageProjects || staffImpersonating || (portalRole === "CONSULTANT" && !closedOrCancelled);
+    canManageProjects ||
+    sessionRole === "customer_support" ||
+    sessionRole === "admin" ||
+    staffImpersonating ||
+    (portalRole === "CONSULTANT" && !closedOrCancelled);
   const isCreator = staffImpersonating
     ? false
     : Boolean(
@@ -272,17 +278,17 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
         </Field>
       </section>
 
+      <TicketRecordMeta
+        createdBy={ticket.createdBy}
+        createdAt={ticket.createdAt}
+        updatedAt={ticket.updatedAt}
+        updatedBy={ticket.updatedBy}
+      />
+
       <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
         <h2 className="mb-2 font-semibold">Description</h2>
         <p className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{ticket.description}</p>
       </section>
-
-      {ticket.resolutionNotes?.trim() ? (
-        <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-          <h2 className="mb-2 font-semibold">Resolution notes</h2>
-          <p className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{ticket.resolutionNotes}</p>
-        </section>
-      ) : null}
 
       <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -343,6 +349,13 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
           </form>
         )}
       </section>
+
+      {ticket.resolutionNotes?.trim() ? (
+        <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <h2 className="mb-2 font-semibold">Resolution notes</h2>
+          <p className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{ticket.resolutionNotes}</p>
+        </section>
+      ) : null}
 
       {ticket.auditLogs && ticket.auditLogs.length > 0 ? (
         <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">

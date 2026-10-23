@@ -23,6 +23,7 @@ import {
 } from "../lib/ticket-lifecycle.js";
 import { autoCloseStaleResolvedTickets } from "../lib/auto-close-resolved-tickets.js";
 import { notifyAsync } from "../../lib/notifications/index.js";
+import { serializeTicketRow, ticketDetailIncludes } from "../lib/serialize-ticket.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -151,32 +152,11 @@ router.get("/tickets", async (req: TbosRequest, res) => {
   const rows = await prisma.ticket.findMany({
     where,
     orderBy: { updatedAt: "desc" },
-    include: {
-      organization: { select: { id: true, name: true, slug: true } },
-      createdBy: { select: { id: true, name: true, email: true } },
-      assignedTo: { select: { id: true, name: true, email: true } },
-    },
+    include: ticketDetailIncludes,
   });
 
   res.json({
-    data: rows.map((row) => ({
-      id: row.id,
-      ticketNumber: row.ticketNumber,
-      organizationId: row.organizationId,
-      organization: row.organization,
-      type: row.type,
-      priority: row.priority,
-      status: row.status,
-      subject: row.subject,
-      description: row.description,
-      createdById: row.createdById,
-      createdBy: row.createdBy,
-      assignedToId: row.assignedToId,
-      assignedTo: row.assignedTo,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
-      closedAt: row.closedAt?.toISOString() ?? null,
-    })),
+    data: rows.map((row) => serializeTicketRow(row)),
   });
 });
 
@@ -250,12 +230,9 @@ router.post("/tickets", async (req: TbosRequest, res) => {
       subject: parsed.data.subject.trim(),
       description: parsed.data.description.trim(),
       createdById: actorId,
+      updatedById: actorId,
     },
-    include: {
-      organization: { select: { id: true, name: true, slug: true } },
-      createdBy: { select: { id: true, name: true, email: true } },
-      assignedTo: { select: { id: true, name: true, email: true } },
-    },
+    include: ticketDetailIncludes,
   });
 
   await logTicketAudit(ticket.id, actorId, "CREATED", {
@@ -269,32 +246,14 @@ router.post("/tickets", async (req: TbosRequest, res) => {
     void notifySupportGroupOfTicket(ticket.id);
     const refreshed = await prisma.ticket.findUnique({
       where: { id: ticket.id },
-      include: {
-        organization: { select: { id: true, name: true, slug: true } },
-        createdBy: { select: { id: true, name: true, email: true } },
-        assignedTo: { select: { id: true, name: true, email: true } },
-      },
+      include: ticketDetailIncludes,
     });
     if (refreshed) {
-      return res.status(201).json({
-        data: {
-          ...refreshed,
-          createdAt: refreshed.createdAt.toISOString(),
-          updatedAt: refreshed.updatedAt.toISOString(),
-          closedAt: refreshed.closedAt?.toISOString() ?? null,
-        },
-      });
+      return res.status(201).json({ data: serializeTicketRow(refreshed) });
     }
   }
 
-  res.status(201).json({
-    data: {
-      ...ticket,
-      createdAt: ticket.createdAt.toISOString(),
-      updatedAt: ticket.updatedAt.toISOString(),
-      closedAt: ticket.closedAt?.toISOString() ?? null,
-    },
-  });
+  res.status(201).json({ data: serializeTicketRow(ticket) });
 });
 
 router.get("/tickets/:ticketId/attachments/:attachmentId/file", async (req: TbosRequest, res) => {
@@ -321,10 +280,7 @@ router.get("/tickets/:id", async (req: TbosRequest, res) => {
   const ticket = await prisma.ticket.findFirst({
     where: { id: req.params.id, ...orgScope },
     include: {
-      organization: { select: { id: true, name: true, slug: true } },
-      project: { select: { projectNumber: true, title: true } },
-      createdBy: { select: { id: true, name: true, email: true } },
-      assignedTo: { select: { id: true, name: true, email: true } },
+      ...ticketDetailIncludes,
       attachments: { orderBy: { createdAt: "asc" } },
       auditLogs: {
         orderBy: { createdAt: "desc" },
@@ -341,18 +297,10 @@ router.get("/tickets/:id", async (req: TbosRequest, res) => {
     include: { author: { select: { id: true, name: true, email: true, role: true } } },
   });
 
-  const projectLabel =
-    ticket.project?.projectNumber && ticket.project?.title
-      ? `${ticket.project.projectNumber} — ${ticket.project.title}`
-      : null;
-
   res.json({
     data: {
-      ...ticket,
-      projectLabel,
-      createdAt: ticket.createdAt.toISOString(),
-      updatedAt: ticket.updatedAt.toISOString(),
-      closedAt: ticket.closedAt?.toISOString() ?? null,
+      ...serializeTicketRow(ticket),
+      attachments: ticket.attachments,
       messages,
       auditLogs: ticket.auditLogs.map((log) => ({
         ...log,
@@ -412,7 +360,8 @@ router.post("/tickets/:id/lifecycle", async (req: TbosRequest, res) => {
 
   const updated = await prisma.ticket.update({
     where: { id: existing.id },
-    data,
+    data: { ...data, updatedById: actorId },
+    include: ticketDetailIncludes,
   });
 
   await logTicketAudit(existing.id, actorId, "UPDATED", {
@@ -429,14 +378,7 @@ router.post("/tickets/:id/lifecycle", async (req: TbosRequest, res) => {
     actorEmail: tbosUser.email,
   });
 
-  res.json({
-    data: {
-      ...updated,
-      createdAt: updated.createdAt.toISOString(),
-      updatedAt: updated.updatedAt.toISOString(),
-      closedAt: updated.closedAt?.toISOString() ?? null,
-    },
-  });
+  res.json({ data: serializeTicketRow(updated) });
 });
 
 router.post("/organizations/from-project/:projectId", requireTbosAdmin, async (req: TbosRequest, res) => {
@@ -558,12 +500,8 @@ router.get("/assignees", async (req: TbosRequest, res) => {
     return res.json({ data: rows });
   }
   if (isTbosAdminRole(tbosUser.role)) {
-    const rows = await prisma.ticketingUser.findMany({
-      where: { role: "CONSULTANT", consultantVerified: true, active: true },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, email: true },
-    });
-    return res.json({ data: rows });
+    const { listGlobalTicketAssignees } = await import("../../lib/ticket-project-assignees.js");
+    return res.json({ data: await listGlobalTicketAssignees() });
   }
   res.json({ data: [] });
 });
@@ -616,12 +554,8 @@ router.patch("/tickets/:id", async (req: TbosRequest, res) => {
 
   const updated = await prisma.ticket.update({
     where: { id: existing.id },
-    data,
-    include: {
-      organization: { select: { id: true, name: true, slug: true } },
-      createdBy: { select: { id: true, name: true, email: true } },
-      assignedTo: { select: { id: true, name: true, email: true } },
-    },
+    data: { ...data, updatedById: actorId },
+    include: ticketDetailIncludes,
   });
 
   for (const field of ["priority", "type", "assignedToId", "subject", "description"] as const) {
@@ -637,14 +571,7 @@ router.patch("/tickets/:id", async (req: TbosRequest, res) => {
     }
   }
 
-  res.json({
-    data: {
-      ...updated,
-      createdAt: updated.createdAt.toISOString(),
-      updatedAt: updated.updatedAt.toISOString(),
-      closedAt: updated.closedAt?.toISOString() ?? null,
-    },
-  });
+  res.json({ data: serializeTicketRow(updated) });
 });
 
 router.delete("/tickets/:id", requireTbosAdmin, async (req: TbosRequest, res) => {
@@ -706,7 +633,7 @@ router.post("/tickets/:id/messages", async (req: TbosRequest, res) => {
 
   await prisma.ticket.update({
     where: { id: ticket.id },
-    data: { updatedAt: new Date(), ...statusPatch },
+    data: { updatedAt: new Date(), updatedById: actorId, ...statusPatch },
   });
 
   if (statusPatch.status) {

@@ -327,8 +327,16 @@ export async function sendUserInviteEmail(input: {
 }): Promise<void> {
   const resend = requireResendClient();
   const greeting = `Hello ${input.name},`;
-  const text = `An account has been created for you on TIBOSX.\n\nSign-in email: ${input.to}\nTemporary password: ${input.temporaryPassword}\n\nSign in: ${input.loginUrl}${input.extraText ?? ""}`;
-  const bodyHtml = `<p>An account has been created for you on <strong>TIBOSX</strong>.</p><p>Sign-in email: <strong>${escapeHtml(input.to)}</strong><br/>Temporary password: <strong>${escapeHtml(input.temporaryPassword)}</strong></p><p><a href="${escapeHtml(input.loginUrl)}">Sign in to TIBOSX</a></p><p>You will set a new password and enroll in MFA on first sign-in.</p>`;
+  const text = `An account has been created for you on TIBOSX.\n\nSign-in email: ${input.to}\nTemporary password: ${input.temporaryPassword}\n\nSign in: ${input.loginUrl}\n\nYou will set a new password and enroll in MFA on first sign-in.${input.extraText ?? ""}`;
+  const bodyHtml = `<p>An account has been created for you on <strong>TIBOSX</strong>.</p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px 0;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;width:100%;">
+  <tr><td style="padding:12px 16px;font-size:14px;color:#374151;"><strong>Sign-in email</strong><br/>${escapeHtml(input.to)}</td></tr>
+  <tr><td style="padding:12px 16px;font-size:14px;color:#374151;border-top:1px solid #e5e7eb;"><strong>Temporary password</strong><br/><span style="font-family:ui-monospace,Menlo,monospace;">${escapeHtml(input.temporaryPassword)}</span></td></tr>
+</table>
+<p style="margin:20px 0;">
+  <a href="${escapeHtml(input.loginUrl)}" style="display:inline-block;background:${TIBOSX_EMAIL_BLUE};color:#ffffff;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:8px;">Sign in to TIBOSX</a>
+</p>
+<p style="font-size:14px;color:#4b5563;">You will set a new password and enroll in MFA on first sign-in.</p>`;
   const built = buildTibosxNotificationEmail({
     headerTitle: "Welcome to TIBOSX!",
     subjectLine: "Your account invitation",

@@ -16,8 +16,11 @@ type TicketRow = {
   priority: string;
   type: string;
   organization?: { name: string };
-  assignedTo?: { id: string; name: string; email: string } | null;
+  createdBy?: { name: string };
+  createdAt: string;
   updatedAt: string;
+  updatedBy?: { name: string } | null;
+  assignedTo?: { id: string; name: string; email: string } | null;
 };
 
 export default function SupportTicketsPage() {
@@ -118,15 +121,18 @@ export default function SupportTicketsPage() {
               <th className="px-4 py-3">Company</th>
               <th className="px-4 py-3">Priority</th>
               <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Assigned to</th>
+              <th className="px-4 py-3">Created by</th>
+              <th className="px-4 py-3">Created</th>
               <th className="px-4 py-3">Updated</th>
+              <th className="px-4 py-3">Updated by</th>
+              <th className="px-4 py-3">Assigned to</th>
               {role === "admin" ? <th className="px-4 py-3 w-12" aria-label="Actions" /> : null}
             </tr>
           </thead>
           <tbody className="divide-y dark:divide-gray-800">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={role === "admin" ? 7 : 6} className="px-4 py-8 text-center text-gray-500">No tickets found.</td>
+                <td colSpan={role === "admin" ? 10 : 9} className="px-4 py-8 text-center text-gray-500">No tickets found.</td>
               </tr>
             ) : (
               rows.map((row) => (
@@ -142,10 +148,13 @@ export default function SupportTicketsPage() {
                   <td className="px-4 py-3">
                     <TicketStatusBadge status={row.status} />
                   </td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.createdBy?.name ?? "—"}</td>
+                  <td className="px-4 py-3 text-gray-500">{new Date(row.createdAt).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-gray-500">{new Date(row.updatedAt).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.updatedBy?.name ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                     {row.assignedTo?.name ?? "Unassigned"}
                   </td>
-                  <td className="px-4 py-3 text-gray-500">{new Date(row.updatedAt).toLocaleString()}</td>
                   {role === "admin" ? (
                     <td className="px-4 py-3">
                       <button
