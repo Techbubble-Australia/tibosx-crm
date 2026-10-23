@@ -42,6 +42,7 @@ const messageSchema = z.object({
 
 const lifecycleSchema = z.object({
   action: z.enum(["reopen", "start_work", "client_info_needed", "resolve", "close", "cancel"]),
+  resolutionNotes: z.string().max(20000).optional(),
 });
 
 const ticketCreateSchema = z.object({
@@ -321,6 +322,7 @@ router.get("/tickets/:id", async (req: TbosRequest, res) => {
     where: { id: req.params.id, ...orgScope },
     include: {
       organization: { select: { id: true, name: true, slug: true } },
+      project: { select: { projectNumber: true, title: true } },
       createdBy: { select: { id: true, name: true, email: true } },
       assignedTo: { select: { id: true, name: true, email: true } },
       attachments: { orderBy: { createdAt: "asc" } },
@@ -339,9 +341,15 @@ router.get("/tickets/:id", async (req: TbosRequest, res) => {
     include: { author: { select: { id: true, name: true, email: true, role: true } } },
   });
 
+  const projectLabel =
+    ticket.project?.projectNumber && ticket.project?.title
+      ? `${ticket.project.projectNumber} — ${ticket.project.title}`
+      : null;
+
   res.json({
     data: {
       ...ticket,
+      projectLabel,
       createdAt: ticket.createdAt.toISOString(),
       updatedAt: ticket.updatedAt.toISOString(),
       closedAt: ticket.closedAt?.toISOString() ?? null,
@@ -383,7 +391,19 @@ router.post("/tickets/:id/lifecycle", async (req: TbosRequest, res) => {
   const nextStatus = nextStatusForLifecycleAction(existing.status, action);
   if (!nextStatus) return res.status(400).json({ error: "Invalid status transition" });
 
+  if (action === "resolve") {
+    const notes = parsed.data.resolutionNotes?.trim() ?? "";
+    if (!notes) {
+      return res.status(400).json({
+        error: "Resolution notes are mandatory before the ticket is resolved",
+      });
+    }
+  }
+
   const data: Record<string, unknown> = { status: nextStatus };
+  if (action === "resolve" && parsed.data.resolutionNotes?.trim()) {
+    data.resolutionNotes = parsed.data.resolutionNotes.trim();
+  }
   if (nextStatus === TicketStatus.CLOSED || nextStatus === TicketStatus.RESOLVED) {
     data.closedAt = new Date();
   } else if (nextStatus !== TicketStatus.CANCELLED) {

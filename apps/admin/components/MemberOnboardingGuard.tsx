@@ -11,6 +11,7 @@ const ALLOWED_PREFIXES = [
   "/change-password",
   "/mfa-setup",
   "/workspace",
+  "/timesheets",
 ];
 
 function pathAllowed(pathname: string) {

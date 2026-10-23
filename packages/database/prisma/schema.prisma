@@ -1185,7 +1185,8 @@ model Ticket {
   assignedTo     TicketingUser? @relation("TicketAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
-  closedAt       DateTime?
+  closedAt         DateTime?
+  resolutionNotes  String?        @db.Text
 
   messages    TicketMessage[]
   attachments TicketAttachment[]

@@ -427,15 +427,23 @@ export function TimesheetForm({
   }, [defaults.approverKind, defaults.projectClientContactId]);
 
   useEffect(() => {
-    void adminFetch("/api/admin/timesheets/active-projects")
+    const query = weekMonday
+      ? `?weekStart=${encodeURIComponent(weekMonday)}`
+      : "";
+    void adminFetch(`/api/admin/timesheets/active-projects${query}`)
       .then((r) => r.json())
       .then((data) => {
         const list = (data.data as ProjectOption[]) ?? [];
         setProjects(list);
-        if (!projectId && defaults.projectId) setProjectId(defaults.projectId);
-        else if (!projectId && list.length === 1) setProjectId(list[0]!.id);
+        if (projectId && !list.some((row) => row.id === projectId)) {
+          setProjectId("");
+        } else if (!projectId && defaults.projectId && list.some((row) => row.id === defaults.projectId)) {
+          setProjectId(defaults.projectId);
+        } else if (!projectId && list.length === 1) {
+          setProjectId(list[0]!.id);
+        }
       });
-  }, [defaults.projectId, projectId]);
+  }, [defaults.projectId, projectId, weekMonday]);
 
   useEffect(() => {
     if (!projectId) {

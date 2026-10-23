@@ -34,6 +34,7 @@ import {
 import {
   assertTimesheetWithinProjectDates,
   projectDateBoundsIso,
+  weekOverlapsProjectRange,
 } from "../lib/timesheet-project-dates";
 
 const router: IRouter = Router();
@@ -309,7 +310,12 @@ async function timesheetAccessWhere(req: AuthRequest): Promise<Prisma.TimesheetW
   return { OR: or };
 }
 
-async function assertMemberCanSubmitTimesheets(actorId: string, roles: string[]) {
+async function assertMemberCanSubmitTimesheets(
+  actorId: string,
+  roles: string[],
+  options?: { impersonatorId?: string },
+) {
+  if (options?.impersonatorId) return;
   if (!hasEffectiveRole(roles, "project_member")) return;
   if (roles.includes("admin") || roles.includes("project_manager")) return;
   const onboarding = await getMemberOnboardingStatus(actorId);
@@ -330,9 +336,18 @@ async function actorMayLogTimesheets(actorId: string, role: string): Promise<boo
 router.get("/active-projects", async (req: AuthRequest, res) => {
   try {
     const actorId = getActorId(req);
+    const weekStart =
+      typeof req.query.weekStart === "string" && req.query.weekStart.trim()
+        ? req.query.weekStart.trim()
+        : null;
     const projectMemberships = await listActiveProjectMembershipsForUser(actorId);
+    const rows = projectMemberships.filter((row) => {
+      if (!weekStart) return true;
+      const { startDate, endDate } = projectDateBoundsIso(row.project);
+      return weekOverlapsProjectRange(weekStart, startDate, endDate);
+    });
     res.json({
-      data: projectMemberships.map((row) => ({
+      data: rows.map((row) => ({
         id: row.project.id,
         label: `${row.project.projectNumber} — ${row.project.title}`,
         kind: row.project.kind,
@@ -789,7 +804,7 @@ router.post("/", async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Only project members can create timesheets" });
     }
     const data = timesheetSchema.parse(req.body);
-    await assertMemberCanSubmitTimesheets(actorId, roles);
+    await assertMemberCanSubmitTimesheets(actorId, roles, { impersonatorId: req.user?.impersonatorId });
 
     let resolved;
     try {
@@ -917,7 +932,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
     if (!(await actorMayLogTimesheets(actorId, role))) {
       return res.status(403).json({ error: "Only project members can edit timesheets" });
     }
-    await assertMemberCanSubmitTimesheets(actorId, roles);
+    await assertMemberCanSubmitTimesheets(actorId, roles, { impersonatorId: req.user?.impersonatorId });
     const existing = await prisma.timesheet.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: "Not found" });
     if (existing.memberUserId !== actorId) return res.status(403).json({ error: "Forbidden" });
@@ -1081,7 +1096,7 @@ router.post("/submit", async (req: AuthRequest, res) => {
     if (!(await actorMayLogTimesheets(actorId, role))) {
       return res.status(403).json({ error: "Only project members can submit timesheets" });
     }
-    await assertMemberCanSubmitTimesheets(actorId, roles);
+    await assertMemberCanSubmitTimesheets(actorId, roles, { impersonatorId: req.user?.impersonatorId });
     const ids = items.map((i) => i.id);
     const rows = await prisma.timesheet.findMany({
       where: { id: { in: ids }, memberUserId: actorId, status: "DRAFT" },

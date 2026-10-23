@@ -18,7 +18,9 @@ export async function listActiveProjectMembershipsForUser(userId: string) {
   const rows = await prisma.projectMember.findMany({
     where: { ...whereMember, project: { status: "ACTIVE" } },
     include: {
-      project: { select: { id: true, title: true, projectNumber: true, kind: true } },
+      project: {
+        select: { id: true, title: true, projectNumber: true, kind: true, startDate: true, endDate: true },
+      },
     },
     orderBy: { project: { updatedAt: "desc" } },
   });

@@ -342,7 +342,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
           (group.id === "workspace" && canAccessWorkspaceTimesheets);
         return groupAllowed && group.items.length > 0;
       });
-  }, [role, additionalRoles, canAccessProjectManagementTimesheets, canAccessWorkspaceTimesheets]);
+      }, [role, additionalRoles, canAccessProjectManagementTimesheets, canAccessWorkspaceTimesheets, impersonation]);
 
   function toggleGroup(id: string) {
     setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));

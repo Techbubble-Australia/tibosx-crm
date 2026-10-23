@@ -31,6 +31,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 
 const lifecycleSchema = z.object({
   action: z.enum(["reopen", "start_work", "client_info_needed", "resolve", "close", "cancel"]),
+  resolutionNotes: z.string().max(20000).optional(),
 });
 
 function serializeAuditLog(row: {
@@ -105,20 +106,28 @@ function serializeTicket(row: {
   createdAt: Date;
   updatedAt: Date;
   closedAt: Date | null;
+  resolutionNotes?: string | null;
   organization?: { id: string; name: string; slug: string };
+  project?: { projectNumber: string; title: string } | null;
   createdBy?: { id: string; name: string; email: string };
   assignedTo?: { id: string; name: string; email: string } | null;
 }) {
+  const projectLabel =
+    row.project?.projectNumber && row.project?.title
+      ? `${row.project.projectNumber} — ${row.project.title}`
+      : null;
   return {
     id: row.id,
     ticketNumber: row.ticketNumber,
     organizationId: row.organizationId,
     organization: row.organization,
+    projectLabel,
     type: row.type,
     priority: row.priority,
     status: row.status,
     subject: row.subject,
     description: row.description,
+    resolutionNotes: row.resolutionNotes ?? null,
     createdById: row.createdById,
     createdBy: row.createdBy,
     assignedToId: row.assignedToId,
@@ -330,6 +339,7 @@ router.get("/:id", async (req: TicketingRequest, res) => {
     where: { id: req.params.id },
     include: {
       organization: { select: { id: true, name: true, slug: true } },
+      project: { select: { projectNumber: true, title: true } },
       createdBy: { select: { id: true, name: true, email: true } },
       assignedTo: { select: { id: true, name: true, email: true } },
       attachments: { orderBy: { createdAt: "asc" } },
@@ -389,7 +399,19 @@ router.post("/:id/lifecycle", async (req: TicketingRequest, res) => {
     return res.status(400).json({ error: "Invalid status transition" });
   }
 
+  if (action === "resolve") {
+    const notes = parsed.data.resolutionNotes?.trim() ?? "";
+    if (!notes) {
+      return res.status(400).json({
+        error: "Resolution notes are mandatory before the ticket is resolved",
+      });
+    }
+  }
+
   const data: Record<string, unknown> = { status: nextStatus };
+  if (action === "resolve" && parsed.data.resolutionNotes?.trim()) {
+    data.resolutionNotes = parsed.data.resolutionNotes.trim();
+  }
   if (nextStatus === TicketStatus.CLOSED || nextStatus === TicketStatus.RESOLVED) {
     data.closedAt = new Date();
   } else if (nextStatus !== TicketStatus.CANCELLED) {
@@ -401,6 +423,7 @@ router.post("/:id/lifecycle", async (req: TicketingRequest, res) => {
     data,
     include: {
       organization: { select: { id: true, name: true, slug: true } },
+      project: { select: { projectNumber: true, title: true } },
       createdBy: { select: { id: true, name: true, email: true } },
       assignedTo: { select: { id: true, name: true, email: true } },
     },

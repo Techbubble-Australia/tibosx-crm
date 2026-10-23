@@ -30,6 +30,8 @@ type TicketDetail = {
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
+  resolutionNotes?: string | null;
+  projectLabel?: string | null;
   organization?: { id: string; name: string };
   createdBy?: { id?: string; name: string; email: string };
   assignedTo?: { id: string; name: string; email: string } | null;
@@ -54,6 +56,7 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [resolutionNotes, setResolutionNotes] = useState("");
   const [session, setSession] = useState<{
     ticketingUserId: string;
     role: string | null;
@@ -65,7 +68,9 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
       .then(async (res) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load ticket");
-        setTicket(data.data as TicketDetail);
+        const row = data.data as TicketDetail;
+        setTicket(row);
+        setResolutionNotes(row.resolutionNotes ?? "");
         setError("");
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"));
@@ -85,13 +90,13 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
       .then((data) => setAssignees((data.data as Assignee[]) ?? []));
   }, [reload, ticketId]);
 
-  async function runLifecycle(action: string) {
+  async function runLifecycle(action: string, payload?: { resolutionNotes?: string }) {
     setSaving(true);
     try {
       const res = await adminFetch(`/api/admin/ticketing/tickets/${ticketId}/lifecycle`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, ...payload }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Action failed");
@@ -195,7 +200,7 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
         <p className="text-sm text-gray-500">{ticket.ticketNumber}</p>
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{ticket.subject}</h1>
         <p className="mt-1 text-sm text-gray-500">
-          {ticket.organization?.name ?? "—"}
+          {ticket.projectLabel ?? ticket.organization?.name ?? "—"}
           {ticket.createdBy ? ` · opened by ${ticket.createdBy.name}` : ""}
         </p>
         <p className="text-xs text-gray-400">
@@ -210,6 +215,8 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
           role={portalRole}
           isCreator={isCreator}
           disabled={saving}
+          resolutionNotes={resolutionNotes}
+          onResolutionNotesChange={setResolutionNotes}
           onAction={runLifecycle}
         />
       ) : null}
@@ -269,6 +276,13 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
         <h2 className="mb-2 font-semibold">Description</h2>
         <p className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{ticket.description}</p>
       </section>
+
+      {ticket.resolutionNotes?.trim() ? (
+        <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <h2 className="mb-2 font-semibold">Resolution notes</h2>
+          <p className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{ticket.resolutionNotes}</p>
+        </section>
+      ) : null}
 
       <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">

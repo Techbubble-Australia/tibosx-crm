@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { adminFetch } from "@/lib/admin-api";
 import { workspaceFetch } from "@/lib/workspace-fetch";
 import {
   isTerminalTicketStatus,
@@ -40,6 +41,8 @@ type TicketDetail = {
   assignedToId?: string | null;
   assignedTo?: { id: string; name: string; email: string } | null;
   organization?: { name: string };
+  projectLabel?: string | null;
+  resolutionNotes?: string | null;
   messages: Message[];
   attachments: { id: string; fileName: string; fileUrl: string; fileSize?: number | null }[];
   auditLogs?: TicketAuditRow[];
@@ -57,6 +60,7 @@ export default function TicketDetailPage() {
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [assignees, setAssignees] = useState<Assignee[]>([]);
+  const [resolutionNotes, setResolutionNotes] = useState("");
 
   function reload() {
     void workspaceFetch(`/tickets/${id}`)
@@ -65,6 +69,7 @@ export default function TicketDetailPage() {
         const t = data.data as TicketDetail;
         setTicket(t);
         setDescription(t.description);
+        setResolutionNotes(t.resolutionNotes ?? "");
       });
   }
 
@@ -73,11 +78,18 @@ export default function TicketDetailPage() {
     void workspaceFetch("/auth/me")
       .then((res) => res.json())
       .then((data) => setMe(data.data as { id: string; role: string }));
-    void workspaceFetch(`/tickets/assignees?ticketId=${encodeURIComponent(id)}`)
+  }, [id]);
+
+  useEffect(() => {
+    const staffImpersonating = Boolean(impersonation);
+    const load = staffImpersonating
+      ? adminFetch(`/api/admin/ticketing/assignees?ticketId=${encodeURIComponent(id)}`)
+      : workspaceFetch(`/tickets/assignees?ticketId=${encodeURIComponent(id)}`);
+    void load
       .then((res) => res.json())
       .then((data) => setAssignees((data.data as Assignee[]) ?? []))
       .catch(() => setAssignees([]));
-  }, [id]);
+  }, [id, impersonation]);
 
   async function savePatch(body: Record<string, unknown>) {
     setSaving(true);
@@ -95,12 +107,12 @@ export default function TicketDetailPage() {
     reload();
   }
 
-  async function runLifecycle(action: string) {
+  async function runLifecycle(action: string, payload?: { resolutionNotes?: string }) {
     setSaving(true);
     const res = await workspaceFetch(`/tickets/${id}/lifecycle`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ action, ...payload }),
     });
     setSaving(false);
     if (!res.ok) {
@@ -149,7 +161,8 @@ export default function TicketDetailPage() {
   }
 
   const staffImpersonating = Boolean(impersonation);
-  const lifecycleRole = staffImpersonating ? "CONSULTANT" : (me?.role ?? "");
+  const lifecycleRole =
+    staffImpersonating || me?.role === "CONSULTANT" ? "CONSULTANT" : (me?.role ?? "");
   const isConsultant = lifecycleRole === "CONSULTANT";
   const isClient = lifecycleRole === "CLIENT";
   const isCreator = staffImpersonating ? false : Boolean(me?.id && ticket.createdById === me.id);
@@ -164,7 +177,9 @@ export default function TicketDetailPage() {
       <div>
         <p className="text-sm text-gray-500">{ticket.ticketNumber}</p>
         <h1 className="text-2xl font-semibold">{ticket.subject}</h1>
-        {ticket.organization ? <p className="text-sm text-gray-500">{ticket.organization.name}</p> : null}
+        {ticket.projectLabel || ticket.organization?.name ? (
+          <p className="text-sm text-gray-500">{ticket.projectLabel ?? ticket.organization?.name}</p>
+        ) : null}
       </div>
 
       {!closedOrCancelled ? (
@@ -173,6 +188,8 @@ export default function TicketDetailPage() {
           role={lifecycleRole}
           isCreator={isCreator}
           disabled={saving}
+          resolutionNotes={resolutionNotes}
+          onResolutionNotesChange={setResolutionNotes}
           onAction={runLifecycle}
         />
       ) : null}

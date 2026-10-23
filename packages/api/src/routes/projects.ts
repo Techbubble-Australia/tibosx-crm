@@ -939,6 +939,13 @@ router.put("/:id", async (req: AuthRequest, res) => {
       await replaceEstimates(tx, projectId, estimates);
       await replaceActuals(tx, projectId, actuals);
       await logProjectFieldChanges(tx, projectId, beforeSnapshot, afterSnapshot, getActorId(req) || null);
+      if (afterSnapshot.title !== beforeSnapshot.title) {
+        const orgName = `${existing.projectNumber} — ${afterSnapshot.title}`;
+        await tx.organization.updateMany({
+          where: { projectId },
+          data: { name: orgName },
+        });
+      }
     });
 
     if (data.forCustomerSupport !== undefined) {
