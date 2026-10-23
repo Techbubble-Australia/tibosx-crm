@@ -16,6 +16,7 @@ type TicketRow = {
   priority: string;
   type: string;
   organization?: { name: string };
+  assignedTo?: { id: string; name: string; email: string } | null;
   updatedAt: string;
 };
 
@@ -117,6 +118,7 @@ export default function SupportTicketsPage() {
               <th className="px-4 py-3">Company</th>
               <th className="px-4 py-3">Priority</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Assigned to</th>
               <th className="px-4 py-3">Updated</th>
               {role === "admin" ? <th className="px-4 py-3 w-12" aria-label="Actions" /> : null}
             </tr>
@@ -124,7 +126,7 @@ export default function SupportTicketsPage() {
           <tbody className="divide-y dark:divide-gray-800">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={role === "admin" ? 6 : 5} className="px-4 py-8 text-center text-gray-500">No tickets found.</td>
+                <td colSpan={role === "admin" ? 7 : 6} className="px-4 py-8 text-center text-gray-500">No tickets found.</td>
               </tr>
             ) : (
               rows.map((row) => (
@@ -139,6 +141,9 @@ export default function SupportTicketsPage() {
                   <td className="px-4 py-3">{TICKET_PRIORITY_LABELS[row.priority] ?? row.priority}</td>
                   <td className="px-4 py-3">
                     <TicketStatusBadge status={row.status} />
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                    {row.assignedTo?.name ?? "Unassigned"}
                   </td>
                   <td className="px-4 py-3 text-gray-500">{new Date(row.updatedAt).toLocaleString()}</td>
                   {role === "admin" ? (

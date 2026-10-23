@@ -56,7 +56,7 @@ export function SignatureCaptureDialog({ open, title = "Add your signature", onC
   }, [open, reset]);
 
   useEffect(() => {
-    if (!open || tab !== "draw") return;
+    if (!open) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -71,8 +71,10 @@ export function SignatureCaptureDialog({ open, title = "Add your signature", onC
       ctx.lineWidth = 2;
       ctx.lineCap = "round";
       ctx.strokeStyle = "#111827";
-      historyRef.current = [];
-      redoRef.current = [];
+      if (tab === "draw") {
+        historyRef.current = [];
+        redoRef.current = [];
+      }
     };
     resize();
     window.addEventListener("resize", resize);
@@ -161,7 +163,28 @@ export function SignatureCaptureDialog({ open, title = "Add your signature", onC
     reader.readAsDataURL(file);
   }
 
-  const canInsert = legalAck && Boolean(preview);
+  function exportCanvasPng(): string | null {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    try {
+      return canvas.toDataURL("image/png", 0.92);
+    } catch {
+      return preview;
+    }
+  }
+
+  function clearCanvasSurface() {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  const canInsert =
+    legalAck &&
+    ((tab === "type" && typedName.trim().length > 0) ||
+      (tab === "upload" && Boolean(preview)) ||
+      (tab === "draw" && Boolean(preview)));
 
   if (!open) return null;
 
@@ -188,7 +211,9 @@ export function SignatureCaptureDialog({ open, title = "Add your signature", onC
               type="button"
               onClick={() => {
                 setTab(id);
+                setTypedName("");
                 setPreview(null);
+                clearCanvasSurface();
               }}
               className={`flex flex-1 items-center justify-center gap-2 border-b-2 px-3 py-3 text-sm font-medium ${
                 tab === id
@@ -297,7 +322,14 @@ export function SignatureCaptureDialog({ open, title = "Add your signature", onC
             type="button"
             disabled={!canInsert}
             onClick={() => {
-              if (preview) onInsert(preview);
+              if (tab === "type" && typedName.trim()) {
+                applyTyped();
+              }
+              const dataUrl =
+                tab === "upload"
+                  ? preview
+                  : exportCanvasPng() ?? preview;
+              if (dataUrl?.startsWith("data:image/")) onInsert(dataUrl);
             }}
             className="shrink-0 rounded-lg bg-sky-600 px-5 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
           >

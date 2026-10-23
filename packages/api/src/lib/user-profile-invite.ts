@@ -1,4 +1,5 @@
 import { prisma } from "@techbubble/database";
+import { isMemberConsultantProfileExempt } from "./admin-roles";
 import {
   addressComplete,
   bankDetailsComplete,
@@ -34,14 +35,19 @@ export async function isAdminUserProfileFullyComplete(userId: string): Promise<b
 
 /** Bump invite counter; require profile onboarding modal only when profile was empty at invite time. */
 export async function recordTbUserInvite(userId: string): Promise<void> {
-  const complete = await isAdminUserProfileFullyComplete(userId);
+  const user = await prisma.adminUser.findUnique({
+    where: { id: userId },
+    select: { role: true, additionalRoles: true },
+  });
+  const profileExempt = user
+    ? isMemberConsultantProfileExempt(user.role, user.additionalRoles)
+    : false;
+  const complete = profileExempt || (await isAdminUserProfileFullyComplete(userId));
   await prisma.adminUser.update({
     where: { id: userId },
     data: {
       inviteCount: { increment: 1 },
-      ...(complete
-        ? { profileOnboardingRequiredAt: null }
-        : { profileOnboardingRequiredAt: new Date() }),
+      profileOnboardingRequiredAt: complete ? null : new Date(),
     },
   });
 }

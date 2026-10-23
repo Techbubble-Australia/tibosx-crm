@@ -31,7 +31,7 @@ export function AdminRolesMultiSelect({ value, onChange }: Props) {
   return (
     <div className="space-y-2">
       <div className="grid gap-2 sm:grid-cols-2">
-        {ADMIN_ROLES.map((role) => (
+        {ADMIN_ROLES.filter((role) => role !== "client").map((role) => (
           <label
             key={role}
             className="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-600"

@@ -45,7 +45,7 @@ type ActivityRow = {
 };
 
 export default function ProfileSettingsPageInner() {
-  const { refreshSession, additionalRoles } = useAdminSession();
+  const { refreshSession, additionalRoles, role: sessionRole, memberOnboarding } = useAdminSession();
   const router = useRouter();
   const searchParams = useSearchParams();
   const onboarding = searchParams.get("onboarding") === "1";
@@ -79,12 +79,18 @@ export default function ProfileSettingsPageInner() {
   const [confirmPassword, setConfirmPassword] = useState("");
 
   const staffExemptFromConsultantProfile =
+    sessionRole === "admin" ||
+    sessionRole === "project_manager" ||
     role === "admin" ||
     role === "project_manager" ||
     additionalRoles.includes("admin") ||
     additionalRoles.includes("project_manager");
   const isProjectMemberOnboarding = onboarding && role === "project_member";
-  const showConsultantOnboardingBanner = onboarding && !staffExemptFromConsultantProfile;
+  const showConsultantOnboardingBanner =
+    onboarding &&
+    !staffExemptFromConsultantProfile &&
+    !loading &&
+    !memberOnboarding?.profileComplete;
   const addressFieldsRequired = role === "project_member" || isProjectMemberOnboarding;
   const canEditAccountFields = role === "admin";
 

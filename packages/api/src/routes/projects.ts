@@ -584,8 +584,8 @@ router.post("/my-agreement/sign", async (req: AuthRequest, res) => {
 
     const body = z
       .object({
-        signatureDataUrl: z.string().min(1).max(500_000).optional(),
-        signatures: z.record(z.string().min(1), z.string().min(1).max(500_000)).optional(),
+        signatureDataUrl: z.string().min(1).max(2_500_000).optional(),
+        signatures: z.record(z.string().min(1), z.string().min(1).max(2_500_000)).optional(),
       })
       .parse(req.body);
 

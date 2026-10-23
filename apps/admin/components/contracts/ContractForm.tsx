@@ -535,8 +535,8 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   }
 
   async function persistFileUrls(nextUrls: string[]) {
-    if (!defaults.id || isEditable) {
-      setFileUrls(nextUrls);
+    setFileUrls(nextUrls);
+    if (!defaults.id) {
       return;
     }
     setSavingFiles(true);

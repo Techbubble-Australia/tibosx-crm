@@ -57,6 +57,13 @@ export async function getMemberOnboardingStatus(userId: string): Promise<MemberO
     !consultantProfileExempt &&
     Boolean(user?.profileOnboardingRequiredAt && !user.profileDetailsCompletedAt);
 
+  if (consultantProfileExempt && user?.profileOnboardingRequiredAt) {
+    await prisma.adminUser.update({
+      where: { id: userId },
+      data: { profileOnboardingRequiredAt: null },
+    });
+  }
+
   return {
     hasAgreementAssignment,
     agreementSigned,

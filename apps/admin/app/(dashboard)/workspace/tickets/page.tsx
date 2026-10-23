@@ -15,6 +15,7 @@ type TicketRow = {
   type: string;
   priority: string;
   organization?: { name: string };
+  assignedTo?: { id: string; name: string; email: string } | null;
   updatedAt: string;
 };
 
@@ -72,6 +73,7 @@ export default function TicketsPage() {
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Priority</th>
                 <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Assigned to</th>
                 <th className="px-4 py-3">Updated</th>
               </tr>
             </thead>
@@ -90,6 +92,7 @@ export default function TicketsPage() {
                   <td className="px-4 py-3">
                     <TicketStatusBadge status={row.status} />
                   </td>
+                  <td className="px-4 py-3 text-gray-600">{row.assignedTo?.name ?? "Unassigned"}</td>
                   <td className="px-4 py-3 text-gray-500">{new Date(row.updatedAt).toLocaleString()}</td>
                 </tr>
               ))}

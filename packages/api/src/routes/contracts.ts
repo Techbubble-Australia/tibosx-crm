@@ -36,6 +36,7 @@ import {
   syncProfileAvailableFlag,
 } from "../lib/contract-profiles";
 import { createProjectFromContract } from "../lib/create-project-from-contract";
+import { normalizeContractFileUrls } from "../lib/contract-file-urls";
 import { toNumber, toNumberOrNull } from "../lib/decimal";
 
 const router: IRouter = Router();
@@ -705,9 +706,7 @@ function serializeContract(row: {
   const contractValue = toNumber(row.contractValue);
   const totalVariation = toNumber(row.totalVariation);
   const consumed = toNumber(row.consumed);
-  const fileUrls = Array.isArray(row.fileUrls)
-    ? row.fileUrls.filter((url): url is string => typeof url === "string")
-    : [];
+  const fileUrls = normalizeContractFileUrls(row.fileUrls);
   const variationRows = row.variations ?? [];
   const { latestVariationStartDate, latestVariationEndDate } = latestVariationDates(variationRows);
   const hasCareerApplication = Boolean(row.careerApplication?.id);
@@ -1322,9 +1321,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
       comments: data.comments ?? existing.comments,
       fileUrls:
         data.fileUrls ??
-        (Array.isArray(existing.fileUrls)
-          ? existing.fileUrls.filter((url): url is string => typeof url === "string")
-          : []),
+        normalizeContractFileUrls(existing.fileUrls),
       ownerId: existing.ownerId,
     };
 

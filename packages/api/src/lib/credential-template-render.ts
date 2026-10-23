@@ -34,6 +34,56 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/** Replace the full contents of a signature capture div (handles nested divs in template HTML). */
+function replaceSignatureCaptureDiv(html: string, captureId: string, innerHtml: string): string {
+  const marker = `data-signature-capture="${captureId}"`;
+  let searchFrom = 0;
+
+  while (searchFrom < html.length) {
+    const markerIndex = html.indexOf(marker, searchFrom);
+    if (markerIndex === -1) return html;
+
+    const divStart = html.lastIndexOf("<div", markerIndex);
+    if (divStart === -1) return html;
+
+    const openTagEnd = html.indexOf(">", divStart);
+    if (openTagEnd === -1) return html;
+
+    let depth = 0;
+    let i = divStart;
+    let replaced = false;
+
+    while (i < html.length) {
+      const slice = html.slice(i);
+      const openMatch = slice.match(/^<div\b/i);
+      const closeMatch = slice.match(/^<\/div>/i);
+
+      if (openMatch) {
+        depth += 1;
+        i += openMatch[0].length;
+        continue;
+      }
+      if (closeMatch) {
+        depth -= 1;
+        i += closeMatch[0].length;
+        if (depth === 0) {
+          const openTag = html.slice(divStart, openTagEnd + 1);
+          html = html.slice(0, divStart) + openTag + innerHtml + html.slice(i);
+          searchFrom = divStart + openTag.length + innerHtml.length;
+          replaced = true;
+          break;
+        }
+        continue;
+      }
+      i += 1;
+    }
+
+    if (!replaced) return html;
+  }
+
+  return html;
+}
+
 export function renderTemplateHtml(
   html: string,
   values: Record<string, string>,
@@ -70,10 +120,9 @@ export function renderTemplateHtml(
       year: "numeric",
     });
     const signatureImg = `<img src="${signatureDataUrl}" alt="Signature" style="max-height:80px;display:block;" /><p style="font-size:11px;color:#444;margin:6px 0 0;">Signed on ${signedDate}</p>`;
-    rendered = rendered.replace(
-      /<div([^>]*data-signature-capture="[^"]+"[^>]*)>\s*<\/div>/gi,
-      `<div$1>${signatureImg}</div>`,
-    );
+    for (const captureId of listSignatureCaptureIds(rendered)) {
+      rendered = replaceSignatureCaptureDiv(rendered, captureId, signatureImg);
+    }
   }
 
   return rendered;
@@ -95,11 +144,7 @@ export function renderTemplateHtmlWithSignatures(
   for (const [captureId, dataUrl] of Object.entries(signaturesByCaptureId)) {
     if (!dataUrl.startsWith("data:image/")) continue;
     const signatureImg = `<img src="${dataUrl}" alt="Signature" style="max-height:80px;display:block;" /><p style="font-size:11px;color:#444;margin:6px 0 0;">Signed on ${signedDate}</p>`;
-    const escaped = captureId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    rendered = rendered.replace(
-      new RegExp(`<div([^>]*data-signature-capture="${escaped}"[^>]*)>\\s*</div>`, "gi"),
-      `<div$1>${signatureImg}</div>`,
-    );
+    rendered = replaceSignatureCaptureDiv(rendered, captureId, signatureImg);
     rendered = rendered.replace(new RegExp(`\\{Date\\}`, "gi"), signedDate);
   }
 

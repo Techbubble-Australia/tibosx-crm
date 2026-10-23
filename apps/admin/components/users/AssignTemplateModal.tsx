@@ -179,7 +179,7 @@ export function AssignTemplateModal({
               {selectedTemplate?.addStartDate ? (
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Start date
+                    Agreement start date
                     {selectedTemplate.requireStartDate ? <span className="text-red-500"> *</span> : null}
                   </label>
                   <input
@@ -194,7 +194,7 @@ export function AssignTemplateModal({
               {selectedTemplate?.addEndDate ? (
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    End date
+                    Agreement end date
                     {selectedTemplate.requireEndDate ? <span className="text-red-500"> *</span> : null}
                   </label>
                   <input

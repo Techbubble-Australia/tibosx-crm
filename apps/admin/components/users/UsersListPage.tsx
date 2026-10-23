@@ -80,7 +80,11 @@ export function UsersListPage({ activeOnly }: { activeOnly: boolean }) {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const scopedRows = useMemo(
-    () => rows.filter((row) => (activeOnly ? row.active : !row.active)),
+    () =>
+      rows.filter((row) => {
+        if (row.role === "client" || row.additionalRoles?.includes("client")) return false;
+        return activeOnly ? row.active : !row.active;
+      }),
     [rows, activeOnly],
   );
 

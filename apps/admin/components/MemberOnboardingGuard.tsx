@@ -21,7 +21,7 @@ function pathAllowed(pathname: string) {
 export function MemberOnboardingGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { role, additionalRoles } = useAdminSession();
+  const { role, additionalRoles, impersonation } = useAdminSession();
   const staffExemptFromConsultantProfile =
     role === "admin" ||
     role === "project_manager" ||
@@ -30,7 +30,7 @@ export function MemberOnboardingGuard({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     if (pathAllowed(pathname)) return;
-    if (staffExemptFromConsultantProfile) return;
+    if (staffExemptFromConsultantProfile || impersonation) return;
 
     void adminFetch("/api/auth/me")
       .then((res) => res.json())
@@ -48,7 +48,7 @@ export function MemberOnboardingGuard({ children }: { children: React.ReactNode 
         }
       })
       .catch(() => undefined);
-  }, [pathname, router, staffExemptFromConsultantProfile]);
+  }, [pathname, router, staffExemptFromConsultantProfile, impersonation]);
 
   return children;
 }
