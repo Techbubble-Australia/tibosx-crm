@@ -104,7 +104,7 @@ export default function NewTimesheetPage() {
       <div>
         <Link
           href="/timesheets"
-          className="mb-4 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+          className="mb-2 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
         >
           <ArrowLeft className="h-4 w-4" /> Back to timesheets
         </Link>

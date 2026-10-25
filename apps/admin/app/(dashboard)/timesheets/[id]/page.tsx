@@ -156,12 +156,12 @@ export default function TimesheetDetailPage() {
   return (
     <ProjectManagementGuard>
       <div>
-        <Link href="/timesheets" className="mb-2 inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100">
+        <Link href="/timesheets" className="mb-1 inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100">
           <ArrowLeft className="h-4 w-4" /> Back to timesheets
         </Link>
 
         {timesheet ? (
-          <div className="mb-2 flex justify-end">
+          <div className="mb-1 flex justify-end">
             <button
               type="button"
               onClick={() => void exportCsv()}
@@ -174,7 +174,7 @@ export default function TimesheetDetailPage() {
         ) : null}
 
         {awaitingClient ? (
-          <div className="mb-6 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">
+          <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">
             Waiting for approver
             {timesheet.approverLabel ? ` (${timesheet.approverLabel})` : ""} in the{" "}
             <strong>TIBOSX workspace</strong> to approve/reject this timesheet.

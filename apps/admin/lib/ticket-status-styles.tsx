@@ -26,7 +26,7 @@ export function TicketStatusBadge({ status }: { status: string | null | undefine
   const label = ticketStatusLabel(status);
   return (
     <span
-      className={`inline-flex min-h-[1.5rem] items-center rounded-md px-2.5 py-1 text-xs font-semibold ${ticketStatusBadgeClass(status)}`}
+      className={`inline-flex min-h-[1.5rem] whitespace-nowrap items-center rounded-md px-2.5 py-1 text-xs font-semibold ${ticketStatusBadgeClass(status)}`}
     >
       {label}
     </span>

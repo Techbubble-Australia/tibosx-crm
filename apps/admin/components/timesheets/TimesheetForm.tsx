@@ -735,13 +735,13 @@ export function TimesheetForm({
         ) : null}
 
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-950">
-          <div className="border-b border-gray-100 px-5 py-3 dark:border-gray-800">
+          <div className="border-b border-gray-100 px-5 py-2.5 dark:border-gray-800">
             <div className="flex items-start justify-between gap-4">
-              <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{pageTitle}</h1>
+              <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{pageTitle}</h1>
               <TimesheetStatusBadge status={status} />
             </div>
 
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Project <span className="text-red-500">*</span>
@@ -823,8 +823,8 @@ export function TimesheetForm({
             </div>
           </div>
 
-          <div className="px-6 py-4">
-            <div className="mb-3 flex items-end justify-between gap-4">
+          <div className="px-5 py-3">
+            <div className="mb-2 flex items-end justify-between gap-4">
               <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Time Entries</h2>
               <div className="text-right">
                 <p className="text-xs text-gray-500 dark:text-gray-400">Weekly Total</p>
@@ -975,8 +975,8 @@ export function TimesheetForm({
             ) : null}
           </div>
 
-          <div className="border-t border-gray-100 px-6 py-5 dark:border-gray-800">
-            <h2 className="mb-4 text-base font-semibold text-gray-900 dark:text-gray-100">
+          <div className="border-t border-gray-100 px-5 py-3 dark:border-gray-800">
+            <h2 className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">
               Submission Details
             </h2>
 
@@ -1031,7 +1031,7 @@ export function TimesheetForm({
             />
           </div>
 
-          <div className="flex flex-col gap-4 border-t border-gray-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800">
+          <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800">
             <div>
               <p className="text-lg font-bold tabular-nums text-gray-900 dark:text-gray-100">
                 Total: {hoursTotal.toFixed(2)} hrs
@@ -1154,9 +1154,9 @@ export function TimesheetForm({
 
       {selection && selectedLine && selectedDayIso ? (
         <aside
-          className="mt-6 w-full shrink-0 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-950 xl:mt-0 xl:w-[22rem] xl:border-l xl:shadow-[-4px_0_24px_rgba(0,0,0,0.06)]"
+          className="mt-4 w-full shrink-0 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-950 xl:mt-0 xl:w-[22rem] xl:border-l xl:shadow-[-4px_0_24px_rgba(0,0,0,0.06)]"
         >
-          <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+          <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3 dark:border-gray-800">
             <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Selected Task</h2>
             <button
               type="button"
@@ -1167,7 +1167,7 @@ export function TimesheetForm({
               <X className="h-5 w-5" />
             </button>
           </div>
-          <div className="space-y-5 px-5 py-5">
+          <div className="space-y-4 px-5 py-4">
             <div>
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                 {formatLongDate(selectedDayIso)}

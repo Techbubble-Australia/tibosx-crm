@@ -139,12 +139,9 @@ export default function TicketsPage() {
                 <th className="px-4 py-3">Subject</th>
                 <th className="px-4 py-3">Project</th>
                 <th className="px-4 py-3">Priority</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Created by</th>
-                <th className="px-4 py-3">Created</th>
-                <th className="px-4 py-3">Updated</th>
-                <th className="whitespace-nowrap px-4 py-3">Updated by</th>
+                <th className="min-w-[11rem] whitespace-nowrap px-4 py-3">Status</th>
                 <th className="whitespace-nowrap px-4 py-3">Assigned to</th>
+                <th className="whitespace-nowrap px-4 py-3">Updated</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -170,16 +167,15 @@ export default function TicketsPage() {
                     <td className="px-4 py-3">
                       <TicketPriorityBadge priority={row.priority} />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="whitespace-nowrap px-4 py-3">
                       <TicketStatusBadge status={row.status} />
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{row.createdBy?.name ?? "—"}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-500">{new Date(row.createdAt).toLocaleString()}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-500">{new Date(row.updatedAt).toLocaleString()}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-                      {row.updatedBy?.name?.trim() || row.updatedBy?.email || "—"}
+                      {row.assignedTo?.name ?? "Unassigned"}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-600">{row.assignedTo?.name ?? "Unassigned"}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-gray-500">
+                      {new Date(row.updatedAt).toLocaleString()}
+                    </td>
                   </tr>
                 );
               })}
