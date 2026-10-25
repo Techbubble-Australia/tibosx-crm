@@ -27,8 +27,8 @@ export function TicketResolutionNotesSection({
     (statusKey === "RESOLVED" || statusKey === "CLOSED" || statusKey === "IN_PROGRESS");
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-      <h2 className="mb-2 font-semibold">Resolution notes</h2>
+    <div>
+      <h3 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Resolution notes</h3>
       {canEdit ? (
         <div className="space-y-2">
           <textarea
@@ -57,6 +57,6 @@ export function TicketResolutionNotesSection({
       ) : (
         <p className="text-sm text-gray-500">—</p>
       )}
-    </section>
+    </div>
   );
 }

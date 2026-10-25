@@ -7,6 +7,7 @@ import {
   type ActivityRow,
   type TicketRow,
   type TimesheetSummary,
+  type SubmittedTimesheetRow,
 } from "@/components/customer-support/CustomerSupportDashboard";
 
 export default function CustomerSupportDashboardPage() {
@@ -31,6 +32,13 @@ export default function CustomerSupportDashboardPage() {
     return (data.data as TimesheetSummary) ?? { total: 0, pendingApproval: 0 };
   }, []);
 
+  const loadRecentSubmittedTimesheets = useCallback(async () => {
+    const res = await adminFetch("/api/admin/timesheets/recent-submitted?limit=3");
+    const data = await res.json();
+    if (!res.ok) return [];
+    return (data.data as SubmittedTimesheetRow[]) ?? [];
+  }, []);
+
   return (
     <CustomerSupportDashboard
       ticketDetailHref={(id) => `/support-tickets/${id}`}
@@ -39,7 +47,9 @@ export default function CustomerSupportDashboardPage() {
       loadTickets={loadTickets}
       loadActivity={loadActivity}
       loadTimesheetSummary={loadTimesheetSummary}
+      loadRecentSubmittedTimesheets={loadRecentSubmittedTimesheets}
       showTimesheetSummary
+      timesheetDetailHref={(id) => `/timesheets/${id}`}
     />
   );
 }

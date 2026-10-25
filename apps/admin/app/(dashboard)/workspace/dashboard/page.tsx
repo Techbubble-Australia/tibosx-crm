@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback } from "react";
-import { adminFetch } from "@/lib/admin-api";
 import { workspaceFetch } from "@/lib/workspace-fetch";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { getEffectiveRoles } from "@/lib/admin-roles";
@@ -37,7 +36,7 @@ export default function DashboardPage() {
   }, []);
 
   const loadRecentSubmittedTimesheets = useCallback(async () => {
-    const res = await adminFetch("/api/admin/timesheets/recent-submitted?limit=3");
+    const res = await workspaceFetch("/timesheets/recent-submitted?limit=3");
     const data = await res.json();
     if (!res.ok) return [];
     return (data.data as SubmittedTimesheetRow[]) ?? [];
@@ -56,6 +55,7 @@ export default function DashboardPage() {
       loadTimesheetSummary={loadTimesheetSummary}
       loadRecentSubmittedTimesheets={loadRecentSubmittedTimesheets}
       showTimesheetSummary={showTimesheetSummary}
+      timesheetDetailHref={(id) => `/workspace/timesheets/${id}`}
     />
   );
 }

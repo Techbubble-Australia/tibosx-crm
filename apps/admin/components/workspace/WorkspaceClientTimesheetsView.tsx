@@ -124,6 +124,11 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
   }, [rows, search]);
 
   async function approve(id: string) {
+    if (
+      !window.confirm("You're about to approve this timesheet. Do you want to continue?")
+    ) {
+      return;
+    }
     setActingId(id);
     try {
       const res = await workspaceFetch(`/timesheets/${id}/approve`, { method: "POST" });

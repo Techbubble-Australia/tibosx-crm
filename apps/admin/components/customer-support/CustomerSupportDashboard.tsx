@@ -6,6 +6,7 @@ import { normalizeTicketStatusKey } from "@/lib/support-ticket-labels";
 import { TicketPriorityBadge } from "@/lib/ticket-priority-styles";
 import { TicketStatusBadge } from "@/lib/ticket-status-styles";
 import { EmptyTickets } from "@/components/workspace/EmptyTickets";
+import { TimesheetStatusBadge } from "@/lib/timesheet-status-styles";
 
 export type TicketRow = {
   id: string;
@@ -34,6 +35,7 @@ export type TimesheetSummary = {
 
 export type SubmittedTimesheetRow = {
   id: string;
+  status?: string;
   memberName: string;
   projectLabel: string;
   startDate: string;
@@ -43,6 +45,7 @@ export type SubmittedTimesheetRow = {
 
 type Props = {
   ticketDetailHref: (id: string) => string;
+  timesheetDetailHref?: (id: string) => string;
   ticketsListHref: string;
   timesheetsHref: string;
   loadTickets: () => Promise<TicketRow[]>;
@@ -56,8 +59,13 @@ function formatDate(value: string) {
   return new Date(value).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
 }
 
+function formatTimesheetPeriod(startDate: string, endDate: string) {
+  return `${formatDate(startDate)} – ${formatDate(endDate)}`;
+}
+
 export function CustomerSupportDashboard({
   ticketDetailHref,
+  timesheetDetailHref = (id) => `/timesheets/${id}`,
   ticketsListHref,
   timesheetsHref,
   loadTickets,
@@ -112,34 +120,34 @@ export function CustomerSupportDashboard({
   const recentActivity = activity.slice(0, 3);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Dashboard</h1>
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Dashboard</h1>
         <p className="text-sm text-gray-500">Track ticket and timesheet status at a glance.</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
           <p className="text-sm text-gray-500">Open tickets</p>
-          <p className="text-3xl font-semibold text-gray-900 dark:text-gray-100">{counts.open}</p>
+          <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{counts.open}</p>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+        <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
           <p className="text-sm text-gray-500">Awaiting response</p>
-          <p className="text-3xl font-semibold text-gray-900 dark:text-gray-100">{counts.awaitingResponse}</p>
+          <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{counts.awaitingResponse}</p>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+        <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
           <p className="text-sm text-gray-500">In progress</p>
-          <p className="text-3xl font-semibold text-gray-900 dark:text-gray-100">{counts.inProgress}</p>
+          <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{counts.inProgress}</p>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+        <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
           <p className="text-sm text-gray-500">Resolved</p>
-          <p className="text-3xl font-semibold text-gray-900 dark:text-gray-100">{counts.resolved}</p>
+          <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{counts.resolved}</p>
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-          <div className="mb-3 flex items-center justify-between gap-2">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+          <div className="mb-2 flex items-center justify-between gap-2">
             <h2 className="font-semibold text-gray-900 dark:text-gray-100">Needs attention</h2>
             <Link href={ticketsListHref} className="text-sm text-sky-600 hover:underline">View all tickets</Link>
           </div>
@@ -150,7 +158,7 @@ export function CustomerSupportDashboard({
               {needsAttention.map((row) => (
                 <li
                   key={row.id}
-                  className="grid grid-cols-[minmax(0,1fr)_auto_7.5rem] items-center gap-x-3 gap-y-1 py-3 text-sm"
+                  className="grid grid-cols-[minmax(0,1fr)_auto_7.5rem] items-center gap-x-3 gap-y-1 py-2 text-sm"
                 >
                   <div className="min-w-0">
                     <Link href={ticketDetailHref(row.id)} className="font-medium text-sky-600 hover:underline">
@@ -170,13 +178,13 @@ export function CustomerSupportDashboard({
           )}
         </section>
 
-        <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-          <div className="mb-3 flex items-center justify-between gap-2">
+        <section className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+          <div className="mb-2 flex items-center justify-between gap-2">
             <h2 className="font-semibold text-gray-900 dark:text-gray-100">Timesheets</h2>
             <Link href={timesheetsHref} className="text-sm text-sky-600 hover:underline">View timesheets</Link>
           </div>
           {showTimesheetSummary ? (
-            <p className="mb-3 text-sm text-gray-500">
+            <p className="mb-2 text-xs text-gray-500">
               {timesheets.pendingApproval} awaiting approval · {timesheets.total} total
             </p>
           ) : null}
@@ -185,13 +193,22 @@ export function CustomerSupportDashboard({
           ) : (
             <ul className="divide-y divide-gray-100 dark:divide-gray-800">
               {recentSubmitted.slice(0, 3).map((row) => (
-                <li key={row.id} className="py-3 text-sm">
-                  <p className="font-medium text-gray-900 dark:text-gray-100">{row.memberName}</p>
-                  <p className="truncate text-gray-600 dark:text-gray-400">{row.projectLabel}</p>
-                  <p className="text-xs text-gray-500">
-                    {formatDate(row.startDate)} – {formatDate(row.endDate)} · Submitted{" "}
-                    {new Date(row.updatedAt).toLocaleString()}
-                  </p>
+                <li
+                  key={row.id}
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-2 text-sm"
+                >
+                  <div className="min-w-0">
+                    <Link
+                      href={timesheetDetailHref(row.id)}
+                      className="font-medium text-sky-600 hover:underline"
+                    >
+                      {formatTimesheetPeriod(row.startDate, row.endDate)}
+                    </Link>
+                    <p className="truncate text-gray-700 dark:text-gray-300">{row.memberName}</p>
+                  </div>
+                  <div className="justify-self-end">
+                    <TimesheetStatusBadge status={row.status ?? "SUBMITTED"} />
+                  </div>
                 </li>
               ))}
             </ul>
@@ -200,7 +217,7 @@ export function CustomerSupportDashboard({
       </div>
 
       <section>
-        <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="mb-2 flex items-center justify-between gap-2">
           <h2 className="font-semibold text-gray-900 dark:text-gray-100">Recent activity</h2>
           <Link href={ticketsListHref} className="text-sm text-sky-600 hover:underline">View tickets</Link>
         </div>
@@ -209,7 +226,7 @@ export function CustomerSupportDashboard({
         ) : (
           <ul className="relative space-y-0 border-l-2 border-sky-200 pl-4 dark:border-sky-800">
             {recentActivity.map((row) => (
-              <li key={`${row.id}-${row.createdAt}`} className="relative pb-4">
+              <li key={`${row.id}-${row.createdAt}`} className="relative pb-3">
                 <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-sky-500" />
                 <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
                   <Link href={ticketDetailHref(row.id)} className="text-sky-700 hover:underline dark:text-sky-400">

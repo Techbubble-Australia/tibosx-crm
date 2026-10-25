@@ -60,6 +60,70 @@ router.get("/summary", async (req: TicketingRequest, res) => {
   res.json({ data: { total, pendingApproval } });
 });
 
+router.get("/recent-submitted", async (req: TicketingRequest, res) => {
+  const user = req.ticketingUser!;
+  const limitRaw = typeof req.query.limit === "string" ? Number.parseInt(req.query.limit, 10) : 3;
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 10) : 3;
+
+  let where: {
+    status: "SUBMITTED";
+    projectId?: { in: string[] };
+    project?: { projectManagerId: string };
+    OR?: Array<{ approverKind: string | null } | { approverKind: string }>;
+    approverKind?: string;
+    projectClientContactId?: { in: string[] };
+  } = { status: "SUBMITTED" };
+
+  if (user.role === "CONSULTANT" && user.tbosAdminUserId) {
+    const managerId = user.tbosAdminUserId;
+    where = {
+      status: "SUBMITTED",
+      AND: [
+        { OR: [{ approverKind: "PM" }, { approverKind: null }] },
+        { project: { projectManagerId: managerId } },
+      ],
+    } as typeof where;
+  } else if (user.role === "CLIENT") {
+    const links = await prisma.projectClientContact.findMany({
+      where: { ticketingUserId: user.id, canApproveTimesheets: true },
+      select: { id: true },
+    });
+    const linkIds = links.map((l) => l.id);
+    if (!linkIds.length) return res.json({ data: [] });
+    where = {
+      status: "SUBMITTED",
+      approverKind: "CLIENT_CONTACT",
+      projectClientContactId: { in: linkIds },
+    };
+  } else {
+    return res.json({ data: [] });
+  }
+
+  const rows = await prisma.timesheet.findMany({
+    where,
+    include: {
+      memberUser: { select: { name: true, email: true } },
+      project: { select: { projectNumber: true, title: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: limit,
+  });
+
+  res.json({
+    data: rows.map((row) => ({
+      id: row.id,
+      status: row.status,
+      memberName: row.memberUser?.name || row.memberUser?.email || "",
+      projectLabel: row.project
+        ? `${row.project.projectNumber} — ${row.project.title}`
+        : "",
+      startDate: row.startDate.toISOString(),
+      endDate: row.endDate.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    })),
+  });
+});
+
 router.get("/", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
   if (user.role !== "CLIENT") {

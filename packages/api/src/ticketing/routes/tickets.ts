@@ -171,8 +171,10 @@ router.get("/", async (req: TicketingRequest, res) => {
   });
 
   const { enrichTicketsUpdatedBy } = await import("../lib/ticket-list-updated-by.js");
+  const { enrichTicketsProjectLabels } = await import("../lib/ticket-project-label.js");
   const enriched = await enrichTicketsUpdatedBy(rows);
-  res.json({ data: enriched.map(serializeTicket) });
+  const withProjects = await enrichTicketsProjectLabels(enriched);
+  res.json({ data: withProjects.map(serializeTicket) });
 });
 
 router.post("/", async (req: TicketingRequest, res) => {
@@ -312,9 +314,12 @@ router.get("/:id", async (req: TicketingRequest, res) => {
     .filter((log) => (user.role === "CLIENT" ? auditVisibleToClient(log) : true))
     .map(serializeAuditLog);
 
+  const { enrichTicketsProjectLabels } = await import("../lib/ticket-project-label.js");
+  const [withProject] = await enrichTicketsProjectLabels([ticket]);
+
   res.json({
     data: {
-      ...serializeTicket(ticket),
+      ...serializeTicket(withProject ?? ticket),
       attachments: ticket.attachments,
       messages,
       auditLogs,

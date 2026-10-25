@@ -158,9 +158,11 @@ router.get("/tickets", async (req: TbosRequest, res) => {
   });
 
   const { enrichTicketsUpdatedBy } = await import("../lib/ticket-list-updated-by.js");
+  const { enrichTicketsProjectLabels } = await import("../lib/ticket-project-label.js");
   const enriched = await enrichTicketsUpdatedBy(rows);
+  const withProjects = await enrichTicketsProjectLabels(enriched);
   res.json({
-    data: enriched.map((row) => serializeTicketRow(row)),
+    data: withProjects.map((row) => serializeTicketRow(row)),
   });
 });
 
@@ -301,9 +303,12 @@ router.get("/tickets/:id", async (req: TbosRequest, res) => {
     include: { author: { select: { id: true, name: true, email: true, role: true } } },
   });
 
+  const { enrichTicketsProjectLabels } = await import("../lib/ticket-project-label.js");
+  const [withProject] = await enrichTicketsProjectLabels([ticket]);
+
   res.json({
     data: {
-      ...serializeTicketRow(ticket),
+      ...serializeTicketRow(withProject ?? ticket),
       attachments: ticket.attachments,
       messages,
       auditLogs: ticket.auditLogs.map((log) => ({

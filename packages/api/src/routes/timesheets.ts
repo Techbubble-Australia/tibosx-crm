@@ -824,6 +824,7 @@ router.get("/recent-submitted", async (req: AuthRequest, res) => {
     res.json({
       data: rows.map((row) => ({
         id: row.id,
+        status: row.status,
         memberName: row.memberUser?.name || row.memberUser?.email || "",
         projectLabel: row.project
           ? `${row.project.projectNumber} — ${row.project.title}`

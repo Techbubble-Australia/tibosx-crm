@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { adminFetch } from "@/lib/admin-api";
 import {
   isTerminalTicketStatus,
@@ -14,11 +13,12 @@ import {
 import { TicketAttachmentList } from "@/components/support-tickets/TicketAttachmentList";
 import { TicketLifecycleActions } from "@/components/workspace/TicketLifecycleActions";
 import { TicketStatusBadge } from "@/lib/ticket-status-styles";
-import { formatTicketAuditLine, type TicketAuditRow } from "@/lib/ticket-audit-display";
+import { type TicketAuditRow } from "@/lib/ticket-audit-display";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
-import { TicketRecordMeta } from "@/components/support-tickets/TicketRecordMeta";
 import { TicketEditableSubject } from "@/components/support-tickets/TicketEditableSubject";
 import { TicketResolutionNotesSection } from "@/components/support-tickets/TicketResolutionNotesSection";
+import { TicketRecordLayout, TicketAttributeField } from "@/components/support-tickets/TicketRecordLayout";
+import { TicketPriorityBadge } from "@/lib/ticket-priority-styles";
 import { normalizeTicketStatusKey } from "@/lib/support-ticket-labels";
 
 type Assignee = { id: string; name: string; email: string };
@@ -37,6 +37,7 @@ type TicketDetail = {
   closedAt: string | null;
   resolutionNotes?: string | null;
   projectLabel?: string | null;
+  projectId?: string | null;
   organization?: { id: string; name: string };
   createdBy?: { id?: string; name: string; email: string };
   updatedBy?: { id?: string; name: string; email: string } | null;
@@ -208,209 +209,194 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
   const canEditResolutionNotes =
     portalRole === "CONSULTANT" && !closedOrCancelled && statusKey === "IN_PROGRESS";
   const projectLine = ticket.projectLabel?.trim() || null;
+  const projectHref =
+    ticket.projectId && canManageProjects ? `/projects/${ticket.projectId}` : null;
+
+  const headerActions = !closedOrCancelled ? (
+    <>
+      <TicketLifecycleActions
+        status={ticket.status}
+        role={portalRole}
+        isCreator={isCreator}
+        disabled={saving}
+        resolutionNotes={resolutionNotes}
+        onAction={runLifecycle}
+      />
+      {showAssignToMe ? (
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => void patch({ assignedToId: session!.ticketingUserId })}
+          className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200"
+        >
+          Assign to me
+        </button>
+      ) : null}
+    </>
+  ) : null;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <Link href="/support-tickets" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
-        ← All tickets
-      </Link>
-
-      <div>
-        <p className="text-sm text-gray-500">{ticket.ticketNumber}</p>
-        <TicketEditableSubject
-          subject={ticket.subject}
-          disabled={closedOrCancelled || saving}
-          onSave={(subject) => patch({ subject })}
-        />
-        <p className="mt-1 text-sm text-gray-500">
-          {projectLine ?? "—"}
-          {ticket.createdBy ? ` · opened by ${ticket.createdBy.name}` : ""}
-        </p>
-        <p className="text-xs text-gray-400">
-          Created {new Date(ticket.createdAt).toLocaleString()} · Updated {new Date(ticket.updatedAt).toLocaleString()}
-          {ticket.closedAt ? ` · Closed ${new Date(ticket.closedAt).toLocaleString()}` : ""}
-        </p>
-      </div>
-
-      {!closedOrCancelled ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <TicketLifecycleActions
-            status={ticket.status}
-            role={portalRole}
-            isCreator={isCreator}
-            disabled={saving}
-            resolutionNotes={resolutionNotes}
-            onAction={runLifecycle}
+    <div className="mx-auto max-w-6xl">
+      <TicketRecordLayout
+        breadcrumbs={[
+          { label: "Support", href: "/support-tickets" },
+          { label: "Tickets", href: "/support-tickets" },
+          { label: ticket.ticketNumber },
+        ]}
+        ticketNumber={ticket.ticketNumber}
+        subject={
+          <TicketEditableSubject
+            subject={ticket.subject}
+            disabled={closedOrCancelled || saving}
+            onSave={(subject) => patch({ subject })}
           />
-          {showAssignToMe ? (
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void patch({ assignedToId: session!.ticketingUserId })}
-              className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200"
-            >
-              Assign to me
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-
-      <section className="grid gap-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="Status">
-          <div className="mt-1">
-            <TicketStatusBadge status={ticket.status} />
-          </div>
-        </Field>
-        <Field label="Priority">
-          <select
-            disabled={saving || closedOrCancelled}
-            value={ticket.priority}
-            onChange={(e) => void patch({ priority: e.target.value })}
-            className="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
-          >
-            {TICKET_PRIORITIES.map((p) => (
-              <option key={p} value={p}>{TICKET_PRIORITY_LABELS[p]}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Type">
-          <select
-            disabled={saving || closedOrCancelled}
-            value={ticket.type}
-            onChange={(e) => void patch({ type: e.target.value })}
-            className="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
-          >
-            {TICKET_TYPES.map((t) => (
-              <option key={t} value={t}>{TICKET_TYPE_LABELS[t]}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Assigned to">
-          {canManageAssignee ? (
-            <select
-              disabled={saving || closedOrCancelled}
-              value={ticket.assignedToId ?? ""}
-              onChange={(e) => void patch({ assignedToId: e.target.value || null })}
-              className="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
-            >
-              <option value="">Unassigned</option>
-              {assignees.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </select>
-          ) : (
-            <p className="mt-1 text-sm text-gray-800 dark:text-gray-200">
-              {ticket.assignedTo?.name ?? "Unassigned"}
-            </p>
-          )}
-        </Field>
-      </section>
-
-      <TicketRecordMeta
+        }
+        status={ticket.status}
+        projectLabel={projectLine}
+        projectHref={projectHref}
+        headerActions={headerActions}
         createdBy={ticket.createdBy}
         createdAt={ticket.createdAt}
         updatedAt={ticket.updatedAt}
         updatedBy={ticket.updatedBy}
-      />
-
-      <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-        <h2 className="mb-2 font-semibold">Description</h2>
-        <p className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{ticket.description}</p>
-      </section>
-
-      <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-semibold">Attachments</h2>
-          {closedOrCancelled ? null : (
-            <label className="cursor-pointer text-sm font-medium text-blue-600 hover:underline dark:text-blue-400">
-              {uploading ? "Uploading…" : "Add file"}
-              <input type="file" className="hidden" onChange={onUpload} disabled={uploading} />
-            </label>
-          )}
-        </div>
-        <TicketAttachmentList ticketId={ticket.id} attachments={ticket.attachments} />
-      </section>
-
-      <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-        <h2 className="mb-3 font-semibold">Conversation</h2>
-        {ticket.messages.length === 0 ? (
-          <p className="mb-4 text-sm text-gray-500">No messages yet. Reply to the client below.</p>
-        ) : (
-          <ul className="mb-4 space-y-3">
-            {ticket.messages.map((m) => (
-              <li
-                key={m.id}
-                className={`rounded-lg p-3 text-sm ${m.isInternal ? "bg-amber-50 dark:bg-amber-950/40" : "bg-gray-50 dark:bg-gray-800"}`}
+        auditLogs={ticket.auditLogs}
+        attributesBar={
+          <>
+            <TicketAttributeField label="Type">
+              <select
+                disabled={saving || closedOrCancelled}
+                value={ticket.type}
+                onChange={(e) => void patch({ type: e.target.value })}
+                className="w-full rounded-lg border px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
               >
-                <p className="text-xs text-gray-500">
-                  {m.author.name} ({m.author.role}) · {new Date(m.createdAt).toLocaleString()}
-                  {m.isInternal ? " · Internal note" : " · Visible to client"}
+                {TICKET_TYPES.map((t) => (
+                  <option key={t} value={t}>{TICKET_TYPE_LABELS[t]}</option>
+                ))}
+              </select>
+            </TicketAttributeField>
+            <TicketAttributeField label="Priority">
+              <div className="flex items-center gap-2">
+                <TicketPriorityBadge priority={ticket.priority} />
+                <select
+                  disabled={saving || closedOrCancelled}
+                  value={ticket.priority}
+                  onChange={(e) => void patch({ priority: e.target.value })}
+                  className="min-w-0 flex-1 rounded-lg border px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
+                >
+                  {TICKET_PRIORITIES.map((p) => (
+                    <option key={p} value={p}>{TICKET_PRIORITY_LABELS[p]}</option>
+                  ))}
+                </select>
+              </div>
+            </TicketAttributeField>
+            <TicketAttributeField label="Status">
+              <TicketStatusBadge status={ticket.status} />
+            </TicketAttributeField>
+            <TicketAttributeField label="Assigned to">
+              {canManageAssignee ? (
+                <select
+                  disabled={saving || closedOrCancelled}
+                  value={ticket.assignedToId ?? ""}
+                  onChange={(e) => void patch({ assignedToId: e.target.value || null })}
+                  className="w-full rounded-lg border px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
+                >
+                  <option value="">Unassigned</option>
+                  {assignees.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-sm text-gray-800 dark:text-gray-200">
+                  {ticket.assignedTo?.name ?? "Unassigned"}
                 </p>
-                <p className="mt-1 whitespace-pre-wrap">{m.body}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-        {closedOrCancelled ? (
-          <p className="border-t border-gray-100 pt-4 text-sm text-gray-500 dark:border-gray-800">
-            This ticket is closed or cancelled. No further replies or uploads are allowed.
-          </p>
-        ) : (
-          <form onSubmit={sendReply} className="space-y-2 border-t border-gray-100 pt-4 dark:border-gray-800">
-            <textarea
-              rows={4}
-              value={reply}
-              onChange={(e) => setReply(e.target.value)}
-              placeholder="Reply to client or add an internal note…"
-              className="w-full rounded-lg border px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
-            />
-            <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-              <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
-              Internal note (not visible to client)
-            </label>
-            <button
-              type="submit"
-              className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900"
-            >
-              Send message
-            </button>
-          </form>
-        )}
-      </section>
-
-      <TicketResolutionNotesSection
-        notes={resolutionNotes}
-        status={ticket.status}
-        canEdit={canEditResolutionNotes}
-        disabled={saving}
-        onNotesChange={setResolutionNotes}
-        showSaveDraft={
-          canEditResolutionNotes && resolutionNotes.trim() !== (ticket.resolutionNotes ?? "").trim()
+              )}
+            </TicketAttributeField>
+          </>
         }
-        onSaveDraft={() => patch({ resolutionNotes: resolutionNotes.trim() || null })}
+        description={
+          <>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="font-semibold">Description</h2>
+            </div>
+            <p className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{ticket.description}</p>
+          </>
+        }
+        attachments={
+          <>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-semibold">Attachments</h2>
+              {closedOrCancelled ? null : (
+                <label className="cursor-pointer text-sm font-medium text-blue-600 hover:underline dark:text-blue-400">
+                  {uploading ? "Uploading…" : "+ Add file"}
+                  <input type="file" className="hidden" onChange={onUpload} disabled={uploading} />
+                </label>
+              )}
+            </div>
+            <TicketAttachmentList ticketId={ticket.id} attachments={ticket.attachments} />
+          </>
+        }
+        conversation={
+          <>
+            <h2 className="mb-3 font-semibold">Conversation</h2>
+            {ticket.messages.length === 0 ? (
+              <p className="mb-4 text-sm text-gray-500">No messages yet. Reply to the client below.</p>
+            ) : (
+              <ul className="mb-4 space-y-3">
+                {ticket.messages.map((m) => (
+                  <li
+                    key={m.id}
+                    className={`rounded-lg p-3 text-sm ${m.isInternal ? "bg-amber-50 dark:bg-amber-950/40" : "bg-gray-50 dark:bg-gray-800"}`}
+                  >
+                    <p className="text-xs text-gray-500">
+                      {m.author.name} ({m.author.role}) · {new Date(m.createdAt).toLocaleString()}
+                      {m.isInternal ? " · Internal note" : " · Visible to client"}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap">{m.body}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {closedOrCancelled ? (
+              <p className="border-t border-gray-100 pt-4 text-sm text-gray-500 dark:border-gray-800">
+                This ticket is closed or cancelled. No further replies or uploads are allowed.
+              </p>
+            ) : (
+              <form onSubmit={sendReply} className="space-y-2 border-t border-gray-100 pt-4 dark:border-gray-800">
+                <textarea
+                  rows={3}
+                  value={reply}
+                  onChange={(e) => setReply(e.target.value)}
+                  placeholder="Write a reply…"
+                  className="w-full rounded-lg border px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
+                />
+                <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                  <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
+                  Internal note
+                </label>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+                >
+                  Send
+                </button>
+              </form>
+            )}
+          </>
+        }
+        resolution={
+          <TicketResolutionNotesSection
+            notes={resolutionNotes}
+            status={ticket.status}
+            canEdit={canEditResolutionNotes}
+            disabled={saving}
+            onNotesChange={setResolutionNotes}
+            showSaveDraft={
+              canEditResolutionNotes && resolutionNotes.trim() !== (ticket.resolutionNotes ?? "").trim()
+            }
+            onSaveDraft={() => patch({ resolutionNotes: resolutionNotes.trim() || null })}
+          />
+        }
       />
-
-      {ticket.auditLogs && ticket.auditLogs.length > 0 ? (
-        <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-          <h2 className="mb-2 font-semibold">Activity log</h2>
-          <ul className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
-            {ticket.auditLogs.map((log) => (
-              <li key={log.id}>
-                {new Date(log.createdAt).toLocaleString()} — {formatTicketAuditLine(log)}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
-      {children}
     </div>
   );
 }

@@ -25,8 +25,10 @@ export function serializeTicketRow(row: {
     id: string;
     name: string;
     slug: string;
+    projectId?: string | null;
     project?: { projectNumber: string; title: string } | null;
   };
+  projectId?: string | null;
   project?: { projectNumber: string; title: string } | null;
   createdBy?: { id: string; name: string; email: string };
   assignedTo?: { id: string; name: string; email: string } | null;
@@ -40,6 +42,7 @@ export function serializeTicketRow(row: {
       : linkedProject?.title
         ? linkedProject.title
         : null;
+  const projectId = row.projectId ?? row.organization?.projectId ?? null;
   const updatedBy = ticketingUserLabel(row.updatedBy);
   const createdBy = ticketingUserLabel(row.createdBy);
   const assignedTo = row.assignedTo ? ticketingUserLabel(row.assignedTo) : null;
@@ -49,6 +52,7 @@ export function serializeTicketRow(row: {
     organizationId: row.organizationId,
     organization: row.organization,
     projectLabel,
+    projectId,
     type: row.type,
     priority: row.priority,
     status: row.status,
