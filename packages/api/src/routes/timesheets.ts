@@ -33,6 +33,7 @@ import {
 } from "../lib/timesheet-entries";
 import {
   assertTimesheetWithinProjectDates,
+  effectiveTimesheetProjectDateBoundsIso,
   projectDateBoundsIso,
   projectWeekMondayBounds,
   snapWeekMondayToInput,
@@ -611,7 +612,7 @@ router.get("/target-meta", async (req: AuthRequest, res) => {
       });
       if (!project) return res.status(404).json({ error: "Project not found" });
       const approvers = await buildProjectApprovers(projectId);
-      const { startDate, endDate } = projectDateBoundsIso(project);
+      const { startDate, endDate } = effectiveTimesheetProjectDateBoundsIso(project);
       return res.json({
         data: {
           kind: "project",
@@ -783,12 +784,16 @@ async function assertTimesheetProjectDateRules(
 ) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { startDate: true, endDate: true },
+    select: { startDate: true, endDate: true, status: true },
   });
   if (!project) throw new Error("PROJECT_NOT_FOUND");
+  const effective = effectiveTimesheetProjectDateBoundsIso(project);
   const weekMondayIso = startDate.toISOString().slice(0, 10);
   assertTimesheetWithinProjectDates(
-    project,
+    {
+      startDate: new Date(`${effective.startDate}T00:00:00.000Z`),
+      endDate: new Date(`${effective.endDate}T00:00:00.000Z`),
+    },
     weekMondayIso,
     resolved.entryRows,
     resolved.dailyHours ?? null,

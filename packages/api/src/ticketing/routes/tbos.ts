@@ -34,6 +34,7 @@ const ticketUpdateSchema = z.object({
   subject: z.string().min(1).max(300).optional(),
   description: z.string().min(1).max(20000).optional(),
   assignedToId: z.string().nullable().optional(),
+  resolutionNotes: z.string().max(20000).optional().nullable(),
 });
 
 const messageSchema = z.object({
@@ -76,7 +77,8 @@ router.get("/session", async (req: TbosRequest, res) => {
 });
 
 function isTbosAdminRole(role: string) {
-  return role.trim().toLowerCase() === "admin";
+  const r = role.trim().toLowerCase();
+  return r === "admin" || r === "customer_support";
 }
 
 async function orgFilterForTbos(tbosUser: { id: string; role: string }) {

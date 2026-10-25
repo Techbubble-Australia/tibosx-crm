@@ -316,6 +316,11 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
 
   const visibleGroups = useMemo(() => {
     function itemVisible(item: NavItem): boolean {
+      const hasAdmin = anyEffectiveRole(role, additionalRoles, ["admin"]);
+      const useInternalSupportTickets = hasAdmin;
+      const useWorkspacePortal =
+        anyEffectiveRole(role, additionalRoles, ["customer_support", "client"]) && !useInternalSupportTickets;
+
       if (item.href === "/timesheets") {
         return anyEffectiveRole(role, additionalRoles, item.roles) || canAccessProjectManagementTimesheets;
       }
@@ -323,11 +328,14 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         if (anyEffectiveRole(role, additionalRoles, ["customer_support"])) return false;
         return canAccessWorkspaceTimesheets;
       }
-      if (
-        item.href.startsWith("/workspace/") &&
-        anyEffectiveRole(role, additionalRoles, ["admin"])
-      ) {
-        return false;
+      if (item.href.startsWith("/workspace/")) {
+        if (item.href === "/workspace/timesheets") {
+          return canAccessWorkspaceTimesheets;
+        }
+        return useWorkspacePortal && anyEffectiveRole(role, additionalRoles, item.roles);
+      }
+      if (item.href.startsWith("/support-tickets")) {
+        return useInternalSupportTickets && anyEffectiveRole(role, additionalRoles, item.roles);
       }
       return anyEffectiveRole(role, additionalRoles, item.roles);
     }

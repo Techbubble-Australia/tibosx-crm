@@ -8,7 +8,6 @@ type Props = {
   isCreator: boolean;
   disabled?: boolean;
   resolutionNotes?: string;
-  onResolutionNotesChange?: (value: string) => void;
   onAction: (action: string, payload?: { resolutionNotes?: string }) => void | Promise<void>;
 };
 
@@ -23,7 +22,6 @@ export function TicketLifecycleActions({
   isCreator,
   disabled,
   resolutionNotes = "",
-  onResolutionNotesChange,
   onAction,
 }: Props) {
   const statusKey = normalizeTicketStatusKey(status);
@@ -59,9 +57,8 @@ export function TicketLifecycleActions({
   ];
 
   const visible = buttons.filter((b) => b.show);
-  const showResolutionField = canConsultantAct && statusKey === "IN_PROGRESS";
 
-  if (!visible.length && !showResolutionField) return null;
+  if (!visible.length) return null;
 
   function runAction(action: string) {
     if (action === "resolve") {
@@ -80,35 +77,18 @@ export function TicketLifecycleActions({
   }
 
   return (
-    <div className="space-y-3">
-      {showResolutionField ? (
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Resolution notes</label>
-          <textarea
-            rows={3}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
-            placeholder="Describe how this ticket was resolved…"
-            value={resolutionNotes}
-            disabled={disabled}
-            onChange={(e) => onResolutionNotesChange?.(e.target.value)}
-          />
-        </div>
-      ) : null}
-      {visible.length ? (
-        <div className="flex flex-wrap gap-2">
-          {visible.map((b) => (
-            <button
-              key={b.action}
-              type="button"
-              disabled={disabled}
-              onClick={() => runAction(b.action)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50"
-            >
-              {b.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
+    <div className="flex flex-wrap gap-2">
+      {visible.map((b) => (
+        <button
+          key={b.action}
+          type="button"
+          disabled={disabled}
+          onClick={() => runAction(b.action)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+        >
+          {b.label}
+        </button>
+      ))}
     </div>
   );
 }

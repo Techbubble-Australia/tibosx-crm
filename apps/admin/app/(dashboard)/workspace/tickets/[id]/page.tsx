@@ -20,6 +20,9 @@ import { TicketStatusBadge } from "@/lib/ticket-status-styles";
 import { formatTicketAuditLine, type TicketAuditRow } from "@/lib/ticket-audit-display";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { TicketRecordMeta } from "@/components/support-tickets/TicketRecordMeta";
+import { TicketEditableSubject } from "@/components/support-tickets/TicketEditableSubject";
+import { TicketResolutionNotesSection } from "@/components/support-tickets/TicketResolutionNotesSection";
+import { normalizeTicketStatusKey } from "@/lib/support-ticket-labels";
 
 type Message = {
   id: string;
@@ -182,15 +185,21 @@ export default function TicketDetailPage() {
     canEditAssignee &&
     Boolean(me?.id) &&
     ticket.assignedToId !== me?.id;
+  const statusKey = normalizeTicketStatusKey(ticket.status);
+  const canEditResolutionNotes =
+    isConsultant && !closedOrCancelled && statusKey === "IN_PROGRESS";
+  const projectLine = ticket.projectLabel?.trim() || null;
 
   return (
     <div className="space-y-6">
       <div>
         <p className="text-sm text-gray-500">{ticket.ticketNumber}</p>
-        <h1 className="text-2xl font-semibold">{ticket.subject}</h1>
-        {ticket.projectLabel || ticket.organization?.name ? (
-          <p className="text-sm text-gray-500">{ticket.projectLabel ?? ticket.organization?.name}</p>
-        ) : null}
+        <TicketEditableSubject
+          subject={ticket.subject}
+          disabled={closedOrCancelled || saving}
+          onSave={(subject) => savePatch({ subject })}
+        />
+        {projectLine ? <p className="mt-1 text-sm text-gray-500">{projectLine}</p> : null}
       </div>
 
       {!closedOrCancelled ? (
@@ -201,7 +210,6 @@ export default function TicketDetailPage() {
             isCreator={isCreator}
             disabled={saving}
             resolutionNotes={resolutionNotes}
-            onResolutionNotesChange={setResolutionNotes}
             onAction={runLifecycle}
           />
           {showAssignToMe ? (
@@ -359,12 +367,17 @@ export default function TicketDetailPage() {
         )}
       </section>
 
-      {ticket.resolutionNotes?.trim() ? (
-        <section className="rounded-xl border border-gray-200 bg-white p-4">
-          <h2 className="mb-2 font-semibold">Resolution notes</h2>
-          <p className="whitespace-pre-wrap text-sm text-gray-700">{ticket.resolutionNotes}</p>
-        </section>
-      ) : null}
+      <TicketResolutionNotesSection
+        notes={resolutionNotes}
+        status={ticket.status}
+        canEdit={canEditResolutionNotes}
+        disabled={saving}
+        onNotesChange={setResolutionNotes}
+        showSaveDraft={
+          canEditResolutionNotes && resolutionNotes.trim() !== (ticket.resolutionNotes ?? "").trim()
+        }
+        onSaveDraft={() => savePatch({ resolutionNotes: resolutionNotes.trim() || null })}
+      />
 
       {ticket.auditLogs && ticket.auditLogs.length > 0 ? (
         <section className="rounded-xl border border-gray-200 bg-white p-4">

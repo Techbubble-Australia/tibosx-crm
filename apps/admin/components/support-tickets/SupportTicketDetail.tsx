@@ -17,6 +17,9 @@ import { TicketStatusBadge } from "@/lib/ticket-status-styles";
 import { formatTicketAuditLine, type TicketAuditRow } from "@/lib/ticket-audit-display";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { TicketRecordMeta } from "@/components/support-tickets/TicketRecordMeta";
+import { TicketEditableSubject } from "@/components/support-tickets/TicketEditableSubject";
+import { TicketResolutionNotesSection } from "@/components/support-tickets/TicketResolutionNotesSection";
+import { normalizeTicketStatusKey } from "@/lib/support-ticket-labels";
 
 type Assignee = { id: string; name: string; email: string };
 
@@ -201,6 +204,10 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
         session?.ticketingUserId &&
           (ticket.createdById === session.ticketingUserId || ticket.createdBy?.id === session.ticketingUserId),
       );
+  const statusKey = normalizeTicketStatusKey(ticket.status);
+  const canEditResolutionNotes =
+    portalRole === "CONSULTANT" && !closedOrCancelled && statusKey === "IN_PROGRESS";
+  const projectLine = ticket.projectLabel?.trim() || null;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -210,9 +217,13 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
 
       <div>
         <p className="text-sm text-gray-500">{ticket.ticketNumber}</p>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{ticket.subject}</h1>
+        <TicketEditableSubject
+          subject={ticket.subject}
+          disabled={closedOrCancelled || saving}
+          onSave={(subject) => patch({ subject })}
+        />
         <p className="mt-1 text-sm text-gray-500">
-          {ticket.projectLabel ?? ticket.organization?.name ?? "—"}
+          {projectLine ?? "—"}
           {ticket.createdBy ? ` · opened by ${ticket.createdBy.name}` : ""}
         </p>
         <p className="text-xs text-gray-400">
@@ -229,7 +240,6 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
             isCreator={isCreator}
             disabled={saving}
             resolutionNotes={resolutionNotes}
-            onResolutionNotesChange={setResolutionNotes}
             onAction={runLifecycle}
           />
           {showAssignToMe ? (
@@ -368,12 +378,17 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
         )}
       </section>
 
-      {ticket.resolutionNotes?.trim() ? (
-        <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-          <h2 className="mb-2 font-semibold">Resolution notes</h2>
-          <p className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{ticket.resolutionNotes}</p>
-        </section>
-      ) : null}
+      <TicketResolutionNotesSection
+        notes={resolutionNotes}
+        status={ticket.status}
+        canEdit={canEditResolutionNotes}
+        disabled={saving}
+        onNotesChange={setResolutionNotes}
+        showSaveDraft={
+          canEditResolutionNotes && resolutionNotes.trim() !== (ticket.resolutionNotes ?? "").trim()
+        }
+        onSaveDraft={() => patch({ resolutionNotes: resolutionNotes.trim() || null })}
+      />
 
       {ticket.auditLogs && ticket.auditLogs.length > 0 ? (
         <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">

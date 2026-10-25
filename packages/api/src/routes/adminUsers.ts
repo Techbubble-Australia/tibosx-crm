@@ -95,7 +95,7 @@ const createSchema = z.object({
   passwordNeedsReset: z.boolean().default(false),
   mappedClientContactId: z.string().min(1).optional().nullable(),
   mappedProfileId: z.string().min(1).optional().nullable(),
-  taxNumber: z.string().min(1).max(50),
+  taxNumber: z.string().max(50).optional(),
   requireProfileAfterFirstLogin: z.boolean().optional().default(true),
 });
 
@@ -722,7 +722,7 @@ router.post("/", async (req: AuthRequest, res) => {
           passwordNeedsReset: data.passwordNeedsReset,
           mappedClientContactId: mappedId,
           mappedProfileId,
-          taxNumber: data.taxNumber.trim(),
+          taxNumber: data.taxNumber?.trim() || null,
           mfaEnabled: true,
           requireProfileAfterFirstLogin: data.requireProfileAfterFirstLogin ?? true,
           profileKycStatus: "INCOMPLETE",

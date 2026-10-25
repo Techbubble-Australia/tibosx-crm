@@ -104,7 +104,7 @@ export default function TicketsPage() {
               <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">{section.label}</h2>
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {section.items.map((row) => {
-                  const projectName = row.projectLabel ?? row.organization?.name ?? "—";
+                  const projectName = row.projectLabel?.trim() || "—";
                   return (
                     <Link
                       key={row.id}
@@ -149,7 +149,7 @@ export default function TicketsPage() {
             </thead>
             <tbody className="divide-y">
               {rows.map((row) => {
-                const projectName = row.projectLabel ?? row.organization?.name ?? "—";
+                const projectName = row.projectLabel?.trim() || "—";
                 return (
                   <tr key={row.id} className="hover:bg-gray-50">
                     <td className="max-w-[8rem] px-4 py-3">

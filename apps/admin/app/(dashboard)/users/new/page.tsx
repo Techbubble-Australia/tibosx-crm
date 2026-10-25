@@ -86,7 +86,6 @@ function NewUserPageInner() {
           passwordNeedsReset: formData.get("passwordNeedsReset") === "on",
           mappedClientContactId: roles.includes("client") ? mappedClientContactId : null,
           mappedProfileId: mappedProfileId.trim() || null,
-          taxNumber: String(formData.get("taxNumber") ?? "").trim(),
           requireProfileAfterFirstLogin: formData.get("requireProfileAfterFirstLogin") === "on",
         }),
       });
@@ -108,7 +107,7 @@ function NewUserPageInner() {
         <Link href="/users" className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">New admin user</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">New internal user</h2>
       </div>
       <form
         onSubmit={onSubmit}
@@ -125,10 +124,6 @@ function NewUserPageInner() {
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Phone *</label>
           <input name="phone" required className={inputClass} value={prefillPhone} onChange={(e) => setPrefillPhone(e.target.value)} />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Tax number *</label>
-          <input name="taxNumber" required className={inputClass} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Password *</label>

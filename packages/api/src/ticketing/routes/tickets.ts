@@ -85,6 +85,7 @@ const ticketUpdateSchema = z.object({
   subject: z.string().min(1).max(300).optional(),
   description: z.string().min(1).max(20000).optional(),
   assignedToId: z.string().nullable().optional(),
+  resolutionNotes: z.string().max(20000).optional().nullable(),
 });
 
 const messageSchema = z.object({
@@ -410,9 +411,11 @@ router.patch("/:id", async (req: TicketingRequest, res) => {
 
   const isConsultant = user.role === "CONSULTANT" && user.consultantVerified;
   if (!isConsultant) {
-    const allowed = Object.keys(parsed.data).every((k) => k === "description" || k === "type" || k === "priority");
-    if (!allowed || parsed.data.assignedToId !== undefined || parsed.data.subject !== undefined) {
-      return res.status(403).json({ error: "Clients can only update description, type, and priority" });
+    const allowed = Object.keys(parsed.data).every(
+      (k) => k === "description" || k === "type" || k === "priority" || k === "subject",
+    );
+    if (!allowed || parsed.data.assignedToId !== undefined || parsed.data.resolutionNotes !== undefined) {
+      return res.status(403).json({ error: "Clients can only update description, type, priority, and subject" });
     }
   }
 

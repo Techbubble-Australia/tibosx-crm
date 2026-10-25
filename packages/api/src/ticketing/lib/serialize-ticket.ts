@@ -26,11 +26,13 @@ export function serializeTicketRow(row: {
   assignedTo?: { id: string; name: string; email: string } | null;
   updatedBy?: { id: string; name: string; email: string } | null;
 }) {
-  const linkedProject = row.organization?.project ?? row.project;
+  const linkedProject = row.organization?.project ?? row.project ?? null;
   const projectLabel =
     linkedProject?.projectNumber && linkedProject?.title
       ? `${linkedProject.projectNumber} — ${linkedProject.title}`
-      : row.organization?.name ?? null;
+      : linkedProject?.title
+        ? linkedProject.title
+        : null;
   const updatedBy = row.updatedBy ?? row.createdBy ?? null;
   return {
     id: row.id,
@@ -61,6 +63,7 @@ export const ticketDetailIncludes = {
       id: true,
       name: true,
       slug: true,
+      projectId: true,
       project: { select: { projectNumber: true, title: true } },
     },
   },

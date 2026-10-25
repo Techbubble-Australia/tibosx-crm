@@ -156,9 +156,9 @@ export default function SupportTicketsPage() {
                   <td className="max-w-xs px-4 py-3">
                     <span
                       className="block truncate text-gray-600 dark:text-gray-400"
-                      title={row.projectLabel ?? row.organization?.name ?? ""}
+                      title={row.projectLabel?.trim() ?? ""}
                     >
-                      {row.projectLabel ?? row.organization?.name ?? "—"}
+                      {row.projectLabel?.trim() || "—"}
                     </span>
                   </td>
                   <td className="px-4 py-3">
