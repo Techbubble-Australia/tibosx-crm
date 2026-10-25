@@ -6,6 +6,7 @@ import { adminFetch } from "@/lib/admin-api";
 import { workspaceFetch } from "@/lib/workspace-fetch";
 import {
   isTerminalTicketStatus,
+  ticketAllowsAssignToMe,
   TICKET_PRIORITIES,
   TICKET_PRIORITY_LABELS,
   TICKET_STATUS_LABELS,
@@ -176,6 +177,11 @@ export default function TicketDetailPage() {
   const canEditAssignee = isConsultant || staffImpersonating;
   const typeOptions = isClient ? CLIENT_REQUEST_TYPES : TICKET_TYPES.map((t) => ({ value: t, label: TICKET_TYPE_LABELS[t] }));
   const closedOrCancelled = isTerminalTicketStatus(ticket.status);
+  const showAssignToMe =
+    ticketAllowsAssignToMe(ticket.status) &&
+    canEditAssignee &&
+    Boolean(me?.id) &&
+    ticket.assignedToId !== me?.id;
 
   return (
     <div className="space-y-6">
@@ -188,15 +194,27 @@ export default function TicketDetailPage() {
       </div>
 
       {!closedOrCancelled ? (
-        <TicketLifecycleActions
-          status={ticket.status}
-          role={lifecycleRole}
-          isCreator={isCreator}
-          disabled={saving}
-          resolutionNotes={resolutionNotes}
-          onResolutionNotesChange={setResolutionNotes}
-          onAction={runLifecycle}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <TicketLifecycleActions
+            status={ticket.status}
+            role={lifecycleRole}
+            isCreator={isCreator}
+            disabled={saving}
+            resolutionNotes={resolutionNotes}
+            onResolutionNotesChange={setResolutionNotes}
+            onAction={runLifecycle}
+          />
+          {showAssignToMe ? (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void savePatch({ assignedToId: me!.id })}
+              className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100 disabled:opacity-50"
+            >
+              Assign to me
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="grid gap-4 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">

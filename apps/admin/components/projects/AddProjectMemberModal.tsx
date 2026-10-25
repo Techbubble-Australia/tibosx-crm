@@ -70,9 +70,7 @@ export function AddProjectMemberModal({ projectId, onClose, onAdded }: Props) {
         className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900"
       >
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Add member</h3>
-        <p className="mt-1 text-sm text-gray-500">
-          Search TBOS users (client portal users are excluded). A recruitment profile is created automatically when needed.
-        </p>
+        <p className="mt-1 text-sm text-gray-500">Search and add internal users</p>
 
         <div className="mt-4 space-y-3">
           <input

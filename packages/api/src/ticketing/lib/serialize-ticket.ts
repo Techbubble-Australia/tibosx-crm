@@ -15,16 +15,23 @@ export function serializeTicketRow(row: {
   updatedAt: Date;
   closedAt: Date | null;
   resolutionNotes?: string | null;
-  organization?: { id: string; name: string; slug: string };
+  organization?: {
+    id: string;
+    name: string;
+    slug: string;
+    project?: { projectNumber: string; title: string } | null;
+  };
   project?: { projectNumber: string; title: string } | null;
   createdBy?: { id: string; name: string; email: string };
   assignedTo?: { id: string; name: string; email: string } | null;
   updatedBy?: { id: string; name: string; email: string } | null;
 }) {
+  const linkedProject = row.organization?.project ?? row.project;
   const projectLabel =
-    row.project?.projectNumber && row.project?.title
-      ? `${row.project.projectNumber} — ${row.project.title}`
-      : null;
+    linkedProject?.projectNumber && linkedProject?.title
+      ? `${linkedProject.projectNumber} — ${linkedProject.title}`
+      : row.organization?.name ?? null;
+  const updatedBy = row.updatedBy ?? row.createdBy ?? null;
   return {
     id: row.id,
     ticketNumber: row.ticketNumber,
@@ -41,7 +48,7 @@ export function serializeTicketRow(row: {
     createdBy: row.createdBy,
     assignedToId: row.assignedToId,
     assignedTo: row.assignedTo,
-    updatedBy: row.updatedBy ?? null,
+    updatedBy,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     closedAt: row.closedAt?.toISOString() ?? null,
@@ -49,7 +56,14 @@ export function serializeTicketRow(row: {
 }
 
 export const ticketDetailIncludes = {
-  organization: { select: { id: true, name: true, slug: true } },
+  organization: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      project: { select: { projectNumber: true, title: true } },
+    },
+  },
   project: { select: { projectNumber: true, title: true } },
   createdBy: { select: { id: true, name: true, email: true } },
   assignedTo: { select: { id: true, name: true, email: true } },

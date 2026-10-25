@@ -5,6 +5,7 @@ import Link from "next/link";
 import { adminFetch } from "@/lib/admin-api";
 import {
   isTerminalTicketStatus,
+  ticketAllowsAssignToMe,
   TICKET_PRIORITIES,
   TICKET_PRIORITY_LABELS,
   TICKET_TYPE_LABELS,
@@ -189,6 +190,11 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
     sessionRole === "admin" ||
     staffImpersonating ||
     (portalRole === "CONSULTANT" && !closedOrCancelled);
+  const showAssignToMe =
+    ticketAllowsAssignToMe(ticket?.status ?? "") &&
+    canManageAssignee &&
+    Boolean(session?.ticketingUserId) &&
+    ticket?.assignedToId !== session?.ticketingUserId;
   const isCreator = staffImpersonating
     ? false
     : Boolean(
@@ -216,15 +222,27 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
       </div>
 
       {!closedOrCancelled ? (
-        <TicketLifecycleActions
-          status={ticket.status}
-          role={portalRole}
-          isCreator={isCreator}
-          disabled={saving}
-          resolutionNotes={resolutionNotes}
-          onResolutionNotesChange={setResolutionNotes}
-          onAction={runLifecycle}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <TicketLifecycleActions
+            status={ticket.status}
+            role={portalRole}
+            isCreator={isCreator}
+            disabled={saving}
+            resolutionNotes={resolutionNotes}
+            onResolutionNotesChange={setResolutionNotes}
+            onAction={runLifecycle}
+          />
+          {showAssignToMe ? (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void patch({ assignedToId: session!.ticketingUserId })}
+              className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200"
+            >
+              Assign to me
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       <section className="grid gap-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 sm:grid-cols-2 lg:grid-cols-4">

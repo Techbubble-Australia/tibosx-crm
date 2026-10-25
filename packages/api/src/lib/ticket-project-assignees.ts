@@ -178,9 +178,17 @@ export async function isValidProjectTicketAssignee(
 export async function autoAssignTicketToProjectSupport(ticketId: string, projectId: string): Promise<TicketAssignee | null> {
   const assignees = await listProjectTicketAssignees(projectId);
   if (assignees.length === 1) {
+    const existing = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      select: { updatedById: true, createdById: true },
+    });
     await prisma.ticket.update({
       where: { id: ticketId },
-      data: { assignedToId: assignees[0]!.id, projectId },
+      data: {
+        assignedToId: assignees[0]!.id,
+        projectId,
+        updatedById: existing?.updatedById ?? existing?.createdById ?? undefined,
+      },
     });
     return assignees[0]!;
   }

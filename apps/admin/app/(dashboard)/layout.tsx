@@ -35,6 +35,7 @@ import {
   Ticket,
 } from "lucide-react";
 import { UserAccountMenu } from "@/components/UserAccountMenu";
+import { HelpSupportHeaderButton } from "@/components/HelpSupportHeaderButton";
 import { ImpersonationBanner } from "@/components/users/ImpersonationBanner";
 import { ImpersonateUserModal } from "@/components/users/ImpersonateUserModal";
 import { anyEffectiveRole, defaultLandingPath } from "@/lib/admin-roles";
@@ -479,6 +480,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{headerTitle(pathname)}</h1>
           <div className="flex items-center gap-3">
             <TicketPortalLink />
+            {!loading && email ? <HelpSupportHeaderButton /> : null}
             {!loading && email ? (
               <UserAccountMenu
                 name={userName}

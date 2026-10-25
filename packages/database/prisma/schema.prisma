@@ -833,7 +833,7 @@ model ProjectMember {
   project              Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   profileId            String
   profile              CandidateProfile    @relation(fields: [profileId], references: [id], onDelete: Restrict)
-  adminUserId          String?             @unique
+  adminUserId          String?
   adminUser            AdminUser?          @relation("ProjectMemberUser", fields: [adminUserId], references: [id], onDelete: SetNull)
   credentialTemplateId String?
   credentialTemplate   CredentialTemplate? @relation(fields: [credentialTemplateId], references: [id], onDelete: SetNull)
@@ -847,6 +847,7 @@ model ProjectMember {
   @@unique([projectId, profileId])
   @@index([projectId])
   @@index([profileId])
+  @@index([adminUserId])
 }
 
 model ProjectEstimate {
@@ -1005,7 +1006,7 @@ model AdminUser {
   contractActivities ContractActivityLog[] @relation("ContractActivityPerformer")
   managedProjects Project[] @relation("ProjectManager")
   timesheetApproverProjects Project[] @relation("ProjectTimesheetApprover")
-  projectMembership ProjectMember? @relation("ProjectMemberUser")
+  projectMemberships ProjectMember[] @relation("ProjectMemberUser")
   timesheets Timesheet[] @relation("TimesheetMember")
   projectActivities ProjectActivityLog[] @relation("ProjectActivityPerformer")
   timesheetActivities TimesheetActivityLog[] @relation("TimesheetActivityPerformer")

@@ -1325,6 +1325,16 @@ router.post("/:id/members", async (req: AuthRequest, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
     }
+    const prismaCode =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code: string }).code)
+        : "";
+    if (prismaCode === "P2002") {
+      return res.status(400).json({
+        error:
+          "This user is already assigned to another project. Run the latest database migration so users can join multiple projects.",
+      });
+    }
     console.error("Error adding project member:", error);
     res.status(500).json({ error: "Failed to add member" });
   }

@@ -30,6 +30,7 @@ import {
 } from "../lib/password-reset";
 import { sendPasswordResetEmail } from "../lib/mail";
 import { tbosLoginUrl } from "../lib/user-invite";
+import { helpSupportRoutes } from "./help-support.js";
 const router: IRouter = Router();
 
 const loginSchema = z.object({
@@ -1143,5 +1144,7 @@ router.post("/mfa/disable", authMiddleware, async (req: AuthRequest, res) => {
     res.status(500).json({ error: "Failed to disable MFA" });
   }
 });
+
+router.use(helpSupportRoutes);
 
 export { router as authRoutes };

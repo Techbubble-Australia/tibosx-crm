@@ -59,6 +59,12 @@ export function isOpenTicketStatus(status: string): boolean {
   const key = normalizeTicketStatusKey(status);
   return Boolean(key) && !TERMINAL_TICKET_STATUSES.has(key) && key !== "RESOLVED";
 }
+
+/** Assign-to-me is hidden once a ticket is resolved, closed, or cancelled. */
+export function ticketAllowsAssignToMe(status: string): boolean {
+  const key = normalizeTicketStatusKey(status);
+  return Boolean(key) && key !== "RESOLVED" && key !== "CLOSED" && key !== "CANCELLED";
+}
 export const TICKET_PRIORITIES = Object.keys(TICKET_PRIORITY_LABELS);
 export const TICKET_TYPES = Object.keys(TICKET_TYPE_LABELS);
 

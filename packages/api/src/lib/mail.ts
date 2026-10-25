@@ -216,6 +216,62 @@ export type ContactFormEmailData = {
   message: string;
 };
 
+export async function sendHelpAndSupportEmail(input: {
+  to: string;
+  userName: string;
+  userEmail: string;
+  userId: string;
+  topic: string;
+  message: string;
+  attachments?: Array<{ filename: string; content: Buffer }>;
+}): Promise<void> {
+  const subject = `TIBOSX Help & Support: ${input.topic.slice(0, 80)}`;
+  const text = [
+    `From: ${input.userName} (${input.userEmail})`,
+    `User id: ${input.userId}`,
+    "",
+    "What do you need help with?",
+    input.topic,
+    "",
+    "Message:",
+    input.message,
+  ].join("\n");
+  const bodyHtml = `
+    <p><strong>From:</strong> ${escapeHtml(input.userName)} (${escapeHtml(input.userEmail)})</p>
+    <p><strong>User id:</strong> ${escapeHtml(input.userId)}</p>
+    <p><strong>What do you need help with?</strong></p>
+    <p>${escapeHtml(input.topic)}</p>
+    <p><strong>Message</strong></p>
+    <p style="white-space:pre-wrap;">${escapeHtml(input.message)}</p>
+  `;
+  const resend = getResendClient();
+  const built = buildTibosxNotificationEmail({
+    headerTitle: "Help & Support request",
+    subjectLine: subject,
+    greeting: "Hi Team,",
+    bodyHtml,
+    bodyText: text,
+  });
+  if (!resend) {
+    console.info("[help-support-email] RESEND not configured; would send to", input.to, built.subject);
+    return;
+  }
+  const { error } = await resend.emails.send({
+    from: getNotificationMailFrom(),
+    to: [input.to],
+    subject: built.subject,
+    text: built.text,
+    html: built.html,
+    attachments: input.attachments?.map((file) => ({
+      filename: file.filename,
+      content: file.content,
+    })),
+  });
+  if (error) {
+    throw new Error(error.message || "Failed to send help request email");
+  }
+}
+
 export async function sendContactFormNotificationEmail(input: {
   to: string;
   submission: ContactFormEmailData;
