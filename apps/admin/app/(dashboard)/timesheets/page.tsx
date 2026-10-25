@@ -113,10 +113,29 @@ export default function TimesheetsPage() {
 
   async function openCreateTimesheet() {
     try {
-      const res = await adminFetch("/api/admin/timesheets/create-entry");
-      const data = await res.json();
-      if (!res.ok) throw new Error(messageFromApiError(data, "Unable to start a new timesheet"));
-      const row = data.data as {
+      let res = await adminFetch("/api/admin/timesheets/create-entry");
+      if (res.status === 404) {
+        res = await adminFetch("/api/admin/timesheets/entry-point");
+      }
+      let data: unknown;
+      try {
+        data = await res.json();
+      } catch {
+        if (!res.ok) {
+          router.push("/timesheets/new");
+          return;
+        }
+        throw new Error("Unable to start a new timesheet");
+      }
+      if (!res.ok) {
+        const message = messageFromApiError(data, "Unable to start a new timesheet");
+        if (res.status === 404 && (message === "Not found" || message === "Timesheet not found")) {
+          router.push("/timesheets/new");
+          return;
+        }
+        throw new Error(message);
+      }
+      const row = (data as { data?: Record<string, unknown> }).data as {
         projectId?: string;
         weekStart?: string;
         existingTimesheetId?: string | null;

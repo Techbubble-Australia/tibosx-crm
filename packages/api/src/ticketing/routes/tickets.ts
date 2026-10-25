@@ -260,7 +260,8 @@ router.get("/assignees", async (req: TicketingRequest, res) => {
     (user.role === "CONSULTANT" && (user.consultantVerified || Boolean(user.tbosAdminUserId))) ||
     staffTbosRole === "customer_support" ||
     staffTbosRole === "admin" ||
-    staffTbosRole === "project_manager";
+    staffTbosRole === "project_manager" ||
+    staffTbosRole === "project_member";
   if (!mayListAssignees) {
     return res.json({ data: [] });
   }

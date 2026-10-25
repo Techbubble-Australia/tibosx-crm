@@ -200,6 +200,7 @@ function serializeTimesheet(row: {
           row.projectClientContact?.contact.email ||
           "";
         if (raw.trim()) return raw.replace(/\s*\(client\)\s*$/i, "").trim() || raw;
+        if (projectApproverName.trim()) return projectApproverName;
         return "Client contact";
       }
       if (row.approverKind === "PM") {
@@ -390,18 +391,34 @@ async function hydrateTimesheetApproverRow<
   T extends {
     approverKind: string | null;
     projectClientContactId: string | null;
+    projectId?: string | null;
     projectClientContact?: { contact: { name: string; email: string } } | null;
   },
 >(row: T): Promise<T> {
-  if (row.approverKind !== "CLIENT_CONTACT" || !row.projectClientContactId) return row;
+  if (row.approverKind !== "CLIENT_CONTACT") return row;
   const contact = row.projectClientContact?.contact;
   if (contact?.name?.trim() || contact?.email?.trim()) return row;
-  const link = await prisma.projectClientContact.findUnique({
-    where: { id: row.projectClientContactId },
-    include: { contact: { select: { name: true, email: true } } },
-  });
-  if (!link) return row;
-  return { ...row, projectClientContact: link };
+
+  if (row.projectClientContactId) {
+    const link = await prisma.projectClientContact.findUnique({
+      where: { id: row.projectClientContactId },
+      include: { contact: { select: { name: true, email: true } } },
+    });
+    if (link?.contact?.name?.trim() || link?.contact?.email?.trim()) {
+      return { ...row, projectClientContact: link };
+    }
+  }
+
+  if (row.projectId) {
+    const fallback = await prisma.projectClientContact.findFirst({
+      where: { projectId: row.projectId, canApproveTimesheets: true },
+      include: { contact: { select: { name: true, email: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+    if (fallback) return { ...row, projectClientContact: fallback };
+  }
+
+  return row;
 }
 
 async function findNextOpenTimesheetWeek(
@@ -487,23 +504,47 @@ async function actorMayLogTimesheets(actorId: string, role: string): Promise<boo
 router.get("/active-projects", async (req: AuthRequest, res) => {
   try {
     const actorId = getActorId(req);
+    const role = req.user?.role ?? "";
     const weekStart =
       typeof req.query.weekStart === "string" && req.query.weekStart.trim()
         ? req.query.weekStart.trim()
         : null;
     const projectMemberships = await listActiveProjectMembershipsForUser(actorId);
-    const rows = projectMemberships.filter((row) => {
-      if (!weekStart) return true;
-      const { startDate, endDate } = projectDateBoundsIso(row.project);
-      return weekOverlapsProjectRange(weekStart, startDate, endDate);
-    });
-    res.json({
-      data: rows.map((row) => ({
+    const options: Array<{ id: string; label: string; kind: string }> = [];
+    const seen = new Set<string>();
+    for (const row of projectMemberships) {
+      if (weekStart) {
+        const { startDate, endDate } = projectDateBoundsIso(row.project);
+        if (!weekOverlapsProjectRange(weekStart, startDate, endDate)) continue;
+      }
+      if (seen.has(row.project.id)) continue;
+      seen.add(row.project.id);
+      options.push({
         id: row.project.id,
         label: `${row.project.projectNumber} — ${row.project.title}`,
         kind: row.project.kind,
-      })),
-    });
+      });
+    }
+    if (canManageAllTimesheets(role) || isProjectManagerRole(role)) {
+      const managed = await prisma.project.findMany({
+        where: { projectManagerId: actorId, status: "ACTIVE" },
+        select: { id: true, projectNumber: true, title: true, kind: true, startDate: true, endDate: true },
+      });
+      for (const project of managed) {
+        if (seen.has(project.id)) continue;
+        if (weekStart) {
+          const { startDate, endDate } = projectDateBoundsIso(project);
+          if (!weekOverlapsProjectRange(weekStart, startDate, endDate)) continue;
+        }
+        seen.add(project.id);
+        options.push({
+          id: project.id,
+          label: `${project.projectNumber} — ${project.title}`,
+          kind: project.kind,
+        });
+      }
+    }
+    res.json({ data: options });
   } catch (error) {
     console.error("Error fetching active projects for timesheets:", error);
     res.status(500).json({ error: "Failed to fetch projects" });

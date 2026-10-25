@@ -17,6 +17,7 @@ type CustomerDetail = {
   name: string | null;
   phone: string | null;
   active: boolean;
+  mfaEnabled: boolean;
   profilePhotoUrl: string | null;
   mappedClientContact: {
     clientName: string;
@@ -110,6 +111,21 @@ export default function EditCustomerUserPage() {
             <label className="mb-1 block text-sm font-medium">Phone *</label>
             <input name="phone" required defaultValue={detail.phone ?? ""} className={inputClass} />
           </div>
+        </div>
+        <div>
+          <span className="mb-1 block text-sm font-medium">MFA</span>
+          <span
+            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+              detail.mfaEnabled
+                ? "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200"
+                : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+            }`}
+          >
+            {detail.mfaEnabled ? "Enabled" : "Off"}
+          </span>
+          <p className="mt-1 text-xs text-gray-500">
+            Customers enroll MFA on first login when required by security settings.
+          </p>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">New password</label>

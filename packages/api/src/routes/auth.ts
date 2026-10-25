@@ -442,6 +442,9 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
     });
   }
 
+  const { syncAdminUserProfileKycStatus } = await import("../lib/admin-user-profile-kyc.js");
+  await syncAdminUserProfileKycStatus(user.id);
+
   const { prepareMemberOnboardingForUser, userQualifiesForMemberOnboarding } = await import(
     "../lib/project-member-user.js"
   );

@@ -408,6 +408,7 @@ export function TimesheetForm({
   const selectedApproverLabel =
     defaults.approverLabel ||
     approvers.find((a) => selectedApprover === `${a.kind}:${a.id}`)?.label ||
+    (approvers.length === 1 ? approvers[0]!.label : "") ||
     "";
   const approverParts = approverDisplayName(selectedApproverLabel);
 
@@ -458,7 +459,11 @@ export function TimesheetForm({
       .then((data) => {
         const list = (data.data as ProjectOption[]) ?? [];
         setProjects(list);
-        if (projectId && !list.some((row) => row.id === projectId)) {
+        if (
+          projectId &&
+          !list.some((row) => row.id === projectId) &&
+          projectId !== defaults.projectId
+        ) {
           setProjectId("");
         } else if (!projectId && defaults.projectId && list.some((row) => row.id === defaults.projectId)) {
           setProjectId(defaults.projectId);

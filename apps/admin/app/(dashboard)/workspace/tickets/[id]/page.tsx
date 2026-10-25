@@ -90,15 +90,24 @@ export default function TicketDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    const staffImpersonating = Boolean(impersonation);
-    const load = staffImpersonating
-      ? adminFetch(`/api/admin/ticketing/assignees?ticketId=${encodeURIComponent(id)}`)
-      : workspaceFetch(`/tickets/assignees?ticketId=${encodeURIComponent(id)}`);
-    void load
-      .then((res) => res.json())
-      .then((data) => setAssignees((data.data as Assignee[]) ?? []))
+    void workspaceFetch(`/tickets/assignees?ticketId=${encodeURIComponent(id)}`)
+      .then(async (res) => {
+        const data = await res.json();
+        const list = (data.data as Assignee[]) ?? [];
+        if (list.length > 0) {
+          setAssignees(list);
+          return;
+        }
+        if (!res.ok) {
+          setAssignees([]);
+          return;
+        }
+        const fallback = await adminFetch(`/api/admin/ticketing/assignees?ticketId=${encodeURIComponent(id)}`);
+        const fallbackData = await fallback.json();
+        setAssignees((fallbackData.data as Assignee[]) ?? []);
+      })
       .catch(() => setAssignees([]));
-  }, [id, impersonation]);
+  }, [id]);
 
   async function savePatch(body: Record<string, unknown>) {
     setSaving(true);

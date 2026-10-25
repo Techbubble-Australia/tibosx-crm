@@ -329,6 +329,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         return canAccessWorkspaceTimesheets;
       }
       if (item.href.startsWith("/workspace/")) {
+        if (hasAdmin) return false;
         if (item.href === "/workspace/timesheets") {
           return canAccessWorkspaceTimesheets;
         }

@@ -176,15 +176,19 @@ export async function isValidProjectTicketAssignee(
   if (actorTicketingUserId && assignedToId === actorTicketingUserId && projectId) {
     const actor = await prisma.ticketingUser.findUnique({
       where: { id: actorTicketingUserId },
-      select: { id: true, active: true, role: true, tbosAdminUserId: true },
+      select: { id: true, active: true, tbosAdminUserId: true },
     });
-    if (actor?.active && actor.role === "CONSULTANT" && actor.tbosAdminUserId) {
+    if (actor?.active && actor.tbosAdminUserId) {
       const onProject = await prisma.projectMember.findFirst({
         where: { projectId, adminUserId: actor.tbosAdminUserId },
         select: { id: true },
       });
       if (onProject) {
-        await provisionSupportMemberConsultant(projectId, actor.tbosAdminUserId, onProject.id);
+        try {
+          await provisionSupportMemberConsultant(projectId, actor.tbosAdminUserId, onProject.id);
+        } catch {
+          // still allow self-assign when membership is valid
+        }
         return true;
       }
     }

@@ -40,10 +40,7 @@ export function serializeTicketRow(row: {
       : linkedProject?.title
         ? linkedProject.title
         : null;
-  const updatedBy =
-    ticketingUserLabel(row.updatedBy) ??
-    ticketingUserLabel(row.createdBy) ??
-    null;
+  const updatedBy = ticketingUserLabel(row.updatedBy);
   const createdBy = ticketingUserLabel(row.createdBy);
   const assignedTo = row.assignedTo ? ticketingUserLabel(row.assignedTo) : null;
   return {
