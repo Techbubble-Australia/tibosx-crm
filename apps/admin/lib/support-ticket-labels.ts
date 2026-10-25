@@ -27,6 +27,11 @@ export const TICKET_TYPE_LABELS: Record<string, string> = {
 
 export const TICKET_STATUSES = Object.keys(TICKET_STATUS_LABELS);
 
+/** Statuses shown in list filters (tickets do not use Draft in the product). */
+export const TICKET_STATUS_FILTER_ENTRIES = Object.entries(TICKET_STATUS_LABELS).filter(
+  ([value]) => value !== "DRAFT",
+);
+
 const TERMINAL_TICKET_STATUSES = new Set(["CLOSED", "CANCELLED"]);
 
 export function normalizeTicketStatusKey(status: string | null | undefined): string {

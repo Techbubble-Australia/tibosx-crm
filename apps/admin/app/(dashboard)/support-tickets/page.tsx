@@ -5,7 +5,8 @@ import Link from "next/link";
 import { Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
-import { TICKET_PRIORITY_LABELS, TICKET_STATUS_LABELS } from "@/lib/support-ticket-labels";
+import { TICKET_STATUS_FILTER_ENTRIES } from "@/lib/support-ticket-labels";
+import { TicketPriorityBadge } from "@/lib/ticket-priority-styles";
 import { TicketStatusBadge } from "@/lib/ticket-status-styles";
 
 type TicketRow = {
@@ -14,7 +15,7 @@ type TicketRow = {
   subject: string;
   status: string;
   priority: string;
-  type: string;
+  projectLabel?: string | null;
   organization?: { name: string };
   createdBy?: { name: string };
   createdAt: string;
@@ -95,7 +96,7 @@ export default function SupportTicketsPage() {
           className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
         >
           <option value="">All statuses</option>
-          {Object.entries(TICKET_STATUS_LABELS).map(([v, l]) => (
+          {TICKET_STATUS_FILTER_ENTRIES.map(([v, l]) => (
             <option key={v} value={v}>{l}</option>
           ))}
         </select>
@@ -117,8 +118,9 @@ export default function SupportTicketsPage() {
         <table className="min-w-full text-sm">
           <thead className="border-b bg-gray-50 text-left text-gray-500 dark:bg-gray-800">
             <tr>
-              <th className="px-4 py-3">Ticket</th>
-              <th className="px-4 py-3">Company</th>
+              <th className="px-4 py-3">Ticket #</th>
+              <th className="px-4 py-3">Subject</th>
+              <th className="px-4 py-3">Project</th>
               <th className="px-4 py-3">Priority</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Created by</th>
@@ -132,19 +134,36 @@ export default function SupportTicketsPage() {
           <tbody className="divide-y dark:divide-gray-800">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={role === "admin" ? 10 : 9} className="px-4 py-8 text-center text-gray-500">No tickets found.</td>
+                <td colSpan={role === "admin" ? 11 : 10} className="px-4 py-8 text-center text-gray-500">No tickets found.</td>
               </tr>
             ) : (
               rows.map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                  <td className="px-4 py-3">
-                    <Link href={`/support-tickets/${row.id}`} className="font-medium text-blue-600 hover:underline">
+                  <td className="max-w-[8rem] px-4 py-3">
+                    <Link
+                      href={`/support-tickets/${row.id}`}
+                      className="block truncate font-medium text-blue-600 hover:underline"
+                      title={row.ticketNumber}
+                    >
                       {row.ticketNumber}
                     </Link>
-                    <p className="text-gray-700 dark:text-gray-300">{row.subject}</p>
                   </td>
-                  <td className="px-4 py-3">{row.organization?.name ?? "—"}</td>
-                  <td className="px-4 py-3">{TICKET_PRIORITY_LABELS[row.priority] ?? row.priority}</td>
+                  <td className="max-w-xs px-4 py-3">
+                    <span className="block truncate text-gray-700 dark:text-gray-300" title={row.subject}>
+                      {row.subject}
+                    </span>
+                  </td>
+                  <td className="max-w-xs px-4 py-3">
+                    <span
+                      className="block truncate text-gray-600 dark:text-gray-400"
+                      title={row.projectLabel ?? row.organization?.name ?? ""}
+                    >
+                      {row.projectLabel ?? row.organization?.name ?? "—"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <TicketPriorityBadge priority={row.priority} />
+                  </td>
                   <td className="px-4 py-3">
                     <TicketStatusBadge status={row.status} />
                   </td>

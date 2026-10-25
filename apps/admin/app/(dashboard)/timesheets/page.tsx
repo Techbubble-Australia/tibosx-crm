@@ -51,15 +51,6 @@ export default function TimesheetsPage() {
     void fetchRows();
   }, []);
 
-  function toggleSelect(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
   async function submitSelected() {
     const ids = [...selected].filter((id) => {
       const row = rows.find((r) => r.id === id);
@@ -102,10 +93,32 @@ export default function TimesheetsPage() {
     }
   }
 
+  function toggleExportSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleExportSelectAll() {
+    setSelected((prev) => {
+      if (prev.size === rows.length) return new Set();
+      return new Set(rows.map((r) => r.id));
+    });
+  }
+
   async function exportCsv() {
+    const ids = [...selected];
+    if (!ids.length) {
+      alert("Select at least one timesheet to export.");
+      return;
+    }
     setExporting(true);
     try {
-      const res = await adminFetch("/api/admin/timesheets/export");
+      const params = new URLSearchParams({ ids: ids.join(",") });
+      const res = await adminFetch(`/api/admin/timesheets/export?${params}`);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(messageFromApiError(data, "Failed to export timesheets"));
@@ -157,8 +170,8 @@ export default function TimesheetsPage() {
               <button
                 type="button"
                 onClick={() => void exportCsv()}
-                disabled={exporting}
-                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600"
+                disabled={exporting || selected.size === 0}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600"
               >
                 <Download className="h-4 w-4" /> Export CSV
               </button>
@@ -199,49 +212,65 @@ export default function TimesheetsPage() {
             <table className="min-w-full text-sm">
               <thead className="border-b border-gray-100 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
                 <tr>
-                  {isEffectiveProjectMember ? <th className="w-10 px-4 py-3" aria-label="Select drafts" /> : null}
+                  <th className="w-10 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all timesheets for export"
+                      checked={rows.length > 0 && selected.size === rows.length}
+                      onChange={() => toggleExportSelectAll()}
+                    />
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Timesheet period</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Project</th>
                   {canManageProjects ? (
                     <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Member</th>
                   ) : null}
-                  <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Week</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
+                  {canManageProjects ? (
+                    <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Approver</th>
+                  ) : null}
                   <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {rows.map((row) => {
+                  const projectLine =
+                    row.targetLabel && row.targetLabel.includes(" — ")
+                      ? row.targetLabel
+                      : row.projectNumber && row.projectTitle
+                        ? `${row.projectNumber} — ${row.projectTitle}`
+                        : row.targetLabel || "—";
+                  return (
                   <tr key={row.id} className="border-b border-gray-50 dark:border-gray-800">
-                    {isEffectiveProjectMember ? (
-                      <td className="px-4 py-3">
-                        {row.status === "DRAFT" ? (
-                          <input
-                            type="checkbox"
-                            checked={selected.has(row.id)}
-                            onChange={() => toggleSelect(row.id)}
-                          />
-                        ) : null}
-                      </td>
-                    ) : null}
                     <td className="px-4 py-3">
-                      <Link href={`/timesheets/${row.id}`} className="text-sky-600 hover:underline dark:text-sky-400">
-                        {row.targetLabel || (
-                          <>
-                            <span className="font-mono text-xs text-gray-400">{row.projectNumber}</span>
-                            <br />
-                            {row.projectTitle}
-                          </>
-                        )}
+                      <input
+                        type="checkbox"
+                        checked={selected.has(row.id)}
+                        onChange={() => toggleExportSelect(row.id)}
+                        aria-label={`Select timesheet ${formatDate(row.startDate)} – ${formatDate(row.endDate)}`}
+                      />
+                    </td>
+                    <td className="max-w-[11rem] px-4 py-3 text-gray-500">
+                      <Link
+                        href={`/timesheets/${row.id}`}
+                        className="block truncate text-sky-600 hover:underline dark:text-sky-400"
+                        title={`${formatDate(row.startDate)} – ${formatDate(row.endDate)}`}
+                      >
+                        {formatDate(row.startDate)} – {formatDate(row.endDate)}
+                      </Link>
+                    </td>
+                    <td className="max-w-xs px-4 py-3">
+                      <Link
+                        href={`/timesheets/${row.id}`}
+                        className="block truncate text-gray-800 hover:text-sky-600 hover:underline dark:text-gray-200 dark:hover:text-sky-400"
+                        title={projectLine}
+                      >
+                        {projectLine}
                       </Link>
                     </td>
                     {canManageProjects ? (
                       <td className="px-4 py-3 text-gray-500">{row.memberName}</td>
                     ) : null}
-                    <td className="px-4 py-3 text-gray-500">
-                      <Link href={`/timesheets/${row.id}`} className="hover:text-sky-600 hover:underline dark:hover:text-sky-400">
-                        {formatDate(row.startDate)} – {formatDate(row.endDate)}
-                      </Link>
-                    </td>
                     <td className="px-4 py-3">
                       <TimesheetStatusBadge status={row.status} />
                       {row.status === "SUBMITTED" && row.approverKind === "CLIENT_CONTACT" ? (
@@ -250,6 +279,13 @@ export default function TimesheetsPage() {
                         </span>
                       ) : null}
                     </td>
+                    {canManageProjects ? (
+                      <td className="max-w-[10rem] px-4 py-3 text-gray-600 dark:text-gray-400">
+                        <span className="block truncate" title={row.approverLabel ?? ""}>
+                          {row.approverLabel ?? "—"}
+                        </span>
+                      </td>
+                    ) : null}
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex gap-2">
                         {isEffectiveProjectMember && row.status === "DRAFT" ? (
@@ -277,7 +313,8 @@ export default function TimesheetsPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

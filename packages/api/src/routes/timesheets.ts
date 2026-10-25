@@ -151,7 +151,14 @@ function serializeTimesheet(row: {
   comments: string | null;
   createdAt: Date;
   updatedAt: Date;
-  project?: { id: string; title: string; projectNumber: string; projectManagerId: string } | null;
+  project?: {
+    id: string;
+    title: string;
+    projectNumber: string;
+    projectManagerId: string;
+    projectManager?: { name: string | null; email: string } | null;
+    timesheetApprover?: { name: string | null; email: string } | null;
+  } | null;
   opportunity?: { id: string; name: string } | null;
   ticket?: { id: string; ticketNumber: string; subject: string; projectId: string | null } | null;
   projectClientContact?: { id: string; contact: { name: string; email: string } } | null;
@@ -181,7 +188,11 @@ function serializeTimesheet(row: {
       row.approverKind === "CLIENT_CONTACT"
         ? row.projectClientContact?.contact.name || row.projectClientContact?.contact.email || "Client contact"
         : row.approverKind === "PM"
-          ? "Project manager"
+          ? row.project?.timesheetApprover?.name ||
+            row.project?.timesheetApprover?.email ||
+            row.project?.projectManager?.name ||
+            row.project?.projectManager?.email ||
+            "Project manager"
           : "",
     projectTitle: row.project?.title ?? "",
     projectNumber: row.project?.projectNumber ?? "",
@@ -524,7 +535,7 @@ router.get("/target-meta", async (req: AuthRequest, res) => {
         include: { projectManager: { select: { name: true, email: true } } },
       });
       if (!project) return res.status(404).json({ error: "Project not found" });
-      const approvers = project.kind === "SUPPORT" ? await buildProjectApprovers(projectId) : [];
+      const approvers = await buildProjectApprovers(projectId);
       const { startDate, endDate } = projectDateBoundsIso(project);
       return res.json({
         data: {
@@ -648,7 +659,17 @@ router.get("/export", async (req: AuthRequest, res) => {
       typeof req.query.timesheetId === "string" && req.query.timesheetId.trim()
         ? req.query.timesheetId.trim()
         : "";
-    const where = timesheetId ? { ...accessWhere, id: timesheetId } : accessWhere;
+    const idsRaw = typeof req.query.ids === "string" ? req.query.ids : "";
+    const exportIds = idsRaw
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
+    const where =
+      exportIds.length > 0
+        ? { ...accessWhere, id: { in: exportIds } }
+        : timesheetId
+          ? { ...accessWhere, id: timesheetId }
+          : accessWhere;
     const rows = await prisma.timesheet.findMany({
       where,
       include: {
@@ -755,16 +776,19 @@ router.get("/", async (req: AuthRequest, res) => {
       where,
       include: {
         project: {
-    select: {
-      id: true,
-      title: true,
-      projectNumber: true,
-      projectManagerId: true,
-      timesheetApproverUserId: true,
-    },
-  },
+          select: {
+            id: true,
+            title: true,
+            projectNumber: true,
+            projectManagerId: true,
+            timesheetApproverUserId: true,
+            projectManager: { select: { name: true, email: true } },
+            timesheetApprover: { select: { name: true, email: true } },
+          },
+        },
         opportunity: { select: { id: true, name: true } },
         memberUser: { select: { id: true, name: true, email: true } },
+        projectClientContact: { include: { contact: { select: { name: true, email: true } } } },
       },
       orderBy: { createdAt: "desc" },
     });
