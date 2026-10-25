@@ -176,7 +176,8 @@ router.get("/:id", async (req: TicketingRequest, res) => {
     return res.status(404).json({ error: "Not found" });
   }
 
-  res.json({ data: mapDetail(timesheet) });
+  const canApprove = timesheet.status === "SUBMITTED";
+  res.json({ data: { ...mapDetail(timesheet), canApprove } });
 });
 
 router.post("/:id/approve", async (req: TicketingRequest, res) => {

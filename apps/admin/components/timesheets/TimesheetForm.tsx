@@ -68,6 +68,8 @@ export type TimesheetFormValues = {
   comments?: string | null;
   rejectReason?: string | null;
   targetLabel?: string;
+  projectNumber?: string;
+  projectTitle?: string;
   activityLogs?: Array<{
     id: string;
     action: string;
@@ -651,6 +653,12 @@ export function TimesheetForm({
 
   const shortDows = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+  const projectDisplayLabel =
+    defaults.targetLabel ||
+    (defaults.projectNumber && defaults.projectTitle
+      ? `${defaults.projectNumber} — ${defaults.projectTitle}`
+      : projects.find((row) => row.id === projectId)?.label || "");
+
   return (
     <form onSubmit={(e) => void handleSave(e)} className="flex flex-col xl:flex-row xl:items-start">
       <div className="min-w-0 flex-1">
@@ -672,22 +680,31 @@ export function TimesheetForm({
                 <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Project <span className="text-red-500">*</span>
                 </label>
-                <select
-                  className={`${selectClass} ${formEditable ? "" : "cursor-not-allowed bg-gray-50"}`}
-                  value={projectId}
-                  onChange={(e) => {
-                    setProjectId(e.target.value);
-                    setLines([emptyLine()]);
-                    setSelection(null);
-                  }}
-                  disabled={!formEditable}
-                  required
-                >
-                  <option value="">Select project…</option>
-                  {projects.map((row) => (
-                    <option key={row.id} value={row.id}>{row.label}</option>
-                  ))}
-                </select>
+                {!formEditable && projectDisplayLabel ? (
+                  <p
+                    className="flex h-10 items-center rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                    title={projectDisplayLabel}
+                  >
+                    <span className="truncate">{projectDisplayLabel}</span>
+                  </p>
+                ) : (
+                  <select
+                    className={`${selectClass} ${formEditable ? "" : "cursor-not-allowed bg-gray-50"}`}
+                    value={projectId}
+                    onChange={(e) => {
+                      setProjectId(e.target.value);
+                      setLines([emptyLine()]);
+                      setSelection(null);
+                    }}
+                    disabled={!formEditable}
+                    required
+                  >
+                    <option value="">Select project…</option>
+                    {projects.map((row) => (
+                      <option key={row.id} value={row.id}>{row.label}</option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div>
@@ -993,7 +1010,7 @@ export function TimesheetForm({
         <section className="mt-6 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-950">
           <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">Files</h3>
           <p className="mb-3 text-xs text-gray-500">
-            Attach evidence when required for client approval outside TBOS.
+            Attach evidence of client approval if required
           </p>
           {entryEditable ? (
             <label

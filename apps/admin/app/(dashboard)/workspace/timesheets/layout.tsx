@@ -5,6 +5,10 @@ import { usePathname } from "next/navigation";
 
 export default function WorkspaceTimesheetsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const isDetailPage =
+    pathname.startsWith("/workspace/timesheets/") &&
+    pathname !== "/workspace/timesheets/submitted" &&
+    pathname !== "/workspace/timesheets/approved";
   const tabs = [
     { href: "/workspace/timesheets/submitted", id: "submitted", label: "Submitted" },
     { href: "/workspace/timesheets/approved", id: "approved", label: "Approved" },
@@ -17,6 +21,7 @@ export default function WorkspaceTimesheetsLayout({ children }: { children: Reac
         <p className="mt-1 text-sm text-slate-500">Review team timesheets for projects where you are the designated approver.</p>
       </div>
 
+      {!isDetailPage ? (
       <div className="flex flex-wrap gap-2 border-b border-gray-200 dark:border-gray-700">
         {tabs.map((tab) => {
           const active = pathname === tab.href || (tab.id === "submitted" && pathname === "/workspace/timesheets");
@@ -36,6 +41,7 @@ export default function WorkspaceTimesheetsLayout({ children }: { children: Reac
           );
         })}
       </div>
+      ) : null}
 
       {children}
     </div>
