@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import { adminFetch } from "@/lib/admin-api";
 import { workspaceFetch } from "@/lib/workspace-fetch";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { getEffectiveRoles } from "@/lib/admin-roles";
@@ -9,6 +10,7 @@ import {
   type ActivityRow,
   type TicketRow,
   type TimesheetSummary,
+  type SubmittedTimesheetRow,
 } from "@/components/customer-support/CustomerSupportDashboard";
 
 export default function DashboardPage() {
@@ -34,6 +36,13 @@ export default function DashboardPage() {
     return (data.data as TimesheetSummary) ?? { total: 0, pendingApproval: 0 };
   }, []);
 
+  const loadRecentSubmittedTimesheets = useCallback(async () => {
+    const res = await adminFetch("/api/admin/timesheets/recent-submitted?limit=3");
+    const data = await res.json();
+    if (!res.ok) return [];
+    return (data.data as SubmittedTimesheetRow[]) ?? [];
+  }, []);
+
   const showTimesheetSummary = canAccessWorkspaceTimesheets && !isCustomerSupport;
   const timesheetsHref = showTimesheetSummary ? "/workspace/timesheets/submitted" : "/timesheets";
 
@@ -45,6 +54,7 @@ export default function DashboardPage() {
       loadTickets={loadTickets}
       loadActivity={loadActivity}
       loadTimesheetSummary={loadTimesheetSummary}
+      loadRecentSubmittedTimesheets={loadRecentSubmittedTimesheets}
       showTimesheetSummary={showTimesheetSummary}
     />
   );

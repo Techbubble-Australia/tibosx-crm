@@ -123,7 +123,7 @@ router.get("/activity/recent", async (req: TicketingRequest, res) => {
   );
 
   res.json({
-    data: latestActivityPerTicket(logs).map(serializeTicketActivityRow),
+    data: latestActivityPerTicket(logs, 4).map(serializeTicketActivityRow),
   });
 });
 

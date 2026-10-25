@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
@@ -15,6 +16,7 @@ const inputClass =
 type EmergencyContact = { name: string; email?: string; phone?: string; relation?: string };
 
 export function MemberProfileCompletionGate() {
+  const pathname = usePathname();
   const { sessionLoaded, memberOnboarding, refreshSession } = useAdminSession();
   const needsProfileCompletion = Boolean(
     memberOnboarding?.profileOnboardingRequired && memberOnboarding?.agreementSigned,
@@ -191,6 +193,10 @@ export function MemberProfileCompletionGate() {
     } finally {
       setSaving(false);
     }
+  }
+
+  if (pathname === "/timesheets" || pathname.startsWith("/timesheets/")) {
+    return null;
   }
 
   if (!open) return null;

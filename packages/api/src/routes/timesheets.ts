@@ -34,6 +34,8 @@ import {
 import {
   assertTimesheetWithinProjectDates,
   projectDateBoundsIso,
+  projectWeekMondayBounds,
+  snapWeekMondayToInput,
   weekOverlapsProjectRange,
 } from "../lib/timesheet-project-dates";
 
@@ -360,10 +362,48 @@ async function assertMemberCanSubmitTimesheets(
   if (options?.impersonatorId) return;
   if (!hasEffectiveRole(roles, "project_member")) return;
   if (roles.includes("admin") || roles.includes("project_manager")) return;
+  // Timesheets are not gated on profile/KYC — only a signed credential agreement when one is assigned.
   const onboarding = await getMemberOnboardingStatus(actorId);
-  if (!onboarding.agreementSigned) {
+  if (onboarding.hasAgreementAssignment && !onboarding.agreementSigned) {
     throw new Error("AGREEMENT_REQUIRED");
   }
+}
+
+function addDaysIso(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+async function findNextOpenTimesheetWeek(actorId: string, projectId: string): Promise<string | null> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { startDate: true, endDate: true },
+  });
+  if (!project) return null;
+  const { startDate, endDate } = projectDateBoundsIso(project);
+  const bounds = projectWeekMondayBounds(startDate, endDate);
+  let monday = snapWeekMondayToInput(new Date().toISOString());
+  if (monday < bounds.min) monday = bounds.min;
+
+  for (let i = 0; i < 156; i++) {
+    if (monday > bounds.max) return monday;
+    if (!weekOverlapsProjectRange(monday, startDate, endDate)) {
+      monday = addDaysIso(monday, 7);
+      continue;
+    }
+    const existing = await prisma.timesheet.findFirst({
+      where: {
+        memberUserId: actorId,
+        projectId,
+        startDate: new Date(`${monday}T00:00:00.000Z`),
+      },
+      select: { id: true },
+    });
+    if (!existing) return monday;
+    monday = addDaysIso(monday, 7);
+  }
+  return monday;
 }
 
 /** Log/edit own timesheets: project_member role, PM/admin, or active project membership. */
@@ -639,6 +679,74 @@ router.get("/defaults", async (_req, res) => {
   });
 });
 
+router.get("/entry-point", async (req: AuthRequest, res) => {
+  try {
+    const actorId = getActorId(req);
+    const role = req.user?.role ?? "";
+    if (!(await actorMayLogTimesheets(actorId, role))) {
+      return res.status(403).json({ error: "Only project members can create timesheets" });
+    }
+    const preferredProjectId =
+      typeof req.query.projectId === "string" ? req.query.projectId.trim() : "";
+    const memberships = await listActiveProjectMembershipsForUser(actorId);
+    if (!memberships.length) {
+      return res.status(404).json({ error: "No active project assignments" });
+    }
+    const match =
+      (preferredProjectId && memberships.find((row) => row.project.id === preferredProjectId)) ||
+      memberships[0];
+    const projectId = match!.project.id;
+    const weekStart = await findNextOpenTimesheetWeek(actorId, projectId);
+    if (!weekStart) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+    const mon = new Date(`${weekStart}T00:00:00.000Z`);
+    const sun = sundayOfWeek(mon);
+    res.json({
+      data: {
+        projectId,
+        weekStart,
+        weekEnd: sun.toISOString().slice(0, 10),
+      },
+    });
+  } catch (error) {
+    console.error("Error resolving timesheet entry point:", error);
+    res.status(500).json({ error: "Failed to resolve timesheet entry" });
+  }
+});
+
+router.get("/recent-submitted", async (req: AuthRequest, res) => {
+  try {
+    const limitRaw = typeof req.query.limit === "string" ? Number.parseInt(req.query.limit, 10) : 3;
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 10) : 3;
+    const where = await timesheetAccessWhere(req);
+    const rows = await prisma.timesheet.findMany({
+      where: { ...where, status: "SUBMITTED" },
+      orderBy: { updatedAt: "desc" },
+      take: limit,
+      include: {
+        memberUser: { select: { name: true, email: true } },
+        project: { select: { projectNumber: true, title: true } },
+      },
+    });
+    res.json({
+      data: rows.map((row) => ({
+        id: row.id,
+        memberName: row.memberUser?.name || row.memberUser?.email || "",
+        projectLabel: row.project
+          ? `${row.project.projectNumber} — ${row.project.title}`
+          : "",
+        startDate: row.startDate.toISOString(),
+        endDate: row.endDate.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching recent submitted timesheets:", error);
+    res.status(500).json({ error: "Failed to fetch timesheets" });
+  }
+});
+
 router.get("/for-week", async (req: AuthRequest, res) => {
   try {
     const actorId = getActorId(req);
@@ -881,22 +989,22 @@ router.post("/", async (req: AuthRequest, res) => {
         return res.status(400).json({ error: "You are not assigned to this active project" });
       }
       await assertTimesheetProjectDateRules(resolved.projectId, data.startDate, resolved);
+      const duplicate = await prisma.timesheet.findFirst({
+        where: {
+          memberUserId: actorId,
+          projectId: resolved.projectId,
+          startDate: data.startDate,
+        },
+        select: { id: true },
+      });
+      if (duplicate) {
+        return res.status(409).json({
+          error: "A timesheet already exists for this project and week",
+          data: { id: duplicate.id },
+        });
+      }
       if (resolved.entryRows.length > 0) {
         await assertValidTimesheetEntries(actorId, resolved.projectId, resolved.entryRows);
-        const duplicate = await prisma.timesheet.findFirst({
-          where: {
-            memberUserId: actorId,
-            projectId: resolved.projectId,
-            startDate: data.startDate,
-          },
-          select: { id: true },
-        });
-        if (duplicate) {
-          return res.status(409).json({
-            error: "A timesheet already exists for this project and week",
-            data: { id: duplicate.id },
-          });
-        }
       }
     } else if (data.opportunityId) {
       const opportunity = await prisma.opportunity.findUnique({ where: { id: data.opportunityId } });

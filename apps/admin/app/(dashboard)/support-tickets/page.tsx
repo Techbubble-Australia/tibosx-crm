@@ -126,8 +126,8 @@ export default function SupportTicketsPage() {
               <th className="px-4 py-3">Created by</th>
               <th className="px-4 py-3">Created</th>
               <th className="px-4 py-3">Updated</th>
-              <th className="px-4 py-3">Updated by</th>
-              <th className="px-4 py-3">Assigned to</th>
+              <th className="whitespace-nowrap px-4 py-3">Updated by</th>
+              <th className="whitespace-nowrap px-4 py-3">Assigned to</th>
               {role === "admin" ? <th className="px-4 py-3 w-12" aria-label="Actions" /> : null}
             </tr>
           </thead>

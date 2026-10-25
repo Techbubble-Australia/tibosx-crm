@@ -186,7 +186,7 @@ router.get("/tickets/activity/recent", async (req: TbosRequest, res) => {
   );
 
   res.json({
-    data: latestActivityPerTicket(logs).map(serializeTicketActivityRow),
+    data: latestActivityPerTicket(logs, 4).map(serializeTicketActivityRow),
   });
 });
 

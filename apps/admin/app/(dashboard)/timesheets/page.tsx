@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Download, Plus, Send, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
@@ -29,6 +30,7 @@ function formatDate(value: string) {
 }
 
 export default function TimesheetsPage() {
+  const router = useRouter();
   const { isEffectiveProjectMember, canManageProjects, canCreateTimesheets, userId } = useAdminSession();
   const showCreateTimesheet = canCreateTimesheets;
   const [rows, setRows] = useState<TimesheetRow[]>([]);
@@ -109,6 +111,25 @@ export default function TimesheetsPage() {
     });
   }
 
+  async function openCreateTimesheet() {
+    try {
+      const res = await adminFetch("/api/admin/timesheets/entry-point");
+      const data = await res.json();
+      if (!res.ok) throw new Error(messageFromApiError(data, "Unable to start a new timesheet"));
+      const row = data.data as { projectId?: string; weekStart?: string };
+      if (!row.projectId || !row.weekStart) {
+        throw new Error("No open timesheet week found");
+      }
+      const params = new URLSearchParams({
+        projectId: row.projectId,
+        weekStart: row.weekStart,
+      });
+      router.push(`/timesheets/new?${params}`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Unable to start a new timesheet");
+    }
+  }
+
   async function exportCsv() {
     const ids = [...selected];
     if (!ids.length) {
@@ -187,12 +208,13 @@ export default function TimesheetsPage() {
               </button>
             ) : null}
             {showCreateTimesheet ? (
-              <Link
-                href="/timesheets/new"
+              <button
+                type="button"
+                onClick={() => void openCreateTimesheet()}
                 className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
               >
                 <Plus className="h-4 w-4" /> Create timesheet
-              </Link>
+              </button>
             ) : null}
           </div>
         </div>

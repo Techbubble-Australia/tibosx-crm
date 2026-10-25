@@ -703,6 +703,23 @@ export function TimesheetForm({
     setWeekMonday(snapped);
   }
 
+  const prevProjectIdRef = useRef(projectId);
+  useEffect(() => {
+    if (defaults.id || !formEditable) return;
+    const prev = prevProjectIdRef.current;
+    prevProjectIdRef.current = projectId;
+    if (!projectId || projectId === prev) return;
+    if (!prev) return;
+    void adminFetch(`/api/admin/timesheets/entry-point?projectId=${encodeURIComponent(projectId)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const weekStart = (data.data as { weekStart?: string })?.weekStart;
+        if (!weekStart) return;
+        applyWeekChange(weekStart);
+      })
+      .catch(() => undefined);
+  }, [projectId, defaults.id, formEditable]);
+
   return (
     <form onSubmit={(e) => void handleSave(e)} className="flex flex-col xl:flex-row xl:items-start">
       <div className="min-w-0 flex-1">

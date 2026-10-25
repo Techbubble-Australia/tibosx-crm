@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { workspaceFetch } from "@/lib/workspace-fetch";
-import { TICKET_STATUS_FILTER_ENTRIES } from "@/lib/support-ticket-labels";
+import {
+  TICKET_STATUS_FILTER_ENTRIES,
+  normalizeTicketStatusKey,
+  ticketStatusLabel,
+} from "@/lib/support-ticket-labels";
 import { TicketPriorityBadge } from "@/lib/ticket-priority-styles";
 import { TicketStatusBadge } from "@/lib/ticket-status-styles";
 import { EmptyTickets } from "@/components/workspace/EmptyTickets";
+import { ViewModeToggle, type ViewMode } from "@/components/ui/ViewModeToggle";
 
 type TicketRow = {
   id: string;
@@ -23,10 +28,20 @@ type TicketRow = {
   assignedTo?: { id: string; name: string; email: string } | null;
 };
 
+const CARD_STATUS_ORDER = [
+  "OPEN",
+  "IN_PROGRESS",
+  "PENDING_CLIENT",
+  "RESOLVED",
+  "CLOSED",
+  "CANCELLED",
+] as const;
+
 export default function TicketsPage() {
   const [rows, setRows] = useState<TicketRow[]>([]);
   const [status, setStatus] = useState("");
   const [q, setQ] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -37,11 +52,25 @@ export default function TicketsPage() {
       .then((data) => setRows((data.data as TicketRow[]) ?? []));
   }, [status, q]);
 
+  const grouped = useMemo(() => {
+    const map = new Map<string, TicketRow[]>();
+    for (const row of rows) {
+      const key = normalizeTicketStatusKey(row.status) || "OPEN";
+      const list = map.get(key) ?? [];
+      list.push(row);
+      map.set(key, list);
+    }
+    return CARD_STATUS_ORDER
+      .map((key) => ({ key, label: ticketStatusLabel(key), items: map.get(key) ?? [] }))
+      .filter((section) => section.items.length > 0);
+  }, [rows]);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold text-slate-900">Tickets</h1>
         <div className="flex flex-wrap items-center gap-2">
+          <ViewModeToggle mode={viewMode} onChange={setViewMode} />
           <Link
             href="/workspace/tickets/new"
             className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
@@ -68,6 +97,39 @@ export default function TicketsPage() {
       </div>
       {rows.length === 0 ? (
         <EmptyTickets />
+      ) : viewMode === "card" ? (
+        <div className="space-y-8">
+          {grouped.map((section) => (
+            <section key={section.key}>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">{section.label}</h2>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {section.items.map((row) => {
+                  const projectName = row.projectLabel ?? row.organization?.name ?? "—";
+                  return (
+                    <Link
+                      key={row.id}
+                      href={`/workspace/tickets/${row.id}`}
+                      className="flex flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-sky-200 hover:shadow-md"
+                    >
+                      <div className="mb-2 flex items-start justify-between gap-2">
+                        <span className="font-semibold text-sky-700">{row.ticketNumber}</span>
+                        <TicketStatusBadge status={row.status} />
+                      </div>
+                      <p className="mb-1 line-clamp-2 font-medium text-gray-900">{row.subject}</p>
+                      <p className="mb-3 line-clamp-1 text-xs text-gray-500">{projectName}</p>
+                      <div className="mt-auto flex items-center justify-between gap-2">
+                        <TicketPriorityBadge priority={row.priority} />
+                        <span className="text-xs text-gray-400">
+                          {new Date(row.updatedAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
           <table className="min-w-full text-sm">
@@ -81,8 +143,8 @@ export default function TicketsPage() {
                 <th className="px-4 py-3">Created by</th>
                 <th className="px-4 py-3">Created</th>
                 <th className="px-4 py-3">Updated</th>
-                <th className="px-4 py-3">Updated by</th>
-                <th className="px-4 py-3">Assigned to</th>
+                <th className="whitespace-nowrap px-4 py-3">Updated by</th>
+                <th className="whitespace-nowrap px-4 py-3">Assigned to</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -112,10 +174,10 @@ export default function TicketsPage() {
                       <TicketStatusBadge status={row.status} />
                     </td>
                     <td className="px-4 py-3 text-gray-600">{row.createdBy?.name ?? "—"}</td>
-                    <td className="px-4 py-3 text-gray-500">{new Date(row.createdAt).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-gray-500">{new Date(row.updatedAt).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-gray-600">{row.updatedBy?.name ?? "—"}</td>
-                    <td className="px-4 py-3 text-gray-600">{row.assignedTo?.name ?? "Unassigned"}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-gray-500">{new Date(row.createdAt).toLocaleString()}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-gray-500">{new Date(row.updatedAt).toLocaleString()}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-gray-600">{row.updatedBy?.name ?? "—"}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-gray-600">{row.assignedTo?.name ?? "Unassigned"}</td>
                   </tr>
                 );
               })}
