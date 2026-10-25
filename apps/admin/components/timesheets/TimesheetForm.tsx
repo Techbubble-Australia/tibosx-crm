@@ -730,13 +730,13 @@ export function TimesheetForm({
         ) : null}
 
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-950">
-          <div className="border-b border-gray-100 px-6 py-5 dark:border-gray-800">
+          <div className="border-b border-gray-100 px-5 py-3 dark:border-gray-800">
             <div className="flex items-start justify-between gap-4">
               <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{pageTitle}</h1>
               <TimesheetStatusBadge status={status} />
             </div>
 
-            <div className="mt-6 grid gap-6 md:grid-cols-2">
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Project <span className="text-red-500">*</span>

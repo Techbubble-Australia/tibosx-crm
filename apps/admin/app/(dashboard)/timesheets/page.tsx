@@ -113,10 +113,18 @@ export default function TimesheetsPage() {
 
   async function openCreateTimesheet() {
     try {
-      const res = await adminFetch("/api/admin/timesheets/entry-point");
+      const res = await adminFetch("/api/admin/timesheets/create-entry");
       const data = await res.json();
       if (!res.ok) throw new Error(messageFromApiError(data, "Unable to start a new timesheet"));
-      const row = data.data as { projectId?: string; weekStart?: string };
+      const row = data.data as {
+        projectId?: string;
+        weekStart?: string;
+        existingTimesheetId?: string | null;
+      };
+      if (row.existingTimesheetId) {
+        router.push(`/timesheets/${row.existingTimesheetId}`);
+        return;
+      }
       if (!row.projectId || !row.weekStart) {
         throw new Error("No open timesheet week found");
       }
@@ -179,7 +187,7 @@ export default function TimesheetsPage() {
   return (
     <ProjectManagementGuard>
       <div>
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Timesheets</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -234,7 +242,7 @@ export default function TimesheetsPage() {
             <table className="min-w-full text-sm">
               <thead className="border-b border-gray-100 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
                 <tr>
-                  <th className="w-10 px-4 py-3">
+                  <th className="w-10 px-4 py-2">
                     <input
                       type="checkbox"
                       aria-label="Select all timesheets for export"
@@ -242,14 +250,14 @@ export default function TimesheetsPage() {
                       onChange={() => toggleExportSelectAll()}
                     />
                   </th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Timesheet period</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Project</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Timesheet period</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Project</th>
                   {canManageProjects ? (
-                    <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Member</th>
+                    <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Member</th>
                   ) : null}
-                  <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Approver</th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Approver</th>
+                  <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -262,7 +270,7 @@ export default function TimesheetsPage() {
                         : row.targetLabel || "—";
                   return (
                   <tr key={row.id} className="border-b border-gray-50 dark:border-gray-800">
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-2">
                       <input
                         type="checkbox"
                         checked={selected.has(row.id)}
@@ -270,7 +278,7 @@ export default function TimesheetsPage() {
                         aria-label={`Select timesheet ${formatDate(row.startDate)} – ${formatDate(row.endDate)}`}
                       />
                     </td>
-                    <td className="max-w-[11rem] px-4 py-3 text-gray-500">
+                    <td className="max-w-[11rem] px-4 py-2 text-gray-500">
                       <Link
                         href={`/timesheets/${row.id}`}
                         className="block truncate text-sky-600 hover:underline dark:text-sky-400"
@@ -279,7 +287,7 @@ export default function TimesheetsPage() {
                         {formatDate(row.startDate)} – {formatDate(row.endDate)}
                       </Link>
                     </td>
-                    <td className="max-w-xs px-4 py-3">
+                    <td className="max-w-xs px-4 py-2">
                       <Link
                         href={`/timesheets/${row.id}`}
                         className="block truncate text-gray-800 hover:text-sky-600 hover:underline dark:text-gray-200 dark:hover:text-sky-400"
@@ -289,9 +297,9 @@ export default function TimesheetsPage() {
                       </Link>
                     </td>
                     {canManageProjects ? (
-                      <td className="px-4 py-3 text-gray-500">{row.memberName}</td>
+                      <td className="px-4 py-2 text-gray-500">{row.memberName}</td>
                     ) : null}
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-2">
                       <TimesheetStatusBadge status={row.status} />
                       {row.status === "SUBMITTED" && row.approverKind === "CLIENT_CONTACT" ? (
                         <span className="mt-0.5 block text-xs text-sky-600 dark:text-sky-400">
@@ -299,12 +307,12 @@ export default function TimesheetsPage() {
                         </span>
                       ) : null}
                     </td>
-                    <td className="max-w-[10rem] px-4 py-3 text-gray-600 dark:text-gray-400">
+                    <td className="max-w-[10rem] px-4 py-2 text-gray-600 dark:text-gray-400">
                       <span className="block truncate" title={row.approverLabel ?? ""}>
                         {row.approverLabel ?? "—"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-2 text-right">
                       <div className="inline-flex gap-2">
                         {isEffectiveProjectMember && row.status === "DRAFT" ? (
                           <button

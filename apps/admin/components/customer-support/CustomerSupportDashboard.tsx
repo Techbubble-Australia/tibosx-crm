@@ -148,15 +148,20 @@ export function CustomerSupportDashboard({
           ) : (
             <ul className="divide-y divide-gray-100 dark:divide-gray-800">
               {needsAttention.map((row) => (
-                <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
+                <li
+                  key={row.id}
+                  className="grid grid-cols-[minmax(0,1fr)_auto_7.5rem] items-center gap-x-3 gap-y-1 py-3 text-sm"
+                >
                   <div className="min-w-0">
                     <Link href={ticketDetailHref(row.id)} className="font-medium text-sky-600 hover:underline">
                       {row.ticketNumber}
                     </Link>
                     <p className="truncate text-gray-700 dark:text-gray-300">{row.subject}</p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="justify-self-end">
                     <TicketPriorityBadge priority={row.priority} />
+                  </div>
+                  <div className="justify-self-end">
                     <TicketStatusBadge status={row.status} />
                   </div>
                 </li>

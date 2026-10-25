@@ -24,7 +24,10 @@ import {
   credentialDefaultsForAdminUser,
 } from "../lib/assign-credential-template";
 import { buildAgreementRecordsForUser } from "../lib/user-agreement-records";
-import { profileKycFieldsFromMergedProfile } from "../lib/admin-user-profile-kyc";
+import {
+  profileKycFieldsFromMergedProfile,
+  syncAdminUserProfileKycStatus,
+} from "../lib/admin-user-profile-kyc";
 
 const router: IRouter = Router();
 
@@ -289,6 +292,12 @@ router.get("/", async (_req, res) => {
       orderBy: { email: "asc" },
       select: listSelect,
     });
+    for (const row of rows) {
+      if (row.profileKycStatus !== "COMPLETE") {
+        const synced = await syncAdminUserProfileKycStatus(row.id);
+        if (synced) row.profileKycStatus = synced.profileKycStatus;
+      }
+    }
     res.json({ data: rows.map(sanitizeUser) });
   } catch (error) {
     console.error("Error fetching admin users:", error);
@@ -475,6 +484,9 @@ router.get("/:id", async (req, res) => {
     });
     if (!row) return res.status(404).json({ error: "Not found" });
 
+    const synced = await syncAdminUserProfileKycStatus(row.id);
+    const profileKycStatus = synced?.profileKycStatus ?? row.profileKycStatus;
+
     const agreementRecords = await buildAgreementRecordsForUser(row.id);
 
     const memberWhere: { OR: Array<{ adminUserId: string } | { profileId: string }> } = {
@@ -530,6 +542,7 @@ router.get("/:id", async (req, res) => {
     res.json({
       data: {
         ...sanitizeDetail(row),
+        profileKycStatus,
         agreementTemplate,
         agreementRecords,
         agreementFiles: [],

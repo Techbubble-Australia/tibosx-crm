@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Response } from "express";
 import { z } from "zod";
 import { prisma, type Prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth";
@@ -195,11 +195,12 @@ function serializeTimesheet(row: {
         row.project?.projectManager?.email ||
         "";
       if (row.approverKind === "CLIENT_CONTACT") {
-        return (
+        const raw =
           row.projectClientContact?.contact.name ||
           row.projectClientContact?.contact.email ||
-          "Client contact"
-        );
+          "";
+        if (raw.trim()) return raw.replace(/\s*\(client\)\s*$/i, "").trim() || raw;
+        return "Client contact";
       }
       if (row.approverKind === "PM") {
         return projectApproverName || "Project manager";
@@ -376,19 +377,49 @@ function addDaysIso(iso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-async function findNextOpenTimesheetWeek(actorId: string, projectId: string): Promise<string | null> {
+type TimesheetEntryPoint = {
+  weekStart: string;
+  existingTimesheetId?: string;
+};
+
+function isLikelyTimesheetId(value: string): boolean {
+  return /^c[a-z0-9]{20,}$/i.test(value);
+}
+
+async function hydrateTimesheetApproverRow<
+  T extends {
+    approverKind: string | null;
+    projectClientContactId: string | null;
+    projectClientContact?: { contact: { name: string; email: string } } | null;
+  },
+>(row: T): Promise<T> {
+  if (row.approverKind !== "CLIENT_CONTACT" || !row.projectClientContactId) return row;
+  const contact = row.projectClientContact?.contact;
+  if (contact?.name?.trim() || contact?.email?.trim()) return row;
+  const link = await prisma.projectClientContact.findUnique({
+    where: { id: row.projectClientContactId },
+    include: { contact: { select: { name: true, email: true } } },
+  });
+  if (!link) return row;
+  return { ...row, projectClientContact: link };
+}
+
+async function findNextOpenTimesheetWeek(
+  actorId: string,
+  projectId: string,
+): Promise<TimesheetEntryPoint | null> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { startDate: true, endDate: true },
+    select: { startDate: true, endDate: true, status: true },
   });
   if (!project) return null;
-  const { startDate, endDate } = projectDateBoundsIso(project);
+  const { startDate, endDate } = effectiveTimesheetProjectDateBoundsIso(project);
   const bounds = projectWeekMondayBounds(startDate, endDate);
   let monday = snapWeekMondayToInput(new Date().toISOString());
   if (monday < bounds.min) monday = bounds.min;
 
   for (let i = 0; i < 156; i++) {
-    if (monday > bounds.max) return monday;
+    if (monday > bounds.max) break;
     if (!weekOverlapsProjectRange(monday, startDate, endDate)) {
       monday = addDaysIso(monday, 7);
       continue;
@@ -399,12 +430,49 @@ async function findNextOpenTimesheetWeek(actorId: string, projectId: string): Pr
         projectId,
         startDate: new Date(`${monday}T00:00:00.000Z`),
       },
-      select: { id: true },
+      select: { id: true, status: true },
     });
-    if (!existing) return monday;
+    if (!existing) return { weekStart: monday };
+    if (existing.status === "DRAFT") {
+      return { weekStart: monday, existingTimesheetId: existing.id };
+    }
     monday = addDaysIso(monday, 7);
   }
-  return monday;
+  return null;
+}
+
+async function resolveTimesheetEntryPoint(req: AuthRequest, res: Response) {
+  const actorId = getActorId(req);
+  const role = req.user?.role ?? "";
+  if (!(await actorMayLogTimesheets(actorId, role))) {
+    return res.status(403).json({ error: "Only project members can create timesheets" });
+  }
+  const preferredProjectId =
+    typeof req.query.projectId === "string" ? req.query.projectId.trim() : "";
+  const memberships = await listActiveProjectMembershipsForUser(actorId);
+  if (!memberships.length) {
+    return res.status(404).json({ error: "No active project assignments" });
+  }
+  const match =
+    (preferredProjectId && memberships.find((row) => row.project.id === preferredProjectId)) ||
+    memberships[0];
+  const projectId = match!.project.id;
+  const entry = await findNextOpenTimesheetWeek(actorId, projectId);
+  if (!entry) {
+    return res.status(409).json({
+      error: "All timesheet weeks are already logged for your active project assignments",
+    });
+  }
+  const mon = new Date(`${entry.weekStart}T00:00:00.000Z`);
+  const sun = sundayOfWeek(mon);
+  return res.json({
+    data: {
+      projectId,
+      weekStart: entry.weekStart,
+      weekEnd: sun.toISOString().slice(0, 10),
+      existingTimesheetId: entry.existingTimesheetId ?? null,
+    },
+  });
 }
 
 /** Log/edit own timesheets: project_member role, PM/admin, or active project membership. */
@@ -680,36 +748,18 @@ router.get("/defaults", async (_req, res) => {
   });
 });
 
+router.get("/create-entry", async (req: AuthRequest, res) => {
+  try {
+    await resolveTimesheetEntryPoint(req, res);
+  } catch (error) {
+    console.error("Error resolving timesheet entry point:", error);
+    res.status(500).json({ error: "Failed to resolve timesheet entry" });
+  }
+});
+
 router.get("/entry-point", async (req: AuthRequest, res) => {
   try {
-    const actorId = getActorId(req);
-    const role = req.user?.role ?? "";
-    if (!(await actorMayLogTimesheets(actorId, role))) {
-      return res.status(403).json({ error: "Only project members can create timesheets" });
-    }
-    const preferredProjectId =
-      typeof req.query.projectId === "string" ? req.query.projectId.trim() : "";
-    const memberships = await listActiveProjectMembershipsForUser(actorId);
-    if (!memberships.length) {
-      return res.status(404).json({ error: "No active project assignments" });
-    }
-    const match =
-      (preferredProjectId && memberships.find((row) => row.project.id === preferredProjectId)) ||
-      memberships[0];
-    const projectId = match!.project.id;
-    const weekStart = await findNextOpenTimesheetWeek(actorId, projectId);
-    if (!weekStart) {
-      return res.status(404).json({ error: "Project not found" });
-    }
-    const mon = new Date(`${weekStart}T00:00:00.000Z`);
-    const sun = sundayOfWeek(mon);
-    res.json({
-      data: {
-        projectId,
-        weekStart,
-        weekEnd: sun.toISOString().slice(0, 10),
-      },
-    });
+    await resolveTimesheetEntryPoint(req, res);
   } catch (error) {
     console.error("Error resolving timesheet entry point:", error);
     res.status(500).json({ error: "Failed to resolve timesheet entry" });
@@ -940,7 +990,8 @@ router.get("/", async (req: AuthRequest, res) => {
       },
       orderBy: { createdAt: "desc" },
     });
-    res.json({ data: rows.map((row) => serializeTimesheet({ ...row, activityLogs: [] })) });
+    const hydrated = await Promise.all(rows.map((row) => hydrateTimesheetApproverRow(row)));
+    res.json({ data: hydrated.map((row) => serializeTimesheet({ ...row, activityLogs: [] })) });
   } catch (error) {
     console.error("Error fetching timesheets:", error);
     res.status(500).json({ error: "Failed to fetch timesheets" });
@@ -951,6 +1002,9 @@ router.get("/:id", async (req: AuthRequest, res) => {
   try {
     const timesheetId = req.params.id;
     if (!timesheetId) return res.status(400).json({ error: "Invalid id" });
+    if (!isLikelyTimesheetId(timesheetId)) {
+      return res.status(404).json({ error: "Timesheet not found" });
+    }
     const row = await fetchTimesheet(timesheetId);
     if (!row) return res.status(404).json({ error: "Not found" });
     const where = await timesheetAccessWhere(req);
@@ -958,8 +1012,9 @@ router.get("/:id", async (req: AuthRequest, res) => {
     if (!allowed) return res.status(403).json({ error: "Forbidden" });
     const role = req.user?.role ?? "";
     const actorId = getActorId(req);
+    const hydrated = await hydrateTimesheetApproverRow(row);
     res.json({
-      data: mapDetailWithActions(row, actorId, role),
+      data: mapDetailWithActions(hydrated, actorId, role),
     });
   } catch (error) {
     console.error("Error fetching timesheet:", error);

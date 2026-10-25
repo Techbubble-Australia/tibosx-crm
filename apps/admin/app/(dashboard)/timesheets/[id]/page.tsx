@@ -156,12 +156,12 @@ export default function TimesheetDetailPage() {
   return (
     <ProjectManagementGuard>
       <div>
-        <Link href="/timesheets" className="mb-4 inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100">
+        <Link href="/timesheets" className="mb-2 inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100">
           <ArrowLeft className="h-4 w-4" /> Back to timesheets
         </Link>
 
         {timesheet ? (
-          <div className="mb-4 flex justify-end">
+          <div className="mb-2 flex justify-end">
             <button
               type="button"
               onClick={() => void exportCsv()}

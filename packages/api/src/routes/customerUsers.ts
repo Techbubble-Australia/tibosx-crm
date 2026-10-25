@@ -18,6 +18,8 @@ const listSelect = {
   profilePhotoUrl: true,
   passwordNeedsReset: true,
   mappedClientContactId: true,
+  mfaEnabled: true,
+  mfaEnrolledAt: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -31,6 +33,8 @@ function serialize(row: {
   profilePhotoUrl: string | null;
   passwordNeedsReset: boolean;
   mappedClientContactId: string | null;
+  mfaEnabled: boolean;
+  mfaEnrolledAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -43,6 +47,8 @@ function serialize(row: {
     profilePhotoUrl: row.profilePhotoUrl,
     passwordNeedsReset: row.passwordNeedsReset,
     mappedClientContactId: row.mappedClientContactId,
+    mfaEnabled: row.mfaEnabled,
+    mfaEnrolledAt: row.mfaEnrolledAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

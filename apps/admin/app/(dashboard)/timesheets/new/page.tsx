@@ -40,11 +40,19 @@ export default function NewTimesheetPage() {
 
   useEffect(() => {
     if (sessionLoading || !canCreateTimesheets || queryProjectId || queryWeekStart) return;
-    void adminFetch("/api/admin/timesheets/entry-point")
+    void adminFetch("/api/admin/timesheets/create-entry")
       .then(async (res) => {
         const data = await res.json();
         if (!res.ok) return;
-        const row = data.data as { projectId?: string; weekStart?: string };
+        const row = data.data as {
+          projectId?: string;
+          weekStart?: string;
+          existingTimesheetId?: string | null;
+        };
+        if (row.existingTimesheetId) {
+          router.replace(`/timesheets/${row.existingTimesheetId}`);
+          return;
+        }
         if (!row.projectId || !row.weekStart) return;
         const params = new URLSearchParams({
           projectId: row.projectId,

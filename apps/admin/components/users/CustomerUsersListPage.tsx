@@ -10,6 +10,7 @@ type CustomerUserRow = {
   name: string | null;
   phone: string | null;
   active: boolean;
+  mfaEnabled: boolean;
 };
 
 export function CustomerUsersListPage({ activeOnly }: { activeOnly: boolean }) {
@@ -53,12 +54,13 @@ export function CustomerUsersListPage({ activeOnly }: { activeOnly: boolean }) {
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Phone</th>
+              <th className="px-4 py-3">MFA</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={3} className="px-4 py-8 text-center text-gray-500">No customer users found.</td>
+                <td colSpan={4} className="px-4 py-8 text-center text-gray-500">No customer users found.</td>
               </tr>
             ) : (
               filtered.map((row) => (
@@ -70,6 +72,17 @@ export function CustomerUsersListPage({ activeOnly }: { activeOnly: boolean }) {
                   </td>
                   <td className="px-4 py-3">{row.email}</td>
                   <td className="px-4 py-3">{row.phone || "—"}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        row.mfaEnabled
+                          ? "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200"
+                          : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                      }`}
+                    >
+                      {row.mfaEnabled ? "Enabled" : "Off"}
+                    </span>
+                  </td>
                 </tr>
               ))
             )}
