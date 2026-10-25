@@ -270,6 +270,25 @@ function approverDisplayName(label: string) {
   return { name: label, role: "" };
 }
 
+function lineHasEntryContent(line: LineEntry): boolean {
+  return Boolean(line.caseKey.trim()) || sumDailyHours(line.dailyHours) > 0;
+}
+
+function timesheetLinesDirty(lines: LineEntry[], defaults: Partial<TimesheetFormValues>): boolean {
+  const current = lines.filter(lineHasEntryContent);
+  const initial = linesFromDefaults(defaults).filter(lineHasEntryContent);
+  if (current.length !== initial.length) return true;
+  for (let i = 0; i < current.length; i++) {
+    const a = current[i]!;
+    const b = initial[i]!;
+    if (a.caseKey !== b.caseKey) return true;
+    for (const key of WEEKDAY_KEYS) {
+      if ((a.dailyHours[key] ?? 0) !== (b.dailyHours[key] ?? 0)) return true;
+    }
+  }
+  return false;
+}
+
 export function TimesheetForm({
   defaults,
   onSubmit,
@@ -454,10 +473,13 @@ export function TimesheetForm({
       setCases([]);
       return;
     }
-    void adminFetch(`/api/admin/timesheets/project-cases?projectId=${encodeURIComponent(projectId)}`)
+    const weekQuery = weekMonday ? `&weekStart=${encodeURIComponent(weekMonday)}` : "";
+    void adminFetch(
+      `/api/admin/timesheets/project-cases?projectId=${encodeURIComponent(projectId)}${weekQuery}`,
+    )
       .then((r) => r.json())
       .then((data) => setCases((data.data as CaseOption[]) ?? []));
-  }, [projectId]);
+  }, [projectId, weekMonday]);
 
   useEffect(() => {
     if (!projectId) {
@@ -659,6 +681,28 @@ export function TimesheetForm({
       ? `${defaults.projectNumber} — ${defaults.projectTitle}`
       : projects.find((row) => row.id === projectId)?.label || "");
 
+  const saveButtonLabel = defaults.id ? "Save Draft" : "Add Timesheet";
+
+  function hasUnsavedChanges(): boolean {
+    if (!formEditable) return false;
+    if ((comments ?? "").trim() !== (defaults.comments ?? "").trim()) return true;
+    const initialFiles = defaults.fileUrls ?? [];
+    if (fileUrls.length !== initialFiles.length || fileUrls.some((url, index) => url !== initialFiles[index])) {
+      return true;
+    }
+    return timesheetLinesDirty(lines, defaults);
+  }
+
+  function applyWeekChange(nextMonday: string) {
+    const snapped = snapToMondayInput(nextMonday);
+    if (snapped === weekMonday) return;
+    if (hasUnsavedChanges()) {
+      const ok = window.confirm("Timesheet entries are not saved. Do you want to continue?");
+      if (!ok) return;
+    }
+    setWeekMonday(snapped);
+  }
+
   return (
     <form onSubmit={(e) => void handleSave(e)} className="flex flex-col xl:flex-row xl:items-start">
       <div className="min-w-0 flex-1">
@@ -716,7 +760,7 @@ export function TimesheetForm({
                     type="button"
                     className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600"
                     disabled={!canShiftWeekPrev}
-                    onClick={() => setWeekMonday((w) => shiftWeek(w, -7))}
+                    onClick={() => applyWeekChange(shiftWeek(weekMonday, -7))}
                     aria-label="Previous week"
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -729,7 +773,7 @@ export function TimesheetForm({
                       value={weekMonday}
                       min={weekMondayBounds?.min}
                       max={weekMondayBounds?.max}
-                      onChange={(e) => setWeekMonday(snapToMondayInput(e.target.value))}
+                      onChange={(e) => applyWeekChange(e.target.value)}
                       tabIndex={-1}
                       aria-hidden
                     />
@@ -747,7 +791,7 @@ export function TimesheetForm({
                     type="button"
                     className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600"
                     disabled={!canShiftWeekNext}
-                    onClick={() => setWeekMonday((w) => shiftWeek(w, 7))}
+                    onClick={() => applyWeekChange(shiftWeek(weekMonday, 7))}
                     aria-label="Next week"
                   >
                     <ChevronRight className="h-4 w-4" />
@@ -984,7 +1028,7 @@ export function TimesheetForm({
                     className="inline-flex items-center justify-center gap-2 rounded-lg bg-black px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-200"
                   >
                     {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    Save Draft
+                    {saveButtonLabel}
                   </button>
                   {showSubmitForApproval ? (
                     <button

@@ -212,7 +212,7 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
                 <tr>
                   <th className="px-4 py-3 font-medium">Timesheet period</th>
                   <th className="px-4 py-3 font-medium">Member</th>
-                  <th className="px-4 py-3 font-medium">Project / case</th>
+                  <th className="px-4 py-3 font-medium">Project</th>
                   {mode === "submitted" ? <th className="px-4 py-3 text-right font-medium">Actions</th> : null}
                 </tr>
               </thead>

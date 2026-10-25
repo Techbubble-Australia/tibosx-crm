@@ -226,9 +226,7 @@ export default function TimesheetsPage() {
                     <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Member</th>
                   ) : null}
                   <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
-                  {canManageProjects ? (
-                    <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Approver</th>
-                  ) : null}
+                  <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Approver</th>
                   <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
                 </tr>
               </thead>
@@ -279,13 +277,11 @@ export default function TimesheetsPage() {
                         </span>
                       ) : null}
                     </td>
-                    {canManageProjects ? (
-                      <td className="max-w-[10rem] px-4 py-3 text-gray-600 dark:text-gray-400">
-                        <span className="block truncate" title={row.approverLabel ?? ""}>
-                          {row.approverLabel ?? "—"}
-                        </span>
-                      </td>
-                    ) : null}
+                    <td className="max-w-[10rem] px-4 py-3 text-gray-600 dark:text-gray-400">
+                      <span className="block truncate" title={row.approverLabel ?? ""}>
+                        {row.approverLabel ?? "—"}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex gap-2">
                         {isEffectiveProjectMember && row.status === "DRAFT" ? (

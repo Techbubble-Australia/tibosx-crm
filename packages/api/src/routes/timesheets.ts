@@ -184,16 +184,25 @@ function serializeTimesheet(row: {
     ticketId: row.ticketId,
     approverKind: row.approverKind,
     projectClientContactId: row.projectClientContactId,
-    approverLabel:
-      row.approverKind === "CLIENT_CONTACT"
-        ? row.projectClientContact?.contact.name || row.projectClientContact?.contact.email || "Client contact"
-        : row.approverKind === "PM"
-          ? row.project?.timesheetApprover?.name ||
-            row.project?.timesheetApprover?.email ||
-            row.project?.projectManager?.name ||
-            row.project?.projectManager?.email ||
-            "Project manager"
-          : "",
+    approverLabel: (() => {
+      const projectApproverName =
+        row.project?.timesheetApprover?.name ||
+        row.project?.timesheetApprover?.email ||
+        row.project?.projectManager?.name ||
+        row.project?.projectManager?.email ||
+        "";
+      if (row.approverKind === "CLIENT_CONTACT") {
+        return (
+          row.projectClientContact?.contact.name ||
+          row.projectClientContact?.contact.email ||
+          "Client contact"
+        );
+      }
+      if (row.approverKind === "PM") {
+        return projectApproverName || "Project manager";
+      }
+      return projectApproverName;
+    })(),
     projectTitle: row.project?.title ?? "",
     projectNumber: row.project?.projectNumber ?? "",
     opportunityName: row.opportunity?.name ?? "",
@@ -284,20 +293,42 @@ function mapDetailWithActions(
   };
 }
 
-async function listTimesheetTicketsForProject(projectId: string) {
+const TERMINAL_TICKET_STATUSES = ["RESOLVED", "CLOSED", "CANCELLED"] as const;
+
+function ticketEligibleForTimesheetWeek(
+  ticket: { status: string; closedAt: Date | null; updatedAt: Date },
+  weekStartIso: string | null | undefined,
+): boolean {
+  if (!TERMINAL_TICKET_STATUSES.includes(ticket.status as (typeof TERMINAL_TICKET_STATUSES)[number])) {
+    return true;
+  }
+  if (!weekStartIso) return false;
+  const weekStart = new Date(`${weekStartIso}T00:00:00.000Z`);
+  const terminalAt = ticket.closedAt ?? ticket.updatedAt;
+  return terminalAt >= weekStart;
+}
+
+async function listTimesheetTicketsForProject(projectId: string, weekStartIso?: string | null) {
   const supportOrg = await prisma.organization.findFirst({
     where: { projectId, active: true },
     select: { id: true },
   });
-  return prisma.ticket.findMany({
+  const rows = await prisma.ticket.findMany({
     where: {
-      status: { notIn: ["CANCELLED"] },
       OR: [{ projectId }, ...(supportOrg ? [{ organizationId: supportOrg.id }] : [])],
     },
-    select: { id: true, ticketNumber: true, subject: true },
+    select: {
+      id: true,
+      ticketNumber: true,
+      subject: true,
+      status: true,
+      closedAt: true,
+      updatedAt: true,
+    },
     orderBy: { updatedAt: "desc" },
-    take: 100,
+    take: 200,
   });
+  return rows.filter((row) => ticketEligibleForTimesheetWeek(row, weekStartIso));
 }
 
 async function timesheetAccessWhere(req: AuthRequest): Promise<Prisma.TimesheetWhereInput> {
@@ -374,6 +405,10 @@ router.get("/project-cases", async (req: AuthRequest, res) => {
   try {
     const actorId = getActorId(req);
     const projectId = typeof req.query.projectId === "string" ? req.query.projectId : "";
+    const weekStart =
+      typeof req.query.weekStart === "string" && req.query.weekStart.trim()
+        ? req.query.weekStart.trim()
+        : null;
     if (!projectId) return res.status(400).json({ error: "projectId is required" });
 
     const hasMembership = await userHasActiveProjectMembership(actorId, projectId);
@@ -392,7 +427,7 @@ router.get("/project-cases", async (req: AuthRequest, res) => {
       id: projectId,
       label: `${membership.project.projectNumber} — ${membership.project.title}`,
     };
-    const tickets = await listTimesheetTicketsForProject(projectId);
+    const tickets = await listTimesheetTicketsForProject(projectId, weekStart);
     const ticketOptions = tickets.map((row) => ({
       kind: "ticket" as const,
       id: row.id,
