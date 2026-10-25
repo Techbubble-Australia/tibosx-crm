@@ -1305,6 +1305,14 @@ router.post("/:id/members", async (req: AuthRequest, res) => {
       },
     });
 
+    if (member.adminUserId) {
+      try {
+        await provisionSupportMemberConsultant(projectId, member.adminUserId, member.id);
+      } catch (provisionError) {
+        console.error("Support consultant provisioning after add member:", provisionError);
+      }
+    }
+
     const detail = await fetchProject(projectId);
     res.status(201).json({
       data: {
@@ -1330,13 +1338,17 @@ router.post("/:id/members", async (req: AuthRequest, res) => {
         ? String((error as { code: string }).code)
         : "";
     if (prismaCode === "P2002") {
+      const target = (error as { meta?: { target?: string[] } }).meta?.target?.join(", ") ?? "record";
       return res.status(400).json({
         error:
-          "This user is already assigned to another project. Run the latest database migration so users can join multiple projects.",
+          target.includes("adminUserId")
+            ? "This user is already a member of this project."
+            : "This profile is already on the project or conflicts with another record.",
       });
     }
     console.error("Error adding project member:", error);
-    res.status(500).json({ error: "Failed to add member" });
+    const message = error instanceof Error ? error.message : "Failed to add member";
+    res.status(500).json({ error: message === "Failed to add member" ? message : `Failed to add member: ${message}` });
   }
 });
 

@@ -157,8 +157,10 @@ router.get("/tickets", async (req: TbosRequest, res) => {
     include: ticketDetailIncludes,
   });
 
+  const { enrichTicketsUpdatedBy } = await import("../lib/ticket-list-updated-by.js");
+  const enriched = await enrichTicketsUpdatedBy(rows);
   res.json({
-    data: rows.map((row) => serializeTicketRow(row)),
+    data: enriched.map((row) => serializeTicketRow(row)),
   });
 });
 
@@ -532,7 +534,7 @@ router.patch("/tickets/:id", async (req: TbosRequest, res) => {
       "../../lib/ticket-project-assignees.js"
     );
     const projectId = await resolveTicketProjectId(existing);
-    const ok = await isValidProjectTicketAssignee(projectId, parsed.data.assignedToId);
+    const ok = await isValidProjectTicketAssignee(projectId, parsed.data.assignedToId, actorId);
     if (!ok) {
       return res.status(400).json({ error: "Assignee must be a member of the project support team" });
     }

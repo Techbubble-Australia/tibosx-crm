@@ -1,5 +1,11 @@
 import type { TicketPriority, TicketStatus, TicketType } from "@techbubble/database";
 
+function ticketingUserLabel(user?: { name: string; email: string } | null) {
+  if (!user) return null;
+  const name = user.name?.trim() || user.email;
+  return { ...user, name };
+}
+
 export function serializeTicketRow(row: {
   id: string;
   ticketNumber: string;
@@ -25,6 +31,7 @@ export function serializeTicketRow(row: {
   createdBy?: { id: string; name: string; email: string };
   assignedTo?: { id: string; name: string; email: string } | null;
   updatedBy?: { id: string; name: string; email: string } | null;
+  updatedById?: string | null;
 }) {
   const linkedProject = row.organization?.project ?? row.project ?? null;
   const projectLabel =
@@ -33,7 +40,12 @@ export function serializeTicketRow(row: {
       : linkedProject?.title
         ? linkedProject.title
         : null;
-  const updatedBy = row.updatedBy ?? row.createdBy ?? null;
+  const updatedBy =
+    ticketingUserLabel(row.updatedBy) ??
+    ticketingUserLabel(row.createdBy) ??
+    null;
+  const createdBy = ticketingUserLabel(row.createdBy);
+  const assignedTo = row.assignedTo ? ticketingUserLabel(row.assignedTo) : null;
   return {
     id: row.id,
     ticketNumber: row.ticketNumber,
@@ -47,9 +59,9 @@ export function serializeTicketRow(row: {
     description: row.description,
     resolutionNotes: row.resolutionNotes ?? null,
     createdById: row.createdById,
-    createdBy: row.createdBy,
+    createdBy,
     assignedToId: row.assignedToId,
-    assignedTo: row.assignedTo,
+    assignedTo,
     updatedBy,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

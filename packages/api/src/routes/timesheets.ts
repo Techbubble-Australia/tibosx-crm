@@ -1339,42 +1339,28 @@ router.post("/submit", async (req: AuthRequest, res) => {
     await prisma.$transaction(async (tx) => {
       for (const row of rows) {
         const item = itemMap.get(row.id);
-        let supportProjectId: string | null = null;
-        if (row.project?.kind === "SUPPORT" && row.projectId) {
-          supportProjectId = row.projectId;
-        } else if (row.ticket?.projectId) {
-          const project = await tx.project.findUnique({
-            where: { id: row.ticket.projectId },
-            select: { kind: true },
-          });
-          if (project?.kind === "SUPPORT") supportProjectId = row.ticket.projectId;
-        }
+        const approverProjectId = row.projectId ?? row.ticket?.projectId ?? null;
         let approverKind: string | null = row.approverKind;
         let projectClientContactId: string | null = row.projectClientContactId;
-        if (!supportProjectId) {
-          approverKind = null;
-          projectClientContactId = null;
-        } else {
-          const chosenKind = item?.approverKind ?? row.approverKind ?? "PM";
-          if (chosenKind === "CLIENT_CONTACT") {
-            const contactId = item?.projectClientContactId ?? row.projectClientContactId;
-            if (!contactId) {
-              throw new Error("APPROVER_REQUIRED");
-            }
-            const link = await tx.projectClientContact.findFirst({
-              where: {
-                id: contactId,
-                projectId: supportProjectId,
-                canApproveTimesheets: true,
-              },
-            });
-            if (!link) throw new Error("INVALID_APPROVER");
-            approverKind = "CLIENT_CONTACT";
-            projectClientContactId = link.id;
-          } else {
-            approverKind = "PM";
-            projectClientContactId = null;
+        const chosenKind = item?.approverKind ?? row.approverKind ?? "PM";
+        if (chosenKind === "CLIENT_CONTACT" && approverProjectId) {
+          const contactId = item?.projectClientContactId ?? row.projectClientContactId;
+          if (!contactId) {
+            throw new Error("APPROVER_REQUIRED");
           }
+          const link = await tx.projectClientContact.findFirst({
+            where: {
+              id: contactId,
+              projectId: approverProjectId,
+              canApproveTimesheets: true,
+            },
+          });
+          if (!link) throw new Error("INVALID_APPROVER");
+          approverKind = "CLIENT_CONTACT";
+          projectClientContactId = link.id;
+        } else {
+          approverKind = "PM";
+          projectClientContactId = null;
         }
         await tx.timesheet.update({
           where: { id: row.id },

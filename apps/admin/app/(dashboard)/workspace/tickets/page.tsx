@@ -24,7 +24,7 @@ type TicketRow = {
   createdBy?: { name: string };
   createdAt: string;
   updatedAt: string;
-  updatedBy?: { name: string } | null;
+  updatedBy?: { name: string; email?: string } | null;
   assignedTo?: { id: string; name: string; email: string } | null;
 };
 
@@ -176,7 +176,9 @@ export default function TicketsPage() {
                     <td className="px-4 py-3 text-gray-600">{row.createdBy?.name ?? "—"}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-gray-500">{new Date(row.createdAt).toLocaleString()}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-gray-500">{new Date(row.updatedAt).toLocaleString()}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-600">{row.updatedBy?.name ?? "—"}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                      {row.updatedBy?.name?.trim() || row.updatedBy?.email || "—"}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3 text-gray-600">{row.assignedTo?.name ?? "Unassigned"}</td>
                   </tr>
                 );

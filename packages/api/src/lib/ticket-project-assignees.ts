@@ -169,8 +169,27 @@ export async function listProjectTicketAssignees(projectId: string | null | unde
 export async function isValidProjectTicketAssignee(
   projectId: string | null | undefined,
   assignedToId: string | null | undefined,
+  actorTicketingUserId?: string | null,
 ): Promise<boolean> {
   if (!assignedToId) return true;
+
+  if (actorTicketingUserId && assignedToId === actorTicketingUserId && projectId) {
+    const actor = await prisma.ticketingUser.findUnique({
+      where: { id: actorTicketingUserId },
+      select: { id: true, active: true, role: true, tbosAdminUserId: true },
+    });
+    if (actor?.active && actor.role === "CONSULTANT" && actor.tbosAdminUserId) {
+      const onProject = await prisma.projectMember.findFirst({
+        where: { projectId, adminUserId: actor.tbosAdminUserId },
+        select: { id: true },
+      });
+      if (onProject) {
+        await provisionSupportMemberConsultant(projectId, actor.tbosAdminUserId, onProject.id);
+        return true;
+      }
+    }
+  }
+
   const assignees = await listProjectTicketAssignees(projectId);
   return assignees.some((row) => row.id === assignedToId);
 }

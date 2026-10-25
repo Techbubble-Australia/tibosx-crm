@@ -14,7 +14,7 @@ export async function autoCloseStaleResolvedTickets(): Promise<void> {
     if (!resolvedReadyForAutoClose(row.updatedAt, now)) continue;
     await prisma.ticket.update({
       where: { id: row.id },
-      data: { status: TicketStatus.CLOSED, closedAt: now },
+      data: { status: TicketStatus.CLOSED, closedAt: now, updatedAt: now },
     });
     await logTicketAudit(row.id, null, "UPDATED", {
       field: "status",

@@ -170,7 +170,9 @@ router.get("/", async (req: TicketingRequest, res) => {
     include: ticketDetailIncludes,
   });
 
-  res.json({ data: rows.map(serializeTicket) });
+  const { enrichTicketsUpdatedBy } = await import("../lib/ticket-list-updated-by.js");
+  const enriched = await enrichTicketsUpdatedBy(rows);
+  res.json({ data: enriched.map(serializeTicket) });
 });
 
 router.post("/", async (req: TicketingRequest, res) => {
@@ -409,7 +411,8 @@ router.patch("/:id", async (req: TicketingRequest, res) => {
     return res.status(400).json({ error: "Cannot edit a closed or cancelled ticket" });
   }
 
-  const isConsultant = user.role === "CONSULTANT" && user.consultantVerified;
+  const isConsultant =
+    user.role === "CONSULTANT" && (user.consultantVerified || Boolean(user.tbosAdminUserId));
   if (!isConsultant) {
     const allowed = Object.keys(parsed.data).every(
       (k) => k === "description" || k === "type" || k === "priority" || k === "subject",
@@ -426,7 +429,7 @@ router.patch("/:id", async (req: TicketingRequest, res) => {
     });
     const projectId = existing.projectId ?? org?.projectId ?? null;
     const { isValidProjectTicketAssignee } = await import("../../lib/ticket-project-assignees.js");
-    const ok = await isValidProjectTicketAssignee(projectId, parsed.data.assignedToId);
+    const ok = await isValidProjectTicketAssignee(projectId, parsed.data.assignedToId, user.id);
     if (!ok) {
       return res.status(400).json({ error: "Assignee must be a member of the project support team" });
     }

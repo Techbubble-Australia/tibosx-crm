@@ -47,7 +47,10 @@ export function HelpSupportDialog({ open, onClose }: Props) {
         method: "POST",
         body: formData,
       });
-      const data = await res.json();
+      const contentType = res.headers.get("content-type") ?? "";
+      const data = contentType.includes("application/json")
+        ? await res.json()
+        : { error: "Help request could not reach the server. Try again or email hr@techbubble.com.au." };
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to send");
       setSuccess(true);
     } catch (err) {
