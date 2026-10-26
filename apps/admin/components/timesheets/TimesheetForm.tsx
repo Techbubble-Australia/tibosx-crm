@@ -335,6 +335,11 @@ export function TimesheetForm({
   const formEditable = !readOnly && status === "DRAFT";
   const entryEditable = formEditable && !weekConflict;
   const pageTitle = title ?? (defaults.id ? "Timesheet" : "New Timesheet");
+  const loadedMonday = useMemo(
+    () => snapToMondayInput(toDateInput(defaults.startDate) || ""),
+    [defaults.startDate],
+  );
+  const loadedProjectId = defaults.projectId ?? "";
 
   const weekSun = useMemo(() => {
     const mon = new Date(`${weekMonday}T00:00:00.000Z`);
@@ -543,7 +548,16 @@ export function TimesheetForm({
   }, [projectBounds, formEditable, defaults.id, weekInProject, weekMonday]);
 
   useEffect(() => {
-    if (defaults.id || !projectId || !weekMonday) {
+    if (!projectId || !weekMonday) {
+      setWeekConflict(false);
+      return;
+    }
+    const isNewForm = !defaults.id;
+    const weekOrProjectChangedFromRecord =
+      Boolean(defaults.id) &&
+      formEditable &&
+      (weekMonday !== loadedMonday || projectId !== loadedProjectId);
+    if (!isNewForm && !weekOrProjectChangedFromRecord) {
       setWeekConflict(false);
       return;
     }
@@ -552,15 +566,30 @@ export function TimesheetForm({
     )
       .then((r) => r.json())
       .then((data) => {
-        const existing = data.data as { id?: string } | null;
+        const existing = data.data as { id?: string; status?: string } | null;
         if (existing?.id) {
-          router.replace(`/timesheets/${existing.id}`);
+          if (existing.id !== defaults.id) {
+            router.replace(`/timesheets/${existing.id}`);
+          }
+          return;
+        }
+        if (weekOrProjectChangedFromRecord) {
+          const params = new URLSearchParams({ projectId, weekStart: weekMonday });
+          router.replace(`/timesheets/new?${params}`);
           return;
         }
         setWeekConflict(false);
       })
       .catch(() => setWeekConflict(false));
-  }, [defaults.id, projectId, weekMonday, router]);
+  }, [
+    defaults.id,
+    formEditable,
+    loadedMonday,
+    loadedProjectId,
+    projectId,
+    weekMonday,
+    router,
+  ]);
 
   useEffect(() => {
     if (!formEditable) return;
@@ -724,7 +753,11 @@ export function TimesheetForm({
 
   const prevProjectIdRef = useRef(defaults.projectId ?? "");
   useEffect(() => {
-    if (defaults.id || !formEditable || !projectId) return;
+    prevProjectIdRef.current = defaults.projectId ?? "";
+  }, [defaults.projectId]);
+
+  useEffect(() => {
+    if (!formEditable || !projectId) return;
     const prev = prevProjectIdRef.current;
     if (prev === projectId) return;
     prevProjectIdRef.current = projectId;
@@ -739,7 +772,7 @@ export function TimesheetForm({
         if (row.weekStart) void applyWeekChange(row.weekStart);
       })
       .catch(() => undefined);
-  }, [projectId, defaults.id, formEditable, router]);
+  }, [projectId, formEditable, router]);
 
   return (
     <form onSubmit={(e) => void handleSave(e)} className="flex flex-col xl:flex-row xl:items-start">

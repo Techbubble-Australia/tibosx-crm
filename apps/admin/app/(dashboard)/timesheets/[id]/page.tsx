@@ -52,6 +52,13 @@ export default function TimesheetDetailPage() {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
+      if (res.status === 409) {
+        const existingId = (data as { data?: { id?: string } }).data?.id;
+        if (existingId) {
+          window.location.href = `/timesheets/${existingId}`;
+          return;
+        }
+      }
       if (!res.ok) throw new Error(messageFromApiError(data, "Failed to save timesheet"));
       setTimesheet(data.data as TimesheetFormValues);
     } catch (error) {

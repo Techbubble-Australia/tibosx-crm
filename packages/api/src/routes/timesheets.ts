@@ -516,6 +516,7 @@ async function findNextOpenTimesheetWeek(
     if (existing.status === "DRAFT") {
       return { weekStart: monday, existingTimesheetId: existing.id };
     }
+    // SUBMITTED or APPROVED — advance to the next week without an existing timesheet.
     monday = addDaysIso(monday, 7);
   }
   return null;
@@ -1299,6 +1300,21 @@ router.put("/:id", async (req: AuthRequest, res) => {
         return res.status(400).json({ error: "You are not assigned to this active project" });
       }
       await assertTimesheetProjectDateRules(resolved.projectId, data.startDate, resolved);
+      const duplicate = await prisma.timesheet.findFirst({
+        where: {
+          memberUserId: actorId,
+          projectId: resolved.projectId,
+          startDate: data.startDate,
+          id: { not: req.params.id },
+        },
+        select: { id: true },
+      });
+      if (duplicate) {
+        return res.status(409).json({
+          error: "A timesheet already exists for this project and week",
+          data: { id: duplicate.id },
+        });
+      }
       if (resolved.entryRows.length > 0) {
         await assertValidTimesheetEntries(actorId, resolved.projectId, resolved.entryRows);
       }
