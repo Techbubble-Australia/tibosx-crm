@@ -196,10 +196,10 @@ function serializeTimesheet(row: {
         "";
       if (row.approverKind === "CLIENT_CONTACT") {
         const raw =
-          row.projectClientContact?.contact.name ||
-          row.projectClientContact?.contact.email ||
+          row.projectClientContact?.contact.name?.trim() ||
+          row.projectClientContact?.contact.email?.trim() ||
           "";
-        if (raw.trim()) return raw.replace(/\s*\(client\)\s*$/i, "").trim() || raw;
+        if (raw) return raw.replace(/\s*\(client\)\s*$/i, "").trim() || raw;
         if (projectApproverName.trim()) return projectApproverName;
         return "Client contact";
       }
@@ -314,6 +314,14 @@ function formatTicketStatusLabel(status: string): string {
   return TICKET_STATUS_LABELS[status] ?? status.replace(/_/g, " ").toLowerCase();
 }
 
+function endOfWeekSundayUtc(weekStartIso: string): Date {
+  const sun = sundayOfWeek(new Date(`${weekStartIso}T00:00:00.000Z`));
+  const end = new Date(sun);
+  end.setUTCHours(23, 59, 59, 999);
+  return end;
+}
+
+/** Terminal tickets only appear for the week they were closed/resolved/cancelled in. */
 function ticketEligibleForTimesheetWeek(
   ticket: { status: string; closedAt: Date | null; updatedAt: Date },
   weekStartIso: string | null | undefined,
@@ -323,8 +331,9 @@ function ticketEligibleForTimesheetWeek(
   }
   if (!weekStartIso) return false;
   const weekStart = new Date(`${weekStartIso}T00:00:00.000Z`);
+  const weekEnd = endOfWeekSundayUtc(weekStartIso);
   const terminalAt = ticket.closedAt ?? ticket.updatedAt;
-  return terminalAt >= weekStart;
+  return terminalAt >= weekStart && terminalAt <= weekEnd;
 }
 
 async function listTimesheetTicketsForProject(projectId: string, weekStartIso?: string | null) {
@@ -798,11 +807,14 @@ async function buildProjectApprovers(projectId: string | null | undefined) {
   });
   if (!project) return [];
   const pmName = project.projectManager?.name || project.projectManager?.email || "Project manager";
-  const clientRows = project.clientContacts.map((row) => ({
-    kind: "CLIENT_CONTACT" as const,
-    id: row.id,
-    label: `${row.contact.name} (client)`,
-  }));
+  const clientRows = project.clientContacts.map((row) => {
+    const who = row.contact.name?.trim() || row.contact.email?.trim() || "Client contact";
+    return {
+      kind: "CLIENT_CONTACT" as const,
+      id: row.id,
+      label: `${who} (client)`,
+    };
+  });
   const pmRow = { kind: "PM" as const, id: "PM", label: pmName };
   if (project.kind === "SUPPORT" && clientRows.length > 0) {
     return [...clientRows, pmRow];
@@ -1119,6 +1131,15 @@ router.post("/", async (req: AuthRequest, res) => {
       const ok = await userHasActiveProjectMembership(actorId, resolved.projectId);
       if (!ok) {
         return res.status(400).json({ error: "You are not assigned to this active project" });
+      }
+      const approverOptions = await buildProjectApprovers(resolved.projectId);
+      if (approverOptions.length > 0) {
+        if (!data.approverKind) {
+          return res.status(400).json({ error: "Choose an approver for your timesheet" });
+        }
+        if (data.approverKind === "CLIENT_CONTACT" && !data.projectClientContactId) {
+          return res.status(400).json({ error: "Choose an approver for your timesheet" });
+        }
       }
       await assertTimesheetProjectDateRules(resolved.projectId, data.startDate, resolved);
       const duplicate = await prisma.timesheet.findFirst({

@@ -82,7 +82,16 @@ export type TimesheetFormValues = {
 };
 
 type ProjectOption = { id: string; label: string; kind: string };
-type CaseOption = { kind: "ticket" | "opportunity" | "project"; id: string; label: string };
+type CaseOption = {
+  kind: "ticket" | "opportunity" | "project";
+  id: string;
+  label: string;
+  status?: string;
+};
+
+function caseOptionLabel(row: CaseOption): string {
+  return row.label;
+}
 type ApproverOption = { kind: "PM" | "CLIENT_CONTACT"; id: string; label: string };
 
 type Props = {
@@ -713,22 +722,24 @@ export function TimesheetForm({
     setWeekMonday(snapped);
   }
 
-  const prevProjectIdRef = useRef(projectId);
+  const prevProjectIdRef = useRef(defaults.projectId ?? "");
   useEffect(() => {
-    if (defaults.id || !formEditable) return;
+    if (defaults.id || !formEditable || !projectId) return;
     const prev = prevProjectIdRef.current;
+    if (prev === projectId) return;
     prevProjectIdRef.current = projectId;
-    if (!projectId || projectId === prev) return;
-    if (!prev) return;
     void adminFetch(`/api/admin/timesheets/entry-point?projectId=${encodeURIComponent(projectId)}`)
       .then((r) => r.json())
       .then((data) => {
-        const weekStart = (data.data as { weekStart?: string })?.weekStart;
-        if (!weekStart) return;
-        applyWeekChange(weekStart);
+        const row = data.data as { weekStart?: string; existingTimesheetId?: string | null };
+        if (row.existingTimesheetId) {
+          router.replace(`/timesheets/${row.existingTimesheetId}`);
+          return;
+        }
+        if (row.weekStart) void applyWeekChange(row.weekStart);
       })
       .catch(() => undefined);
-  }, [projectId, defaults.id, formEditable]);
+  }, [projectId, defaults.id, formEditable, router]);
 
   return (
     <form onSubmit={(e) => void handleSave(e)} className="flex flex-col xl:flex-row xl:items-start">
@@ -887,7 +898,7 @@ export function TimesheetForm({
                                 <option value="">Select task…</option>
                                 {cases.map((row) => (
                                   <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
-                                    {row.label}
+                                    {caseOptionLabel(row)}
                                   </option>
                                 ))}
                               </select>
@@ -986,7 +997,9 @@ export function TimesheetForm({
               Submission Details
             </h2>
 
-            <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Assigned Approver</p>
+            <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+              Assigned Approver{approvers.length > 0 ? <span className="text-red-500"> *</span> : null}
+            </p>
             {formEditable && approvers.length > 1 ? (
               <select
                 className={`${selectClass} mb-4 max-w-md`}
@@ -1193,7 +1206,7 @@ export function TimesheetForm({
                 <option value="">Select task…</option>
                 {cases.map((row) => (
                   <option key={`panel-${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
-                    {row.label}
+                    {caseOptionLabel(row)}
                   </option>
                 ))}
               </select>

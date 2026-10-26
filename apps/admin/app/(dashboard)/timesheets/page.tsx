@@ -32,7 +32,9 @@ function formatDate(value: string) {
 
 export default function TimesheetsPage() {
   const router = useRouter();
-  const { isEffectiveProjectMember, canManageProjects, canCreateTimesheets, userId } = useAdminSession();
+  const { isEffectiveProjectMember, canManageProjects, canCreateTimesheets, userId, role, additionalRoles } =
+    useAdminSession();
+  const isAdmin = role === "admin" || additionalRoles.includes("admin");
   const showCreateTimesheet = canCreateTimesheets;
   const [rows, setRows] = useState<TimesheetRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -344,8 +346,7 @@ export default function TimesheetsPage() {
                             Submit
                           </button>
                         ) : null}
-                        {(canManageProjects ||
-                          (row.memberUserId === userId && row.status === "DRAFT")) ? (
+                        {(isAdmin || (row.memberUserId === userId && row.status === "DRAFT")) ? (
                           <button
                             type="button"
                             onClick={() => void deleteOne(row.id)}
