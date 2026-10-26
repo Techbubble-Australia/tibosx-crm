@@ -535,6 +535,17 @@ export function TimesheetForm({
   }, [projectId, formEditable]);
 
   useEffect(() => {
+    if (!projectId) return;
+    setLines((prev) =>
+      prev.map((line) => {
+        if (!line.caseKey.startsWith("project:")) return line;
+        if (line.caseKey === `project:${projectId}`) return line;
+        return { ...line, caseKey: "", label: undefined };
+      }),
+    );
+  }, [projectId]);
+
+  useEffect(() => {
     if (!projectBounds || !formEditable || defaults.id) return;
     if (weekInProject) return;
     const bounds = projectWeekMondayBounds(projectBounds.start, projectBounds.end);
@@ -721,10 +732,9 @@ export function TimesheetForm({
   const shortDows = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   const projectDisplayLabel =
-    defaults.targetLabel ||
     (defaults.projectNumber && defaults.projectTitle
       ? `${defaults.projectNumber} — ${defaults.projectTitle}`
-      : projects.find((row) => row.id === projectId)?.label || "");
+      : projects.find((row) => row.id === projectId)?.label || "") || "";
 
   const saveButtonLabel = defaults.id ? "Save Draft" : "Add Timesheet";
 
@@ -914,6 +924,9 @@ export function TimesheetForm({
                       line.label ||
                       (line.caseKey
                         ? cases.find((c) => `${c.kind}:${c.id}` === line.caseKey)?.label
+                        : undefined) ||
+                      (line.caseKey.startsWith("project:") && projectDisplayLabel
+                        ? projectDisplayLabel
                         : undefined);
                     return (
                       <tr key={line.key} className="border-b border-gray-100 dark:border-gray-800">

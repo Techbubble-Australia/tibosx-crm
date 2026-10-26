@@ -8,6 +8,7 @@ import {
 } from "../lib/client-timesheet-projects.js";
 import { formatZodError } from "../../lib/zod-error.js";
 import { notifyAsync } from "../../lib/notifications";
+import { submittedTimesheetsPendingPmApprovalWhere } from "../../lib/timesheet-approver.js";
 import { fetchTimesheet, mapDetail } from "../../routes/timesheets.js";
 
 const router: IRouter = Router();
@@ -19,17 +20,19 @@ router.get("/summary", async (req: TicketingRequest, res) => {
 
   if (user.role === "CONSULTANT" && user.tbosAdminUserId) {
     const managerId = user.tbosAdminUserId;
+    const projectScope = {
+      OR: [
+        { project: { projectManagerId: managerId } },
+        { project: { timesheetApproverUserId: managerId } },
+      ],
+    };
     const [total, pendingApproval] = await Promise.all([
-      prisma.timesheet.count({
-        where: {
-          project: { projectManagerId: managerId },
-        },
-      }),
+      prisma.timesheet.count({ where: projectScope }),
       prisma.timesheet.count({
         where: {
           status: "SUBMITTED",
           OR: [{ approverKind: "PM" }, { approverKind: null }],
-          project: { projectManagerId: managerId },
+          AND: [projectScope],
         },
       }),
     ]);
@@ -79,13 +82,7 @@ router.get("/recent-submitted", async (req: TicketingRequest, res) => {
 
   if (user.role === "CONSULTANT" && user.tbosAdminUserId) {
     const managerId = user.tbosAdminUserId;
-    where = {
-      status: "SUBMITTED",
-      AND: [
-        { OR: [{ approverKind: "PM" }, { approverKind: null }] },
-        { project: { projectManagerId: managerId } },
-      ],
-    } as typeof where;
+    where = submittedTimesheetsPendingPmApprovalWhere(managerId, ["project_manager"]) as typeof where;
   } else if (user.role === "CLIENT") {
     const links = await ensureClientApproverContactLinks(user.id, user.email);
     const linkIds = links.map((l) => l.id);

@@ -228,7 +228,6 @@ export async function sendHelpAndSupportEmail(input: {
   const subject = `TIBOSX Help & Support: ${input.topic.slice(0, 80)}`;
   const text = [
     `From: ${input.userName} (${input.userEmail})`,
-    `User id: ${input.userId}`,
     "",
     "What do you need help with?",
     input.topic,
@@ -238,7 +237,6 @@ export async function sendHelpAndSupportEmail(input: {
   ].join("\n");
   const bodyHtml = `
     <p><strong>From:</strong> ${escapeHtml(input.userName)} (${escapeHtml(input.userEmail)})</p>
-    <p><strong>User id:</strong> ${escapeHtml(input.userId)}</p>
     <p><strong>What do you need help with?</strong></p>
     <p>${escapeHtml(input.topic)}</p>
     <p><strong>Message</strong></p>

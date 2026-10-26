@@ -1,4 +1,4 @@
-import { prisma } from "@techbubble/database";
+import { prisma, type Prisma } from "@techbubble/database";
 import { effectiveRoleList } from "./admin-roles";
 
 const TIMESHEET_APPROVER_ROLES = new Set(["admin", "project_manager", "client"]);
@@ -35,4 +35,29 @@ export function canActAsTimesheetApprover(
   if (project.timesheetApproverUserId === actorId) return true;
   if (project.projectManagerId === actorId) return true;
   return false;
+}
+
+/** Submitted timesheets awaiting PM approval that this TBOS user can act on. */
+export function submittedTimesheetsPendingPmApprovalWhere(
+  actorId: string,
+  roles: string[],
+): Prisma.TimesheetWhereInput {
+  if (roles.includes("admin")) {
+    return {
+      status: "SUBMITTED",
+      OR: [{ approverKind: "PM" }, { approverKind: null }],
+    };
+  }
+  return {
+    status: "SUBMITTED",
+    AND: [
+      { OR: [{ approverKind: "PM" }, { approverKind: null }] },
+      {
+        OR: [
+          { project: { projectManagerId: actorId } },
+          { project: { timesheetApproverUserId: actorId } },
+        ],
+      },
+    ],
+  };
 }

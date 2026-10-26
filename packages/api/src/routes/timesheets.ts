@@ -7,7 +7,10 @@ import {
   getActorId,
   isProjectManagerRole,
 } from "../lib/project-access";
-import { canActAsTimesheetApprover } from "../lib/timesheet-approver";
+import {
+  canActAsTimesheetApprover,
+  submittedTimesheetsPendingPmApprovalWhere,
+} from "../lib/timesheet-approver";
 import { timesheetClientApproverWhere } from "../lib/timesheet-access";
 import { effectiveRolesForUser, hasEffectiveRole } from "../lib/admin-roles";
 import { getMemberOnboardingStatus } from "../lib/member-onboarding";
@@ -108,13 +111,18 @@ function serializeEntry(row: {
   billable: boolean;
   opportunity?: { name: string } | null;
   ticket?: { ticketNumber: string; subject: string } | null;
+  project?: { projectNumber: string; title: string } | null;
 }) {
   return {
     id: row.id,
     sortOrder: row.sortOrder,
     opportunityId: row.opportunityId,
     ticketId: row.ticketId,
-    label: entryLabel(row),
+    label: entryLabel({
+      ticket: row.ticket,
+      opportunity: row.opportunity,
+      project: row.project ?? null,
+    }),
     dailyHours: row.dailyHours ?? null,
     dailyComments: row.dailyComments ?? null,
     billable: row.billable,
@@ -272,7 +280,9 @@ function mapDetail(row: NonNullable<Awaited<ReturnType<typeof fetchTimesheet>>>)
   return serializeTimesheet({
     ...row,
     activityLogs: row.activityLogs.map(serializeActivity),
-    entries: row.entries.map(serializeEntry),
+    entries: row.entries.map((entry) =>
+      serializeEntry({ ...entry, project: row.project ?? null }),
+    ),
   });
 }
 
@@ -879,9 +889,12 @@ router.get("/recent-submitted", async (req: AuthRequest, res) => {
   try {
     const limitRaw = typeof req.query.limit === "string" ? Number.parseInt(req.query.limit, 10) : 3;
     const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 10) : 3;
-    const where = await timesheetAccessWhere(req);
+    const actorId = getActorId(req);
+    const role = req.user?.role ?? "";
+    const roles = await effectiveRolesForUser(actorId, role);
+    const where = submittedTimesheetsPendingPmApprovalWhere(actorId, roles);
     const rows = await prisma.timesheet.findMany({
-      where: { ...where, status: "SUBMITTED" },
+      where,
       orderBy: { updatedAt: "desc" },
       take: limit,
       include: {
@@ -1043,7 +1056,11 @@ router.get("/export", async (req: AuthRequest, res) => {
         const total = sumDailyHours(hours);
         const cols = [
           ...base,
-          total > 0 ? "Project (no ticket)" : "",
+          total > 0
+            ? ts.project
+              ? `${ts.project.projectNumber} — ${ts.project.title}`
+              : "Project time"
+            : "",
           ...WEEKDAY_KEYS.map((k) => hours[k] ?? ""),
           total,
           comments,
@@ -1054,7 +1071,7 @@ router.get("/export", async (req: AuthRequest, res) => {
 
       for (const entry of ts.entries) {
         const hours = (entry.dailyHours ?? {}) as Record<string, number>;
-        const label = entryLabel(entry);
+        const label = entryLabel({ ...entry, project: ts.project ?? null });
         const total = sumDailyHours(hours);
         const cols = [
           ...base,

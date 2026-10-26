@@ -18,9 +18,13 @@ type EmergencyContact = { name: string; email?: string; phone?: string; relation
 
 export function MemberProfileCompletionGate() {
   const pathname = usePathname();
-  const { sessionLoaded, memberOnboarding, refreshSession } = useAdminSession();
+  const { sessionLoaded, memberOnboarding, refreshSession, role, additionalRoles } = useAdminSession();
+  const isClientUser =
+    role === "client" || additionalRoles.some((r) => r === "client");
   const needsProfileCompletion = Boolean(
-    memberOnboarding?.profileOnboardingRequired && memberOnboarding?.agreementSigned,
+    !isClientUser &&
+      memberOnboarding?.profileOnboardingRequired &&
+      memberOnboarding?.agreementSigned,
   );
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -194,6 +198,10 @@ export function MemberProfileCompletionGate() {
     } finally {
       setSaving(false);
     }
+  }
+
+  if (isClientUser) {
+    return null;
   }
 
   if (pathname === "/timesheets" || pathname.startsWith("/timesheets/")) {

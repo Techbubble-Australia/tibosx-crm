@@ -61,10 +61,15 @@ export function entryHasHours(hours: DailyHours): boolean {
 export function entryLabel(row: {
   ticket?: { ticketNumber: string; subject: string } | null;
   opportunity?: { name: string } | null;
+  project?: { projectNumber: string; title: string } | null;
 }): string {
   if (row.ticket) return `${row.ticket.ticketNumber} — ${row.ticket.subject}`;
   if (row.opportunity) return row.opportunity.name;
-  return "Project (no ticket)";
+  if (row.project?.projectNumber && row.project?.title) {
+    return `${row.project.projectNumber} — ${row.project.title}`;
+  }
+  if (row.project?.title) return row.project.title;
+  return "Project time";
 }
 
 export function activeEntryRows(entries: TimesheetEntryInput[] | undefined): TimesheetEntryInput[] {

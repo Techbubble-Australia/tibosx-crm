@@ -112,20 +112,18 @@ export function TicketRecordLayout({
             {description}
           </section>
           <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-            {conversation}
+            {attachments}
           </section>
           <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-            {attachments}
+            {conversation}
           </section>
         </div>
 
         <div className="space-y-4">
           <SidebarCard title="Ticket details">
             <dl className="space-y-3 text-sm">
-              <DetailRow label="Created by" value={createdBy?.name ?? "—"} />
-              <DetailRow label="Created" value={formatWhen(createdAt)} />
-              <DetailRow label="Updated" value={formatWhen(updatedAt)} />
-              <DetailRow label="Updated by" value={updatedBy?.name ?? "—"} />
+              <DetailRow label="Created" value={formatPersonWhen(createdBy?.name, createdAt)} />
+              <DetailRow label="Updated" value={formatPersonWhen(updatedBy?.name, updatedAt)} />
             </dl>
           </SidebarCard>
           <SidebarCard title="Resolution">{resolution}</SidebarCard>
@@ -152,6 +150,15 @@ function formatWhen(value?: string) {
   if (!value) return "—";
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
+}
+
+function formatPersonWhen(name?: string | null, at?: string) {
+  const who = name?.trim() || "—";
+  const when = formatWhen(at);
+  if (who === "—" && when === "—") return "—";
+  if (when === "—") return who;
+  if (who === "—") return when;
+  return `${who} · ${when}`;
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {

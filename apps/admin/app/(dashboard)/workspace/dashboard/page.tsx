@@ -42,8 +42,10 @@ export default function DashboardPage() {
     return (data.data as SubmittedTimesheetRow[]) ?? [];
   }, []);
 
-  const showTimesheetSummary = canAccessWorkspaceTimesheets && !isCustomerSupport;
-  const timesheetsHref = showTimesheetSummary ? "/workspace/timesheets/submitted" : "/timesheets";
+  const showTimesheetSummary = isCustomerSupport || canAccessWorkspaceTimesheets;
+  const timesheetsHref = canAccessWorkspaceTimesheets
+    ? "/workspace/timesheets/submitted"
+    : "/timesheets";
 
   return (
     <CustomerSupportDashboard
@@ -52,10 +54,12 @@ export default function DashboardPage() {
       timesheetsHref={timesheetsHref}
       loadTickets={loadTickets}
       loadActivity={loadActivity}
-      loadTimesheetSummary={loadTimesheetSummary}
+      loadTimesheetSummary={isCustomerSupport || canAccessWorkspaceTimesheets ? loadTimesheetSummary : undefined}
       loadRecentSubmittedTimesheets={loadRecentSubmittedTimesheets}
       showTimesheetSummary={showTimesheetSummary}
-      timesheetDetailHref={(id) => `/workspace/timesheets/${id}`}
+      timesheetDetailHref={(id) =>
+        isCustomerSupport ? `/timesheets/${id}` : `/workspace/timesheets/${id}`
+      }
     />
   );
 }

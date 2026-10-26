@@ -21,15 +21,17 @@ function pathAllowed(pathname: string) {
 export function MemberOnboardingGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { memberOnboarding, impersonation, sessionLoaded } = useAdminSession();
+  const { memberOnboarding, impersonation, sessionLoaded, role, additionalRoles } = useAdminSession();
+  const isClientUser =
+    role === "client" || additionalRoles.some((r) => r === "client");
 
   useEffect(() => {
-    if (!sessionLoaded || pathAllowed(pathname) || impersonation) return;
+    if (!sessionLoaded || isClientUser || pathAllowed(pathname) || impersonation) return;
     const onboarding = memberOnboarding;
     if (!onboarding?.profileOnboardingRequired) return;
     if (onboarding.hasAgreementAssignment && !onboarding.agreementSigned) return;
     router.replace("/settings/profile?onboarding=1");
-  }, [pathname, router, memberOnboarding, impersonation, sessionLoaded]);
+  }, [pathname, router, memberOnboarding, impersonation, sessionLoaded, isClientUser]);
 
   return children;
 }
