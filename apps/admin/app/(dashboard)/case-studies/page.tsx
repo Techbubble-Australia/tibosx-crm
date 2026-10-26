@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -87,7 +88,7 @@ export default function CaseStudiesPage() {
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(
+        appAlert(
           (payload as { error?: string }).error ||
             "Could not open preview. Ensure the API has CASE_STUDY_PREVIEW_SECRET or JWT_SECRET (non-production).",
         );
@@ -95,7 +96,7 @@ export default function CaseStudiesPage() {
       }
       const previewToken = (payload as { data?: { token?: string } }).data?.token;
       if (!previewToken) {
-        alert("Preview token missing from API response.");
+        appAlert("Preview token missing from API response.");
         return;
       }
       window.open(
@@ -105,7 +106,7 @@ export default function CaseStudiesPage() {
       );
     } catch (e) {
       console.error(e);
-      alert("Failed to open preview.");
+      appAlert("Failed to open preview.");
     }
   }
 
@@ -117,26 +118,26 @@ export default function CaseStudiesPage() {
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert((payload as { error?: string }).error || "Duplicate failed");
+        appAlert((payload as { error?: string }).error || "Duplicate failed");
         return;
       }
       const newId = (payload as { data?: { id?: string } }).data?.id;
       if (!newId) {
-        alert("Duplicate succeeded but no id returned.");
+        appAlert("Duplicate succeeded but no id returned.");
         return;
       }
       await fetchCaseStudies();
       router.push(`/case-studies/${newId}`);
     } catch (error) {
       console.error("Error duplicating case study:", error);
-      alert("Duplicate failed");
+      appAlert("Duplicate failed");
     } finally {
       setDuplicatingId(null);
     }
   }
 
   async function deleteCaseStudy(id: string) {
-    if (!confirm("Are you sure you want to delete this case study?")) return;
+    if (!(await appConfirm("Are you sure you want to delete this case study?"))) return;
 
     try {
       const res = await adminFetch(`/api/admin/case-studies/${id}`, {

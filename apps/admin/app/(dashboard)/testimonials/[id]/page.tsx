@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -65,7 +66,7 @@ export default function EditTestimonialPage() {
       router.push("/testimonials");
     } catch (error) {
       console.error(error);
-      alert("Failed to update testimonial");
+      appAlert("Failed to update testimonial");
     } finally {
       setIsLoading(false);
     }

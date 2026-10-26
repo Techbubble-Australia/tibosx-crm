@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -54,7 +55,7 @@ export default function TimesheetDetailPage() {
       if (!res.ok) throw new Error(messageFromApiError(data, "Failed to save timesheet"));
       setTimesheet(data.data as TimesheetFormValues);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to save timesheet");
+      appAlert(error instanceof Error ? error.message : "Failed to save timesheet");
     } finally {
       setIsSaving(false);
     }
@@ -83,7 +84,7 @@ export default function TimesheetDetailPage() {
       const detail = await adminFetch(`/api/admin/timesheets/${id}`).then((r) => r.json());
       setTimesheet(detail.data as TimesheetFormValues);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to submit");
+      appAlert(error instanceof Error ? error.message : "Failed to submit");
     } finally {
       setActionLoading(false);
     }
@@ -107,14 +108,14 @@ export default function TimesheetDetailPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to export");
+      appAlert(error instanceof Error ? error.message : "Failed to export");
     } finally {
       setExporting(false);
     }
   }
 
   async function approve() {
-    if (!window.confirm("You're about to approve this timesheet. Do you want to continue?")) return;
+    if (!(await appConfirm("You're about to approve this timesheet. Do you want to continue?"))) return;
     setActionLoading(true);
     try {
       const res = await adminFetch(`/api/admin/timesheets/${id}/approve`, { method: "POST" });
@@ -122,7 +123,7 @@ export default function TimesheetDetailPage() {
       if (!res.ok) throw new Error(messageFromApiError(data, "Failed to approve"));
       setTimesheet(data.data as TimesheetFormValues);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to approve");
+      appAlert(error instanceof Error ? error.message : "Failed to approve");
     } finally {
       setActionLoading(false);
     }
@@ -141,7 +142,7 @@ export default function TimesheetDetailPage() {
       setTimesheet(data.data as TimesheetFormValues);
       setShowReject(false);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to reject");
+      appAlert(error instanceof Error ? error.message : "Failed to reject");
     } finally {
       setActionLoading(false);
     }

@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -40,7 +41,7 @@ export default function SupportAssignmentsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ organizationIds: selected[consultantId] ?? [] }),
     });
-    if (!res.ok) alert("Save failed");
+    if (!res.ok) appAlert("Save failed");
   }
 
   if (role !== "admin") {

@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -111,7 +112,7 @@ export default function EditUserPage() {
   const [requireProfileAfterFirstLogin, setRequireProfileAfterFirstLogin] = useState(true);
 
   async function inviteUser() {
-    const ok = window.confirm(
+    const ok = await appConfirm(
       "Existing password will be overwritten by a temporary password. Do you want to continue?",
     );
     if (!ok) return;
@@ -126,7 +127,7 @@ export default function EditUserPage() {
       };
       if (!res.ok) {
         if (data.temporaryPassword) {
-          alert(
+          appAlert(
             `${messageFromApiError(data, "Failed to send invite")}\n\n` +
               "Their previous password was already replaced. Share this temporary password so they can sign in:\n\n" +
               data.temporaryPassword,
@@ -135,13 +136,13 @@ export default function EditUserPage() {
         }
         throw new Error(messageFromApiError(data, "Failed to send invite"));
       }
-      alert(
+      appAlert(
         (data.message ||
           "Invite email sent.") +
           "\n\nAny password set earlier for this user no longer works. They must use the new temporary password from the invite email.",
       );
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to send invite");
+      appAlert(e instanceof Error ? e.message : "Failed to send invite");
     } finally {
       setInviteLoading(false);
     }
@@ -211,7 +212,7 @@ export default function EditUserPage() {
     );
     for (const row of filled) {
       if (!row.name.trim() || !row.email?.trim() || !row.phone?.trim()) {
-        alert("Each emergency contact needs a name, email, and phone.");
+        appAlert("Each emergency contact needs a name, email, and phone.");
         return false;
       }
     }
@@ -224,7 +225,7 @@ export default function EditUserPage() {
     if (!roles.includes("client")) {
       const bankError = validateBankDetailsForm(bankDetails);
       if (bankError) {
-        alert(bankError);
+        appAlert(bankError);
         return;
       }
     }
@@ -282,7 +283,7 @@ export default function EditUserPage() {
       }
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to update user");
+      appAlert(e instanceof Error ? e.message : "Failed to update user");
     } finally {
       setIsLoading(false);
     }

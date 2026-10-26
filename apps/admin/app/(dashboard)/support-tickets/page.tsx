@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -35,7 +36,7 @@ export default function SupportTicketsPage() {
 
   async function deleteTicket(row: TicketRow) {
     if (role !== "admin") return;
-    if (!window.confirm(`Delete ticket ${row.ticketNumber}? This cannot be undone.`)) return;
+    if (!(await appConfirm(`Delete ticket ${row.ticketNumber}? This cannot be undone.`))) return;
     setDeletingId(row.id);
     try {
       const res = await adminFetch(`/api/admin/ticketing/tickets/${row.id}`, { method: "DELETE" });

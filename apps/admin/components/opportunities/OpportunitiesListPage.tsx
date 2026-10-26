@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -476,7 +477,7 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
   }
 
   async function deleteRow(id: string) {
-    if (!confirm("Delete this opportunity?")) return;
+    if (!(await appConfirm("Delete this opportunity?"))) return;
     try {
       const res = await adminFetch(`/api/admin/opportunities/${id}`, { method: "DELETE" });
       if (res.ok) {

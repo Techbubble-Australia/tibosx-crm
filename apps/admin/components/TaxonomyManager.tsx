@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { adminFetch } from "@/lib/admin-api";
@@ -68,7 +69,7 @@ export function TaxonomyManager({ apiPath, title, description }: Props) {
       setNewName("");
       await load();
     } catch {
-      alert(`Failed to add ${title.toLowerCase()}`);
+      appAlert(`Failed to add ${title.toLowerCase()}`);
     } finally {
       setSaving(false);
     }
@@ -88,14 +89,14 @@ export function TaxonomyManager({ apiPath, title, description }: Props) {
       setEditingId(null);
       await load();
     } catch {
-      alert(`Failed to update ${title.toLowerCase()}`);
+      appAlert(`Failed to update ${title.toLowerCase()}`);
     } finally {
       setSaving(false);
     }
   }
 
   async function removeItem(id: string, name: string) {
-    if (!confirm(`Delete "${name}"? Existing job listings using this value will keep the text but it won't appear in dropdowns.`)) {
+    if (!(await appConfirm(`Delete "${name}"? Existing job listings using this value will keep the text but it won't appear in dropdowns.`))) {
       return;
     }
     try {
@@ -103,7 +104,7 @@ export function TaxonomyManager({ apiPath, title, description }: Props) {
       if (!res.ok) throw new Error("Failed");
       await load();
     } catch {
-      alert(`Failed to delete ${title.toLowerCase()}`);
+      appAlert(`Failed to delete ${title.toLowerCase()}`);
     }
   }
 

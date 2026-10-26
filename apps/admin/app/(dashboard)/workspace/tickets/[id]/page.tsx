@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -121,7 +122,7 @@ export default function TicketDetailPage() {
     setSaving(false);
     if (!res.ok) {
       const data = await res.json();
-      alert(data.error || "Update failed");
+      appAlert(data.error || "Update failed");
       return;
     }
     reload();
@@ -137,7 +138,7 @@ export default function TicketDetailPage() {
     setSaving(false);
     if (!res.ok) {
       const data = await res.json();
-      alert(data.error || "Action failed");
+      appAlert(data.error || "Action failed");
       return;
     }
     reload();
@@ -154,7 +155,7 @@ export default function TicketDetailPage() {
       if (!res.ok) throw new Error("Upload failed");
       reload();
     } catch {
-      alert("Could not upload file");
+      appAlert("Could not upload file");
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -169,7 +170,7 @@ export default function TicketDetailPage() {
       body: JSON.stringify({ body: reply, isInternal: internal }),
     });
     if (!res.ok) {
-      alert("Failed to send message");
+      appAlert("Failed to send message");
       return;
     }
     setReply("");

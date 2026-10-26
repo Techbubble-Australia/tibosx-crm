@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -145,14 +146,14 @@ export function ClientsListPage({ statusFilter, heading, description }: Props) {
   }
 
   async function deleteRow(id: string) {
-    if (!confirm("Delete this client?")) return;
+    if (!(await appConfirm("Delete this client?"))) return;
     try {
       const res = await adminFetch(`/api/admin/clients/${id}`, { method: "DELETE" });
       if (res.ok) {
         setRows((prev) => prev.filter((x) => x.id !== id));
       } else {
         const err = await res.json().catch(() => ({}));
-        alert((err as { error?: string }).error || "Delete failed");
+        appAlert((err as { error?: string }).error || "Delete failed");
       }
     } catch (error) {
       console.error("Error deleting client:", error);

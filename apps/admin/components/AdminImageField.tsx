@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { adminFetch } from "@/lib/admin-api";
@@ -77,14 +78,14 @@ export function AdminImageField({
           json && typeof json === "object" && "error" in json
             ? String((json as { error?: unknown }).error)
             : "";
-        alert(err || "Upload failed");
+        appAlert(err || "Upload failed");
         return;
       }
       const next = readUploadImageUrlFromJson(json);
       if (next) setUrl(next);
     } catch (err) {
       console.error(err);
-      alert("Upload failed");
+      appAlert("Upload failed");
     } finally {
       setUploading(false);
       e.target.value = "";

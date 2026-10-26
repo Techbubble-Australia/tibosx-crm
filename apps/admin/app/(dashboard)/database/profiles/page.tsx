@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
@@ -254,7 +255,7 @@ function ProfilesPageInner() {
   }
 
   async function deleteRow(id: string) {
-    if (!confirm("Delete this profile?")) return;
+    if (!(await appConfirm("Delete this profile?"))) return;
     try {
       const res = await adminFetch(`/api/admin/profiles/${id}`, { method: "DELETE" });
       if (res.ok) {
@@ -310,9 +311,9 @@ function ProfilesPageInner() {
     });
   }
 
-  function handleSaveListEdits() {
+  async function handleSaveListEdits() {
     if (!listEditingState.hasChanges) return;
-    if (!confirm("Save changes to this profile?")) return;
+    if (!(await appConfirm("Save changes to this profile?"))) return;
     setSaveRequestKey((key) => key + 1);
   }
 

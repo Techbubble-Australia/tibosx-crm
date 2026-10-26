@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -211,31 +212,31 @@ export function JobForm({
     e.preventDefault();
     const validLocations = locations.filter((row) => row.countryCode.trim() && row.country.trim());
     if (validLocations.length === 0) {
-      alert("Add at least one country for this role.");
+      appAlert("Add at least one country for this role.");
       return;
     }
     const countryCodes = validLocations.map((row) => row.countryCode.trim().toLowerCase());
     const duplicateCountry = countryCodes.find((code, index) => countryCodes.indexOf(code) !== index);
     if (duplicateCountry) {
-      alert(
+      appAlert(
         "Each country should appear only once. Remove the duplicate country row.",
       );
       return;
     }
     if (!category.trim()) {
-      alert("Category is required.");
+      appAlert("Category is required.");
       return;
     }
     if (!technology.trim()) {
-      alert("Technology is required.");
+      appAlert("Technology is required.");
       return;
     }
     if (!department.trim()) {
-      alert("Department is required (e.g. Technology, Engineering).");
+      appAlert("Department is required (e.g. Technology, Engineering).");
       return;
     }
     if (!clientId.trim()) {
-      alert("Client is required.");
+      appAlert("Client is required.");
       return;
     }
 

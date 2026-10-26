@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -27,7 +28,7 @@ export default function NewProjectPage() {
       const created = data.data as { id: string };
       router.push(`/projects/${created.id}`);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to create project");
+      appAlert(error instanceof Error ? error.message : "Failed to create project");
     } finally {
       setIsSaving(false);
     }

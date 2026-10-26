@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -33,7 +34,7 @@ export default function SettingsTemplatesPage() {
   }
 
   async function deleteRow(id: string) {
-    if (!confirm("Delete this template?")) return;
+    if (!(await appConfirm("Delete this template?"))) return;
     const res = await adminFetch(`/api/admin/credential-templates/${id}`, { method: "DELETE" });
     if (res.ok) setRows((prev) => prev.filter((row) => row.id !== id));
   }

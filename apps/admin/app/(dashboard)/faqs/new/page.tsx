@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -33,7 +34,7 @@ export default function NewFaqPage() {
       router.push("/faqs");
     } catch (error) {
       console.error(error);
-      alert("Failed to create FAQ");
+      appAlert("Failed to create FAQ");
     } finally {
       setIsLoading(false);
     }

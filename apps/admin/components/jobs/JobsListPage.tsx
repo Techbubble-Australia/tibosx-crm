@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -255,7 +256,7 @@ export function JobsListPage({ publishedFilter, heading, description }: JobsList
   }
 
   async function deleteJob(id: string) {
-    if (!confirm("Are you sure you want to delete this job listing?")) return;
+    if (!(await appConfirm("Are you sure you want to delete this job listing?"))) return;
     try {
       const res = await adminFetch(`/api/admin/jobs/${id}`, { method: "DELETE" });
       if (res.ok) {

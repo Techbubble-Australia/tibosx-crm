@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
@@ -96,7 +97,7 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
         }),
       );
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to parse variables");
+      appAlert(error instanceof Error ? error.message : "Failed to parse variables");
     } finally {
       setParsing(false);
     }
@@ -187,7 +188,7 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
       setImportedFileName(file.name);
       await applyParsedHtml(nextHtml);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to import file");
+      appAlert(error instanceof Error ? error.message : "Failed to import file");
     } finally {
       setImporting(false);
     }
@@ -196,11 +197,11 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) {
-      alert("Name is required.");
+      appAlert("Name is required.");
       return;
     }
     if (!html.trim()) {
-      alert("HTML content is required.");
+      appAlert("HTML content is required.");
       return;
     }
     await onSubmit({

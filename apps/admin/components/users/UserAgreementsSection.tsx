@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
@@ -118,7 +119,7 @@ export function UserAgreementsSection({
       if (!res.ok) throw new Error((data as { error?: string }).error || "Update failed");
       onRecordsChange((data.data?.agreementRecords as AgreementRecordRow[]) ?? []);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Update failed");
+      appAlert(error instanceof Error ? error.message : "Update failed");
     } finally {
       setSavingId(null);
     }
@@ -126,7 +127,7 @@ export function UserAgreementsSection({
 
   async function deleteForEdit(record: AgreementRecordRow) {
     if (!editableUserId || !onRecordsChange) return;
-    const ok = window.confirm("This will delete the agreement record. Do you want to continue?");
+    const ok = await appConfirm("This will delete the agreement record. Do you want to continue?");
     if (!ok) return;
     setSavingId(record.id);
     try {
@@ -139,7 +140,7 @@ export function UserAgreementsSection({
       onRecordsChange(next);
       onEditAgreement?.(record);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Delete failed");
+      appAlert(error instanceof Error ? error.message : "Delete failed");
     } finally {
       setSavingId(null);
     }

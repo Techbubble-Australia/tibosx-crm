@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useState } from "react";
 import { Loader2, Trash2, Upload } from "lucide-react";
@@ -41,7 +42,7 @@ export function AdminUserFilesField({
       if (!url) throw new Error("Upload did not return a file URL");
       onChange([...files, { name: file.name, url }]);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Upload failed");
+      appAlert(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
     }

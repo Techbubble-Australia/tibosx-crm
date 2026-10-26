@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -77,7 +78,7 @@ export function JobAiInsightsPanel({ jobId, metaTags = [] }: Props) {
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to add profile");
       setAppliedProfileIds((prev) => new Set(prev).add(profileId));
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to add profile");
+      appAlert(error instanceof Error ? error.message : "Failed to add profile");
     } finally {
       setAddingProfileId(null);
     }

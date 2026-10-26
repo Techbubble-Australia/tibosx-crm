@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -37,7 +38,7 @@ export default function ProjectsPage() {
   }, []);
 
   async function deleteProject(id: string) {
-    if (!window.confirm("Delete this draft project? This cannot be undone.")) return;
+    if (!(await appConfirm("Delete this draft project? This cannot be undone."))) return;
     setDeletingId(id);
     try {
       const res = await adminFetch(`/api/admin/projects/${id}`, { method: "DELETE" });
@@ -45,7 +46,7 @@ export default function ProjectsPage() {
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to delete project");
       setRows((prev) => prev.filter((row) => row.id !== id));
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to delete project");
+      appAlert(error instanceof Error ? error.message : "Failed to delete project");
     } finally {
       setDeletingId(null);
     }

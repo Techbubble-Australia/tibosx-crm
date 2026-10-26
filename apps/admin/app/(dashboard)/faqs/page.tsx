@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -51,7 +52,7 @@ export default function FaqsPage() {
   }
 
   async function deleteFaq(id: string) {
-    if (!confirm("Delete this FAQ?")) return;
+    if (!(await appConfirm("Delete this FAQ?"))) return;
     try {
       const res = await adminFetch(`/api/admin/faqs/${id}`, { method: "DELETE" });
       if (res.ok) {

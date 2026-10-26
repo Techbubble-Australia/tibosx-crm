@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -147,14 +148,14 @@ export function UsersListPage({ activeOnly }: { activeOnly: boolean }) {
 
   async function deactivateRow(id: string) {
     if (id === currentUserId) {
-      alert("You cannot deactivate your own account.");
+      appAlert("You cannot deactivate your own account.");
       return;
     }
-    if (!confirm("Deactivate this user? They will not be able to sign in.")) return;
+    if (!(await appConfirm("Deactivate this user? They will not be able to sign in."))) return;
     const res = await adminFetch(`/api/admin/users/${id}/deactivate`, { method: "POST" });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      alert((err as { error?: string }).error || "Deactivate failed");
+      appAlert((err as { error?: string }).error || "Deactivate failed");
       return;
     }
     await fetchRows();
@@ -162,9 +163,9 @@ export function UsersListPage({ activeOnly }: { activeOnly: boolean }) {
 
   async function deleteRow(id: string) {
     if (
-      !confirm(
+      !(await appConfirm(
         "All user data including any mappings, signed documents will be deleted. Do you want to continue?",
-      )
+      ))
     ) {
       return;
     }
@@ -173,7 +174,7 @@ export function UsersListPage({ activeOnly }: { activeOnly: boolean }) {
       if (res.ok) setRows((r) => r.filter((x) => x.id !== id));
       else {
         const err = await res.json().catch(() => ({}));
-        alert((err as { error?: string }).error || "Delete failed");
+        appAlert((err as { error?: string }).error || "Delete failed");
       }
     } catch (error) {
       console.error("Error deleting user:", error);

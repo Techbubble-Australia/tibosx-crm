@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useState } from "react";
 
@@ -16,7 +17,7 @@ export function TimesheetRejectDialog({ onCancel, onConfirm, saving }: Props) {
         onSubmit={(e) => {
           e.preventDefault();
           if (!reason.trim()) {
-            alert("Reject reason is required.");
+            appAlert("Reject reason is required.");
             return;
           }
           onConfirm(reason.trim());

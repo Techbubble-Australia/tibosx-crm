@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -72,7 +73,7 @@ export default function EditClientPage() {
 
   async function createUserForContact(contact: ClientContactInput, index: number) {
     if (!contact.id) {
-      alert("Save the client before creating a user for this contact.");
+      appAlert("Save the client before creating a user for this contact.");
       return;
     }
     setCreatingUserIndex(index);
@@ -84,7 +85,7 @@ export default function EditClientPage() {
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to create user");
       const tempPassword = (data.data as { temporaryPassword?: string }).temporaryPassword;
       if (tempPassword) {
-        alert(
+        appAlert(
           "Portal user created. No invite email was sent — use Customer users → Invite user when you are ready, or share the temporary password shown in the API response.",
         );
       }
@@ -96,7 +97,7 @@ export default function EditClientPage() {
         router.push(`/customer-users/${adminUserId}`);
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to create user");
+      appAlert(err instanceof Error ? err.message : "Failed to create user");
     } finally {
       setCreatingUserIndex(null);
     }
@@ -126,7 +127,7 @@ export default function EditClientPage() {
       }
       router.push(clientListPathForStatus(status));
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to update client");
+      appAlert(err instanceof Error ? err.message : "Failed to update client");
     } finally {
       setIsLoading(false);
     }

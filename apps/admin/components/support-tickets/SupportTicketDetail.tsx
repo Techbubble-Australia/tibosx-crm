@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useCallback, useEffect, useState } from "react";
 import { adminFetch } from "@/lib/admin-api";
@@ -109,7 +110,7 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
       if (!res.ok) throw new Error(data.error || "Action failed");
       reload();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Action failed");
+      appAlert(e instanceof Error ? e.message : "Action failed");
     } finally {
       setSaving(false);
     }
@@ -127,7 +128,7 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
       if (!res.ok) throw new Error(data.error || "Update failed");
       reload();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Update failed");
+      appAlert(e instanceof Error ? e.message : "Update failed");
     } finally {
       setSaving(false);
     }
@@ -143,7 +144,7 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      alert(data.error || "Failed to send message");
+      appAlert(data.error || "Failed to send message");
       return;
     }
     setReply("");
@@ -167,7 +168,7 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
       }
       reload();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Upload failed");
+      appAlert(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
       e.target.value = "";

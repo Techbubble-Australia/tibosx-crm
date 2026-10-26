@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -73,7 +74,7 @@ export default function EditSitePageDocumentPage() {
       router.push("/pages");
     } catch (error) {
       console.error(error);
-      alert("Failed to save");
+      appAlert("Failed to save");
     } finally {
       setIsLoading(false);
     }
@@ -82,9 +83,9 @@ export default function EditSitePageDocumentPage() {
   async function onDelete() {
     if (!record) return;
     if (
-      !confirm(
+      !(await appConfirm(
         `Delete "${record.key}"? The marketing site may show errors or fall back to defaults until this is restored.`,
-      )
+      ))
     )
       return;
     try {
@@ -95,7 +96,7 @@ export default function EditSitePageDocumentPage() {
       router.push("/pages");
     } catch (error) {
       console.error(error);
-      alert("Failed to delete");
+      appAlert("Failed to delete");
     }
   }
 

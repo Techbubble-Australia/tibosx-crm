@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -59,7 +60,7 @@ export default function TimesheetsPage() {
       return row?.status === "DRAFT";
     });
     if (!ids.length) {
-      alert("Select at least one draft timesheet.");
+      appAlert("Select at least one draft timesheet.");
       return;
     }
     setSubmitting(true);
@@ -74,14 +75,14 @@ export default function TimesheetsPage() {
       setSelected(new Set());
       await fetchRows();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to submit");
+      appAlert(error instanceof Error ? error.message : "Failed to submit");
     } finally {
       setSubmitting(false);
     }
   }
 
   async function deleteOne(id: string) {
-    if (!window.confirm("Delete this timesheet? This cannot be undone.")) return;
+    if (!(await appConfirm("Delete this timesheet? This cannot be undone."))) return;
     setSubmitting(true);
     try {
       const res = await adminFetch(`/api/admin/timesheets/${id}`, { method: "DELETE" });
@@ -89,7 +90,7 @@ export default function TimesheetsPage() {
       if (!res.ok) throw new Error(messageFromApiError(data, "Failed to delete"));
       await fetchRows();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to delete");
+      appAlert(error instanceof Error ? error.message : "Failed to delete");
     } finally {
       setSubmitting(false);
     }
@@ -153,14 +154,14 @@ export default function TimesheetsPage() {
       });
       router.push(`/timesheets/new?${params}`);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Unable to start a new timesheet");
+      appAlert(error instanceof Error ? error.message : "Unable to start a new timesheet");
     }
   }
 
   async function exportCsv() {
     const ids = [...selected];
     if (!ids.length) {
-      alert("Select at least one timesheet to export.");
+      appAlert("Select at least one timesheet to export.");
       return;
     }
     setExporting(true);
@@ -179,7 +180,7 @@ export default function TimesheetsPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to export");
+      appAlert(error instanceof Error ? error.message : "Failed to export");
     } finally {
       setExporting(false);
     }
@@ -197,7 +198,7 @@ export default function TimesheetsPage() {
       if (!res.ok) throw new Error(messageFromApiError(data, "Failed to submit"));
       await fetchRows();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to submit");
+      appAlert(error instanceof Error ? error.message : "Failed to submit");
     } finally {
       setSubmitting(false);
     }

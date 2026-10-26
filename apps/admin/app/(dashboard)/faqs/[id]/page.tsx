@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -54,7 +55,7 @@ export default function EditFaqPage() {
       router.push("/faqs");
     } catch (error) {
       console.error(error);
-      alert("Failed to update FAQ");
+      appAlert("Failed to update FAQ");
     } finally {
       setIsLoading(false);
     }

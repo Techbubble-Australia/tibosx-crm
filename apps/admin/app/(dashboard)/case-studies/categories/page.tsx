@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -71,7 +72,7 @@ export default function CaseStudyCategoriesPage() {
       body: JSON.stringify({ name, order: categories.length }),
     });
     if (!res.ok) {
-      alert("Failed to add category");
+      appAlert("Failed to add category");
       return;
     }
     setNewCategory("");
@@ -87,7 +88,7 @@ export default function CaseStudyCategoriesPage() {
       body: JSON.stringify({ name }),
     });
     if (!res.ok) {
-      alert("Failed to update category");
+      appAlert("Failed to update category");
       return;
     }
     setEditingCatId(null);
@@ -95,10 +96,10 @@ export default function CaseStudyCategoriesPage() {
   }
 
   async function deleteCategory(id: string, name: string) {
-    if (!confirm(`Delete category "${name}" and all its subcategories?`)) return;
+    if (!(await appConfirm(`Delete category "${name}" and all its subcategories?`))) return;
     const res = await adminFetch(`/api/admin/case-study-categories/${id}`, { method: "DELETE" });
     if (!res.ok) {
-      alert("Failed to delete category");
+      appAlert("Failed to delete category");
       return;
     }
     await load();
@@ -113,7 +114,7 @@ export default function CaseStudyCategoriesPage() {
       body: JSON.stringify({ name, order: 0 }),
     });
     if (!res.ok) {
-      alert("Failed to add subcategory");
+      appAlert("Failed to add subcategory");
       return;
     }
     setNewSubByCat((prev) => ({ ...prev, [categoryId]: "" }));
@@ -132,7 +133,7 @@ export default function CaseStudyCategoriesPage() {
       },
     );
     if (!res.ok) {
-      alert("Failed to update subcategory");
+      appAlert("Failed to update subcategory");
       return;
     }
     setEditingSub(null);
@@ -140,13 +141,13 @@ export default function CaseStudyCategoriesPage() {
   }
 
   async function deleteSubcategory(categoryId: string, subId: string, name: string) {
-    if (!confirm(`Delete subcategory "${name}"?`)) return;
+    if (!(await appConfirm(`Delete subcategory "${name}"?`))) return;
     const res = await adminFetch(
       `/api/admin/case-study-categories/${categoryId}/subcategories/${subId}`,
       { method: "DELETE" },
     );
     if (!res.ok) {
-      alert("Failed to delete subcategory");
+      appAlert("Failed to delete subcategory");
       return;
     }
     await load();

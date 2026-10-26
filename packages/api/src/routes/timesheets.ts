@@ -365,11 +365,26 @@ async function assertMemberCanSubmitTimesheets(
   if (options?.impersonatorId) return;
   if (!hasEffectiveRole(roles, "project_member")) return;
   if (roles.includes("admin") || roles.includes("project_manager")) return;
-  // Timesheets are not gated on profile/KYC — only a signed credential agreement when one is assigned.
+  // Profile/KYC is not required for timesheets — warn in the UI instead.
   const onboarding = await getMemberOnboardingStatus(actorId);
   if (onboarding.hasAgreementAssignment && !onboarding.agreementSigned) {
     throw new Error("AGREEMENT_REQUIRED");
   }
+}
+
+async function memberTimesheetProfileWarnings(
+  actorId: string,
+  roles: string[],
+  impersonatorId?: string,
+): Promise<string[]> {
+  if (impersonatorId) return [];
+  if (!hasEffectiveRole(roles, "project_member")) return [];
+  if (roles.includes("admin") || roles.includes("project_manager")) return [];
+  const onboarding = await getMemberOnboardingStatus(actorId);
+  if (!onboarding.profileOnboardingRequired) return [];
+  return [
+    "Your profile is incomplete. You can continue using timesheets, but please complete your profile in Settings when you can.",
+  ];
 }
 
 function addDaysIso(iso: string, days: number): string {
@@ -1160,13 +1175,11 @@ router.post("/", async (req: AuthRequest, res) => {
     });
 
     const detail = await fetchTimesheet(row.id);
-    res.status(201).json({ data: detail ? mapDetail(detail) : null });
+    const warnings = await memberTimesheetProfileWarnings(actorId, roles, req.user?.impersonatorId);
+    res.status(201).json({ data: detail ? mapDetail(detail) : null, warnings });
   } catch (error) {
     if (error instanceof Error && error.message === "AGREEMENT_REQUIRED") {
       return res.status(403).json({ error: "Sign your agreement before creating timesheets" });
-    }
-    if (error instanceof Error && error.message === "PROFILE_REQUIRED") {
-      return res.status(403).json({ error: "Complete your profile before creating timesheets" });
     }
     if (error instanceof Error && error.message === "INVALID_ENTRY_TICKET") {
       return res.status(400).json({ error: "One or more tickets do not belong to this project" });
@@ -1260,13 +1273,11 @@ router.put("/:id", async (req: AuthRequest, res) => {
     });
 
     const detail = await fetchTimesheet(row.id);
-    res.json({ data: detail ? mapDetailWithActions(detail, actorId, role) : null });
+    const warnings = await memberTimesheetProfileWarnings(actorId, roles, req.user?.impersonatorId);
+    res.json({ data: detail ? mapDetailWithActions(detail, actorId, role) : null, warnings });
   } catch (error) {
     if (error instanceof Error && error.message === "AGREEMENT_REQUIRED") {
       return res.status(403).json({ error: "Sign your agreement before editing timesheets" });
-    }
-    if (error instanceof Error && error.message === "PROFILE_REQUIRED") {
-      return res.status(403).json({ error: "Complete your profile before editing timesheets" });
     }
     if (error instanceof Error && error.message === "INVALID_ENTRY_TICKET") {
       return res.status(400).json({ error: "One or more tickets do not belong to this project" });
@@ -1429,7 +1440,8 @@ router.post("/submit", async (req: AuthRequest, res) => {
       }
     }
 
-    res.json({ data: { submitted: rows.length } });
+    const warnings = await memberTimesheetProfileWarnings(actorId, roles, req.user?.impersonatorId);
+    res.json({ data: { submitted: rows.length }, warnings });
   } catch (error) {
     if (error instanceof Error && error.message === "APPROVER_REQUIRED") {
       return res.status(400).json({ error: "Select an approver for this support timesheet" });
@@ -1439,9 +1451,6 @@ router.post("/submit", async (req: AuthRequest, res) => {
     }
     if (error instanceof Error && error.message === "AGREEMENT_REQUIRED") {
       return res.status(403).json({ error: "Sign your agreement before submitting timesheets" });
-    }
-    if (error instanceof Error && error.message === "PROFILE_REQUIRED") {
-      return res.status(403).json({ error: "Complete your profile before submitting timesheets" });
     }
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: formatZodError(error), details: error.errors });

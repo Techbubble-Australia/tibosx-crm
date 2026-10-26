@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -46,7 +47,7 @@ export default function WorkspaceTimesheetDetailPage() {
 
   async function approve() {
     if (
-      !window.confirm("You're about to approve this timesheet. Do you want to continue?")
+      !(await appConfirm("You're about to approve this timesheet. Do you want to continue?"))
     ) {
       return;
     }
@@ -57,7 +58,7 @@ export default function WorkspaceTimesheetDetailPage() {
       if (!res.ok) throw new Error(messageFromApiError(data, "Failed to approve"));
       await loadTimesheet();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to approve");
+      appAlert(error instanceof Error ? error.message : "Failed to approve");
     } finally {
       setActionLoading(false);
     }
@@ -76,7 +77,7 @@ export default function WorkspaceTimesheetDetailPage() {
       setShowReject(false);
       await loadTimesheet();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to reject");
+      appAlert(error instanceof Error ? error.message : "Failed to reject");
     } finally {
       setActionLoading(false);
     }

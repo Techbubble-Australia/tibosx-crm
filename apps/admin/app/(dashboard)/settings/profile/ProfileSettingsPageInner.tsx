@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -178,11 +179,11 @@ export default function ProfileSettingsPageInner() {
   function validateAddressFields(country: string) {
     if (!addressFieldsRequired) return true;
     if (!addressLine1.trim() || !city.trim() || !stateRegion.trim() || !postcode.trim() || !country) {
-      alert("Address line 1, city, state, postcode, and country are required.");
+      appAlert("Address line 1, city, state, postcode, and country are required.");
       return false;
     }
     if (countrySelect === COUNTRY_OTHER && !countryOther.trim()) {
-      alert("Enter your country name when Other is selected.");
+      appAlert("Enter your country name when Other is selected.");
       return false;
     }
     return true;
@@ -193,12 +194,12 @@ export default function ProfileSettingsPageInner() {
       (row) => row.name.trim() || row.email?.trim() || row.phone?.trim(),
     );
     if (!touched.length) {
-      alert("Add at least one emergency contact.");
+      appAlert("Add at least one emergency contact.");
       return false;
     }
     for (const row of touched) {
       if (!row.name.trim() || !row.email?.trim() || !row.phone?.trim()) {
-        alert("Each emergency contact needs a name, email, and phone.");
+        appAlert("Each emergency contact needs a name, email, and phone.");
         return false;
       }
     }
@@ -243,7 +244,7 @@ export default function ProfileSettingsPageInner() {
         window.location.href = "/timesheets";
       }
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to save profile");
+      appAlert(error instanceof Error ? error.message : "Failed to save profile");
     } finally {
       setSaving(false);
     }
@@ -252,7 +253,7 @@ export default function ProfileSettingsPageInner() {
   async function handlePasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      alert("New passwords do not match.");
+      appAlert("New passwords do not match.");
       return;
     }
     setSavingPassword(true);
@@ -267,9 +268,9 @@ export default function ProfileSettingsPageInner() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      alert("Password updated.");
+      appAlert("Password updated.");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to update password");
+      appAlert(error instanceof Error ? error.message : "Failed to update password");
     } finally {
       setSavingPassword(false);
     }
@@ -323,9 +324,9 @@ export default function ProfileSettingsPageInner() {
               const data = await res.json();
               if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save");
               await refreshSession();
-              alert("Account saved.");
+              appAlert("Account saved.");
             } catch (error) {
-              alert(error instanceof Error ? error.message : "Failed to save");
+              appAlert(error instanceof Error ? error.message : "Failed to save");
             } finally {
               setSaving(false);
             }
@@ -541,9 +542,9 @@ export default function ProfileSettingsPageInner() {
                   const data = await res.json();
                   if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save");
                   await refreshSession();
-                  alert("Address saved.");
+                  appAlert("Address saved.");
                 } catch (error) {
-                  alert(error instanceof Error ? error.message : "Failed to save address");
+                  appAlert(error instanceof Error ? error.message : "Failed to save address");
                 } finally {
                   setSavingAddress(false);
                 }
@@ -568,16 +569,16 @@ export default function ProfileSettingsPageInner() {
               void (async () => {
                 const bankError = validateBankDetailsForm(bankDetails);
                 if (bankError) {
-                  alert(bankError);
+                  appAlert(bankError);
                   return;
                 }
                 const payload = bankDetailsToApi(bankDetails);
                 if (!payload) {
-                  alert("Complete all required bank details.");
+                  appAlert("Complete all required bank details.");
                   return;
                 }
                 if (!bankDetails.taxNumber.trim()) {
-                  alert("Tax number is required.");
+                  appAlert("Tax number is required.");
                   return;
                 }
                 setSavingBank(true);
@@ -593,7 +594,7 @@ export default function ProfileSettingsPageInner() {
                   const data = await res.json();
                   if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save");
                 } catch (error) {
-                  alert(error instanceof Error ? error.message : "Failed to save bank details");
+                  appAlert(error instanceof Error ? error.message : "Failed to save bank details");
                 } finally {
                   setSavingBank(false);
                 }

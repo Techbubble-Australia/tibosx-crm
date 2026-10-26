@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -38,7 +39,7 @@ export default function NewTestimonialPage() {
       router.push("/testimonials");
     } catch (error) {
       console.error(error);
-      alert("Failed to create testimonial");
+      appAlert("Failed to create testimonial");
     } finally {
       setIsLoading(false);
     }

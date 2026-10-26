@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { adminFetch } from "@/lib/admin-api";
@@ -80,7 +81,7 @@ export function ProjectSupportSetup({ projectId, project, onUpdated }: Props) {
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save");
       onUpdated();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to save client contacts");
+      appAlert(error instanceof Error ? error.message : "Failed to save client contacts");
     } finally {
       setSavingContacts(false);
     }
@@ -98,7 +99,7 @@ export function ProjectSupportSetup({ projectId, project, onUpdated }: Props) {
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save");
       onUpdated();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to save support group");
+      appAlert(error instanceof Error ? error.message : "Failed to save support group");
     } finally {
       setSavingGroup(false);
     }

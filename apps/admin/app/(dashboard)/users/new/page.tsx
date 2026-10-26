@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -65,7 +66,7 @@ function NewUserPageInner() {
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (roles.includes("client")) {
-      alert("Customer portal users are created from a client contact (Clients → contact → Create portal user).");
+      appAlert("Customer portal users are created from a client contact (Clients → contact → Create portal user).");
       return;
     }
     setIsLoading(true);
@@ -95,7 +96,7 @@ function NewUserPageInner() {
       }
       router.push("/users");
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to create user");
+      appAlert(e instanceof Error ? e.message : "Failed to create user");
     } finally {
       setIsLoading(false);
     }

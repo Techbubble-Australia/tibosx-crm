@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -133,7 +134,7 @@ export default function InvoicesPageInner() {
         ),
       );
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to update invoice");
+      appAlert(error instanceof Error ? error.message : "Failed to update invoice");
     } finally {
       setUpdatingInvoiceId(null);
     }

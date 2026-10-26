@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -297,7 +298,7 @@ function MoveApplicationDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!clientId || !jobListingId) {
-      alert("Please select a client and job.");
+      appAlert("Please select a client and job.");
       return;
     }
     setSaving(true);
@@ -313,7 +314,7 @@ function MoveApplicationDialog({
       }
       onMoved(data.data as CareerApplication);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to move application");
+      appAlert(error instanceof Error ? error.message : "Failed to move application");
     } finally {
       setSaving(false);
     }
@@ -581,12 +582,12 @@ function InterviewFieldRow({
 
   async function saveEdit() {
     if (!draftDatetime.trim()) {
-      alert("Interview date and time is required.");
+      appAlert("Interview date and time is required.");
       return;
     }
     const iso = wallTimeInZoneToIso(draftDatetime, draftTimezone);
     if (!iso) {
-      alert("Please enter a valid interview date and time.");
+      appAlert("Please enter a valid interview date and time.");
       return;
     }
     setSaving(true);
@@ -686,7 +687,7 @@ function CommentsFieldRow({
 
   async function saveEdit() {
     if (mandatory && !draft.trim()) {
-      alert("Comments are required for this status.");
+      appAlert("Comments are required for this status.");
       return;
     }
     setSaving(true);
@@ -1087,7 +1088,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
         return updated;
       }
       const err = await res.json().catch(() => null);
-      alert(err?.error ?? "Failed to update application");
+      appAlert(err?.error ?? "Failed to update application");
       return null;
     } catch (error) {
       console.error("Error updating application:", error);
@@ -1170,7 +1171,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
   async function confirmStatusChange() {
     if (!statusChange) return;
     if (statusChange.status === "INTERVIEW_SCHEDULED" && !statusChange.interviewScheduledAt.trim()) {
-      alert("Interview date and time is required.");
+      appAlert("Interview date and time is required.");
       return;
     }
     const interviewIso =
@@ -1178,7 +1179,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
         ? wallTimeInZoneToIso(statusChange.interviewScheduledAt, statusChange.interviewTimezone)
         : undefined;
     if (statusChange.status === "INTERVIEW_SCHEDULED" && !interviewIso) {
-      alert("Please enter a valid interview date and time.");
+      appAlert("Please enter a valid interview date and time.");
       return;
     }
     if (
@@ -1187,7 +1188,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
         statusChange.status === "CANCELLED") &&
       !statusChange.statusComments.trim()
     ) {
-      alert("Comments are required for this status.");
+      appAlert("Comments are required for this status.");
       return;
     }
     setStatusSaving(true);
@@ -1200,7 +1201,7 @@ export function CareerApplicationsList({ jobPublished, jobListingId }: Props) {
   }
 
   async function deleteApplication(id: string) {
-    if (!confirm("Permanently delete this application?")) return;
+    if (!(await appConfirm("Permanently delete this application?"))) return;
     try {
       const res = await adminFetch(`/api/admin/career-applications/admin/applications/${id}`, {
         method: "DELETE",

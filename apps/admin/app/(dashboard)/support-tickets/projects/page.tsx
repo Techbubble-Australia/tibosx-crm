@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -69,7 +70,7 @@ export default function SupportProjectsPage() {
       setLinkProjectId("");
       load();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to create project");
+      appAlert(err instanceof Error ? err.message : "Failed to create project");
     } finally {
       setSaving(false);
     }
@@ -85,7 +86,7 @@ export default function SupportProjectsPage() {
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to link project");
       load();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to link project");
+      appAlert(err instanceof Error ? err.message : "Failed to link project");
     } finally {
       setSaving(false);
     }

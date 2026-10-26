@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -30,7 +31,7 @@ export function UserPhotoField({ name, email, photoUrl, onChange }: Props) {
       if (!url) throw new Error("Upload failed");
       onChange(url);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Upload failed");
+      appAlert(e instanceof Error ? e.message : "Upload failed");
     } finally {
       setUploading(false);
     }

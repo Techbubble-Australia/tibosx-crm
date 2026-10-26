@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -147,7 +148,7 @@ export default function TeamPage() {
   }, [sortedMembers, page, pageSize]);
 
   async function deleteMember(id: string) {
-    if (!confirm("Delete this team member?")) return;
+    if (!(await appConfirm("Delete this team member?"))) return;
     try {
       const res = await adminFetch(`/api/admin/team/${id}`, { method: "DELETE" });
       if (res.ok) setMembers(members.filter((m) => m.id !== id));

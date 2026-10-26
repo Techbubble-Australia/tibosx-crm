@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -63,7 +64,7 @@ export function AgreementOnboardingGate() {
 
   async function handleSubmit() {
     if (!allSigned) {
-      alert("Please sign every signature field in the agreement.");
+      appAlert("Please sign every signature field in the agreement.");
       return;
     }
     setSaving(true);
@@ -78,7 +79,7 @@ export function AgreementOnboardingGate() {
       await refreshSession();
       window.location.reload();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to sign agreement");
+      appAlert(err instanceof Error ? err.message : "Failed to sign agreement");
     } finally {
       setSaving(false);
     }

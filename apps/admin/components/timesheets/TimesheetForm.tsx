@@ -22,6 +22,8 @@ import { resolveDocumentHref } from "@/lib/media-url";
 import { TIMESHEET_STATUS_LABELS, type TimesheetStatus } from "@/lib/project-types";
 import { formatTimesheetActivityTitle } from "@/lib/timesheet-activity-display";
 import { TimesheetStatusBadge } from "@/lib/timesheet-status-styles";
+import { TimesheetProfileWarningBanner } from "@/components/timesheets/TimesheetProfileWarningBanner";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 import {
   type DailyComments,
   type DailyHours,
@@ -632,7 +634,7 @@ export function TimesheetForm({
       }
       setFileUrls(nextUrls);
     } catch {
-      alert("Failed to upload file");
+      appAlert("Failed to upload file");
     } finally {
       setUploading(false);
     }
@@ -642,16 +644,16 @@ export function TimesheetForm({
     e.preventDefault();
     if (!canSave) return;
     if (!projectId) {
-      alert("Select a project.");
+      appAlert("Select a project.");
       return;
     }
     if (approvers.length && !selectedApprover) {
-      alert("Choose an approver for your timesheet.");
+      appAlert("Choose an approver for your timesheet.");
       return;
     }
     const entryRows = entryRowsForSave;
     if (entryRows.some((line) => sumDailyHours(line.dailyHours) > 0 && !line.caseKey.trim())) {
-      alert("Select a task for each row with hours.");
+      appAlert("Select a task for each row with hours.");
       return;
     }
     const mon = new Date(`${weekMonday}T00:00:00.000Z`);
@@ -698,11 +700,14 @@ export function TimesheetForm({
     return timesheetLinesDirty(lines, defaults);
   }
 
-  function applyWeekChange(nextMonday: string) {
+  async function applyWeekChange(nextMonday: string) {
     const snapped = snapToMondayInput(nextMonday);
     if (snapped === weekMonday) return;
     if (hasUnsavedChanges()) {
-      const ok = window.confirm("Timesheet entries are not saved. Do you want to continue?");
+      const ok = await appConfirm("Timesheet entries are not saved. Do you want to continue?", {
+        title: "Unsaved changes",
+        confirmLabel: "Continue",
+      });
       if (!ok) return;
     }
     setWeekMonday(snapped);
@@ -728,6 +733,7 @@ export function TimesheetForm({
   return (
     <form onSubmit={(e) => void handleSave(e)} className="flex flex-col xl:flex-row xl:items-start">
       <div className="min-w-0 flex-1">
+        <TimesheetProfileWarningBanner />
         {conflictMessage ? (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             {conflictMessage}

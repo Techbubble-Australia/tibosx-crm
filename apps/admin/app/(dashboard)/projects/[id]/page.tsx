@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -44,7 +45,7 @@ export default function EditProjectPage() {
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save project");
       router.push("/projects");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to save project");
+      appAlert(error instanceof Error ? error.message : "Failed to save project");
     } finally {
       setIsSaving(false);
     }

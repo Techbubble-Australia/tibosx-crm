@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -109,11 +110,11 @@ export function MemberProfileCompletionGate() {
     const country = mergeCountryValue(countrySelect, countryOther);
     const bankCountry = mergeCountryValue(bankCountrySelect, bankCountryOther);
     if (!addressLine1.trim() || !city.trim() || !stateRegion.trim() || !postcode.trim() || !country) {
-      alert("Address line 1, city, state, postcode, and country are required.");
+      appAlert("Address line 1, city, state, postcode, and country are required.");
       return;
     }
     if (countrySelect === COUNTRY_OTHER && !countryOther.trim()) {
-      alert("Enter your country name when Other is selected.");
+      appAlert("Enter your country name when Other is selected.");
       return;
     }
     if (
@@ -124,35 +125,35 @@ export function MemberProfileCompletionGate() {
       !bsb.trim() ||
       !taxNumber.trim()
     ) {
-      alert("Complete all required bank details (including tax number and BSB/Routing/IFSC).");
+      appAlert("Complete all required bank details (including tax number and BSB/Routing/IFSC).");
       return;
     }
     if (bankCountrySelect === COUNTRY_OTHER && !bankCountryOther.trim()) {
-      alert("Enter bank country name when Other is selected.");
+      appAlert("Enter bank country name when Other is selected.");
       return;
     }
     if (!filled.length) {
-      alert("Add at least one emergency contact.");
+      appAlert("Add at least one emergency contact.");
       return;
     }
     for (const row of filled) {
       const email = row.email?.trim() ?? "";
       const phone = row.phone?.trim() ?? "";
       if (!email || !phone) {
-        alert("Each emergency contact needs name, email, and phone.");
+        appAlert("Each emergency contact needs name, email, and phone.");
         return;
       }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        alert(`Emergency contact email looks invalid: ${email}`);
+        appAlert(`Emergency contact email looks invalid: ${email}`);
         return;
       }
     }
     if (!idProofUrl || !addressProofUrl) {
-      alert("Upload ID proof and address proof.");
+      appAlert("Upload ID proof and address proof.");
       return;
     }
     if (!privacyAcknowledged) {
-      alert("Please read and acknowledge the Privacy Notice before continuing.");
+      appAlert("Please read and acknowledge the Privacy Notice before continuing.");
       return;
     }
 
@@ -189,7 +190,7 @@ export function MemberProfileCompletionGate() {
       setOpen(false);
       window.location.reload();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to save");
+      appAlert(error instanceof Error ? error.message : "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -338,7 +339,7 @@ export function MemberProfileCompletionGate() {
                 disabled={uploadingProof === "id"}
                 onChange={(e) =>
                   void uploadProof(e.target.files?.[0], "id", setIdProofUrl).catch((err) =>
-                    alert(err instanceof Error ? err.message : "Upload failed"),
+                    appAlert(err instanceof Error ? err.message : "Upload failed"),
                   )
                 }
               />
@@ -353,7 +354,7 @@ export function MemberProfileCompletionGate() {
                 disabled={uploadingProof === "address"}
                 onChange={(e) =>
                   void uploadProof(e.target.files?.[0], "address", setAddressProofUrl).catch((err) =>
-                    alert(err instanceof Error ? err.message : "Upload failed"),
+                    appAlert(err instanceof Error ? err.message : "Upload failed"),
                   )
                 }
               />

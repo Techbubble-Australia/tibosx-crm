@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useCallback, useEffect, useState } from "react";
 import { Trash2, UserPlus } from "lucide-react";
@@ -51,7 +52,7 @@ export function JobApplicationsPanel({
   }, [fetchApplications]);
 
   async function deleteApplication(id: string) {
-    if (!confirm("Delete this application? This cannot be undone.")) return;
+    if (!(await appConfirm("Delete this application? This cannot be undone."))) return;
     setDeletingId(id);
     try {
       const res = await adminFetch(`/api/admin/career-applications/admin/applications/${id}`, {
@@ -61,7 +62,7 @@ export function JobApplicationsPanel({
       setRows((prev) => prev.filter((row) => row.id !== id));
     } catch (error) {
       console.error(error);
-      alert("Failed to delete application.");
+      appAlert("Failed to delete application.");
     } finally {
       setDeletingId(null);
     }

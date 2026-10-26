@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -59,7 +60,7 @@ export default function AgreementPage() {
 
   async function handleSubmit() {
     if (!allSigned) {
-      alert("Please sign every signature field in the agreement.");
+      appAlert("Please sign every signature field in the agreement.");
       return;
     }
     setSaving(true);
@@ -75,7 +76,7 @@ export default function AgreementPage() {
       const refreshData = await refresh.json();
       if (refresh.ok) setAgreement(refreshData.data as AgreementData);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to sign agreement");
+      appAlert(err instanceof Error ? err.message : "Failed to sign agreement");
     } finally {
       setSaving(false);
     }

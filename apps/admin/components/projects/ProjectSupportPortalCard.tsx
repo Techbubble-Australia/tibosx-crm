@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -33,7 +34,7 @@ export function ProjectSupportPortalCard({
       }
       onEnabled();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to enable support portal");
+      appAlert(error instanceof Error ? error.message : "Failed to enable support portal");
     } finally {
       setEnabling(false);
     }

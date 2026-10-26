@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useState } from "react";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
@@ -19,7 +20,7 @@ export function ImpersonationBanner() {
       await refreshSession();
       window.location.href = "/settings/profile";
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not end impersonation");
+      appAlert(e instanceof Error ? e.message : "Could not end impersonation");
     } finally {
       setEnding(false);
     }

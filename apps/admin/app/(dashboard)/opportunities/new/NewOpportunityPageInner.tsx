@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -32,7 +33,7 @@ export default function NewOpportunityPageInner() {
       }
       router.push("/opportunities/active");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to create opportunity");
+      appAlert(err instanceof Error ? err.message : "Failed to create opportunity");
     } finally {
       setIsLoading(false);
     }

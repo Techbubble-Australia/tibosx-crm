@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
@@ -62,18 +63,18 @@ export default function WorkspaceGroupsPage() {
       setMemberIds([]);
       load();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to create group");
+      appAlert(err instanceof Error ? err.message : "Failed to create group");
     } finally {
       setSaving(false);
     }
   }
 
   async function deleteGroup(id: string) {
-    if (!window.confirm("Delete this group?")) return;
+    if (!(await appConfirm("Delete this group?"))) return;
     const res = await adminFetch(`/api/admin/workspace-groups/${id}`, { method: "DELETE" });
     if (!res.ok) {
       const data = await res.json();
-      alert((data as { error?: string }).error || "Failed to delete");
+      appAlert((data as { error?: string }).error || "Failed to delete");
       return;
     }
     load();

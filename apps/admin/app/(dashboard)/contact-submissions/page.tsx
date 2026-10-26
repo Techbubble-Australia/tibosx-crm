@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
@@ -64,7 +65,7 @@ export default function ContactSubmissionsPage() {
   }
 
   async function deleteSubmission(id: string) {
-    if (!confirm("Permanently delete this submission?")) return;
+    if (!(await appConfirm("Permanently delete this submission?"))) return;
     try {
       const res = await adminFetch(`/api/admin/contact-submissions/admin/submissions/${id}`, {
         method: "DELETE",

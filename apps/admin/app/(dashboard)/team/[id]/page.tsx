@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -72,7 +73,7 @@ export default function EditTeamMemberPage() {
       router.push("/team");
     } catch (error) {
       console.error(error);
-      alert("Failed to update team member");
+      appAlert("Failed to update team member");
     } finally {
       setIsLoading(false);
     }

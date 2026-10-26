@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { Loader2, X } from "lucide-react";
@@ -64,11 +65,11 @@ export function RecordOfflineAgreementModal({ userId, open, onClose, onSaved }: 
 
   async function handleSave() {
     if (!templateId) {
-      alert("Select an agreement template.");
+      appAlert("Select an agreement template.");
       return;
     }
     if (!documentUrl) {
-      alert("Upload the signed agreement document.");
+      appAlert("Upload the signed agreement document.");
       return;
     }
     setSaving(true);
@@ -94,7 +95,7 @@ export function RecordOfflineAgreementModal({ userId, open, onClose, onSaved }: 
       onSaved((data.data?.agreementRecords as AgreementRecordRow[]) ?? []);
       onClose();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to save");
+      appAlert(error instanceof Error ? error.message : "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -134,7 +135,7 @@ export function RecordOfflineAgreementModal({ userId, open, onClose, onSaved }: 
               type="file"
               accept=".pdf,image/*"
               disabled={uploading}
-              onChange={(e) => void uploadDocument(e.target.files?.[0]).catch((err) => alert(err instanceof Error ? err.message : "Upload failed"))}
+              onChange={(e) => void uploadDocument(e.target.files?.[0]).catch((err) => appAlert(err instanceof Error ? err.message : "Upload failed"))}
             />
             {uploading ? <p className="mt-1 text-xs text-gray-500">Uploading…</p> : null}
             {documentUrl ? <p className="mt-1 text-xs text-green-600">Document attached</p> : null}

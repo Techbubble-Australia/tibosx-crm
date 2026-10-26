@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -69,7 +70,7 @@ export function AssignTemplateModal({
         if (list.length === 1 && list[0]) setTemplateId(list[0].id);
       } catch (error) {
         console.error(error);
-        alert("Failed to load templates");
+        appAlert("Failed to load templates");
       } finally {
         setLoading(false);
       }
@@ -84,25 +85,25 @@ export function AssignTemplateModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!templateId) {
-      alert("Please select a template.");
+      appAlert("Please select a template.");
       return;
     }
     const template = selectedTemplate;
     if (template?.addStartDate && template.requireStartDate && !startDate) {
-      alert("Start date is required.");
+      appAlert("Start date is required.");
       return;
     }
     if (template?.addEndDate && template.requireEndDate && !endDate) {
-      alert("End date is required.");
+      appAlert("End date is required.");
       return;
     }
     if (startDate && endDate && endDate < startDate) {
-      alert("End date must be on or after start date.");
+      appAlert("End date must be on or after start date.");
       return;
     }
     for (const variable of template?.variables ?? []) {
       if (variable.required && !values[variable.key]?.trim()) {
-        alert(`${variable.label} is required.`);
+        appAlert(`${variable.label} is required.`);
         return;
       }
     }
@@ -127,7 +128,7 @@ export function AssignTemplateModal({
       setDone(true);
       onAssigned();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to assign template");
+      appAlert(error instanceof Error ? error.message : "Failed to assign template");
     } finally {
       setSaving(false);
     }

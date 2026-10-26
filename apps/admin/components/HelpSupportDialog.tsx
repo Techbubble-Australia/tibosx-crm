@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useState } from "react";
 import { Loader2, X } from "lucide-react";
@@ -32,7 +33,7 @@ export function HelpSupportDialog({ open, onClose }: Props) {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!topic.trim() || !message.trim()) {
-      alert("Please complete all required fields.");
+      appAlert("Please complete all required fields.");
       return;
     }
     setSaving(true);
@@ -58,7 +59,7 @@ export function HelpSupportDialog({ open, onClose }: Props) {
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to send");
       setSuccess(true);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to send your message");
+      appAlert(err instanceof Error ? err.message : "Failed to send your message");
     } finally {
       setSaving(false);
     }

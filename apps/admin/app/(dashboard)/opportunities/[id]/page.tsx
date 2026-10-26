@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -66,7 +67,7 @@ export default function EditOpportunityPage() {
       setAvailableJobs((data.data ?? []) as AvailableJob[]);
     } catch (error) {
       console.error(error);
-      alert("Failed to load jobs for linking");
+      appAlert("Failed to load jobs for linking");
     }
   }
 
@@ -88,21 +89,21 @@ export default function EditOpportunityPage() {
       });
       setAvailableJobs((prev) => prev.filter((job) => job.id !== jobId));
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to link job");
+      appAlert(error instanceof Error ? error.message : "Failed to link job");
     } finally {
       setLinkingJobId(null);
     }
   }
 
   async function unlinkJob(jobId: string) {
-    if (!confirm("Unlink this job from the opportunity?")) return;
+    if (!(await appConfirm("Unlink this job from the opportunity?"))) return;
     setUnlinkingJobId(jobId);
     try {
       const res = await adminFetch(`/api/admin/opportunities/${id}/jobs/${jobId}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to unlink job");
       setLinkedJobs((prev) => prev.filter((job) => job.id !== jobId));
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to unlink job");
+      appAlert(error instanceof Error ? error.message : "Failed to unlink job");
     } finally {
       setUnlinkingJobId(null);
     }
@@ -126,7 +127,7 @@ export default function EditOpportunityPage() {
       const inactive = payload.active === false || payload.status === "REJECTED";
       router.push(inactive ? "/opportunities/inactive" : "/opportunities/active");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to update opportunity");
+      appAlert(err instanceof Error ? err.message : "Failed to update opportunity");
     } finally {
       setIsLoading(false);
     }

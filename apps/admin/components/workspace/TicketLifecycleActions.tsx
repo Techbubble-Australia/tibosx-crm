@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { normalizeTicketStatusKey } from "@/lib/support-ticket-labels";
 
@@ -60,19 +61,19 @@ export function TicketLifecycleActions({
 
   if (!visible.length) return null;
 
-  function runAction(action: string) {
+  async function runAction(action: string) {
     if (action === "resolve") {
       const notes = resolutionNotes.trim();
       if (!notes) {
-        alert("Resolution notes are mandatory before the ticket is resolved");
+        appAlert("Resolution notes are mandatory before the ticket is resolved");
         return;
       }
-      if (!window.confirm("Do you want to mark this ticket as resolved?")) return;
+      if (!(await appConfirm("Do you want to mark this ticket as resolved?"))) return;
       void onAction(action, { resolutionNotes: notes });
       return;
     }
     const message = LIFECYCLE_CONFIRM[action];
-    if (message && !window.confirm(message)) return;
+    if (message && !(await appConfirm(message))) return;
     void onAction(action);
   }
 
@@ -83,7 +84,7 @@ export function TicketLifecycleActions({
           key={b.action}
           type="button"
           disabled={disabled}
-          onClick={() => runAction(b.action)}
+          onClick={() => void runAction(b.action)}
           className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50"
         >
           {b.label}

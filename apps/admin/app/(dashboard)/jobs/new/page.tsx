@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -49,7 +50,7 @@ function NewJobPageInner() {
       router.push(published ? "/jobs/active" : "/jobs/inactive");
     } catch (error) {
       console.error(error);
-      alert(error instanceof Error ? error.message : "Failed to create job listing");
+      appAlert(error instanceof Error ? error.message : "Failed to create job listing");
     } finally {
       setIsLoading(false);
     }

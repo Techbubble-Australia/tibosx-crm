@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useState } from "react";
 import { Pencil } from "lucide-react";
@@ -23,7 +24,7 @@ export function TicketEditableSubject({ subject, disabled, onSave }: Props) {
   async function commit() {
     const next = draft.trim();
     if (!next) {
-      alert("Subject is required.");
+      appAlert("Subject is required.");
       return;
     }
     if (next === subject) {

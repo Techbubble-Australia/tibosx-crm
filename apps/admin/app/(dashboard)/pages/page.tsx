@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -76,7 +77,7 @@ export default function SitePagesListPage() {
   }
 
   async function deleteRow(key: string) {
-    if (!confirm(`Delete site content "${key}"? The marketing site may break until you re-seed or recreate this entry.`)) return;
+    if (!(await appConfirm(`Delete site content "${key}"? The marketing site may break until you re-seed or recreate this entry.`))) return;
     try {
       const res = await adminFetch(`/api/admin/site-content/${encodeURIComponent(key)}`, {
         method: "DELETE",
@@ -84,7 +85,7 @@ export default function SitePagesListPage() {
       if (res.ok) setRows((r) => r.filter((x) => x.key !== key));
       else {
         const err = await res.json().catch(() => ({}));
-        alert((err as { error?: string }).error || "Delete failed");
+        appAlert((err as { error?: string }).error || "Delete failed");
       }
     } catch (error) {
       console.error("Error deleting site content:", error);

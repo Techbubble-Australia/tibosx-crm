@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -510,7 +511,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       setShowProfilePicker(false);
       setProfileSearch("");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to add profile");
+      appAlert(error instanceof Error ? error.message : "Failed to add profile");
     } finally {
       setAddingProfile(false);
     }
@@ -518,7 +519,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
 
   async function deleteProfile(contractProfileId: string) {
     if (!defaults.id || !canManageProfiles) return;
-    if (!window.confirm("Remove this profile from the contract?")) return;
+    if (!(await appConfirm("Remove this profile from the contract?"))) return;
     setDeletingProfileId(contractProfileId);
     try {
       const res = await adminFetch(`/api/admin/contracts/${defaults.id}/profiles/${contractProfileId}`, {
@@ -528,7 +529,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to remove profile");
       setProfiles((prev) => prev.filter((row) => row.id !== contractProfileId));
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to remove profile");
+      appAlert(error instanceof Error ? error.message : "Failed to remove profile");
     } finally {
       setDeletingProfileId(null);
     }
@@ -550,7 +551,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save files");
       setFileUrls((data.data as { fileUrls?: string[] }).fileUrls ?? nextUrls);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to save files");
+      appAlert(error instanceof Error ? error.message : "Failed to save files");
     } finally {
       setSavingFiles(false);
     }
@@ -572,7 +573,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       await persistFileUrls(nextUrls);
     } catch (error) {
       console.error(error);
-      alert("Failed to upload file");
+      appAlert("Failed to upload file");
     } finally {
       setUploading(false);
     }
@@ -602,16 +603,16 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   async function saveMilestone() {
     if (!defaults.id || !canAddMilestones) return;
     if (!milestoneDescription.trim()) {
-      alert("Description is required.");
+      appAlert("Description is required.");
       return;
     }
     if (!milestoneDate) {
-      alert("Milestone date is required.");
+      appAlert("Milestone date is required.");
       return;
     }
     const amount = Number.parseFloat(milestoneAmount);
     if (Number.isNaN(amount)) {
-      alert("Amount is required.");
+      appAlert("Amount is required.");
       return;
     }
     setAddingMilestone(true);
@@ -644,7 +645,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       });
       resetMilestoneForm();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to save milestone");
+      appAlert(error instanceof Error ? error.message : "Failed to save milestone");
     } finally {
       setAddingMilestone(false);
     }
@@ -652,7 +653,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
 
   async function deleteMilestone(milestoneId: string) {
     if (!defaults.id || !canAddMilestones) return;
-    if (!window.confirm("Delete this milestone?")) return;
+    if (!(await appConfirm("Delete this milestone?"))) return;
     setDeletingMilestoneId(milestoneId);
     try {
       const res = await adminFetch(`/api/admin/contracts/${defaults.id}/milestones/${milestoneId}`, {
@@ -662,7 +663,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to delete milestone");
       setMilestones((prev) => prev.filter((row) => row.id !== milestoneId));
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to delete milestone");
+      appAlert(error instanceof Error ? error.message : "Failed to delete milestone");
     } finally {
       setDeletingMilestoneId(null);
     }
@@ -681,7 +682,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       if (url) setInvoiceFileUrl(url);
     } catch (error) {
       console.error(error);
-      alert("Failed to upload invoice file");
+      appAlert("Failed to upload invoice file");
     } finally {
       setInvoiceUploading(false);
     }
@@ -717,7 +718,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
         if (saved.contractValue != null) setContractValue(String(saved.contractValue));
       }
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to update end date");
+      appAlert(error instanceof Error ? error.message : "Failed to update end date");
     } finally {
       setSavingEndDate(false);
     }
@@ -736,7 +737,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to create project");
       router.push(`/projects/${(data.data as { id: string }).id}`);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to create project");
+      appAlert(error instanceof Error ? error.message : "Failed to create project");
     } finally {
       setCreatingProjectFor(null);
     }
@@ -773,11 +774,11 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
   async function saveVariation() {
     if (!defaults.id || !canAddVariations) return;
     if (!variationDate) {
-      alert("Variation start date is required.");
+      appAlert("Variation start date is required.");
       return;
     }
     if (type === "T_AND_M" && !variationEndDate) {
-      alert("Variation end date is required for T&M contracts.");
+      appAlert("Variation end date is required for T&M contracts.");
       return;
     }
     const variationDateError = validateVariationDates(
@@ -794,7 +795,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       })),
     );
     if (variationDateError) {
-      alert(variationDateError);
+      appAlert(variationDateError);
       return;
     }
 
@@ -803,15 +804,15 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       const qty = variationQtyTotal;
       const rateVal = Number.parseFloat(variationRate);
       if (!variationWorkUnitMonths.length) {
-        alert("Work units are required for T&M variations.");
+        appAlert("Work units are required for T&M variations.");
         return;
       }
       if (!qty || qty <= 0) {
-        alert("Qty is required for T&M variations.");
+        appAlert("Qty is required for T&M variations.");
         return;
       }
       if (Number.isNaN(rateVal) || rateVal < 0) {
-        alert("Rate is required for T&M variations.");
+        appAlert("Rate is required for T&M variations.");
         return;
       }
       body = {
@@ -825,7 +826,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
     } else {
       const value = Number.parseFloat(variationValue);
       if (Number.isNaN(value)) {
-        alert("Variation value is required.");
+        appAlert("Variation value is required.");
         return;
       }
       body = {
@@ -859,7 +860,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       );
       resetVariationForm();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to save variation");
+      appAlert(error instanceof Error ? error.message : "Failed to save variation");
     } finally {
       setAddingVariation(false);
     }
@@ -867,7 +868,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
 
   async function deleteVariation(variationId: string) {
     if (!defaults.id || !canAddVariations) return;
-    if (!window.confirm("Delete this variation?")) return;
+    if (!(await appConfirm("Delete this variation?"))) return;
     setDeletingVariationId(variationId);
     try {
       const res = await adminFetch(`/api/admin/contracts/${defaults.id}/variations/${variationId}`, {
@@ -877,7 +878,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to delete variation");
       setVariations((prev) => prev.filter((row) => row.id !== variationId));
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to delete variation");
+      appAlert(error instanceof Error ? error.message : "Failed to delete variation");
     } finally {
       setDeletingVariationId(null);
     }
@@ -923,23 +924,23 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
     const rateVal = Number.parseFloat(invoiceRate);
     const taxRate = Number.parseFloat(invoiceTaxRate);
     if (!invoiceIssueDate || !invoiceDueDate) {
-      alert("Issue date and due date are required.");
+      appAlert("Issue date and due date are required.");
       return;
     }
     if (!invoiceDescription.trim()) {
-      alert("Description is required.");
+      appAlert("Description is required.");
       return;
     }
     if (!qty || qty <= 0) {
-      alert("Qty is required.");
+      appAlert("Qty is required.");
       return;
     }
     if (Number.isNaN(rateVal) || rateVal < 0) {
-      alert("Rate is required.");
+      appAlert("Rate is required.");
       return;
     }
     if (Number.isNaN(taxRate) || taxRate < 0) {
-      alert("Tax rate is required.");
+      appAlert("Tax rate is required.");
       return;
     }
     setAddingInvoice(true);
@@ -984,7 +985,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       });
       resetInvoiceForm();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to save invoice");
+      appAlert(error instanceof Error ? error.message : "Failed to save invoice");
     } finally {
       setAddingInvoice(false);
     }
@@ -992,7 +993,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
 
   async function deleteInvoice(invoiceId: string) {
     if (!defaults.id || !canAddInvoices) return;
-    if (!window.confirm("Delete this invoice?")) return;
+    if (!(await appConfirm("Delete this invoice?"))) return;
     setDeletingInvoiceId(invoiceId);
     try {
       const res = await adminFetch(`/api/admin/contracts/${defaults.id}/invoices/${invoiceId}`, {
@@ -1006,7 +1007,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
         return next;
       });
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to delete invoice");
+      appAlert(error instanceof Error ? error.message : "Failed to delete invoice");
     } finally {
       setDeletingInvoiceId(null);
     }
@@ -1030,7 +1031,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
         return next;
       });
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to update invoice status");
+      appAlert(error instanceof Error ? error.message : "Failed to update invoice status");
     } finally {
       setUpdatingInvoiceId(null);
     }
@@ -1042,25 +1043,25 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
 
     if (type === "T_AND_M") {
       if (!unit) {
-        alert("Unit is required for T&M contracts.");
+        appAlert("Unit is required for T&M contracts.");
         return;
       }
       if (!endDate) {
-        alert("End date is required for T&M contracts.");
+        appAlert("End date is required for T&M contracts.");
         return;
       }
       if (!workUnitMonths.length) {
-        alert("Work units are required for T&M contracts.");
+        appAlert("Work units are required for T&M contracts.");
         return;
       }
       const units = sumWorkUnits(workUnitMonths);
       if (!units || units <= 0) {
-        alert("No. of units is required for T&M contracts.");
+        appAlert("No. of units is required for T&M contracts.");
         return;
       }
       const rateValue = Number.parseFloat(rate);
       if (Number.isNaN(rateValue) || rateValue < 0) {
-        alert("Rate is required for T&M contracts.");
+        appAlert("Rate is required for T&M contracts.");
         return;
       }
     }
@@ -1068,7 +1069,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
     if (type === "FIXED_PRICE") {
       const value = Number.parseFloat(contractValue);
       if (Number.isNaN(value) || value < 0) {
-        alert("Contract value is required for fixed price contracts.");
+        appAlert("Contract value is required for fixed price contracts.");
         return;
       }
     }
@@ -1076,7 +1077,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
     const contractDateError = validateContractDates(startDate, endDate || null);
     if (contractDateError) {
       setEndDateError(contractDateError);
-      alert(contractDateError);
+      appAlert(contractDateError);
       return;
     }
     setEndDateError(null);

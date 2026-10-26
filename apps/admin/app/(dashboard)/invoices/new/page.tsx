@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -57,15 +58,15 @@ export default function NewInvoicePage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!contractId) {
-      alert("Please select a contract.");
+      appAlert("Please select a contract.");
       return;
     }
     if (!dueDate) {
-      alert("Due date is required.");
+      appAlert("Due date is required.");
       return;
     }
     if (!description.trim()) {
-      alert("Description is required.");
+      appAlert("Description is required.");
       return;
     }
     setSaving(true);
@@ -89,7 +90,7 @@ export default function NewInvoicePage() {
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to create invoice");
       router.push("/invoices");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to create invoice");
+      appAlert(error instanceof Error ? error.message : "Failed to create invoice");
     } finally {
       setSaving(false);
     }

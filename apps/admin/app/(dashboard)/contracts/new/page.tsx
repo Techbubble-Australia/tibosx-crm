@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -53,7 +54,7 @@ function NewContractPageInner() {
           },
         });
       } catch (error) {
-        alert(error instanceof Error ? error.message : "Failed to load application");
+        appAlert(error instanceof Error ? error.message : "Failed to load application");
       } finally {
         setLoadingPrefill(false);
       }
@@ -76,7 +77,7 @@ function NewContractPageInner() {
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to create contract");
       router.push(`/contracts/${(data.data as { id: string }).id}`);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to create contract");
+      appAlert(error instanceof Error ? error.message : "Failed to create contract");
     } finally {
       setIsSaving(false);
     }

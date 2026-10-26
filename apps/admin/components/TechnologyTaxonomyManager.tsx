@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import { adminFetch } from "@/lib/admin-api";
@@ -92,7 +93,7 @@ export function TechnologyTaxonomyManager() {
       setNewName("");
       await load();
     } catch {
-      alert("Failed to add technology");
+      appAlert("Failed to add technology");
     } finally {
       setSaving(false);
     }
@@ -112,7 +113,7 @@ export function TechnologyTaxonomyManager() {
       setEditingId(null);
       await load();
     } catch {
-      alert("Failed to update technology");
+      appAlert("Failed to update technology");
     } finally {
       setSaving(false);
     }
@@ -120,9 +121,9 @@ export function TechnologyTaxonomyManager() {
 
   async function removeItem(id: string, name: string) {
     if (
-      !confirm(
+      !(await appConfirm(
         `Delete "${name}"? Existing job listings using this value will keep the text but it won't appear in dropdowns.`,
-      )
+      ))
     ) {
       return;
     }
@@ -131,7 +132,7 @@ export function TechnologyTaxonomyManager() {
       if (!res.ok) throw new Error("Failed");
       await load();
     } catch {
-      alert("Failed to delete technology");
+      appAlert("Failed to delete technology");
     }
   }
 

@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -57,7 +58,7 @@ export function AddProjectMemberModal({ projectId, onClose, onAdded }: Props) {
       onAdded();
       onClose();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to add member");
+      appAlert(err instanceof Error ? err.message : "Failed to add member");
     } finally {
       setSaving(false);
     }

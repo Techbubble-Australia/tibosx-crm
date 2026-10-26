@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -72,7 +73,7 @@ export default function NewSitePageDocumentPage() {
       router.push("/pages");
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : "Save failed");
+      appAlert(err instanceof Error ? err.message : "Save failed");
     } finally {
       setIsLoading(false);
     }

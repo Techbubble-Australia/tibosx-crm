@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -45,7 +46,7 @@ export default function NewTeamMemberPage() {
       router.push("/team");
     } catch (error) {
       console.error(error);
-      alert("Failed to create team member");
+      appAlert("Failed to create team member");
     } finally {
       setIsLoading(false);
     }

@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -59,7 +60,7 @@ export default function TestimonialsPage() {
   }
 
   async function deleteTestimonial(id: string) {
-    if (!confirm("Delete this testimonial?")) return;
+    if (!(await appConfirm("Delete this testimonial?"))) return;
     try {
       const res = await adminFetch(`/api/admin/testimonials/${id}`, { method: "DELETE" });
       if (res.ok) setTestimonials(testimonials.filter((t) => t.id !== id));

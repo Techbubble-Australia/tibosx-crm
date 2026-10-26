@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -250,7 +251,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
 
   async function removeMember(memberId: string) {
     if (!defaults.id) return;
-    if (!confirm("Remove this member from the project?")) return;
+    if (!(await appConfirm("Remove this member from the project?"))) return;
     try {
       const res = await adminFetch(`/api/admin/projects/${defaults.id}/members/${memberId}`, {
         method: "DELETE",
@@ -260,7 +261,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
       setMembers((prev) => prev.filter((m) => m.id !== memberId));
       onMembersRefresh?.();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to remove member");
+      appAlert(err instanceof Error ? err.message : "Failed to remove member");
     }
   }
 
@@ -279,7 +280,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
       }
       setFileUrls(nextUrls);
     } catch {
-      alert("Failed to upload file");
+      appAlert("Failed to upload file");
     } finally {
       setUploading(false);
     }
@@ -288,7 +289,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (forCustomerSupport && !supportClientContacts.some((c) => c.portalAccess)) {
-      alert("Select at least one client contact when Customer Support is enabled.");
+      appAlert("Select at least one client contact when Customer Support is enabled.");
       return;
     }
     await onSubmit({

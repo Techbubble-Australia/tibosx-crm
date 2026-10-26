@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { ImagePlus, Info, Loader2, Plus, Trash2, Upload } from "lucide-react";
@@ -66,14 +67,14 @@ export function AdminBannerImagesField({ formKey, initialUrls }: Props) {
           json && typeof json === "object" && "error" in json
             ? String((json as { error?: unknown }).error)
             : "";
-        alert(err || "Upload failed");
+        appAlert(err || "Upload failed");
         return;
       }
       const next = readUploadImageUrlFromJson(json);
       if (next) setAt(index, next);
     } catch (err) {
       console.error(err);
-      alert("Upload failed");
+      appAlert("Upload failed");
     } finally {
       setUploadingIndex(null);
       e.target.value = "";

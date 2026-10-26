@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -63,7 +64,7 @@ export default function NewClientPage() {
       }
       router.push(clientListPathForStatus(status));
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to create client");
+      appAlert(err instanceof Error ? err.message : "Failed to create client");
     } finally {
       setIsLoading(false);
     }

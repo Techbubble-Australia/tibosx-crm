@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -283,7 +284,7 @@ export function ContractsListPage({ activeFilter }: Props) {
   }
 
   async function deleteRow(id: string) {
-    if (!confirm("Delete this contract?")) return;
+    if (!(await appConfirm("Delete this contract?"))) return;
     try {
       const res = await adminFetch(`/api/admin/contracts/${id}`, { method: "DELETE" });
       if (res.ok) setRows((prev) => prev.filter((row) => row.id !== id));

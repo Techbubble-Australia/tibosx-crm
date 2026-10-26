@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
@@ -99,8 +100,8 @@ function TabHeroStatsLogos({
     });
   };
 
-  const removeGovLogo = (i: number) => {
-    if (!window.confirm("Remove this logo from the government supplier strip?")) return;
+  const removeGovLogo = async (i: number) => {
+    if (!(await appConfirm("Remove this logo from the government supplier strip?"))) return;
     onChange({
       ...v,
       governmentSupplierLogos: govLogos.filter((_: HomeAny, j: number) => j !== i),
@@ -125,9 +126,9 @@ function TabHeroStatsLogos({
     onChange({ ...v, trustedLogos });
   };
 
-  const removeTrustedLogo = (i: number) => {
+  const removeTrustedLogo = async (i: number) => {
     if (v.trustedLogos.length <= 1) return;
-    if (!window.confirm("Remove this logo from the homepage strip?")) return;
+    if (!(await appConfirm("Remove this logo from the homepage strip?"))) return;
     const trustedLogos = v.trustedLogos.filter((_: HomeAny, j: number) => j !== i);
     onChange({ ...v, trustedLogos });
   };
@@ -490,9 +491,9 @@ function TabEngagementHow({
     ]);
   };
 
-  const removeModel = (i: number) => {
+  const removeModel = async (i: number) => {
     if (models.length <= 1) return;
-    if (!window.confirm("Remove this service option from the homepage?")) return;
+    if (!(await appConfirm("Remove this service option from the homepage?"))) return;
     setModels(models.filter((_: HomeAny, j: number) => j !== i));
   };
 

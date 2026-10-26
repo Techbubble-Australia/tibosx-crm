@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { Loader2, Search, X } from "lucide-react";
@@ -51,7 +52,7 @@ export function ImpersonateUserModal({ open, onClose }: { open: boolean; onClose
       const additional = Array.isArray(user?.additionalRoles) ? user.additionalRoles : [];
       window.location.href = defaultLandingPath(role, additional);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to impersonate");
+      appAlert(e instanceof Error ? e.message : "Failed to impersonate");
     } finally {
       setStarting(null);
     }

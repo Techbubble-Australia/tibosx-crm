@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -90,13 +91,13 @@ export function CaseStudyForm({
           typeof err === "object" && err && "details" in err
             ? JSON.stringify((err as { details?: unknown }).details)
             : (err as { error?: string }).error;
-        alert(msg || "Save failed");
+        appAlert(msg || "Save failed");
         return;
       }
       router.push("/case-studies");
     } catch (err) {
       console.error(err);
-      alert("Save failed");
+      appAlert("Save failed");
     } finally {
       setIsLoading(false);
     }

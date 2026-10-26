@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useParams, usePathname, useSearchParams, useRouter } from "next/navigation";
@@ -64,7 +65,7 @@ function EditJobPageInner() {
       router.push(listHref);
     } catch (error) {
       console.error(error);
-      alert("Failed to update job listing");
+      appAlert("Failed to update job listing");
     } finally {
       setIsLoading(false);
     }
@@ -86,7 +87,7 @@ function EditJobPageInner() {
       }
     } catch (error) {
       console.error(error);
-      alert(error instanceof Error ? error.message : "Failed to copy job listing");
+      appAlert(error instanceof Error ? error.message : "Failed to copy job listing");
     } finally {
       setIsCopying(false);
     }

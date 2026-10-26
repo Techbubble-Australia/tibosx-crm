@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -78,14 +79,14 @@ export default function NewTimesheetPage() {
           router.push(`/timesheets/${existingId}`);
           return;
         }
-        alert("A timesheet already exists for this project and week.");
+        appAlert("A timesheet already exists for this project and week.");
         return;
       }
       if (!res.ok) throw new Error(messageFromApiError(data, "Failed to create timesheet"));
       const created = data.data as { id: string };
       router.push(`/timesheets/${created.id}`);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to create timesheet");
+      appAlert(error instanceof Error ? error.message : "Failed to create timesheet");
     } finally {
       setIsSaving(false);
     }

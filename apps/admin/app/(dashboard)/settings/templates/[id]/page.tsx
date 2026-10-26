@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -34,7 +35,7 @@ export default function EditCredentialTemplatePage() {
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save template");
       router.push("/settings/templates");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to save template");
+      appAlert(error instanceof Error ? error.message : "Failed to save template");
     } finally {
       setIsSaving(false);
     }

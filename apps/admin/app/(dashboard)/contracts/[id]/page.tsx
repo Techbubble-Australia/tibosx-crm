@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -37,11 +38,11 @@ function MoveToDraftDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!reason) {
-      alert("Please select a reason.");
+      appAlert("Please select a reason.");
       return;
     }
     if (reason === "OTHER" && !otherReason.trim()) {
-      alert("Please enter the other reason.");
+      appAlert("Please enter the other reason.");
       return;
     }
     setSaving(true);
@@ -60,7 +61,7 @@ function MoveToDraftDialog({
       }
       onMoved(data.data as ContractDetail);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to move contract to draft");
+      appAlert(error instanceof Error ? error.message : "Failed to move contract to draft");
     } finally {
       setSaving(false);
     }
@@ -169,7 +170,7 @@ export default function EditContractPage() {
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to update contract");
       setDefaults(data.data as ContractDetail);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to update contract");
+      appAlert(error instanceof Error ? error.message : "Failed to update contract");
     } finally {
       setIsSaving(false);
     }
@@ -183,14 +184,14 @@ export default function EditContractPage() {
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to activate contract");
       setDefaults(data.data as ContractDetail);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to activate contract");
+      appAlert(error instanceof Error ? error.message : "Failed to activate contract");
     } finally {
       setActionLoading(false);
     }
   }
 
   async function handleTerminate() {
-    if (!confirm("Terminate this contract?")) return;
+    if (!(await appConfirm("Terminate this contract?"))) return;
     setActionLoading(true);
     try {
       const res = await adminFetch(`/api/admin/contracts/${id}/terminate`, { method: "POST" });
@@ -198,7 +199,7 @@ export default function EditContractPage() {
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to terminate contract");
       setDefaults(data.data as ContractDetail);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to terminate contract");
+      appAlert(error instanceof Error ? error.message : "Failed to terminate contract");
     } finally {
       setActionLoading(false);
     }

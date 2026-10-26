@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -125,7 +126,7 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
 
   async function approve(id: string) {
     if (
-      !window.confirm("You're about to approve this timesheet. Do you want to continue?")
+      !(await appConfirm("You're about to approve this timesheet. Do you want to continue?"))
     ) {
       return;
     }
@@ -136,7 +137,7 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
       if (!res.ok) throw new Error(messageFromApiError(data, "Failed to approve"));
       load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to approve");
+      appAlert(e instanceof Error ? e.message : "Failed to approve");
     } finally {
       setActingId(null);
     }
@@ -155,7 +156,7 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
       setRejectId(null);
       load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to reject");
+      appAlert(e instanceof Error ? e.message : "Failed to reject");
     } finally {
       setActingId(null);
     }

@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -66,9 +67,9 @@ export default function EditCustomerUserPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(messageFromApiError(data, "Failed to save"));
-      alert("Customer user saved.");
+      appAlert("Customer user saved.");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to save");
+      appAlert(error instanceof Error ? error.message : "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -153,12 +154,12 @@ export default function EditCustomerUserPage() {
                   const res = await adminFetch(`/api/admin/customer-users/${id}/invite`, { method: "POST" });
                   const data = await res.json();
                   if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to send invite");
-                  alert(
+                  appAlert(
                     (data as { message?: string }).message ||
                       "Invite email sent with a new temporary password.",
                   );
                 } catch (error) {
-                  alert(error instanceof Error ? error.message : "Failed to send invite");
+                  appAlert(error instanceof Error ? error.message : "Failed to send invite");
                 } finally {
                   setInviteLoading(false);
                 }

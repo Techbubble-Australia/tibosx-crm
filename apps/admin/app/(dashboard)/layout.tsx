@@ -44,6 +44,7 @@ import { MfaEnrollmentGuard } from "@/components/MfaEnrollmentGuard";
 import { MemberOnboardingGuard } from "@/components/MemberOnboardingGuard";
 import { AgreementOnboardingGate } from "@/components/onboarding/AgreementOnboardingGate";
 import { MemberProfileCompletionGate } from "@/components/onboarding/MemberProfileCompletionGate";
+import { AppAlertProvider } from "@/components/ui/AppAlertProvider";
 import { TechBubbleLogo } from "@/components/TechBubbleLogo";
 import { InactivityLogout } from "@/components/InactivityLogout";
 import { TicketPortalLink } from "@/components/TicketPortalLink";
@@ -517,14 +518,16 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <AdminSessionProvider>
-      <MfaEnrollmentGuard>
-        <MemberOnboardingGuard>
-          <AgreementOnboardingGate />
-          <MemberProfileCompletionGate />
-          <InactivityLogout />
-          <DashboardChrome>{children}</DashboardChrome>
-        </MemberOnboardingGuard>
-      </MfaEnrollmentGuard>
+      <AppAlertProvider>
+        <MfaEnrollmentGuard>
+          <MemberOnboardingGuard>
+            <AgreementOnboardingGate />
+            <MemberProfileCompletionGate />
+            <InactivityLogout />
+            <DashboardChrome>{children}</DashboardChrome>
+          </MemberOnboardingGuard>
+        </MfaEnrollmentGuard>
+      </AppAlertProvider>
     </AdminSessionProvider>
   );
 }

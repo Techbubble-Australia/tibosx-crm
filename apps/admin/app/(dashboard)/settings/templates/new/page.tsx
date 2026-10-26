@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -24,7 +25,7 @@ export default function NewCredentialTemplatePage() {
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to create template");
       router.push("/settings/templates");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to create template");
+      appAlert(error instanceof Error ? error.message : "Failed to create template");
     } finally {
       setIsSaving(false);
     }
