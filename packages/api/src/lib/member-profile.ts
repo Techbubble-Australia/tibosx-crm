@@ -63,18 +63,37 @@ export function addressComplete(user: {
   );
 }
 
-export function emergencyContactsComplete(value: unknown): boolean {
-  if (!Array.isArray(value) || !value.length) return false;
-  return value.every((row) => {
-    if (!row || typeof row !== "object") return false;
-    const contact = row as Record<string, unknown>;
-    return (
-      typeof contact.name === "string" &&
+function emergencyContactRowComplete(row: unknown): boolean {
+  if (!row || typeof row !== "object") return false;
+  const contact = row as Record<string, unknown>;
+  return Boolean(
+    typeof contact.name === "string" &&
       contact.name.trim() &&
       typeof contact.email === "string" &&
       contact.email.trim() &&
       typeof contact.phone === "string" &&
-      contact.phone.trim()
-    );
-  });
+      contact.phone.trim(),
+  );
+}
+
+export function emergencyContactsComplete(value: unknown): boolean {
+  if (!Array.isArray(value) || !value.length) return false;
+  return value.some(emergencyContactRowComplete);
+}
+
+/** Project member / internal user profile KYC: bank, address, and at least one emergency contact. */
+export function memberProfileDetailsComplete(user: {
+  addressLine1?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postcode?: string | null;
+  country?: string | null;
+  bankDetails?: unknown;
+  emergencyContacts?: unknown;
+}): boolean {
+  return (
+    addressComplete(user) &&
+    bankDetailsComplete(user.bankDetails) &&
+    emergencyContactsComplete(user.emergencyContacts)
+  );
 }
