@@ -300,6 +300,20 @@ function mapDetailWithActions(
 
 const TERMINAL_TICKET_STATUSES = ["RESOLVED", "CLOSED", "CANCELLED"] as const;
 
+const TICKET_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Draft",
+  OPEN: "Open",
+  IN_PROGRESS: "In progress",
+  PENDING_CLIENT: "Awaiting client info",
+  RESOLVED: "Resolved",
+  CLOSED: "Closed",
+  CANCELLED: "Cancelled",
+};
+
+function formatTicketStatusLabel(status: string): string {
+  return TICKET_STATUS_LABELS[status] ?? status.replace(/_/g, " ").toLowerCase();
+}
+
 function ticketEligibleForTimesheetWeek(
   ticket: { status: string; closedAt: Date | null; updatedAt: Date },
   weekStartIso: string | null | undefined,
@@ -596,7 +610,8 @@ router.get("/project-cases", async (req: AuthRequest, res) => {
     const ticketOptions = tickets.map((row) => ({
       kind: "ticket" as const,
       id: row.id,
-      label: `${row.ticketNumber} — ${row.subject}`,
+      status: row.status,
+      label: `${row.ticketNumber} — ${row.subject} (${formatTicketStatusLabel(row.status)})`,
     }));
 
     if (membership.project.kind === "SUPPORT") {
