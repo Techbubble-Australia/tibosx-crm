@@ -259,7 +259,7 @@ router.get("/assignees", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
   const staffTbosRole = (user.tbosRole ?? "").toLowerCase();
   const mayListAssignees =
-    (user.role === "CONSULTANT" && (user.consultantVerified || Boolean(user.tbosAdminUserId))) ||
+    user.role === "CONSULTANT" ||
     staffTbosRole === "customer_support" ||
     staffTbosRole === "admin" ||
     staffTbosRole === "project_manager" ||

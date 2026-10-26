@@ -8,6 +8,7 @@ import {
   isProjectManagerRole,
 } from "../lib/project-access";
 import { canActAsTimesheetApprover } from "../lib/timesheet-approver";
+import { timesheetClientApproverWhere } from "../lib/timesheet-access";
 import { effectiveRolesForUser, hasEffectiveRole } from "../lib/admin-roles";
 import { getMemberOnboardingStatus } from "../lib/member-onboarding";
 import { notifyAsync } from "../lib/notifications";
@@ -275,16 +276,38 @@ function mapDetail(row: NonNullable<Awaited<ReturnType<typeof fetchTimesheet>>>)
   });
 }
 
-function mapDetailWithActions(
+async function clientContactCanActOnTimesheet(
+  actorId: string,
+  timesheet: { approverKind: string | null; projectClientContactId: string | null },
+): Promise<boolean> {
+  if (timesheet.approverKind !== "CLIENT_CONTACT" || !timesheet.projectClientContactId) return false;
+  const clientApprover = await timesheetClientApproverWhere(actorId);
+  const ids = clientApprover?.projectClientContactId.in ?? [];
+  return ids.includes(timesheet.projectClientContactId);
+}
+
+async function mapDetailWithActions(
   row: NonNullable<Awaited<ReturnType<typeof fetchTimesheet>>>,
   actorId: string,
   role: string,
 ) {
-  const canApprove =
+  const roles = await effectiveRolesForUser(actorId, role);
+  let canApprove =
     row.status === "SUBMITTED" &&
     row.approverKind !== "CLIENT_CONTACT" &&
     ((row.project && canActAsTimesheetApprover(actorId, role, row.project)) ||
       row.opportunity?.ownerId === actorId);
+  if (
+    !canApprove &&
+    row.status === "SUBMITTED" &&
+    row.approverKind === "CLIENT_CONTACT" &&
+    row.projectClientContactId &&
+    roles.includes("client")
+  ) {
+    const clientApprover = await timesheetClientApproverWhere(actorId);
+    const ids = clientApprover?.projectClientContactId.in ?? [];
+    canApprove = ids.includes(row.projectClientContactId);
+  }
   const canSubmit = row.memberUserId === actorId && row.status === "DRAFT";
   const canDelete =
     (canManageAllTimesheets(role) &&
@@ -376,6 +399,8 @@ async function timesheetAccessWhere(req: AuthRequest): Promise<Prisma.TimesheetW
   }
   if (roles.includes("client")) {
     or.push({ project: { timesheetApproverUserId: actorId } });
+    const clientApprover = await timesheetClientApproverWhere(actorId);
+    if (clientApprover) or.push(clientApprover);
   }
   return { OR: or };
 }
@@ -1098,7 +1123,7 @@ router.get("/:id", async (req: AuthRequest, res) => {
     const actorId = getActorId(req);
     const hydrated = await hydrateTimesheetApproverRow(row);
     res.json({
-      data: mapDetailWithActions(hydrated, actorId, role),
+      data: await mapDetailWithActions(hydrated, actorId, role),
     });
   } catch (error) {
     console.error("Error fetching timesheet:", error);
@@ -1310,7 +1335,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
 
     const detail = await fetchTimesheet(row.id);
     const warnings = await memberTimesheetProfileWarnings(actorId, roles, req.user?.impersonatorId);
-    res.json({ data: detail ? mapDetailWithActions(detail, actorId, role) : null, warnings });
+    res.json({ data: detail ? await mapDetailWithActions(detail, actorId, role) : null, warnings });
   } catch (error) {
     if (error instanceof Error && error.message === "AGREEMENT_REQUIRED") {
       return res.status(403).json({ error: "Sign your agreement before editing timesheets" });
@@ -1513,14 +1538,18 @@ router.post("/:id/approve", async (req: AuthRequest, res) => {
     const canApproveProject =
       existing.project && canActAsTimesheetApprover(actorId, role, existing.project);
     const ownsOpportunity = existing.opportunity?.ownerId === actorId;
-    if (!canApproveProject && !ownsOpportunity) {
+    const canApproveAsClient = await clientContactCanActOnTimesheet(actorId, existing);
+    if (!canApproveProject && !ownsOpportunity && !canApproveAsClient) {
       return res.status(403).json({ error: "Forbidden" });
     }
     if (existing.status !== "SUBMITTED") {
       return res.status(400).json({ error: "Only submitted timesheets can be approved" });
     }
-    if (existing.approverKind === "CLIENT_CONTACT") {
-      return res.status(400).json({ error: "This timesheet must be approved by the selected client contact in the support portal" });
+    if (existing.approverKind === "CLIENT_CONTACT" && !canApproveAsClient) {
+      return res.status(403).json({ error: "This timesheet must be approved by the selected client contact" });
+    }
+    if (existing.approverKind !== "CLIENT_CONTACT" && !canApproveProject && !ownsOpportunity) {
+      return res.status(403).json({ error: "Forbidden" });
     }
 
     await prisma.$transaction(async (tx) => {
@@ -1563,14 +1592,18 @@ router.post("/:id/reject", async (req: AuthRequest, res) => {
     const canRejectProject =
       existing.project && canActAsTimesheetApprover(actorId, role, existing.project);
     const ownsOpportunity = existing.opportunity?.ownerId === actorId;
-    if (!canRejectProject && !ownsOpportunity) {
+    const canRejectAsClient = await clientContactCanActOnTimesheet(actorId, existing);
+    if (!canRejectProject && !ownsOpportunity && !canRejectAsClient) {
       return res.status(403).json({ error: "Forbidden" });
     }
     if (existing.status !== "SUBMITTED") {
       return res.status(400).json({ error: "Only submitted timesheets can be rejected" });
     }
-    if (existing.approverKind === "CLIENT_CONTACT") {
-      return res.status(400).json({ error: "This timesheet must be rejected by the selected client contact in the support portal" });
+    if (existing.approverKind === "CLIENT_CONTACT" && !canRejectAsClient) {
+      return res.status(403).json({ error: "This timesheet must be rejected by the selected client contact" });
+    }
+    if (existing.approverKind !== "CLIENT_CONTACT" && !canRejectProject && !ownsOpportunity) {
+      return res.status(403).json({ error: "Forbidden" });
     }
 
     const trimmed = reason.trim();

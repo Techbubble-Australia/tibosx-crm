@@ -2,7 +2,10 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { prisma } from "@techbubble/database";
 import { authMiddleware, type TicketingRequest } from "../middleware/auth.js";
-import { resolveClientTimesheetProjectIds } from "../lib/client-timesheet-projects.js";
+import {
+  ensureClientApproverContactLinks,
+  resolveClientTimesheetProjectIds,
+} from "../lib/client-timesheet-projects.js";
 import { formatZodError } from "../../lib/zod-error.js";
 import { notifyAsync } from "../../lib/notifications";
 import { fetchTimesheet, mapDetail } from "../../routes/timesheets.js";
@@ -84,10 +87,7 @@ router.get("/recent-submitted", async (req: TicketingRequest, res) => {
       ],
     } as typeof where;
   } else if (user.role === "CLIENT") {
-    const links = await prisma.projectClientContact.findMany({
-      where: { ticketingUserId: user.id, canApproveTimesheets: true },
-      select: { id: true },
-    });
+    const links = await ensureClientApproverContactLinks(user.id, user.email);
     const linkIds = links.map((l) => l.id);
     if (!linkIds.length) return res.json({ data: [] });
     where = {
@@ -171,10 +171,7 @@ router.get("/pending-approval", async (req: TicketingRequest, res) => {
     return res.json({ data: [] });
   }
 
-  const links = await prisma.projectClientContact.findMany({
-    where: { ticketingUserId: user.id, canApproveTimesheets: true },
-    select: { id: true },
-  });
+  const links = await ensureClientApproverContactLinks(user.id, user.email);
   const linkIds = links.map((l) => l.id);
   if (!linkIds.length) return res.json({ data: [] });
 
@@ -215,10 +212,7 @@ router.get("/:id", async (req: TicketingRequest, res) => {
   const user = req.ticketingUser!;
   if (user.role !== "CLIENT") return res.status(403).json({ error: "Forbidden" });
 
-  const links = await prisma.projectClientContact.findMany({
-    where: { ticketingUserId: user.id, canApproveTimesheets: true },
-    select: { id: true },
-  });
+  const links = await ensureClientApproverContactLinks(user.id, user.email);
   const linkIds = links.map((row) => row.id);
   if (!linkIds.length) return res.status(403).json({ error: "Forbidden" });
 

@@ -1,4 +1,41 @@
 import { prisma } from "@techbubble/database";
+import { ensureSupportOrganizationForProject } from "../../lib/support-organization.js";
+import { provisionClientPortalUser } from "../../lib/support-project.js";
+
+/** Link approver-only client contacts to this ticketing user by email when missing. */
+export async function ensureClientApproverContactLinks(
+  ticketingUserId: string,
+  email: string,
+): Promise<Array<{ id: string }>> {
+  const linked = await prisma.projectClientContact.findMany({
+    where: { ticketingUserId, canApproveTimesheets: true },
+    select: { id: true },
+  });
+  if (linked.length) return linked;
+
+  const emailLower = email.trim().toLowerCase();
+  const pending = await prisma.projectClientContact.findMany({
+    where: {
+      canApproveTimesheets: true,
+      contact: { email: { equals: emailLower, mode: "insensitive" } },
+    },
+    include: {
+      project: { select: { id: true, supportOrganization: { select: { id: true } } } },
+    },
+  });
+
+  for (const row of pending) {
+    const orgId =
+      row.project.supportOrganization?.id ??
+      (await ensureSupportOrganizationForProject(row.project.id)).id;
+    await provisionClientPortalUser(row.id, orgId);
+  }
+
+  return prisma.projectClientContact.findMany({
+    where: { ticketingUserId, canApproveTimesheets: true },
+    select: { id: true },
+  });
+}
 
 /** Project IDs a portal client can view timesheets for (org link + project client contacts). */
 export async function resolveClientTimesheetProjectIds(

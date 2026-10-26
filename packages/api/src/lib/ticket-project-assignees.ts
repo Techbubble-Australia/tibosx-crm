@@ -34,27 +34,28 @@ function isEligibleAssignee(tu: {
   );
 }
 
-/** When support group is empty, seed it from all project members with TBOS accounts. */
+/** Keep support group in sync with project members who have TBOS accounts. */
 async function ensureSupportGroupHasProjectMembers(projectId: string) {
   const group = await ensureProjectSupportGroup(projectId);
-  const existing = await prisma.projectSupportGroupMember.count({ where: { groupId: group.id } });
-  if (existing > 0) return;
-
   const members = await prisma.projectMember.findMany({
     where: { projectId, adminUserId: { not: null } },
     select: { id: true, adminUserId: true },
   });
   for (const member of members) {
     if (!member.adminUserId) continue;
-    await prisma.projectSupportGroupMember.upsert({
-      where: { projectMemberId: member.id },
-      create: {
-        groupId: group.id,
-        projectMemberId: member.id,
-        adminUserId: member.adminUserId,
-      },
-      update: { groupId: group.id, adminUserId: member.adminUserId },
-    });
+    try {
+      await provisionSupportMemberConsultant(projectId, member.adminUserId, member.id);
+    } catch {
+      await prisma.projectSupportGroupMember.upsert({
+        where: { projectMemberId: member.id },
+        create: {
+          groupId: group.id,
+          projectMemberId: member.id,
+          adminUserId: member.adminUserId,
+        },
+        update: { groupId: group.id, adminUserId: member.adminUserId },
+      });
+    }
   }
 }
 

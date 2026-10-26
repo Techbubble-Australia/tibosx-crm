@@ -799,7 +799,7 @@ export function TimesheetForm({
                     type="button"
                     className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600"
                     disabled={!canShiftWeekPrev}
-                    onClick={() => applyWeekChange(shiftWeek(weekMonday, -7))}
+                    onClick={() => void applyWeekChange(shiftWeek(weekMonday, -7))}
                     aria-label="Previous week"
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -812,7 +812,7 @@ export function TimesheetForm({
                       value={weekMonday}
                       min={weekMondayBounds?.min}
                       max={weekMondayBounds?.max}
-                      onChange={(e) => applyWeekChange(e.target.value)}
+                      onChange={(e) => void applyWeekChange(e.target.value)}
                       tabIndex={-1}
                       aria-hidden
                     />
@@ -830,7 +830,7 @@ export function TimesheetForm({
                     type="button"
                     className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600"
                     disabled={!canShiftWeekNext}
-                    onClick={() => applyWeekChange(shiftWeek(weekMonday, 7))}
+                    onClick={() => void applyWeekChange(shiftWeek(weekMonday, 7))}
                     aria-label="Next week"
                   >
                     <ChevronRight className="h-4 w-4" />

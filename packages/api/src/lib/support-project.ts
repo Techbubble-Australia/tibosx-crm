@@ -70,7 +70,7 @@ export async function syncProjectClientContacts(
   });
 
   for (const link of links) {
-    if (!link.portalAccess) continue;
+    if (!link.portalAccess && !link.canApproveTimesheets) continue;
     await provisionClientPortalUser(link.id, orgId);
   }
 }
@@ -80,7 +80,7 @@ export async function provisionClientPortalUser(projectClientContactId: string, 
     where: { id: projectClientContactId },
     include: { contact: true },
   });
-  if (!link || !link.portalAccess) return;
+  if (!link || (!link.portalAccess && !link.canApproveTimesheets)) return;
 
   const email = link.contact.email.trim().toLowerCase();
   const name = link.contact.name.trim();

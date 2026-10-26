@@ -149,9 +149,9 @@ export default function TimesheetDetailPage() {
   }
 
   const status = timesheet?.status ?? "DRAFT";
-  const awaitingClient =
-    status === "SUBMITTED" && timesheet?.approverKind === "CLIENT_CONTACT";
   const pmCanAct = Boolean(timesheet?.canApprove);
+  const awaitingClient =
+    status === "SUBMITTED" && timesheet?.approverKind === "CLIENT_CONTACT" && !pmCanAct;
   const canSubmitTimesheet = Boolean(timesheet?.canSubmit) && isEffectiveProjectMember;
 
   return (
