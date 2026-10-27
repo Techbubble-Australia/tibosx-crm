@@ -3,15 +3,15 @@ import { TICKET_PRIORITY_LABELS } from "@/lib/support-ticket-labels";
 export function ticketPriorityDotClass(priority: string | null | undefined): string {
   switch ((priority ?? "").toUpperCase()) {
     case "LOW":
-      return "bg-yellow-400";
+      return "bg-sky-600 ring-1 ring-sky-200";
     case "MEDIUM":
-      return "bg-amber-500";
+      return "bg-amber-500 ring-1 ring-amber-200";
     case "HIGH":
-      return "bg-red-500";
+      return "bg-red-500 ring-1 ring-red-200";
     case "URGENT":
-      return "bg-red-800";
+      return "bg-red-700 ring-1 ring-red-300";
     default:
-      return "bg-gray-400";
+      return "bg-gray-500 ring-1 ring-gray-200";
   }
 }
 
@@ -20,15 +20,21 @@ export function ticketPriorityBadgeClass(priority: string | null | undefined): s
   return ticketPriorityDotClass(priority);
 }
 
+export function TicketPriorityDot({ priority }: { priority: string | null | undefined }) {
+  return (
+    <span
+      className={`inline-block h-3 w-3 shrink-0 rounded-full ${ticketPriorityDotClass(priority)}`}
+      aria-hidden
+    />
+  );
+}
+
 export function TicketPriorityBadge({ priority }: { priority: string | null | undefined }) {
   const key = (priority ?? "").toUpperCase();
   const label = TICKET_PRIORITY_LABELS[key] ?? priority ?? "—";
   return (
     <span className="inline-flex items-center gap-2 text-xs font-semibold text-gray-800 dark:text-gray-200">
-      <span
-        className={`h-2 w-2 shrink-0 rounded-full ${ticketPriorityDotClass(priority)}`}
-        aria-hidden
-      />
+      <TicketPriorityDot priority={priority} />
       {label}
     </span>
   );

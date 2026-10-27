@@ -19,7 +19,7 @@ import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { TicketEditableSubject } from "@/components/support-tickets/TicketEditableSubject";
 import { TicketResolutionNotesSection } from "@/components/support-tickets/TicketResolutionNotesSection";
 import { TicketRecordLayout, TicketAttributeField } from "@/components/support-tickets/TicketRecordLayout";
-import { TicketPriorityBadge } from "@/lib/ticket-priority-styles";
+import { TicketPriorityBadge, TicketPriorityDot } from "@/lib/ticket-priority-styles";
 import { normalizeTicketStatusKey } from "@/lib/support-ticket-labels";
 
 type Assignee = { id: string; name: string; email: string };
@@ -277,7 +277,7 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
             </TicketAttributeField>
             <TicketAttributeField label="Priority">
               <div className="flex items-center gap-2">
-                <TicketPriorityBadge priority={ticket.priority} />
+                <TicketPriorityDot priority={ticket.priority} />
                 <select
                   disabled={saving || closedOrCancelled}
                   value={ticket.priority}

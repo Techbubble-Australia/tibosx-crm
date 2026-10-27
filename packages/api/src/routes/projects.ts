@@ -471,12 +471,12 @@ router.get("/", async (req: AuthRequest, res) => {
     const role = req.user?.role ?? "";
     const where: Prisma.ProjectWhereInput = {};
     if (!canManageProjects(role)) {
-      const membership = await prisma.projectMember.findFirst({
+      const memberships = await prisma.projectMember.findMany({
         where: { adminUserId: getActorId(req) },
         select: { projectId: true },
       });
-      if (!membership) return res.json({ data: [] });
-      where.id = membership.projectId;
+      if (!memberships.length) return res.json({ data: [] });
+      where.id = { in: memberships.map((row) => row.projectId) };
     }
     const rows = await prisma.project.findMany({
       where,

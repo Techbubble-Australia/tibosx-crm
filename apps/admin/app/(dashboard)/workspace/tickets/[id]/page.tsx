@@ -23,7 +23,7 @@ import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { TicketEditableSubject } from "@/components/support-tickets/TicketEditableSubject";
 import { TicketResolutionNotesSection } from "@/components/support-tickets/TicketResolutionNotesSection";
 import { TicketRecordLayout, TicketAttributeField } from "@/components/support-tickets/TicketRecordLayout";
-import { TicketPriorityBadge } from "@/lib/ticket-priority-styles";
+import { TicketPriorityBadge, TicketPriorityDot } from "@/lib/ticket-priority-styles";
 import { normalizeTicketStatusKey } from "@/lib/support-ticket-labels";
 
 type Message = {
@@ -270,7 +270,7 @@ export default function TicketDetailPage() {
             <TicketAttributeField label="Priority">
               {canEditTypePriority && !closedOrCancelled ? (
                 <div className="flex items-center gap-2">
-                  <TicketPriorityBadge priority={ticket.priority} />
+                  <TicketPriorityDot priority={ticket.priority} />
                   <select
                     value={ticket.priority}
                     disabled={saving}

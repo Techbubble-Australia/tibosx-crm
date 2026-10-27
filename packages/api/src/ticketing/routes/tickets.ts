@@ -8,7 +8,11 @@ import {
   prisma,
 } from "@techbubble/database";
 import { authMiddleware, type TicketingRequest } from "../middleware/auth.js";
-import { formatTicketAssigneeAuditValue, logTicketAudit } from "../lib/ticket-audit.js";
+import {
+  enrichTicketAuditLogsForDisplay,
+  formatTicketAssigneeAuditValue,
+  logTicketAudit,
+} from "../lib/ticket-audit.js";
 import { nextTicketNumber } from "../lib/ticket-number.js";
 import {
   canAccessTicketOrganization,
@@ -224,8 +228,6 @@ router.post("/", async (req: TicketingRequest, res) => {
 
   if (projectId) {
     const { notifySupportGroupOfTicket } = await import("../../lib/support-project.js");
-    const { autoAssignTicketToProjectSupport } = await import("../../lib/ticket-project-assignees.js");
-    await autoAssignTicketToProjectSupport(ticket.id, projectId);
     void notifySupportGroupOfTicket(ticket.id);
     const refreshed = await prisma.ticket.findUnique({
       where: { id: ticket.id },
@@ -310,9 +312,10 @@ router.get("/:id", async (req: TicketingRequest, res) => {
     include: { author: { select: { id: true, name: true, email: true, role: true } } },
   });
 
-  const auditLogs = ticket.auditLogs
-    .filter((log) => (user.role === "CLIENT" ? auditVisibleToClient(log) : true))
-    .map(serializeAuditLog);
+  const auditRows = ticket.auditLogs.filter((log) =>
+    user.role === "CLIENT" ? auditVisibleToClient(log) : true,
+  );
+  const auditLogs = (await enrichTicketAuditLogsForDisplay(auditRows)).map(serializeAuditLog);
 
   const { enrichTicketsProjectLabels } = await import("../lib/ticket-project-label.js");
   const [withProject] = await enrichTicketsProjectLabels([ticket]);
@@ -385,6 +388,14 @@ router.post("/:id/lifecycle", async (req: TicketingRequest, res) => {
     metadata: { lifecycleAction: action },
   });
 
+  if (action === "resolve" && parsed.data.resolutionNotes?.trim()) {
+    await logTicketAudit(existing.id, user.id, "UPDATED", {
+      field: "resolutionNotes",
+      oldValue: (existing.resolutionNotes ?? "").trim() || undefined,
+      newValue: parsed.data.resolutionNotes.trim(),
+    });
+  }
+
   const actor = await prisma.ticketingUser.findUnique({
     where: { id: user.id },
     select: { email: true },
@@ -453,6 +464,18 @@ router.patch("/:id", async (req: TicketingRequest, res) => {
     include: ticketDetailIncludes,
   });
 
+  if (parsed.data.resolutionNotes !== undefined) {
+    const oldNotes = (existing.resolutionNotes ?? "").trim();
+    const newNotes = (parsed.data.resolutionNotes ?? "").trim();
+    if (oldNotes !== newNotes) {
+      await logTicketAudit(existing.id, user.id, "UPDATED", {
+        field: "resolutionNotes",
+        oldValue: oldNotes || undefined,
+        newValue: newNotes || undefined,
+      });
+    }
+  }
+
   for (const field of ["priority", "type", "assignedToId", "subject", "description"] as const) {
     const next = parsed.data[field];
     if (next === undefined) continue;
@@ -466,7 +489,7 @@ router.patch("/:id", async (req: TicketingRequest, res) => {
           typeof next === "string" ? next : null,
         );
         await logTicketAudit(existing.id, user.id, "UPDATED", {
-          field,
+          field: "assignedTo",
           oldValue,
           newValue,
         });

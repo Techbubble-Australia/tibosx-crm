@@ -5,7 +5,7 @@ import { TicketPriority, TicketStatus, TicketType, prisma } from "@techbubble/da
 import { tbosAuthMiddleware, requireTbosAdmin, type TbosRequest } from "../middleware/tbos-auth.js";
 import { assignedOrganizationIds } from "../lib/ticket-access.js";
 import { resolveTbosActorUserId } from "../lib/tbos-actor.js";
-import { logTicketAudit } from "../lib/ticket-audit.js";
+import { enrichTicketAuditLogsForDisplay, logTicketAudit } from "../lib/ticket-audit.js";
 import { nextTicketNumber } from "../lib/ticket-number.js";
 import { saveTicketUpload } from "../lib/upload-storage.js";
 import { streamTicketAttachmentFile } from "../lib/serve-ticket-attachment.js";
@@ -247,8 +247,6 @@ router.post("/tickets", async (req: TbosRequest, res) => {
 
   if (projectId) {
     const { notifySupportGroupOfTicket } = await import("../../lib/support-project.js");
-    const { autoAssignTicketToProjectSupport } = await import("../../lib/ticket-project-assignees.js");
-    await autoAssignTicketToProjectSupport(ticket.id, projectId);
     void notifySupportGroupOfTicket(ticket.id);
     const refreshed = await prisma.ticket.findUnique({
       where: { id: ticket.id },
@@ -311,9 +309,15 @@ router.get("/tickets/:id", async (req: TbosRequest, res) => {
       ...serializeTicketRow(withProject ?? ticket),
       attachments: ticket.attachments,
       messages,
-      auditLogs: ticket.auditLogs.map((log) => ({
-        ...log,
+      auditLogs: (await enrichTicketAuditLogsForDisplay(ticket.auditLogs)).map((log) => ({
+        id: log.id,
+        action: log.action,
+        field: log.field,
+        oldValue: log.oldValue,
+        newValue: log.newValue,
+        metadata: log.metadata,
         createdAt: log.createdAt.toISOString(),
+        actor: log.actor,
       })),
     },
   });
@@ -379,6 +383,14 @@ router.post("/tickets/:id/lifecycle", async (req: TbosRequest, res) => {
     newValue: nextStatus,
     metadata: { lifecycleAction: action },
   });
+
+  if (action === "resolve" && parsed.data.resolutionNotes?.trim()) {
+    await logTicketAudit(existing.id, actorId, "UPDATED", {
+      field: "resolutionNotes",
+      oldValue: (existing.resolutionNotes ?? "").trim() || undefined,
+      newValue: parsed.data.resolutionNotes.trim(),
+    });
+  }
 
   notifyAsync("ticket.status.changed", {
     ticketId: existing.id,
@@ -562,6 +574,18 @@ router.patch("/tickets/:id", async (req: TbosRequest, res) => {
     include: ticketDetailIncludes,
   });
 
+  if (parsed.data.resolutionNotes !== undefined) {
+    const oldNotes = (existing.resolutionNotes ?? "").trim();
+    const newNotes = (parsed.data.resolutionNotes ?? "").trim();
+    if (oldNotes !== newNotes) {
+      await logTicketAudit(existing.id, actorId, "UPDATED", {
+        field: "resolutionNotes",
+        oldValue: oldNotes || undefined,
+        newValue: newNotes || undefined,
+      });
+    }
+  }
+
   for (const field of ["priority", "type", "assignedToId", "subject", "description"] as const) {
     const next = parsed.data[field];
     if (next === undefined) continue;
@@ -576,7 +600,7 @@ router.patch("/tickets/:id", async (req: TbosRequest, res) => {
           typeof next === "string" ? next : null,
         );
         await logTicketAudit(existing.id, actorId, "UPDATED", {
-          field,
+          field: "assignedTo",
           oldValue,
           newValue,
         });

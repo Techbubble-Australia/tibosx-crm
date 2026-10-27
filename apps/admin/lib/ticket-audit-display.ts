@@ -30,30 +30,33 @@ export function formatTicketAuditLine(log: TicketAuditRow): string {
           ? "Priority"
           : log.field === "type"
             ? "Type"
-            : log.field === "assignedToId"
+            : log.field === "assignedToId" || log.field === "assignedTo"
               ? "Assigned to"
-              : log.field === "description"
+              : log.field === "resolutionNotes"
+                ? "Resolution notes"
+                : log.field === "description"
                 ? "Description"
                 : log.field === "subject"
                   ? "Subject"
                   : log.field;
-    if (log.field === "description") return `${fieldLabel} updated${actor}`;
-    const fromEmpty =
-      log.field === "assignedToId" && (!log.oldValue || log.oldValue === "null");
-    const toEmpty =
-      log.field === "assignedToId" && (!log.newValue || log.newValue === "null");
+    if (log.field === "description" || log.field === "resolutionNotes") {
+      return `${fieldLabel} updated${actor}`;
+    }
+    const isAssignee = log.field === "assignedToId" || log.field === "assignedTo";
+    const fromEmpty = isAssignee && (!log.oldValue || log.oldValue === "null");
+    const toEmpty = isAssignee && (!log.newValue || log.newValue === "null");
     const from = fromEmpty
       ? "Unassigned"
       : log.oldValue
         ? labelForField(log.field, log.oldValue)
-        : log.field === "assignedToId"
+        : isAssignee
           ? "Unassigned"
           : "—";
     const to = toEmpty
       ? "Unassigned"
       : log.newValue
         ? labelForField(log.field, log.newValue)
-        : log.field === "assignedToId"
+        : isAssignee
           ? "Unassigned"
           : "—";
     return `${fieldLabel} changed from ${from} to ${to}${actor}`;
