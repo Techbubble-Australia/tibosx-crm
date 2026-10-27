@@ -102,7 +102,12 @@ export default function WorkspaceTimesheetDetailPage() {
           <Loader2 className="h-8 w-8 animate-spin text-sky-600" />
         </div>
       ) : loadError ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{loadError}</p>
+        <div className="space-y-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <p>{loadError}</p>
+          <Link href="/workspace/timesheets/submitted" className="inline-block font-medium text-sky-700 hover:underline">
+            Back to submitted timesheets
+          </Link>
+        </div>
       ) : timesheet ? (
         <TimesheetForm
           defaults={timesheet}

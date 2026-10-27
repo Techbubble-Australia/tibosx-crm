@@ -88,8 +88,8 @@ router.post("/login", async (req, res) => {
     const email = parsed.email.trim().toLowerCase();
     const password = parsed.password;
 
-    const customer = await prisma.customerUser.findUnique({
-      where: { email },
+    const customer = await prisma.customerUser.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
       select: {
         id: true,
         email: true,
@@ -100,14 +100,42 @@ router.post("/login", async (req, res) => {
         totpSecretEnc: true,
       },
     });
-    if (customer?.passwordHash) {
-      if (customer.active === false) {
+
+    const adminUser = await prisma.adminUser.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        active: true,
+        passwordHash: true,
+        passwordNeedsReset: true,
+        mfaEnabled: true,
+        totpSecretEnc: true,
+        role: true,
+      },
+    });
+
+    const customerPasswordOk =
+      Boolean(customer?.passwordHash) &&
+      customer!.active !== false &&
+      (await bcrypt.compare(password, customer!.passwordHash!));
+    const adminPasswordOk =
+      Boolean(adminUser?.passwordHash) &&
+      adminUser!.active !== false &&
+      (await bcrypt.compare(password, adminUser!.passwordHash!));
+
+    if (!customerPasswordOk && !adminPasswordOk) {
+      if (customer?.active === false || adminUser?.active === false) {
         return res.status(401).json({ error: "Account is disabled" });
       }
-      const validCustomer = await bcrypt.compare(password, customer.passwordHash);
-      if (!validCustomer) {
-        return res.status(401).json({ error: "Invalid credentials" });
-      }
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const preferAdminLogin =
+      Boolean(adminPasswordOk && adminUser && adminUser.role !== "client");
+
+    if (customerPasswordOk && customer && !preferAdminLogin) {
       const customerPublic = publicUser({ ...customer, role: "client" });
       if (customer.passwordNeedsReset) {
         const resetToken = generatePasswordResetRequiredToken({
@@ -154,18 +182,11 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    const user = await prisma.adminUser.findUnique({ where: { email } });
-    if (!user?.passwordHash) {
+    if (!adminPasswordOk || !adminUser) {
       return res.status(401).json({ error: "Invalid credentials" });
-    }
-    if (user.active === false) {
-      return res.status(401).json({ error: "Account is disabled" });
     }
 
-    const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
+    const user = adminUser;
 
     if (user.passwordNeedsReset) {
       const resetToken = generatePasswordResetRequiredToken({
@@ -1078,15 +1099,18 @@ router.post("/password/forgot", async (req, res) => {
 
     const adminUser = await prisma.adminUser.findFirst({
       where: { email: { equals: normalizedEmail, mode: "insensitive" } },
-      select: { id: true, email: true, name: true, active: true, passwordHash: true },
+      select: { id: true, email: true, name: true, role: true, active: true, passwordHash: true },
     });
 
-    const account =
+    const adminForgot =
+      adminUser?.active !== false && adminUser?.passwordHash && adminUser.role !== "client"
+        ? { kind: "admin" as const, row: adminUser }
+        : null;
+    const customerForgot =
       customer?.active !== false && customer?.passwordHash
         ? { kind: "customer" as const, row: customer }
-        : adminUser?.active !== false && adminUser?.passwordHash
-          ? { kind: "admin" as const, row: adminUser }
-          : null;
+        : null;
+    const account = adminForgot ?? customerForgot;
 
     if (account) {
       const rawToken = generatePasswordResetToken();

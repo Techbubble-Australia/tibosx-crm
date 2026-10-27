@@ -227,6 +227,12 @@ router.get("/:id", async (req: TicketingRequest, res) => {
     return res.status(403).json({ error: "Forbidden" });
   }
 
+  if (timesheet.status === "DRAFT") {
+    return res.status(404).json({
+      error:
+        "This timesheet was returned to the team member for revision and is no longer available here.",
+    });
+  }
   if (!["SUBMITTED", "APPROVED", "REJECTED"].includes(timesheet.status)) {
     return res.status(404).json({ error: "Not found" });
   }

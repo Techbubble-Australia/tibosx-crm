@@ -434,10 +434,19 @@ router.post("/:id/invite", async (req: AuthRequest, res) => {
 
     const temporaryPassword = randomBytes(12).toString("base64url");
     const passwordHash = await bcrypt.hash(temporaryPassword, 10);
-    await prisma.adminUser.update({
-      where: { id: userId },
-      data: { passwordHash, passwordNeedsReset: true },
-    });
+    const normalizedEmail = user.email.trim().toLowerCase();
+    await prisma.$transaction([
+      prisma.adminUser.update({
+        where: { id: userId },
+        data: { passwordHash, passwordNeedsReset: true, email: normalizedEmail },
+      }),
+      prisma.customerUser.updateMany({
+        where: {
+          OR: [{ id: userId }, { email: { equals: user.email, mode: "insensitive" } }],
+        },
+        data: { passwordHash, passwordNeedsReset: true, email: normalizedEmail },
+      }),
+    ]);
 
     try {
       await emailTbosUserInvite({
