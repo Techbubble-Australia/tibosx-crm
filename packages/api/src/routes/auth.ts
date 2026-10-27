@@ -640,18 +640,18 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
       if (input.email !== undefined) patch.email = input.email.trim().toLowerCase();
     }
 
-    for (const field of addressFields) {
-      if (input[field] !== undefined) {
-        patch[field] = input[field] as string | null;
-      }
-    }
     if (existing.role !== "client") {
+      for (const field of addressFields) {
+        if (input[field] !== undefined) {
+          patch[field] = input[field] as string | null;
+        }
+      }
       if (input.bankDetails !== undefined) patch.bankDetails = input.bankDetails;
       if (input.idProofUrl !== undefined) patch.idProofUrl = input.idProofUrl;
       if (input.addressProofUrl !== undefined) patch.addressProofUrl = input.addressProofUrl;
-    }
-    if (input.emergencyContacts !== undefined) {
-      patch.emergencyContacts = input.emergencyContacts;
+      if (input.emergencyContacts !== undefined) {
+        patch.emergencyContacts = input.emergencyContacts;
+      }
     }
     if (input.profilePhotoUrl !== undefined) {
       patch.profilePhotoUrl = input.profilePhotoUrl;
@@ -693,6 +693,7 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
           await logAdminUserFieldChange(tx, u.id, u.id, field, oldVal, newVal);
         }
       }
+      if (existing.role !== "client") {
       for (const field of addressFields) {
         if (input[field] === undefined) continue;
         const oldVal = (existing[field] as string | null) ?? null;
@@ -708,6 +709,7 @@ router.patch("/profile", authMiddleware, async (req: AuthRequest, res) => {
           JSON.stringify(existing.emergencyContacts ?? []),
           JSON.stringify(input.emergencyContacts),
         );
+      }
       }
       if (input.profilePhotoUrl !== undefined && input.profilePhotoUrl !== existing.profilePhotoUrl) {
         await logAdminUserFieldChange(

@@ -211,7 +211,7 @@ app.use(
   "/api/upload",
   authMiddleware,
   requireMfaEnrolled,
-  requireAnyModule("website", "recruitment", "sales", "project_management"),
+  requireAnyModule("website", "recruitment", "sales", "project_management", "workspace"),
   uploadRoutes,
 );
 

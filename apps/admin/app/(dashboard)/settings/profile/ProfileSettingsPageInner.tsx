@@ -79,6 +79,7 @@ export default function ProfileSettingsPageInner() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  const isClientUser = role === "client";
   const isProjectMemberOnboarding = onboarding && role === "project_member";
   const showConsultantOnboardingBanner =
     onboarding && Boolean(memberOnboarding?.profileOnboardingRequired) && !loading;
@@ -299,7 +300,9 @@ export default function ProfileSettingsPageInner() {
           <p className="text-sm text-gray-500">
             {canEditAccountFields
               ? "As an administrator you can update your account details below, plus password and emergency contacts."
-              : "Name, email, phone, and role are managed by your administrator. Update your password and emergency contacts below."}
+              : isClientUser
+                ? "Name, email, phone, and role are managed by your administrator. You can update your profile photo and password below."
+                : "Name, email, phone, and role are managed by your administrator. Update your password and emergency contacts below."}
           </p>
         </div>
       </div>
@@ -349,9 +352,13 @@ export default function ProfileSettingsPageInner() {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ profilePhotoUrl: url }),
                   });
-                  if (res.ok) await refreshSession();
-                } catch {
-                  // save via form if auto-save fails
+                  const data = await res.json().catch(() => ({}));
+                  if (!res.ok) {
+                    throw new Error(messageFromApiError(data, "Failed to save profile photo"));
+                  }
+                  await refreshSession();
+                } catch (error) {
+                  appAlert(error instanceof Error ? error.message : "Failed to save profile photo");
                 }
               })();
             }}
@@ -455,6 +462,7 @@ export default function ProfileSettingsPageInner() {
         </div>
       </form>
 
+      {!isClientUser ? (
       <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
         <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Address</h3>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -557,7 +565,9 @@ export default function ProfileSettingsPageInner() {
           </button>
         </div>
       </section>
+      ) : null}
 
+      {!isClientUser ? (
       <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
         <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Bank details</h3>
         <BankDetailsFields value={bankDetails} onChange={setBankDetails} showTaxNumber />
@@ -607,7 +617,9 @@ export default function ProfileSettingsPageInner() {
           </button>
         </div>
       </section>
+      ) : null}
 
+      {!isClientUser ? (
       <form onSubmit={(e) => void handleProfileSubmit(e)} className="space-y-6">
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
           <div className="mb-4 flex items-center justify-between">
@@ -685,6 +697,7 @@ export default function ProfileSettingsPageInner() {
           </div>
         </section>
       </form>
+      ) : null}
 
       <UserAgreementsSection records={agreementRecords} />
 
