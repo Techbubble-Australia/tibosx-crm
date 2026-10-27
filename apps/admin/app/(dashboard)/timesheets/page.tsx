@@ -164,50 +164,8 @@ export default function TimesheetsPage() {
     });
   }
 
-  async function openCreateTimesheet() {
-    try {
-      let res = await adminFetch("/api/admin/timesheets/create-entry");
-      if (res.status === 404) {
-        res = await adminFetch("/api/admin/timesheets/entry-point");
-      }
-      let data: unknown;
-      try {
-        data = await res.json();
-      } catch {
-        if (!res.ok) {
-          router.push("/timesheets/new");
-          return;
-        }
-        throw new Error("Unable to start a new timesheet");
-      }
-      if (!res.ok) {
-        const message = messageFromApiError(data, "Unable to start a new timesheet");
-        if (res.status === 404 && (message === "Not found" || message === "Timesheet not found")) {
-          router.push("/timesheets/new");
-          return;
-        }
-        throw new Error(message);
-      }
-      const row = (data as { data?: Record<string, unknown> }).data as {
-        projectId?: string;
-        weekStart?: string;
-        existingTimesheetId?: string | null;
-      };
-      if (row.existingTimesheetId) {
-        router.push(`/timesheets/${row.existingTimesheetId}`);
-        return;
-      }
-      if (!row.projectId || !row.weekStart) {
-        throw new Error("No open timesheet week found");
-      }
-      const params = new URLSearchParams({
-        projectId: row.projectId,
-        weekStart: row.weekStart,
-      });
-      router.push(`/timesheets/new?${params}`);
-    } catch (error) {
-      appAlert(error instanceof Error ? error.message : "Unable to start a new timesheet");
-    }
+  function openCreateTimesheet() {
+    router.push("/timesheets/new");
   }
 
   async function exportCsv() {

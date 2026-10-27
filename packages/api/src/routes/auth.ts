@@ -1173,7 +1173,7 @@ router.post("/password/reset", async (req, res) => {
         passwordResetTokenHash: tokenHash,
         passwordResetExpiresAt: { gt: new Date() },
       },
-      select: { id: true, active: true },
+      select: { id: true, email: true, active: true },
     });
 
     const adminUser = await prisma.adminUser.findFirst({
@@ -1187,14 +1187,27 @@ router.post("/password/reset", async (req, res) => {
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
     if (customer && customer.active !== false) {
-      await prisma.customerUser.update({
-        where: { id: customer.id },
-        data: {
-          passwordHash,
-          passwordNeedsReset: false,
-          passwordResetTokenHash: null,
-          passwordResetExpiresAt: null,
-        },
+      await prisma.$transaction(async (tx) => {
+        await tx.customerUser.update({
+          where: { id: customer.id },
+          data: {
+            passwordHash,
+            passwordNeedsReset: false,
+            passwordResetTokenHash: null,
+            passwordResetExpiresAt: null,
+          },
+        });
+        await tx.adminUser.updateMany({
+          where: {
+            OR: [{ id: customer.id }, { email: { equals: customer.email, mode: "insensitive" } }],
+          },
+          data: {
+            passwordHash,
+            passwordNeedsReset: false,
+            passwordResetTokenHash: null,
+            passwordResetExpiresAt: null,
+          },
+        });
       });
       return res.json({ message: "Password updated. You can sign in with your new password." });
     }

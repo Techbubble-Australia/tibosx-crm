@@ -4,7 +4,7 @@ import { appAlert, appConfirm } from "@/lib/app-alert";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Loader2, Mail } from "lucide-react";
+import { ArrowLeft, KeyRound, Loader2, Mail } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { messageFromApiError } from "@/lib/api-error";
 import { UserPhotoField } from "@/components/users/UserPhotoField";
@@ -33,6 +33,7 @@ export default function EditCustomerUserPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const [detail, setDetail] = useState<CustomerDetail | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
@@ -186,6 +187,38 @@ export default function EditCustomerUserPage() {
           >
             {inviteLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
             Invite user
+          </button>
+          <button
+            type="button"
+            disabled={resetLoading || !detail.active}
+            onClick={() => {
+              void (async () => {
+                if (
+                  !(await appConfirm(
+                    `Send a password reset link to ${detail.email}? They can choose a new password from the email.`,
+                  ))
+                ) {
+                  return;
+                }
+                setResetLoading(true);
+                try {
+                  const res = await adminFetch(`/api/admin/customer-users/${id}/reset-password`, {
+                    method: "POST",
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(messageFromApiError(data, "Failed to send reset email"));
+                  appAlert((data as { message?: string }).message || "Password reset email sent.");
+                } catch (error) {
+                  appAlert(error instanceof Error ? error.message : "Failed to send reset email");
+                } finally {
+                  setResetLoading(false);
+                }
+              })();
+            }}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600"
+          >
+            {resetLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+            Send reset password email
           </button>
         </div>
       </form>

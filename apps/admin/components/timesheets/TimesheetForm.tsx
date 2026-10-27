@@ -104,6 +104,8 @@ type Props = {
   onSubmitForApproval?: () => void | Promise<void>;
   submitForApprovalLoading?: boolean;
   showSubmitForApproval?: boolean;
+  /** New timesheet: pick project before week grid and entries. */
+  requireProjectFirst?: boolean;
 };
 
 type LineEntry = {
@@ -310,15 +312,18 @@ export function TimesheetForm({
   onSubmitForApproval,
   submitForApprovalLoading = false,
   showSubmitForApproval = false,
+  requireProjectFirst = false,
 }: Props) {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [projectId, setProjectId] = useState(defaults.projectId ?? "");
   const [cases, setCases] = useState<CaseOption[]>([]);
   const [lines, setLines] = useState<LineEntry[]>(() => linesFromDefaults(defaults));
-  const [weekMonday, setWeekMonday] = useState(
-    snapToMondayInput(toDateInput(defaults.startDate) || toDateInputUtc(mondayOfWeek())),
-  );
+  const [weekMonday, setWeekMonday] = useState(() => {
+    if (requireProjectFirst && !defaults.id && !defaults.startDate) return "";
+    return snapToMondayInput(toDateInput(defaults.startDate) || toDateInputUtc(mondayOfWeek()));
+  });
+  const [entryPointLoading, setEntryPointLoading] = useState(false);
   const [comments, setComments] = useState(defaults.comments ?? "");
   const [approvers, setApprovers] = useState<ApproverOption[]>([]);
   const [selectedApprover, setSelectedApprover] = useState("");
@@ -336,6 +341,7 @@ export function TimesheetForm({
   const formEditable = !readOnly && status === "DRAFT";
   const entryEditable = formEditable && !weekConflict;
   const panelReadOnly = Boolean(selection && !entryEditable);
+  const showTimesheetBody = !requireProjectFirst || (Boolean(projectId) && Boolean(weekMonday));
   const pageTitle = title ?? (defaults.id ? "Timesheet" : "New Timesheet");
   const loadedMonday = useMemo(
     () => snapToMondayInput(toDateInput(defaults.startDate) || ""),
@@ -587,13 +593,9 @@ export function TimesheetForm({
         const existing = data.data as { id?: string; status?: string } | null;
         if (existing?.id) {
           if (existing.id !== defaults.id) {
-            if (isNewForm && existing.status && existing.status !== "DRAFT") {
-              setWeekConflict(true);
-              return;
-            }
-            if (existing.status === "DRAFT" || !isNewForm) {
-              router.replace(`/timesheets/${existing.id}`);
-            }
+            router.replace(`/timesheets/${existing.id}`);
+          } else {
+            setWeekConflict(false);
           }
           return;
         }
@@ -791,10 +793,14 @@ export function TimesheetForm({
   useEffect(() => {
     if (!allowProjectWeekNavigation || !projectId) return;
     const prev = prevProjectIdRef.current;
-    if (prev === projectId) return;
+    const projectChanged = prev !== projectId;
+    const needsOpenWeek =
+      requireProjectFirst && !defaults.id && (!weekMonday || projectChanged);
+    if (!projectChanged && !needsOpenWeek) return;
     prevProjectIdRef.current = projectId;
     projectEntryPointPendingRef.current = true;
     setWeekConflict(false);
+    setEntryPointLoading(true);
     void adminFetch(`/api/admin/timesheets/entry-point?projectId=${encodeURIComponent(projectId)}`)
       .then((r) => r.json())
       .then((data) => {
@@ -803,13 +809,20 @@ export function TimesheetForm({
           router.replace(`/timesheets/${row.existingTimesheetId}`);
           return;
         }
-        if (row.weekStart) void applyWeekChange(row.weekStart);
+        if (row.weekStart) {
+          setWeekMonday(snapToMondayInput(row.weekStart));
+          setLines([emptyLine()]);
+          setComments("");
+          setFileUrls([]);
+          setSelection(null);
+        }
       })
       .catch(() => undefined)
       .finally(() => {
         projectEntryPointPendingRef.current = false;
+        setEntryPointLoading(false);
       });
-  }, [projectId, allowProjectWeekNavigation, router]);
+  }, [projectId, allowProjectWeekNavigation, requireProjectFirst, defaults.id, router]);
 
   return (
     <form onSubmit={(e) => void handleSave(e)} className="flex flex-col xl:flex-row xl:items-start">
@@ -845,9 +858,14 @@ export function TimesheetForm({
                     className={`${selectClass} ${allowProjectWeekNavigation ? "" : "cursor-not-allowed bg-gray-50"}`}
                     value={projectId}
                     onChange={(e) => {
-                      setProjectId(e.target.value);
+                      const next = e.target.value;
+                      setProjectId(next);
                       setLines([emptyLine()]);
                       setSelection(null);
+                      if (requireProjectFirst && !defaults.id) {
+                        setWeekMonday("");
+                        setWeekConflict(false);
+                      }
                     }}
                     disabled={!allowProjectWeekNavigation}
                     required
@@ -860,6 +878,7 @@ export function TimesheetForm({
                 )}
               </div>
 
+              {showTimesheetBody ? (
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Timesheet week <span className="text-red-500">*</span>
@@ -907,9 +926,21 @@ export function TimesheetForm({
                   </button>
                 </div>
               </div>
+              ) : null}
             </div>
+            {requireProjectFirst && !projectId ? (
+              <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                Select a project to load your timesheet week. You can move to earlier weeks afterward to view
+                submitted or draft timesheets.
+              </p>
+            ) : null}
+            {entryPointLoading ? (
+              <p className="mt-3 text-sm text-gray-500">Loading open timesheet week…</p>
+            ) : null}
           </div>
 
+          {showTimesheetBody ? (
+          <>
           <div className="px-5 py-3">
             <div className="mb-2 flex items-end justify-between gap-4">
               <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Time Entries</h2>
@@ -992,13 +1023,16 @@ export function TimesheetForm({
                             <td key={key} className="border-l border-gray-100 p-1 dark:border-gray-800">
                               <button
                                 type="button"
-                                disabled={!dayAllowed || (!entryEditable && !hasComment && !(value > 0))}
+                                disabled={
+                                  !dayAllowed ||
+                                  (!entryEditable && !hasComment && !((value ?? 0) > 0))
+                                }
                                 onClick={() => openCell(line.key, key)}
                                 className={`relative flex h-11 w-full flex-col items-center justify-center rounded-md text-sm tabular-nums transition-colors ${
                                   isSelected
                                     ? "border-2 border-blue-500 bg-blue-50/50 ring-1 ring-blue-200"
                                     : "border border-transparent hover:bg-gray-50 dark:hover:bg-gray-900"
-                                } ${!entryEditable && !hasComment && !(value > 0) ? "cursor-default opacity-60" : ""}`}
+                                } ${!entryEditable && !hasComment && !((value ?? 0) > 0) ? "cursor-default opacity-60" : ""}`}
                               >
                                 <span className="font-medium text-gray-900 dark:text-gray-100">
                                   {formatHoursCell(value)}
@@ -1163,8 +1197,11 @@ export function TimesheetForm({
               ) : null}
             </div>
           </div>
+          </>
+          ) : null}
         </div>
 
+        {showTimesheetBody ? (
         <section className="mt-6 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-950">
           <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">Files</h3>
           <p className="mb-3 text-xs text-gray-500">
@@ -1214,6 +1251,7 @@ export function TimesheetForm({
             <p className="text-sm text-gray-400">No files attached.</p>
           )}
         </section>
+        ) : null}
 
         {defaults.rejectReason ? (
           <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">

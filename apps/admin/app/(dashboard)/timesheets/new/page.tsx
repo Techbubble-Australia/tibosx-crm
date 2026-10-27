@@ -1,8 +1,8 @@
 "use client";
-import { appAlert, appConfirm } from "@/lib/app-alert";
+import { appAlert } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
@@ -10,59 +10,19 @@ import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
 import { TimesheetForm, type TimesheetFormValues } from "@/components/timesheets/TimesheetForm";
 import { messageFromApiError } from "@/lib/api-error";
-import { sundayOfWeek } from "@/lib/timesheet-week";
 
 export default function NewTimesheetPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { canCreateTimesheets, loading: sessionLoading } = useAdminSession();
   const [isSaving, setIsSaving] = useState(false);
 
-  const queryProjectId = searchParams.get("projectId")?.trim() || "";
-  const queryWeekStart = searchParams.get("weekStart")?.trim() || "";
-
-  const initialDefaults = useMemo((): Partial<TimesheetFormValues> => {
-    if (!queryWeekStart) {
-      return queryProjectId ? { projectId: queryProjectId } : {};
-    }
-    const mon = new Date(`${queryWeekStart}T00:00:00.000Z`);
-    return {
-      ...(queryProjectId ? { projectId: queryProjectId } : {}),
-      startDate: mon.toISOString(),
-      endDate: sundayOfWeek(mon).toISOString(),
-    };
-  }, [queryProjectId, queryWeekStart]);
+  const initialDefaults = useMemo((): Partial<TimesheetFormValues> => ({}), []);
 
   useEffect(() => {
     if (!sessionLoading && !canCreateTimesheets) {
       router.replace("/timesheets");
     }
   }, [sessionLoading, canCreateTimesheets, router]);
-
-  useEffect(() => {
-    if (sessionLoading || !canCreateTimesheets || queryProjectId || queryWeekStart) return;
-    void adminFetch("/api/admin/timesheets/create-entry")
-      .then(async (res) => {
-        const data = await res.json();
-        if (!res.ok) return;
-        const row = data.data as {
-          projectId?: string;
-          weekStart?: string;
-          existingTimesheetId?: string | null;
-        };
-        if (row.existingTimesheetId) {
-          router.replace(`/timesheets/${row.existingTimesheetId}`);
-          return;
-        }
-        if (!row.projectId || !row.weekStart) return;
-        const params = new URLSearchParams({
-          projectId: row.projectId,
-          weekStart: row.weekStart,
-        });
-        router.replace(`/timesheets/new?${params}`);
-      })
-      .catch(() => undefined);
-  }, [sessionLoading, canCreateTimesheets, queryProjectId, queryWeekStart, router]);
 
   async function handleSubmit(payload: Record<string, unknown>) {
     setIsSaving(true);
@@ -112,6 +72,7 @@ export default function NewTimesheetPage() {
         <TimesheetForm
           title="New Timesheet"
           defaults={initialDefaults}
+          requireProjectFirst
           onSubmit={handleSubmit}
           isSaving={isSaving}
         />

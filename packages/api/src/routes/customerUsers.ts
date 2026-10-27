@@ -5,7 +5,13 @@ import { randomBytes } from "crypto";
 import { prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth";
 import { assertMappedContactAvailable } from "../lib/admin-user-contact-map";
-import { emailTbosUserInvite } from "../lib/user-invite";
+import { emailTbosUserInvite, tbosLoginUrl } from "../lib/user-invite";
+import { sendPasswordResetEmail } from "../lib/mail";
+import {
+  generatePasswordResetToken,
+  hashPasswordResetToken,
+  PASSWORD_RESET_TTL_MS,
+} from "../lib/password-reset";
 
 const router: IRouter = Router();
 
@@ -231,6 +237,57 @@ router.post("/:id/invite", async (req: AuthRequest, res) => {
     console.error("Error sending customer user invite:", error);
     const message = error instanceof Error ? error.message : "Failed to send invite email";
     res.status(500).json({ error: message });
+  }
+});
+
+router.post("/:id/reset-password", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.params.id;
+    if (!userId) return res.status(400).json({ error: "Invalid id" });
+    const user = await prisma.customerUser.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true, active: true },
+    });
+    if (!user) return res.status(404).json({ error: "Not found" });
+    if (!user.active) return res.status(400).json({ error: "User is inactive" });
+
+    const rawToken = generatePasswordResetToken();
+    const tokenHash = hashPasswordResetToken(rawToken);
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+    const resetUrl = `${tbosLoginUrl()}/reset-password?token=${encodeURIComponent(rawToken)}`;
+
+    try {
+      await sendPasswordResetEmail({
+        to: user.email,
+        name: user.name?.trim() || "",
+        resetUrl,
+      });
+    } catch (emailErr) {
+      console.error("Customer password reset email failed:", emailErr);
+      return res.status(503).json({ error: "Could not send reset email. Check mail settings and try again." });
+    }
+
+    const tokenPatch = {
+      passwordResetTokenHash: tokenHash,
+      passwordResetExpiresAt: expiresAt,
+    };
+    await prisma.$transaction([
+      prisma.customerUser.update({ where: { id: user.id }, data: tokenPatch }),
+      prisma.adminUser.updateMany({
+        where: {
+          OR: [{ id: user.id }, { email: { equals: user.email, mode: "insensitive" } }],
+        },
+        data: tokenPatch,
+      }),
+    ]);
+
+    res.json({
+      message: `Password reset email sent to ${user.email}. The link expires in 24 hours.`,
+      emailSent: true,
+    });
+  } catch (error) {
+    console.error("Error sending customer password reset:", error);
+    res.status(500).json({ error: "Failed to send password reset email" });
   }
 });
 
