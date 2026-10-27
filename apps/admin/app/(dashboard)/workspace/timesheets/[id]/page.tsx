@@ -2,7 +2,7 @@
 import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { workspaceFetch } from "@/lib/workspace-fetch";
@@ -13,6 +13,7 @@ import { TimesheetRejectDialog } from "@/components/timesheets/TimesheetRejectDi
 type TimesheetDetail = TimesheetFormValues & { canApprove?: boolean };
 
 export default function WorkspaceTimesheetDetailPage() {
+  const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const [timesheet, setTimesheet] = useState<TimesheetDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -75,7 +76,7 @@ export default function WorkspaceTimesheetDetailPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(messageFromApiError(data, "Failed to reject"));
       setShowReject(false);
-      await loadTimesheet();
+      router.push("/workspace/timesheets/submitted");
     } catch (error) {
       appAlert(error instanceof Error ? error.message : "Failed to reject");
     } finally {
