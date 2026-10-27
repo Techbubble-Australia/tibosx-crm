@@ -100,10 +100,14 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
       }),
     ])
       .then(([meData, list]) => {
-        const me = meData.data as { canApproveTimesheets?: boolean; role?: string };
-        setRole(me.role ?? "CLIENT");
-        setCanApprove(Boolean(me.canApproveTimesheets) || me.role === "admin");
-        setRows(list);
+        const me = meData?.data as { canApproveTimesheets?: boolean; role?: string } | undefined;
+        if (!me) {
+          throw new Error("Could not load workspace profile.");
+        }
+        const workspaceRole = (me.role ?? "CLIENT").toUpperCase();
+        setRole(workspaceRole);
+        setCanApprove(Boolean(me.canApproveTimesheets) || workspaceRole === "ADMIN");
+        setRows(Array.isArray(list) ? list : []);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load timesheets"))
       .finally(() => setLoading(false));
@@ -170,7 +174,7 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
     );
   }
 
-  if (role !== "CLIENT" && role !== "admin") {
+  if (role !== "CLIENT" && role !== "ADMIN") {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-10 text-center text-slate-600">
         <p className="font-medium text-slate-900">Approve/Reject Timesheets</p>

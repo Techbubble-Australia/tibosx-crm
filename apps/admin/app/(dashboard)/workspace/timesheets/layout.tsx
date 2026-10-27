@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 export default function WorkspaceTimesheetsLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const isDetailPage =
     pathname.startsWith("/workspace/timesheets/") &&
     pathname !== "/workspace/timesheets/submitted" &&

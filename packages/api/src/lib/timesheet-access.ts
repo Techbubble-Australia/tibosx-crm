@@ -24,14 +24,21 @@ export async function getTimesheetAccessForUser(
     where: { id: userId },
     select: { email: true, mappedClientContactId: true },
   });
-  const email = admin?.email?.trim().toLowerCase() ?? "";
+  const customer = admin
+    ? null
+    : await prisma.customerUser.findUnique({
+        where: { id: userId },
+        select: { email: true, mappedClientContactId: true },
+      });
+  const email = (admin?.email ?? customer?.email)?.trim().toLowerCase() ?? "";
+  const mappedClientContactId = admin?.mappedClientContactId ?? customer?.mappedClientContactId ?? null;
 
   const approverLink = await prisma.projectClientContact.findFirst({
     where: {
       canApproveTimesheets: true,
       project: { status: "ACTIVE" },
       OR: [
-        ...(admin?.mappedClientContactId ? [{ contactId: admin.mappedClientContactId }] : []),
+        ...(mappedClientContactId ? [{ contactId: mappedClientContactId }] : []),
         ...(email ? [{ contact: { email: { equals: email, mode: "insensitive" as const } } }] : []),
       ],
     },
@@ -52,13 +59,20 @@ export async function timesheetClientApproverWhere(
     where: { id: adminUserId },
     select: { email: true, mappedClientContactId: true },
   });
-  if (!admin) return null;
-  const email = admin.email?.trim().toLowerCase() ?? "";
+  const customer = admin
+    ? null
+    : await prisma.customerUser.findUnique({
+        where: { id: adminUserId },
+        select: { email: true, mappedClientContactId: true },
+      });
+  const email = (admin?.email ?? customer?.email)?.trim().toLowerCase() ?? "";
+  const mappedClientContactId = admin?.mappedClientContactId ?? customer?.mappedClientContactId ?? null;
+  if (!email && !mappedClientContactId) return null;
   const contacts = await prisma.projectClientContact.findMany({
     where: {
       canApproveTimesheets: true,
       OR: [
-        ...(admin.mappedClientContactId ? [{ contactId: admin.mappedClientContactId }] : []),
+        ...(mappedClientContactId ? [{ contactId: mappedClientContactId }] : []),
         ...(email ? [{ contact: { email: { equals: email, mode: "insensitive" as const } } }] : []),
       ],
     },

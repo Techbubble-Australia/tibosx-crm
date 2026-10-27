@@ -283,7 +283,7 @@ function navItemIsActive(item: NavItem, pathname: string): boolean {
 }
 
 function DashboardChrome({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const {
     role,
     additionalRoles,

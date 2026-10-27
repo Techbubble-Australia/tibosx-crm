@@ -19,7 +19,7 @@ function pathAllowed(pathname: string) {
 }
 
 export function MemberOnboardingGuard({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const router = useRouter();
   const { memberOnboarding, impersonation, sessionLoaded, role, additionalRoles } = useAdminSession();
   const isClientUser =
