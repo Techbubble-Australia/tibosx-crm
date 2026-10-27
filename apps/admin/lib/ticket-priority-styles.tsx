@@ -3,13 +3,13 @@ import { TICKET_PRIORITY_LABELS } from "@/lib/support-ticket-labels";
 export function ticketPriorityDotClass(priority: string | null | undefined): string {
   switch ((priority ?? "").toUpperCase()) {
     case "LOW":
-      return "bg-sky-600 ring-1 ring-sky-200";
+      return "bg-blue-500 ring-1 ring-blue-200";
     case "MEDIUM":
       return "bg-amber-500 ring-1 ring-amber-200";
     case "HIGH":
       return "bg-red-500 ring-1 ring-red-200";
     case "URGENT":
-      return "bg-red-700 ring-1 ring-red-300";
+      return "bg-red-600 ring-1 ring-red-300";
     default:
       return "bg-gray-500 ring-1 ring-gray-200";
   }

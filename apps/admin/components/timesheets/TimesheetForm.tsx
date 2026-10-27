@@ -332,8 +332,10 @@ export function TimesheetForm({
   const weekDateInputRef = useRef<HTMLInputElement>(null);
 
   const status = defaults.status ?? "DRAFT";
+  const allowProjectWeekNavigation = !readOnly;
   const formEditable = !readOnly && status === "DRAFT";
   const entryEditable = formEditable && !weekConflict;
+  const panelReadOnly = Boolean(selection && !entryEditable);
   const pageTitle = title ?? (defaults.id ? "Timesheet" : "New Timesheet");
   const loadedMonday = useMemo(
     () => snapToMondayInput(toDateInput(defaults.startDate) || ""),
@@ -357,22 +359,24 @@ export function TimesheetForm({
   }, [projectBounds, weekMonday]);
 
   const canShiftWeekPrev = useMemo(() => {
-    if (!formEditable || !weekMondayBounds) return formEditable;
+    if (!allowProjectWeekNavigation) return false;
+    if (!weekMondayBounds) return true;
     const prev = shiftWeek(weekMonday, -7);
     return (
       prev >= weekMondayBounds.min &&
       weekOverlapsProjectRange(prev, projectBounds!.start, projectBounds!.end)
     );
-  }, [formEditable, weekMonday, weekMondayBounds, projectBounds]);
+  }, [allowProjectWeekNavigation, weekMonday, weekMondayBounds, projectBounds]);
 
   const canShiftWeekNext = useMemo(() => {
-    if (!formEditable || !weekMondayBounds) return formEditable;
+    if (!allowProjectWeekNavigation) return false;
+    if (!weekMondayBounds) return true;
     const next = shiftWeek(weekMonday, 7);
     return (
       next <= weekMondayBounds.max &&
       weekOverlapsProjectRange(next, projectBounds!.start, projectBounds!.end)
     );
-  }, [formEditable, weekMonday, weekMondayBounds, projectBounds]);
+  }, [allowProjectWeekNavigation, weekMonday, weekMondayBounds, projectBounds]);
 
   const projectLabel = projects.find((p) => p.id === projectId)?.label ?? "";
 
@@ -566,7 +570,7 @@ export function TimesheetForm({
     const isNewForm = !defaults.id;
     const weekOrProjectChangedFromRecord =
       Boolean(defaults.id) &&
-      formEditable &&
+      allowProjectWeekNavigation &&
       (weekMonday !== loadedMonday || projectId !== loadedProjectId);
     if (!isNewForm && !weekOrProjectChangedFromRecord) {
       setWeekConflict(false);
@@ -603,7 +607,7 @@ export function TimesheetForm({
       .catch(() => setWeekConflict(false));
   }, [
     defaults.id,
-    formEditable,
+    allowProjectWeekNavigation,
     loadedMonday,
     loadedProjectId,
     projectId,
@@ -652,10 +656,18 @@ export function TimesheetForm({
   }
 
   function openCell(lineKey: string, dayKey: WeekdayKey) {
-    if (!entryEditable) return;
     const line = lines.find((l) => l.key === lineKey);
     const iso = weekDays.find((d) => d.key === dayKey)?.iso;
     if (!line || !iso || !dayWithinProject(iso)) return;
+    const comment = line.dailyComments[dayKey]?.trim() ?? "";
+    if (!entryEditable) {
+      if (!comment && !(line.dailyHours[dayKey] ?? 0)) return;
+      setSelection({ lineKey, dayKey });
+      const h = line.dailyHours[dayKey];
+      setPanelHours(h !== undefined && h > 0 ? String(h) : "");
+      setPanelComment(line.dailyComments[dayKey] ?? "");
+      return;
+    }
     setSelection({ lineKey, dayKey });
     const h = line.dailyHours[dayKey];
     setPanelHours(h !== undefined && h > 0 ? String(h) : "");
@@ -777,7 +789,7 @@ export function TimesheetForm({
   }, [defaults.projectId]);
 
   useEffect(() => {
-    if (!formEditable || !projectId) return;
+    if (!allowProjectWeekNavigation || !projectId) return;
     const prev = prevProjectIdRef.current;
     if (prev === projectId) return;
     prevProjectIdRef.current = projectId;
@@ -797,7 +809,7 @@ export function TimesheetForm({
       .finally(() => {
         projectEntryPointPendingRef.current = false;
       });
-  }, [projectId, formEditable, router]);
+  }, [projectId, allowProjectWeekNavigation, router]);
 
   return (
     <form onSubmit={(e) => void handleSave(e)} className="flex flex-col xl:flex-row xl:items-start">
@@ -821,7 +833,7 @@ export function TimesheetForm({
                 <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Project <span className="text-red-500">*</span>
                 </label>
-                {!formEditable && projectDisplayLabel ? (
+                {!allowProjectWeekNavigation && projectDisplayLabel ? (
                   <p
                     className="flex h-10 items-center rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                     title={projectDisplayLabel}
@@ -830,14 +842,14 @@ export function TimesheetForm({
                   </p>
                 ) : (
                   <select
-                    className={`${selectClass} ${formEditable ? "" : "cursor-not-allowed bg-gray-50"}`}
+                    className={`${selectClass} ${allowProjectWeekNavigation ? "" : "cursor-not-allowed bg-gray-50"}`}
                     value={projectId}
                     onChange={(e) => {
                       setProjectId(e.target.value);
                       setLines([emptyLine()]);
                       setSelection(null);
                     }}
-                    disabled={!formEditable}
+                    disabled={!allowProjectWeekNavigation}
                     required
                   >
                     <option value="">Select project…</option>
@@ -876,7 +888,7 @@ export function TimesheetForm({
                     />
                     <button
                       type="button"
-                      disabled={!formEditable}
+                      disabled={!allowProjectWeekNavigation}
                       onClick={() => weekDateInputRef.current?.showPicker?.() ?? weekDateInputRef.current?.click()}
                       className="flex h-10 w-full items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                     >
@@ -980,13 +992,13 @@ export function TimesheetForm({
                             <td key={key} className="border-l border-gray-100 p-1 dark:border-gray-800">
                               <button
                                 type="button"
-                                disabled={!entryEditable || !dayAllowed}
+                                disabled={!dayAllowed || (!entryEditable && !hasComment && !(value > 0))}
                                 onClick={() => openCell(line.key, key)}
                                 className={`relative flex h-11 w-full flex-col items-center justify-center rounded-md text-sm tabular-nums transition-colors ${
                                   isSelected
                                     ? "border-2 border-blue-500 bg-blue-50/50 ring-1 ring-blue-200"
                                     : "border border-transparent hover:bg-gray-50 dark:hover:bg-gray-900"
-                                } ${!entryEditable || !dayAllowed ? "cursor-default opacity-60" : ""}`}
+                                } ${!entryEditable && !hasComment && !(value > 0) ? "cursor-default opacity-60" : ""}`}
                               >
                                 <span className="font-medium text-gray-900 dark:text-gray-100">
                                   {formatHoursCell(value)}
@@ -1262,6 +1274,7 @@ export function TimesheetForm({
               <select
                 className={selectClass}
                 value={selectedLine.caseKey}
+                disabled={panelReadOnly}
                 onChange={(e) => updateLine(selectedLine.key, { caseKey: e.target.value, label: undefined })}
               >
                 <option value="">Select task…</option>
@@ -1280,6 +1293,7 @@ export function TimesheetForm({
               <input
                 type="text"
                 inputMode="decimal"
+                readOnly={panelReadOnly}
                 className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm tabular-nums focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900"
                 value={panelHours}
                 onChange={(e) => setPanelHours(sanitizeHoursInput(e.target.value))}
@@ -1298,18 +1312,22 @@ export function TimesheetForm({
                 className="min-h-[6rem] w-full resize-y rounded-md border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
                 placeholder="Describe work completed on this task for the day…"
                 value={panelComment}
+                readOnly={panelReadOnly}
                 onChange={(e) => setPanelComment(e.target.value)}
                 rows={4}
               />
             </div>
 
-            <div className="flex items-start gap-2 rounded-lg border border-sky-100 bg-sky-50/80 px-3 py-2.5 text-xs text-sky-950 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" aria-hidden />
-              <p>
-                Task entries are created within this timesheet and do not affect the project task list.
-              </p>
-            </div>
+            {panelReadOnly ? null : (
+              <div className="flex items-start gap-2 rounded-lg border border-sky-100 bg-sky-50/80 px-3 py-2.5 text-xs text-sky-950 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" aria-hidden />
+                <p>
+                  Task entries are created within this timesheet and do not affect the project task list.
+                </p>
+              </div>
+            )}
 
+            {panelReadOnly ? null : (
             <button
               type="button"
               onClick={() => deleteSelectedTicketRow()}
@@ -1317,8 +1335,10 @@ export function TimesheetForm({
             >
               <Trash2 className="h-4 w-4" /> Delete this entry
             </button>
+            )}
 
             <div className="flex flex-col gap-2 pt-2">
+              {panelReadOnly ? null : (
               <button
                 type="button"
                 onClick={() => savePanelEntry()}
@@ -1326,6 +1346,7 @@ export function TimesheetForm({
               >
                 <Check className="h-4 w-4" /> Save Entry
               </button>
+              )}
               <button
                 type="button"
                 onClick={() => setSelection(null)}

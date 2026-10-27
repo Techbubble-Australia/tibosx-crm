@@ -66,6 +66,11 @@ function formatTimesheetPeriod(startDate: string, endDate: string) {
   return `${formatDate(startDate)} – ${formatDate(endDate)}`;
 }
 
+function ticketsFilterHref(base: string, status: string) {
+  const join = base.includes("?") ? "&" : "?";
+  return `${base}${join}status=${encodeURIComponent(status)}`;
+}
+
 export function CustomerSupportDashboard({
   ticketDetailHref,
   timesheetDetailHref = (id) => `/timesheets/${id}`,
@@ -156,22 +161,34 @@ export function CustomerSupportDashboard({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+        <Link
+          href={ticketsFilterHref(ticketsListHref, "OPEN")}
+          className="rounded-xl border border-gray-200 bg-white p-3 transition-colors hover:border-sky-300 hover:bg-sky-50/40 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-sky-800"
+        >
           <p className="text-sm text-gray-500">Open tickets</p>
-          <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{counts.open}</p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+          <p className="text-2xl font-semibold text-sky-700 dark:text-sky-300">{counts.open}</p>
+        </Link>
+        <Link
+          href={ticketsFilterHref(ticketsListHref, "PENDING_CLIENT")}
+          className="rounded-xl border border-gray-200 bg-white p-3 transition-colors hover:border-sky-300 hover:bg-sky-50/40 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-sky-800"
+        >
           <p className="text-sm text-gray-500">Awaiting response</p>
-          <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{counts.awaitingResponse}</p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+          <p className="text-2xl font-semibold text-sky-700 dark:text-sky-300">{counts.awaitingResponse}</p>
+        </Link>
+        <Link
+          href={ticketsFilterHref(ticketsListHref, "IN_PROGRESS")}
+          className="rounded-xl border border-gray-200 bg-white p-3 transition-colors hover:border-sky-300 hover:bg-sky-50/40 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-sky-800"
+        >
           <p className="text-sm text-gray-500">In progress</p>
-          <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{counts.inProgress}</p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+          <p className="text-2xl font-semibold text-sky-700 dark:text-sky-300">{counts.inProgress}</p>
+        </Link>
+        <Link
+          href={ticketsFilterHref(ticketsListHref, "RESOLVED")}
+          className="rounded-xl border border-gray-200 bg-white p-3 transition-colors hover:border-sky-300 hover:bg-sky-50/40 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-sky-800"
+        >
           <p className="text-sm text-gray-500">Resolved</p>
-          <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{counts.resolved}</p>
-        </div>
+          <p className="text-2xl font-semibold text-sky-700 dark:text-sky-300">{counts.resolved}</p>
+        </Link>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

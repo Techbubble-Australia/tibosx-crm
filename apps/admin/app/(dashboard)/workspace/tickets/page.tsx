@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { SortableTh, toggleSortKey, type SortDir } from "@/components/ui/SortableTh";
 import Link from "next/link";
@@ -40,8 +41,9 @@ const CARD_STATUS_ORDER = [
 ] as const;
 
 export default function TicketsPage() {
+  const searchParams = useSearchParams();
   const [rows, setRows] = useState<TicketRow[]>([]);
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(() => searchParams.get("status")?.trim().toUpperCase() ?? "");
   const [q, setQ] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [sortKey, setSortKey] = useState<"ticketNumber" | "subject" | "project" | "priority" | "status" | "updatedAt">(

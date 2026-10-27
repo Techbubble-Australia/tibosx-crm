@@ -2,6 +2,7 @@
 import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { SortableTh, toggleSortKey, type SortDir } from "@/components/ui/SortableTh";
 import Link from "next/link";
@@ -29,8 +30,9 @@ type TicketRow = {
 
 export default function SupportTicketsPage() {
   const { role } = useAdminSession();
+  const searchParams = useSearchParams();
   const [rows, setRows] = useState<TicketRow[]>([]);
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(() => searchParams.get("status")?.trim().toUpperCase() ?? "");
   const [organizationId, setOrganizationId] = useState("");
   const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
   const [error, setError] = useState("");

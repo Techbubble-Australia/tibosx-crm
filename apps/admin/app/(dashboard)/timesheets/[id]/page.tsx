@@ -69,6 +69,14 @@ export default function TimesheetDetailPage() {
   }
 
   async function submitForApproval() {
+    if (
+      !(await appConfirm(
+        "You won't be able to make any further changes after submission. Do you want to continue?",
+        { title: "Submit for approval" },
+      ))
+    ) {
+      return;
+    }
     setActionLoading(true);
     try {
       const res = await adminFetch("/api/admin/timesheets/submit", {

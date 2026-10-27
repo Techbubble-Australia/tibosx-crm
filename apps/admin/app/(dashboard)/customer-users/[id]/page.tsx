@@ -67,7 +67,10 @@ export default function EditCustomerUserPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(messageFromApiError(data, "Failed to save"));
-      appAlert("Customer user saved.");
+      appAlert("Customer user saved. Password updates apply to TBOS sign-in for this email.");
+      const form = e.currentTarget;
+      const pwd = form.querySelector<HTMLInputElement>('input[name="password"]');
+      if (pwd) pwd.value = "";
     } catch (error) {
       appAlert(error instanceof Error ? error.message : "Failed to save");
     } finally {
@@ -152,11 +155,25 @@ export default function EditCustomerUserPage() {
                 setInviteLoading(true);
                 try {
                   const res = await adminFetch(`/api/admin/customer-users/${id}/invite`, { method: "POST" });
-                  const data = await res.json();
-                  if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to send invite");
+                  const data = (await res.json().catch(() => ({}))) as {
+                    error?: string;
+                    message?: string;
+                    temporaryPassword?: string;
+                  };
+                  if (!res.ok) {
+                    if (data.temporaryPassword) {
+                      appAlert(
+                        `${messageFromApiError(data, "Failed to send invite")}\n\n` +
+                          "Their previous password was already replaced. Share this temporary password:\n\n" +
+                          data.temporaryPassword,
+                      );
+                      return;
+                    }
+                    throw new Error(messageFromApiError(data, "Failed to send invite"));
+                  }
                   appAlert(
-                    (data as { message?: string }).message ||
-                      "Invite email sent with a new temporary password.",
+                    (data.message || "Invite email sent with a new temporary password.") +
+                      "\n\nAny earlier password no longer works.",
                   );
                 } catch (error) {
                   appAlert(error instanceof Error ? error.message : "Failed to send invite");

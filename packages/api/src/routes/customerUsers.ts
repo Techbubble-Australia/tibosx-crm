@@ -145,20 +145,27 @@ router.patch("/:id", async (req: AuthRequest, res) => {
         data: patch,
         select: listSelect,
       });
-      if (existing.mappedClientContactId || input.mappedClientContactId) {
-        await tx.adminUser.updateMany({
-          where: { id: existing.id, role: "client" },
-          data: {
-            email: row.email,
-            name: row.name,
-            phone: row.phone,
-            active: row.active,
-            profilePhotoUrl: row.profilePhotoUrl,
-            mappedClientContactId: row.mappedClientContactId,
-            ...(input.password ? { passwordHash: patch.passwordHash as string } : {}),
-          },
-        });
+      const adminSync: Record<string, unknown> = {
+        email: row.email,
+        name: row.name,
+        phone: row.phone,
+        active: row.active,
+        profilePhotoUrl: row.profilePhotoUrl,
+        mappedClientContactId: row.mappedClientContactId,
+      };
+      if (input.password) {
+        adminSync.passwordHash = patch.passwordHash;
+        adminSync.passwordNeedsReset = false;
       }
+      await tx.adminUser.updateMany({
+        where: {
+          OR: [
+            { id: existing.id },
+            { email: { equals: existing.email, mode: "insensitive" } },
+          ],
+        },
+        data: adminSync,
+      });
       return row;
     });
 
@@ -196,21 +203,34 @@ router.post("/:id/invite", async (req: AuthRequest, res) => {
       }),
     ]);
 
-    await emailTbosUserInvite({
-      to: user.email,
-      name: user.name || user.email,
-      temporaryPassword,
-      context: "client",
-    });
+    try {
+      await emailTbosUserInvite({
+        to: user.email,
+        name: user.name || user.email,
+        temporaryPassword,
+        context: "client",
+      });
+    } catch (emailErr) {
+      console.error("Error sending customer user invite:", emailErr);
+      const message =
+        emailErr instanceof Error ? emailErr.message : "Failed to send invite email";
+      return res.status(502).json({
+        error: `${message} The user's password was reset — share the temporary password manually.`,
+        inviteEmailSent: false,
+        temporaryPassword,
+        passwordReset: true,
+      });
+    }
 
     res.json({
       message: "Invite email sent. A new temporary password replaced any previous password on this account.",
       inviteEmailSent: true,
+      passwordReset: true,
     });
   } catch (error) {
     console.error("Error sending customer user invite:", error);
     const message = error instanceof Error ? error.message : "Failed to send invite email";
-    res.status(502).json({ error: message });
+    res.status(500).json({ error: message });
   }
 });
 

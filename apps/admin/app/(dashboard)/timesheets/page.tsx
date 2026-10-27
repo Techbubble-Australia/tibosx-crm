@@ -107,6 +107,14 @@ export default function TimesheetsPage() {
       appAlert("Select at least one draft timesheet.");
       return;
     }
+    if (
+      !(await appConfirm(
+        "You won't be able to make any further changes after submission. Do you want to continue?",
+        { title: "Submit for approval" },
+      ))
+    ) {
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await adminFetch("/api/admin/timesheets/submit", {
@@ -231,6 +239,14 @@ export default function TimesheetsPage() {
   }
 
   async function submitOne(id: string) {
+    if (
+      !(await appConfirm(
+        "You won't be able to make any further changes after submission. Do you want to continue?",
+        { title: "Submit for approval" },
+      ))
+    ) {
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await adminFetch("/api/admin/timesheets/submit", {
