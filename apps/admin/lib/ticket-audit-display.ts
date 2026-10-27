@@ -30,14 +30,32 @@ export function formatTicketAuditLine(log: TicketAuditRow): string {
           ? "Priority"
           : log.field === "type"
             ? "Type"
-            : log.field === "description"
-              ? "Description"
-              : log.field === "subject"
-                ? "Subject"
-                : log.field;
+            : log.field === "assignedToId"
+              ? "Assigned to"
+              : log.field === "description"
+                ? "Description"
+                : log.field === "subject"
+                  ? "Subject"
+                  : log.field;
     if (log.field === "description") return `${fieldLabel} updated${actor}`;
-    const from = log.oldValue ? labelForField(log.field, log.oldValue) : "—";
-    const to = log.newValue ? labelForField(log.field, log.newValue) : "—";
+    const fromEmpty =
+      log.field === "assignedToId" && (!log.oldValue || log.oldValue === "null");
+    const toEmpty =
+      log.field === "assignedToId" && (!log.newValue || log.newValue === "null");
+    const from = fromEmpty
+      ? "Unassigned"
+      : log.oldValue
+        ? labelForField(log.field, log.oldValue)
+        : log.field === "assignedToId"
+          ? "Unassigned"
+          : "—";
+    const to = toEmpty
+      ? "Unassigned"
+      : log.newValue
+        ? labelForField(log.field, log.newValue)
+        : log.field === "assignedToId"
+          ? "Unassigned"
+          : "—";
     return `${fieldLabel} changed from ${from} to ${to}${actor}`;
   }
   const action = log.action.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());

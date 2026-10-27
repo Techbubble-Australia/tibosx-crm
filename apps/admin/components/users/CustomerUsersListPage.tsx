@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
+import { appAlert, appConfirm } from "@/lib/app-alert";
+import { messageFromApiError } from "@/lib/api-error";
 
 type CustomerUserRow = {
   id: string;
@@ -16,18 +19,52 @@ type CustomerUserRow = {
 export function CustomerUsersListPage({ activeOnly }: { activeOnly: boolean }) {
   const [rows, setRows] = useState<CustomerUserRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function reload() {
+    const res = await adminFetch("/api/admin/customer-users");
+    const data = await res.json();
+    setRows((data.data as CustomerUserRow[]) ?? []);
+  }
 
   useEffect(() => {
-    void adminFetch("/api/admin/customer-users")
-      .then((res) => res.json())
-      .then((data) => setRows((data.data as CustomerUserRow[]) ?? []))
-      .finally(() => setLoading(false));
+    void reload().finally(() => setLoading(false));
   }, []);
 
   const filtered = useMemo(
     () => rows.filter((row) => (activeOnly ? row.active : !row.active)),
     [rows, activeOnly],
   );
+
+  async function deactivate(row: CustomerUserRow) {
+    if (!(await appConfirm(`Deactivate ${row.name || row.email}? They will not be able to sign in.`))) return;
+    setBusyId(row.id);
+    try {
+      const res = await adminFetch(`/api/admin/customer-users/${row.id}/deactivate`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(messageFromApiError(data, "Failed to deactivate"));
+      await reload();
+    } catch (e) {
+      appAlert(e instanceof Error ? e.message : "Failed to deactivate");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function deleteUser(row: CustomerUserRow) {
+    if (!(await appConfirm(`Delete ${row.name || row.email}? This cannot be undone.`))) return;
+    setBusyId(row.id);
+    try {
+      const res = await adminFetch(`/api/admin/customer-users/${row.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(messageFromApiError(data, "Failed to delete"));
+      await reload();
+    } catch (e) {
+      appAlert(e instanceof Error ? e.message : "Failed to delete");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   if (loading) {
     return (
@@ -55,12 +92,15 @@ export function CustomerUsersListPage({ activeOnly }: { activeOnly: boolean }) {
               <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Phone</th>
               <th className="px-4 py-3">MFA</th>
+              {activeOnly ? <th className="px-4 py-3 text-right">Actions</th> : null}
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-gray-500">No customer users found.</td>
+                <td colSpan={activeOnly ? 5 : 4} className="px-4 py-8 text-center text-gray-500">
+                  No customer users found.
+                </td>
               </tr>
             ) : (
               filtered.map((row) => (
@@ -83,6 +123,29 @@ export function CustomerUsersListPage({ activeOnly }: { activeOnly: boolean }) {
                       {row.mfaEnabled ? "Enabled" : "Off"}
                     </span>
                   </td>
+                  {activeOnly ? (
+                    <td className="px-4 py-3 text-right">
+                      <div className="inline-flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={busyId === row.id}
+                          onClick={() => void deactivate(row)}
+                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600"
+                        >
+                          Deactivate
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busyId === row.id}
+                          onClick={() => void deleteUser(row)}
+                          className="rounded-lg border border-gray-200 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-red-950/30"
+                          aria-label={`Delete ${row.name || row.email}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  ) : null}
                 </tr>
               ))
             )}

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { TablePagination } from "@/components/ui/TablePagination";
+import { SortableTh, toggleSortKey, type SortDir } from "@/components/ui/SortableTh";
 import Link from "next/link";
 import { workspaceFetch } from "@/lib/workspace-fetch";
 import {
@@ -42,6 +44,47 @@ export default function TicketsPage() {
   const [status, setStatus] = useState("");
   const [q, setQ] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [sortKey, setSortKey] = useState<"ticketNumber" | "subject" | "project" | "priority" | "status" | "updatedAt">(
+    "updatedAt",
+  );
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  const sortedRows = useMemo(() => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      switch (sortKey) {
+        case "ticketNumber":
+          return a.ticketNumber.localeCompare(b.ticketNumber) * dir;
+        case "subject":
+          return a.subject.localeCompare(b.subject) * dir;
+        case "project":
+          return (a.projectLabel ?? "").localeCompare(b.projectLabel ?? "") * dir;
+        case "priority":
+          return a.priority.localeCompare(b.priority) * dir;
+        case "status":
+          return a.status.localeCompare(b.status) * dir;
+        case "updatedAt":
+        default:
+          return (new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()) * dir;
+      }
+    });
+  }, [rows, sortKey, sortDir]);
+
+  const pagedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return sortedRows.slice(start, start + pageSize);
+  }, [sortedRows, page, pageSize]);
+
+  function handleSort(
+    key: "ticketNumber" | "subject" | "project" | "priority" | "status" | "updatedAt",
+  ) {
+    const next = toggleSortKey(key, sortKey, sortDir);
+    setSortKey(next.key);
+    setSortDir(next.dir);
+    setPage(1);
+  }
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -135,17 +178,17 @@ export default function TicketsPage() {
           <table className="min-w-full text-sm">
             <thead className="border-b bg-gray-50 text-left text-gray-500">
               <tr>
-                <th className="px-4 py-3">Ticket #</th>
-                <th className="px-4 py-3">Subject</th>
-                <th className="px-4 py-3">Project</th>
-                <th className="px-4 py-3">Priority</th>
-                <th className="min-w-[11rem] whitespace-nowrap px-4 py-3">Status</th>
+                <SortableTh label="Ticket #" sortKey="ticketNumber" activeKey={sortKey} dir={sortDir} onSort={handleSort} className="px-4 py-3" />
+                <SortableTh label="Subject" sortKey="subject" activeKey={sortKey} dir={sortDir} onSort={handleSort} className="px-4 py-3" />
+                <SortableTh label="Project" sortKey="project" activeKey={sortKey} dir={sortDir} onSort={handleSort} className="px-4 py-3" />
+                <SortableTh label="Priority" sortKey="priority" activeKey={sortKey} dir={sortDir} onSort={handleSort} className="px-4 py-3" />
+                <SortableTh label="Status" sortKey="status" activeKey={sortKey} dir={sortDir} onSort={handleSort} className="min-w-[11rem] whitespace-nowrap px-4 py-3" />
                 <th className="whitespace-nowrap px-4 py-3">Assigned to</th>
-                <th className="whitespace-nowrap px-4 py-3">Updated</th>
+                <SortableTh label="Updated" sortKey="updatedAt" activeKey={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y">
-              {rows.map((row) => {
+              {pagedRows.map((row) => {
                 const projectName = row.projectLabel?.trim() || "—";
                 return (
                   <tr key={row.id} className="hover:bg-gray-50">
@@ -181,6 +224,17 @@ export default function TicketsPage() {
               })}
             </tbody>
           </table>
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={sortedRows.length}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+            pageSizeOptions={[10, 20, 50, 100]}
+          />
         </div>
       )}
     </div>

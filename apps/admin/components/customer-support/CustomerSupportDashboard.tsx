@@ -6,7 +6,7 @@ import { normalizeTicketStatusKey } from "@/lib/support-ticket-labels";
 import { TicketPriorityBadge } from "@/lib/ticket-priority-styles";
 import { TicketStatusBadge } from "@/lib/ticket-status-styles";
 import { EmptyTickets } from "@/components/workspace/EmptyTickets";
-import { TimesheetStatusBadge } from "@/lib/timesheet-status-styles";
+import { TICKET_STATUS_LABELS } from "@/lib/support-ticket-labels";
 
 export type TicketRow = {
   id: string;
@@ -53,6 +53,9 @@ type Props = {
   loadTimesheetSummary?: () => Promise<TimesheetSummary>;
   loadRecentSubmittedTimesheets?: () => Promise<SubmittedTimesheetRow[]>;
   showTimesheetSummary?: boolean;
+  /** When false, the right-hand column shows a tickets-by-status chart instead of timesheets. */
+  showTimesheetsWidget?: boolean;
+  subtitle?: string;
 };
 
 function formatDate(value: string) {
@@ -73,6 +76,8 @@ export function CustomerSupportDashboard({
   loadTimesheetSummary,
   loadRecentSubmittedTimesheets,
   showTimesheetSummary = false,
+  showTimesheetsWidget = false,
+  subtitle = "Track ticket status at a glance.",
 }: Props) {
   const [rows, setRows] = useState<TicketRow[]>([]);
   const [activity, setActivity] = useState<ActivityRow[]>([]);
@@ -87,12 +92,19 @@ export function CustomerSupportDashboard({
         .then(setTimesheets)
         .catch(() => setTimesheets({ total: 0, pendingApproval: 0 }));
     }
-    if (loadRecentSubmittedTimesheets) {
+    if (showTimesheetsWidget && loadRecentSubmittedTimesheets) {
       void loadRecentSubmittedTimesheets()
         .then(setRecentSubmitted)
         .catch(() => setRecentSubmitted([]));
     }
-  }, [loadTickets, loadActivity, loadTimesheetSummary, loadRecentSubmittedTimesheets, showTimesheetSummary]);
+  }, [
+    loadTickets,
+    loadActivity,
+    loadTimesheetSummary,
+    loadRecentSubmittedTimesheets,
+    showTimesheetSummary,
+    showTimesheetsWidget,
+  ]);
 
   const counts = useMemo(() => {
     let open = 0;
@@ -119,11 +131,28 @@ export function CustomerSupportDashboard({
 
   const recentActivity = activity.slice(0, 3);
 
+  const statusChart = useMemo(() => {
+    const keys = ["OPEN", "IN_PROGRESS", "PENDING_CLIENT", "RESOLVED", "CLOSED", "CANCELLED"] as const;
+    const counts = new Map<string, number>();
+    for (const key of keys) counts.set(key, 0);
+    for (const row of rows) {
+      const key = normalizeTicketStatusKey(row.status);
+      if (counts.has(key)) counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const max = Math.max(1, ...keys.map((k) => counts.get(k) ?? 0));
+    return keys.map((key) => ({
+      key,
+      label: TICKET_STATUS_LABELS[key] ?? key,
+      count: counts.get(key) ?? 0,
+      max,
+    }));
+  }, [rows]);
+
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Dashboard</h1>
-        <p className="text-sm text-gray-500">Track ticket and timesheet status at a glance.</p>
+        <p className="text-sm text-gray-500">{subtitle}</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -178,42 +207,63 @@ export function CustomerSupportDashboard({
           )}
         </section>
 
-        <section className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h2 className="font-semibold text-gray-900 dark:text-gray-100">Timesheets</h2>
-            <Link href={timesheetsHref} className="text-sm text-sky-600 hover:underline">View timesheets</Link>
-          </div>
-          {showTimesheetSummary ? (
-            <p className="mb-2 text-xs text-gray-500">
-              {timesheets.pendingApproval} awaiting approval · {timesheets.total} total
-            </p>
-          ) : null}
-          {recentSubmitted.length === 0 ? (
-            <p className="text-sm text-gray-500">No submitted timesheets yet.</p>
-          ) : (
-            <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-              {recentSubmitted.slice(0, 3).map((row) => (
-                <li
-                  key={row.id}
-                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-2 text-sm"
-                >
-                  <div className="min-w-0">
-                    <Link
-                      href={timesheetDetailHref(row.id)}
-                      className="font-medium text-sky-600 hover:underline"
-                    >
-                      {formatTimesheetPeriod(row.startDate, row.endDate)}
-                    </Link>
-                    <p className="truncate text-gray-700 dark:text-gray-300">{row.memberName}</p>
-                  </div>
-                  <div className="justify-self-end">
-                    <TimesheetStatusBadge status={row.status ?? "SUBMITTED"} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        {showTimesheetsWidget ? (
+          <section className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100">Timesheets</h2>
+              <Link href={timesheetsHref} className="text-sm text-sky-600 hover:underline">View timesheets</Link>
+            </div>
+            {showTimesheetSummary ? (
+              <p className="mb-2 text-xs text-gray-500">
+                {timesheets.pendingApproval} awaiting approval · {timesheets.total} total
+              </p>
+            ) : null}
+            {recentSubmitted.length === 0 ? (
+              <p className="text-sm text-gray-500">No submitted timesheets yet.</p>
+            ) : (
+              <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+                {recentSubmitted.slice(0, 3).map((row) => (
+                  <li
+                    key={row.id}
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <Link
+                        href={timesheetDetailHref(row.id)}
+                        className="font-medium text-sky-600 hover:underline"
+                      >
+                        {formatTimesheetPeriod(row.startDate, row.endDate)}
+                      </Link>
+                      <p className="truncate text-gray-700 dark:text-gray-300">{row.memberName}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ) : (
+          <section className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+            <h2 className="mb-3 font-semibold text-gray-900 dark:text-gray-100">Tickets by status</h2>
+            {rows.length === 0 ? (
+              <p className="text-sm text-gray-500">No tickets yet.</p>
+            ) : (
+              <ul className="space-y-2.5">
+                {statusChart.map((bar) => (
+                  <li key={bar.key} className="grid grid-cols-[7.5rem_minmax(0,1fr)_2rem] items-center gap-2 text-sm">
+                    <span className="truncate text-gray-600 dark:text-gray-400" title={bar.label}>{bar.label}</span>
+                    <div className="h-3 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                      <div
+                        className="h-full rounded-full bg-sky-500 transition-all"
+                        style={{ width: `${(bar.count / bar.max) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-right font-medium text-gray-900 dark:text-gray-100">{bar.count}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
       </div>
 
       <section>

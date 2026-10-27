@@ -27,6 +27,7 @@ export async function listSupportPortalOrganizations(
   const rows = await prisma.project.findMany({
     where: {
       status: "ACTIVE",
+      kind: "SUPPORT",
       supportOrganization: {
         active: true,
         ...orgScope,

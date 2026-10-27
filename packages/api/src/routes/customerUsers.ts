@@ -214,6 +214,26 @@ router.post("/:id/invite", async (req: AuthRequest, res) => {
   }
 });
 
+router.delete("/:id", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    if (!userId) return res.status(400).json({ error: "Invalid id" });
+    const existing = await prisma.customerUser.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ error: "Not found" });
+    await prisma.$transaction([
+      prisma.customerUser.delete({ where: { id: userId } }),
+      prisma.adminUser.deleteMany({ where: { id: userId, role: "client" } }),
+    ]);
+    res.json({ message: "Customer user deleted" });
+  } catch (error) {
+    console.error("Error deleting customer user:", error);
+    res.status(500).json({ error: "Failed to delete customer user" });
+  }
+});
+
 router.post("/:id/deactivate", async (req, res) => {
   try {
     const row = await prisma.customerUser.update({

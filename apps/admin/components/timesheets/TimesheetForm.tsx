@@ -572,6 +572,9 @@ export function TimesheetForm({
       setWeekConflict(false);
       return;
     }
+    if (projectEntryPointPendingRef.current) {
+      return;
+    }
     void adminFetch(
       `/api/admin/timesheets/for-week?projectId=${encodeURIComponent(projectId)}&startDate=${encodeURIComponent(weekMonday)}`,
     )
@@ -580,7 +583,13 @@ export function TimesheetForm({
         const existing = data.data as { id?: string; status?: string } | null;
         if (existing?.id) {
           if (existing.id !== defaults.id) {
-            router.replace(`/timesheets/${existing.id}`);
+            if (isNewForm && existing.status && existing.status !== "DRAFT") {
+              setWeekConflict(true);
+              return;
+            }
+            if (existing.status === "DRAFT" || !isNewForm) {
+              router.replace(`/timesheets/${existing.id}`);
+            }
           }
           return;
         }
@@ -762,6 +771,7 @@ export function TimesheetForm({
   }
 
   const prevProjectIdRef = useRef(defaults.projectId ?? "");
+  const projectEntryPointPendingRef = useRef(false);
   useEffect(() => {
     prevProjectIdRef.current = defaults.projectId ?? "";
   }, [defaults.projectId]);
@@ -771,6 +781,8 @@ export function TimesheetForm({
     const prev = prevProjectIdRef.current;
     if (prev === projectId) return;
     prevProjectIdRef.current = projectId;
+    projectEntryPointPendingRef.current = true;
+    setWeekConflict(false);
     void adminFetch(`/api/admin/timesheets/entry-point?projectId=${encodeURIComponent(projectId)}`)
       .then((r) => r.json())
       .then((data) => {
@@ -781,7 +793,10 @@ export function TimesheetForm({
         }
         if (row.weekStart) void applyWeekChange(row.weekStart);
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        projectEntryPointPendingRef.current = false;
+      });
   }, [projectId, formEditable, router]);
 
   return (

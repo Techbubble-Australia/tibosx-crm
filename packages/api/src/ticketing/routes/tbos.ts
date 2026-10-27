@@ -567,11 +567,26 @@ router.patch("/tickets/:id", async (req: TbosRequest, res) => {
     if (next === undefined) continue;
     const prev = existing[field];
     if (String(prev ?? "") !== String(next ?? "")) {
-      await logTicketAudit(existing.id, actorId, "UPDATED", {
-        field,
-        oldValue: String(prev ?? ""),
-        newValue: String(next ?? ""),
-      });
+      if (field === "assignedToId") {
+        const { formatTicketAssigneeAuditValue } = await import("../lib/ticket-audit.js");
+        const oldValue = await formatTicketAssigneeAuditValue(
+          typeof prev === "string" ? prev : null,
+        );
+        const newValue = await formatTicketAssigneeAuditValue(
+          typeof next === "string" ? next : null,
+        );
+        await logTicketAudit(existing.id, actorId, "UPDATED", {
+          field,
+          oldValue,
+          newValue,
+        });
+      } else {
+        await logTicketAudit(existing.id, actorId, "UPDATED", {
+          field,
+          oldValue: String(prev ?? ""),
+          newValue: String(next ?? ""),
+        });
+      }
     }
   }
 

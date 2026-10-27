@@ -1,7 +1,7 @@
 "use client";
 import { appAlert, appConfirm } from "@/lib/app-alert";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Download, Plus, Send, Trash2 } from "lucide-react";
@@ -9,8 +9,10 @@ import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
 import { messageFromApiError } from "@/lib/api-error";
-import { type TimesheetStatus } from "@/lib/project-types";
+import { TIMESHEET_STATUSES, TIMESHEET_STATUS_LABELS, type TimesheetStatus } from "@/lib/project-types";
 import { TimesheetStatusBadge } from "@/lib/timesheet-status-styles";
+import { TablePagination } from "@/components/ui/TablePagination";
+import { SortableTh, toggleSortKey, type SortDir } from "@/components/ui/SortableTh";
 
 type TimesheetRow = {
   id: string;
@@ -41,6 +43,46 @@ export default function TimesheetsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("");
+  const [sortKey, setSortKey] = useState<"period" | "project" | "member" | "status">("period");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  const filteredRows = useMemo(() => {
+    let list = rows;
+    if (statusFilter) list = list.filter((row) => row.status === statusFilter);
+    const sorted = [...list].sort((a, b) => {
+      const dir = sortDir === "asc" ? 1 : -1;
+      switch (sortKey) {
+        case "project": {
+          const al = a.targetLabel || a.projectTitle || "";
+          const bl = b.targetLabel || b.projectTitle || "";
+          return al.localeCompare(bl) * dir;
+        }
+        case "member":
+          return a.memberName.localeCompare(b.memberName) * dir;
+        case "status":
+          return a.status.localeCompare(b.status) * dir;
+        case "period":
+        default:
+          return (new Date(a.startDate).getTime() - new Date(b.startDate).getTime()) * dir;
+      }
+    });
+    return sorted;
+  }, [rows, statusFilter, sortKey, sortDir]);
+
+  const pagedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredRows.slice(start, start + pageSize);
+  }, [filteredRows, page, pageSize]);
+
+  function handleSort(key: "period" | "project" | "member" | "status") {
+    const next = toggleSortKey(key, sortKey, sortDir);
+    setSortKey(next.key);
+    setSortDir(next.dir);
+    setPage(1);
+  }
 
   async function fetchRows() {
     try {
@@ -260,6 +302,23 @@ export default function TimesheetsPage() {
             </p>
           </div>
         ) : (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
+                aria-label="Filter by status"
+              >
+                <option value="">All statuses</option>
+                {TIMESHEET_STATUSES.map((value) => (
+                  <option key={value} value={value}>{TIMESHEET_STATUS_LABELS[value]}</option>
+                ))}
+              </select>
+            </div>
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
             <table className="min-w-full text-sm">
               <thead className="border-b border-gray-100 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
@@ -272,18 +331,46 @@ export default function TimesheetsPage() {
                       onChange={() => toggleExportSelectAll()}
                     />
                   </th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Timesheet period</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Project</th>
+                  <SortableTh
+                    label="Timesheet period"
+                    sortKey="period"
+                    activeKey={sortKey}
+                    dir={sortDir}
+                    onSort={handleSort}
+                    className="px-4 py-2 text-left"
+                  />
+                  <SortableTh
+                    label="Project"
+                    sortKey="project"
+                    activeKey={sortKey}
+                    dir={sortDir}
+                    onSort={handleSort}
+                    className="px-4 py-2 text-left"
+                  />
                   {canManageProjects ? (
-                    <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Member</th>
+                    <SortableTh
+                      label="Member"
+                      sortKey="member"
+                      activeKey={sortKey}
+                      dir={sortDir}
+                      onSort={handleSort}
+                      className="px-4 py-2 text-left"
+                    />
                   ) : null}
-                  <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
+                  <SortableTh
+                    label="Status"
+                    sortKey="status"
+                    activeKey={sortKey}
+                    dir={sortDir}
+                    onSort={handleSort}
+                    className="px-4 py-2 text-left"
+                  />
                   <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Approver</th>
                   <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => {
+                {pagedRows.map((row) => {
                   const projectLine =
                     row.targetLabel && row.targetLabel.includes(" — ")
                       ? row.targetLabel
@@ -364,6 +451,18 @@ export default function TimesheetsPage() {
                 })}
               </tbody>
             </table>
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              totalItems={filteredRows.length}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
+              pageSizeOptions={[10, 20, 50, 100]}
+            />
+          </div>
           </div>
         )}
       </div>

@@ -8,7 +8,7 @@ import {
   prisma,
 } from "@techbubble/database";
 import { authMiddleware, type TicketingRequest } from "../middleware/auth.js";
-import { logTicketAudit } from "../lib/ticket-audit.js";
+import { formatTicketAssigneeAuditValue, logTicketAudit } from "../lib/ticket-audit.js";
 import { nextTicketNumber } from "../lib/ticket-number.js";
 import {
   canAccessTicketOrganization,
@@ -458,11 +458,25 @@ router.patch("/:id", async (req: TicketingRequest, res) => {
     if (next === undefined) continue;
     const prev = existing[field];
     if (String(prev) !== String(next)) {
-      await logTicketAudit(existing.id, user.id, "UPDATED", {
-        field,
-        oldValue: String(prev ?? ""),
-        newValue: String(next ?? ""),
-      });
+      if (field === "assignedToId") {
+        const oldValue = await formatTicketAssigneeAuditValue(
+          typeof prev === "string" ? prev : null,
+        );
+        const newValue = await formatTicketAssigneeAuditValue(
+          typeof next === "string" ? next : null,
+        );
+        await logTicketAudit(existing.id, user.id, "UPDATED", {
+          field,
+          oldValue,
+          newValue,
+        });
+      } else {
+        await logTicketAudit(existing.id, user.id, "UPDATED", {
+          field,
+          oldValue: String(prev ?? ""),
+          newValue: String(next ?? ""),
+        });
+      }
     }
   }
 

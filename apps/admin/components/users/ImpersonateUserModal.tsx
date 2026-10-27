@@ -1,14 +1,17 @@
 "use client";
-import { appAlert, appConfirm } from "@/lib/app-alert";
+import { appAlert } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import { Loader2, Search, X } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { defaultLandingPath } from "@/lib/admin-roles";
 
+type Audience = "internal" | "customer";
+
 type SearchRow = { id: string; email: string; name: string | null; role: string };
 
 export function ImpersonateUserModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [audience, setAudience] = useState<Audience>("internal");
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<SearchRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -18,6 +21,7 @@ export function ImpersonateUserModal({ open, onClose }: { open: boolean; onClose
     if (!open) {
       setQ("");
       setRows([]);
+      setAudience("internal");
       return;
     }
     if (q.trim().length < 2) {
@@ -26,13 +30,14 @@ export function ImpersonateUserModal({ open, onClose }: { open: boolean; onClose
     }
     const handle = window.setTimeout(() => {
       setLoading(true);
-      void adminFetch(`/api/auth/impersonate/search?q=${encodeURIComponent(q.trim())}`)
+      const params = new URLSearchParams({ q: q.trim(), audience });
+      void adminFetch(`/api/auth/impersonate/search?${params}`)
         .then((res) => res.json())
         .then((data) => setRows((data.data as SearchRow[]) ?? []))
         .finally(() => setLoading(false));
     }, 250);
     return () => window.clearTimeout(handle);
-  }, [open, q]);
+  }, [open, q, audience]);
 
   async function startImpersonation(userId: string) {
     setStarting(userId);
@@ -68,6 +73,26 @@ export function ImpersonateUserModal({ open, onClose }: { open: boolean; onClose
           <button type="button" onClick={onClose} className="rounded p-1 text-gray-500 hover:bg-gray-100">
             <X className="h-5 w-5" />
           </button>
+        </div>
+        <div className="mb-3 flex gap-4 text-sm">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="radio"
+              name="impersonate-audience"
+              checked={audience === "internal"}
+              onChange={() => setAudience("internal")}
+            />
+            Internal user
+          </label>
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="radio"
+              name="impersonate-audience"
+              checked={audience === "customer"}
+              onChange={() => setAudience("customer")}
+            />
+            Customer user
+          </label>
         </div>
         <div className="relative mb-3">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />

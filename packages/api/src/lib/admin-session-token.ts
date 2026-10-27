@@ -36,7 +36,12 @@ export async function createFullSessionTokenForUserId(
   });
   if (customer) {
     if (customer.active === false) return null;
-    return generateToken({ id: customer.id, email: customer.email, role: "client" });
+    return generateToken({
+      id: customer.id,
+      email: customer.email,
+      role: "client",
+      ...(impersonatorId ? { impersonatorId } : {}),
+    });
   }
   const user = await prisma.adminUser.findUnique({
     where: { id: userId },
@@ -50,17 +55,29 @@ export async function createImpersonationToken(
   impersonatorId: string,
   targetUserId: string,
 ): Promise<string | null> {
-  const [impersonator, target] = await Promise.all([
-    prisma.adminUser.findUnique({
-      where: { id: impersonatorId },
-      select: { id: true, role: true, active: true },
-    }),
-    prisma.adminUser.findUnique({
-      where: { id: targetUserId },
-      select: { id: true, email: true, role: true, additionalRoles: true, active: true },
-    }),
-  ]);
+  const impersonator = await prisma.adminUser.findUnique({
+    where: { id: impersonatorId },
+    select: { id: true, role: true, active: true },
+  });
   if (!impersonator?.active || impersonator.role !== "admin") return null;
+
+  const customer = await prisma.customerUser.findUnique({
+    where: { id: targetUserId },
+    select: { id: true, email: true, active: true },
+  });
+  if (customer?.active && customer.id !== impersonatorId) {
+    return generateToken({
+      id: customer.id,
+      email: customer.email,
+      role: "client",
+      impersonatorId,
+    });
+  }
+
+  const target = await prisma.adminUser.findUnique({
+    where: { id: targetUserId },
+    select: { id: true, email: true, role: true, additionalRoles: true, active: true },
+  });
   if (!target?.active || target.id === impersonatorId) return null;
   return generateToken(sessionAuthUser(target, impersonatorId));
 }

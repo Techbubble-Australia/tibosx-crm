@@ -29,7 +29,7 @@ export default function ForgotPasswordPage() {
       setMessage(
         typeof data.message === "string"
           ? data.message
-          : "If an account exists for that email, we sent password reset instructions.",
+          : "Thank you. If an account exists for that email, you will receive password reset instructions.",
       );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Request failed");

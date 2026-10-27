@@ -326,11 +326,41 @@ router.get("/impersonate/search", authMiddleware, async (req: AuthRequest, res) 
     return res.status(403).json({ error: "Forbidden" });
   }
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  const audience =
+    typeof req.query.audience === "string" && req.query.audience === "customer"
+      ? "customer"
+      : "internal";
   if (q.length < 2) return res.json({ data: [] });
+
+  if (audience === "customer") {
+    const customers = await prisma.customerUser.findMany({
+      where: {
+        active: true,
+        OR: [
+          { email: { contains: q, mode: "insensitive" } },
+          { name: { contains: q, mode: "insensitive" } },
+        ],
+      },
+      orderBy: { email: "asc" },
+      take: 20,
+      select: { id: true, email: true, name: true },
+    });
+    return res.json({
+      data: customers.map((row) => ({
+        id: row.id,
+        email: row.email,
+        name: row.name,
+        role: "client",
+        audience: "customer",
+      })),
+    });
+  }
+
   const rows = await prisma.adminUser.findMany({
     where: {
       active: true,
       id: { not: actor.id },
+      role: { not: "client" },
       OR: [
         { email: { contains: q, mode: "insensitive" } },
         { name: { contains: q, mode: "insensitive" } },
@@ -340,7 +370,7 @@ router.get("/impersonate/search", authMiddleware, async (req: AuthRequest, res) 
     take: 20,
     select: { id: true, email: true, name: true, role: true },
   });
-  res.json({ data: rows });
+  res.json({ data: rows.map((row) => ({ ...row, audience: "internal" })) });
 });
 
 router.post("/impersonate/start", authMiddleware, async (req: AuthRequest, res) => {
@@ -422,9 +452,22 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
     }
     const { getTimesheetAccessForUser } = await import("../lib/timesheet-access.js");
     const timesheetAccess = await getTimesheetAccessForUser(customer.id, "client", []);
+    let impersonation: { impersonatorId: string; impersonatorName: string } | null = null;
+    if (u.impersonatorId) {
+      const impersonator = await prisma.adminUser.findUnique({
+        where: { id: u.impersonatorId },
+        select: { id: true, name: true, email: true },
+      });
+      if (impersonator) {
+        impersonation = {
+          impersonatorId: impersonator.id,
+          impersonatorName: impersonator.name || impersonator.email,
+        };
+      }
+    }
     return res.json({
       data: {
-        impersonation: null,
+        impersonation,
         user: {
           ...publicUser({ ...customer, role: "client", mfaEnabled: customer.mfaEnabled }),
           requiresMfaEnrollment:
@@ -1028,12 +1071,24 @@ router.post("/password/forgot", async (req, res) => {
     const { email } = forgotPasswordSchema.parse(req.body);
     const normalizedEmail = email.trim().toLowerCase();
 
-    const user = await prisma.adminUser.findFirst({
+    const customer = await prisma.customerUser.findFirst({
       where: { email: { equals: normalizedEmail, mode: "insensitive" } },
       select: { id: true, email: true, name: true, active: true, passwordHash: true },
     });
 
-    if (user?.active !== false && user?.passwordHash) {
+    const adminUser = await prisma.adminUser.findFirst({
+      where: { email: { equals: normalizedEmail, mode: "insensitive" } },
+      select: { id: true, email: true, name: true, active: true, passwordHash: true },
+    });
+
+    const account =
+      customer?.active !== false && customer?.passwordHash
+        ? { kind: "customer" as const, row: customer }
+        : adminUser?.active !== false && adminUser?.passwordHash
+          ? { kind: "admin" as const, row: adminUser }
+          : null;
+
+    if (account) {
       const rawToken = generatePasswordResetToken();
       const tokenHash = hashPasswordResetToken(rawToken);
       const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
@@ -1041,8 +1096,8 @@ router.post("/password/forgot", async (req, res) => {
       const resetUrl = `${tbosLoginUrl()}/reset-password?token=${encodeURIComponent(rawToken)}`;
       try {
         await sendPasswordResetEmail({
-          to: user.email,
-          name: user.name?.trim() || "",
+          to: account.row.email,
+          name: account.row.name?.trim() || "",
           resetUrl,
         });
       } catch (emailErr) {
@@ -1050,17 +1105,28 @@ router.post("/password/forgot", async (req, res) => {
         return res.status(503).json({ error: "Could not send reset email. Try again later." });
       }
 
-      await prisma.adminUser.update({
-        where: { id: user.id },
-        data: {
-          passwordResetTokenHash: tokenHash,
-          passwordResetExpiresAt: expiresAt,
-        },
-      });
+      if (account.kind === "customer") {
+        await prisma.customerUser.update({
+          where: { id: account.row.id },
+          data: {
+            passwordResetTokenHash: tokenHash,
+            passwordResetExpiresAt: expiresAt,
+          },
+        });
+      } else {
+        await prisma.adminUser.update({
+          where: { id: account.row.id },
+          data: {
+            passwordResetTokenHash: tokenHash,
+            passwordResetExpiresAt: expiresAt,
+          },
+        });
+      }
     }
 
     res.json({
-      message: "If an account exists for that email, we sent password reset instructions.",
+      message:
+        "Thank you. If an account exists for that email, you will receive password reset instructions.",
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -1076,7 +1142,7 @@ router.post("/password/reset", async (req, res) => {
     const { token, newPassword } = resetPasswordWithTokenSchema.parse(req.body);
     const tokenHash = hashPasswordResetToken(token.trim());
 
-    const user = await prisma.adminUser.findFirst({
+    const customer = await prisma.customerUser.findFirst({
       where: {
         passwordResetTokenHash: tokenHash,
         passwordResetExpiresAt: { gt: new Date() },
@@ -1084,13 +1150,35 @@ router.post("/password/reset", async (req, res) => {
       select: { id: true, active: true },
     });
 
-    if (!user || user.active === false) {
+    const adminUser = await prisma.adminUser.findFirst({
+      where: {
+        passwordResetTokenHash: tokenHash,
+        passwordResetExpiresAt: { gt: new Date() },
+      },
+      select: { id: true, active: true },
+    });
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    if (customer && customer.active !== false) {
+      await prisma.customerUser.update({
+        where: { id: customer.id },
+        data: {
+          passwordHash,
+          passwordNeedsReset: false,
+          passwordResetTokenHash: null,
+          passwordResetExpiresAt: null,
+        },
+      });
+      return res.json({ message: "Password updated. You can sign in with your new password." });
+    }
+
+    if (!adminUser || adminUser.active === false) {
       return res.status(400).json({ error: "This reset link is invalid or has expired." });
     }
 
-    const passwordHash = await bcrypt.hash(newPassword, 10);
     await prisma.adminUser.update({
-      where: { id: user.id },
+      where: { id: adminUser.id },
       data: {
         passwordHash,
         passwordNeedsReset: false,

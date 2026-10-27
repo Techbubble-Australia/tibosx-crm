@@ -25,6 +25,6 @@ export async function POST(req: Request) {
     message:
       typeof data.message === "string"
         ? data.message
-        : "If an account exists for that email, we sent password reset instructions.",
+        : "Thank you. If an account exists for that email, you will receive password reset instructions.",
   });
 }
