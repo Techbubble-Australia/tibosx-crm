@@ -43,7 +43,15 @@ const messageSchema = z.object({
 });
 
 const lifecycleSchema = z.object({
-  action: z.enum(["reopen", "start_work", "client_info_needed", "resolve", "close", "cancel"]),
+  action: z.enum([
+    "reopen",
+    "start_work",
+    "resume_work",
+    "client_info_needed",
+    "resolve",
+    "close",
+    "cancel",
+  ]),
   resolutionNotes: z.string().max(20000).optional(),
 });
 

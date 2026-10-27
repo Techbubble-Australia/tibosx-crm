@@ -208,7 +208,9 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
       );
   const statusKey = normalizeTicketStatusKey(ticket.status);
   const canEditResolutionNotes =
-    portalRole === "CONSULTANT" && !closedOrCancelled && statusKey === "IN_PROGRESS";
+    portalRole === "CONSULTANT" &&
+    !closedOrCancelled &&
+    (statusKey === "IN_PROGRESS" || statusKey === "PENDING_CLIENT");
   const projectLine = ticket.projectLabel?.trim() || null;
   const projectHref =
     ticket.projectId && canManageProjects ? `/projects/${ticket.projectId}` : null;

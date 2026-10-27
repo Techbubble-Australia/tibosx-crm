@@ -199,7 +199,9 @@ export default function TicketDetailPage() {
     ticket.assignedToId !== me?.id;
   const statusKey = normalizeTicketStatusKey(ticket.status);
   const canEditResolutionNotes =
-    isConsultant && !closedOrCancelled && statusKey === "IN_PROGRESS";
+    isConsultant &&
+    !closedOrCancelled &&
+    (statusKey === "IN_PROGRESS" || statusKey === "PENDING_CLIENT");
   const projectLine = ticket.projectLabel?.trim() || null;
 
   const headerActions = !closedOrCancelled ? (

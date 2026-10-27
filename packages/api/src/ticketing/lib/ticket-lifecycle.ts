@@ -4,6 +4,7 @@ import { effectiveRoleList } from "../../lib/admin-roles.js";
 export type TicketLifecycleAction =
   | "reopen"
   | "start_work"
+  | "resume_work"
   | "client_info_needed"
   | "resolve"
   | "close"
@@ -20,10 +21,14 @@ export function nextStatusForLifecycleAction(
       return current === TicketStatus.OPEN || current === TicketStatus.DRAFT
         ? TicketStatus.IN_PROGRESS
         : null;
+    case "resume_work":
+      return current === TicketStatus.PENDING_CLIENT ? TicketStatus.IN_PROGRESS : null;
     case "client_info_needed":
       return current === TicketStatus.IN_PROGRESS ? TicketStatus.PENDING_CLIENT : null;
     case "resolve":
-      return current === TicketStatus.IN_PROGRESS ? TicketStatus.RESOLVED : null;
+      return current === TicketStatus.IN_PROGRESS || current === TicketStatus.PENDING_CLIENT
+        ? TicketStatus.RESOLVED
+        : null;
     case "close":
       return current === TicketStatus.RESOLVED ? TicketStatus.CLOSED : null;
     case "cancel":
@@ -44,10 +49,12 @@ export function canPerformLifecycleAction(
   options?: { isCreator?: boolean },
 ): boolean {
   if (role === "CONSULTANT") {
-    if (options?.isCreator && action !== "start_work") {
-      return false;
-    }
-    return action === "start_work" || action === "client_info_needed" || action === "resolve";
+    return (
+      action === "start_work" ||
+      action === "resume_work" ||
+      action === "client_info_needed" ||
+      action === "resolve"
+    );
   }
   return action === "reopen" || action === "close" || action === "cancel";
 }

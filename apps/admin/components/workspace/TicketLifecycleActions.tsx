@@ -20,7 +20,7 @@ const LIFECYCLE_CONFIRM: Partial<Record<string, string>> = {
 export function TicketLifecycleActions({
   status,
   role,
-  isCreator,
+  isCreator: _isCreator,
   disabled,
   resolutionNotes = "",
   onAction,
@@ -28,8 +28,10 @@ export function TicketLifecycleActions({
   const statusKey = normalizeTicketStatusKey(status);
   const isConsultant = role === "CONSULTANT";
   const isClient = role === "CLIENT";
-  const canConsultantAct = isConsultant && !isCreator;
+  const canConsultantAct = isConsultant;
   const canStartWork = isConsultant && (statusKey === "OPEN" || statusKey === "DRAFT");
+  const canResolve =
+    canConsultantAct && (statusKey === "IN_PROGRESS" || statusKey === "PENDING_CLIENT");
 
   const buttons: { action: string; label: string; show: boolean }[] = [
     { action: "reopen", label: "Re-open", show: isClient && statusKey === "RESOLVED" },
@@ -39,11 +41,16 @@ export function TicketLifecycleActions({
       show: canStartWork,
     },
     {
+      action: "resume_work",
+      label: "Resume work",
+      show: canConsultantAct && statusKey === "PENDING_CLIENT",
+    },
+    {
       action: "client_info_needed",
       label: "Client info needed",
       show: canConsultantAct && statusKey === "IN_PROGRESS",
     },
-    { action: "resolve", label: "Resolve", show: canConsultantAct && statusKey === "IN_PROGRESS" },
+    { action: "resolve", label: "Resolve", show: canResolve },
     { action: "close", label: "Close", show: isClient && statusKey === "RESOLVED" },
     {
       action: "cancel",
