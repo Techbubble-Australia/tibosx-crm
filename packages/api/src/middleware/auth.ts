@@ -6,6 +6,8 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-producti
 
 /** Cookie set by the admin Next.js app after login (httpOnly). */
 export const ADMIN_SESSION_COOKIE = "admin_session";
+/** Cookie for the debug ticket portal app (admin-only, MFA bypass at login). */
+export const DEBUG_PORTAL_SESSION_COOKIE = "debug_portal_session";
 
 export const MFA_PENDING_PURPOSE = "mfa_pending";
 export const MFA_SETUP_REQUIRED_PURPOSE = "mfa_setup_required";
@@ -50,7 +52,7 @@ function extractBearerToken(req: Request): string | undefined {
   if (authHeader?.startsWith("Bearer ")) {
     return authHeader.slice(7);
   }
-  return getCookie(req, ADMIN_SESSION_COOKIE);
+  return getCookie(req, ADMIN_SESSION_COOKIE) ?? getCookie(req, DEBUG_PORTAL_SESSION_COOKIE);
 }
 
 export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {

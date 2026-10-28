@@ -6,7 +6,18 @@ import { appAlert } from "@/lib/app-alert";
 import { useDebugMode, type DebugCaptureType, type ReportedEnvironment } from "@/contexts/DebugModeContext";
 import { JsonTreePreview } from "@/components/debug/JsonTreePreview";
 
-function Accordion({
+function trafficLogHint(reason: string | undefined): string {
+  switch (reason) {
+    case "element_text":
+      return "Matched a recent API response using text or ids from the element you clicked (and nearby labels).";
+    case "list_context":
+      return "Matched a recent list/table API call for this part of the page.";
+    case "recent_request":
+      return "Matched a recent API call on this page (no strong text match — verify the endpoint below).";
+    default:
+      return "Inferred from recent adminFetch traffic on this page.";
+  }
+}
   title,
   children,
   defaultOpen = false,
@@ -189,9 +200,25 @@ export function DebugTicketModal() {
 
               <Accordion title="API prerequisite">
                 {draft.apiPrerequisite ? (
-                  <JsonTreePreview value={draft.apiPrerequisite} />
+                  <>
+                    {draft.apiPrerequisite.captureSource === "traffic_log" ? (
+                      <p className="mb-2 text-xs text-sky-700 dark:text-sky-300">
+                        {trafficLogHint(draft.apiPrerequisite.trafficMatchReason)}
+                      </p>
+                    ) : draft.apiPrerequisite.captureSource === "dom" ? (
+                      <p className="mb-2 text-xs text-gray-500">
+                        From <code className="text-[11px]">data-api-endpoint</code> on this element or a parent.
+                      </p>
+                    ) : null}
+                    <JsonTreePreview value={draft.apiPrerequisite} />
+                  </>
                 ) : (
-                  <p className="text-xs text-gray-500">No data-api-endpoint on this element or its ancestors.</p>
+                  <p className="text-xs text-gray-500">
+                    No API captured. In development, load the page so data appears (API calls are recorded), then
+                    capture again. For a guaranteed link, add{" "}
+                    <code className="text-[11px]">data-api-endpoint=&quot;/api/...&quot;</code> on a parent of
+                    this UI.
+                  </p>
                 )}
               </Accordion>
 

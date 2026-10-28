@@ -77,6 +77,7 @@ function serializeRow(row: {
   id: string;
   ticketId: string;
   type: string;
+  status: string;
   reportedEnvironment: string;
   userDescription: string;
   reporterUserId: string;
@@ -94,6 +95,7 @@ function serializeRow(row: {
     id: row.id,
     ticketId: row.ticketId,
     type: row.type,
+    status: row.status,
     reportedEnvironment: row.reportedEnvironment,
     userDescription: row.userDescription,
     reporterUserId: row.reporterUserId,
@@ -196,6 +198,7 @@ router.get("/", async (req, res) => {
           id: true,
           ticketId: true,
           type: true,
+          status: true,
           reportedEnvironment: true,
           userDescription: true,
           reporterUserId: true,

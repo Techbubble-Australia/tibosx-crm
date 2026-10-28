@@ -28,6 +28,8 @@ import { profileRoutes } from "./routes/profiles";
 import { adminUserRoutes } from "./routes/adminUsers";
 import { customerUserRoutes } from "./routes/customerUsers";
 import { debugCaptureTicketRoutes } from "./routes/debug-capture-tickets.js";
+import { debugPortalAuthRoutes } from "./routes/debug-portal-auth.js";
+import { debugPortalTicketRoutes } from "./routes/debug-portal-tickets.js";
 import { authMiddleware } from "./middleware/auth";
 import { requireMfaEnrolled } from "./middleware/requireMfaEnrolled";
 import { requireRole, requireModule, requireAnyModule, blockModuleMutations } from "./middleware/requireRole";
@@ -156,6 +158,13 @@ app.use(
   requireRole("admin"),
   assertDevEnvMiddleware,
   debugCaptureTicketRoutes,
+);
+app.use("/api/debug-portal/auth", debugPortalAuthRoutes);
+app.use(
+  "/api/debug-portal/tickets",
+  authMiddleware,
+  requireRole("admin"),
+  debugPortalTicketRoutes,
 );
 app.use(
   "/api/admin/workspace-groups",

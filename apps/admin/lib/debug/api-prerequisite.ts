@@ -1,4 +1,5 @@
 import { adminFetch } from "@/lib/admin-api";
+import { inferApiPrerequisiteFromTraffic, type TrafficInferenceReason } from "@/lib/debug/api-traffic-log";
 
 export type ApiPrerequisiteCapture = {
   endpoint: string;
@@ -6,23 +7,17 @@ export type ApiPrerequisiteCapture = {
   status: number | null;
   latencyMs: number;
   payloadCaptured: unknown;
+  /** How this block was resolved (for the debug ticket UI). */
+  captureSource?: "dom" | "traffic_log";
+  trafficMatchReason?: TrafficInferenceReason;
 };
 
-/**
- * If `el` or an ancestor has `data-api-endpoint`, probe that URL (credentials included).
- * Optional: `data-api-method`, `data-api-body` (JSON string for POST/PUT/PATCH).
- */
-export async function captureApiPrerequisite(el: Element): Promise<ApiPrerequisiteCapture | null> {
-  const host = el.closest("[data-api-endpoint]") as HTMLElement | null;
-  if (!host) return null;
-
-  const endpoint = host.getAttribute("data-api-endpoint")?.trim();
-  if (!endpoint) return null;
-
-  const method = (host.getAttribute("data-api-method") ?? "GET").trim().toUpperCase();
-  const bodyRaw = host.getAttribute("data-api-body");
+async function probeEndpoint(
+  endpoint: string,
+  method: string,
+  bodyRaw: string | null,
+): Promise<Omit<ApiPrerequisiteCapture, "captureSource">> {
   const started = performance.now();
-
   try {
     const init: RequestInit = {
       method,
@@ -61,4 +56,35 @@ export async function captureApiPrerequisite(el: Element): Promise<ApiPrerequisi
       },
     };
   }
+}
+
+/**
+ * Resolves API context for a debug capture:
+ * 1. `data-api-endpoint` on the element or an ancestor (re-fetches live).
+ * 2. Otherwise, a recent successful `adminFetch` matched by element text/ids or list context.
+ */
+export async function captureApiPrerequisite(el: Element): Promise<ApiPrerequisiteCapture | null> {
+  const host = el.closest("[data-api-endpoint]") as HTMLElement | null;
+  if (host) {
+    const endpoint = host.getAttribute("data-api-endpoint")?.trim();
+    if (endpoint) {
+      const method = (host.getAttribute("data-api-method") ?? "GET").trim().toUpperCase();
+      const bodyRaw = host.getAttribute("data-api-body");
+      const probed = await probeEndpoint(endpoint, method, bodyRaw);
+      return { ...probed, captureSource: "dom" };
+    }
+  }
+
+  const inferred = inferApiPrerequisiteFromTraffic(el);
+  if (!inferred) return null;
+
+  return {
+    endpoint: inferred.entry.endpoint,
+    method: inferred.entry.method,
+    status: inferred.entry.status,
+    latencyMs: inferred.entry.latencyMs,
+    payloadCaptured: inferred.entry.payloadCaptured,
+    captureSource: "traffic_log",
+    trafficMatchReason: inferred.reason,
+  };
 }

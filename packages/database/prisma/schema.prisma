@@ -1279,10 +1279,18 @@ enum DebugReportedEnvironment {
   production
 }
 
+enum DebugCaptureTicketStatus {
+  PENDING
+  IN_PROGRESS
+  FOR_REVIEW
+  COMPLETED
+}
+
 model DebugCaptureTicket {
   id                   String                   @id @default(cuid())
   ticketId             String                   @unique
   type                 DebugCaptureTicketType
+  status               DebugCaptureTicketStatus @default(PENDING)
   reportedEnvironment  DebugReportedEnvironment @default(development)
   userDescription      String                   @db.Text
   reporterUserId       String
@@ -1298,4 +1306,5 @@ model DebugCaptureTicket {
 
   @@index([createdAt])
   @@index([reporterUserId])
+  @@index([status])
 }
