@@ -4,6 +4,8 @@ import { prisma } from "@techbubble/database";
 import type { TicketingAuthUser } from "../middleware/auth.js";
 import { syncConsultantOrganizationsForTbosUser } from "../../lib/support-organization.js";
 import { provisionClientPortalUser } from "../../lib/support-project.js";
+import { ensureClientPortalContactLinks } from "./client-timesheet-projects.js";
+import { resolveTbosClientPortalIdentity } from "./client-portal-identity.js";
 
 const WORKSPACE_TBOS_ROLES = new Set(["client", "customer_support"]);
 
@@ -15,26 +17,28 @@ async function resolveClientTicketingUser(
   adminUserId: string,
   email: string,
 ): Promise<TicketingAuthUser | null> {
-  const admin = await prisma.adminUser.findUnique({
-    where: { id: adminUserId },
-    select: { mappedClientContactId: true, name: true, email: true },
-  });
-
-  const emailLower = email.trim().toLowerCase();
+  const identity = await resolveTbosClientPortalIdentity(adminUserId);
   const portalAccessOr = [{ portalAccess: true }, { canApproveTimesheets: true }];
-  const link = await prisma.projectClientContact.findFirst({
-    where: {
-      project: { status: "ACTIVE" },
-      OR: [
-        ...(admin?.mappedClientContactId
-          ? [{ contactId: admin.mappedClientContactId, OR: portalAccessOr }]
-          : []),
-        { contact: { email: { equals: emailLower, mode: "insensitive" } }, OR: portalAccessOr },
-      ],
-    },
-    include: { ticketingUser: true, project: { select: { supportOrganization: { select: { id: true } } } } },
-    orderBy: { updatedAt: "desc" },
-  });
+  const contactEmailFilters = identity.contactEmails.map((rowEmail) => ({
+    contact: { email: { equals: rowEmail, mode: "insensitive" as const } },
+  }));
+
+  const linkClauses = [
+    ...(identity.contactIds.length
+      ? [{ contactId: { in: identity.contactIds }, OR: portalAccessOr }]
+      : []),
+    ...contactEmailFilters.map((filter) => ({ ...filter, OR: portalAccessOr })),
+  ];
+  const link = linkClauses.length
+    ? await prisma.projectClientContact.findFirst({
+        where: {
+          project: { status: "ACTIVE" },
+          OR: linkClauses,
+        },
+        include: { ticketingUser: true, project: { select: { supportOrganization: { select: { id: true } } } } },
+        orderBy: { updatedAt: "desc" },
+      })
+    : null;
 
   if (link) {
     let tu = link.ticketingUser;
@@ -65,19 +69,38 @@ async function resolveClientTicketingUser(
     }
   }
 
-  const byEmail = await prisma.ticketingUser.findFirst({
-    where: { email: email.toLowerCase(), role: "CLIENT", active: true },
+  const emailsForLink = [...new Set([...identity.contactEmails, email.trim().toLowerCase()])];
+  const existingClient = await prisma.ticketingUser.findFirst({
+    where: {
+      role: "CLIENT",
+      active: true,
+      OR: emailsForLink.map((rowEmail) => ({ email: { equals: rowEmail, mode: "insensitive" } })),
+    },
   });
-  if (!byEmail) return null;
-  return {
-    id: byEmail.id,
-    email: byEmail.email,
-    role: "CLIENT",
-    organizationId: byEmail.organizationId,
-    consultantVerified: byEmail.consultantVerified,
-    tbosRole: "client",
-    tbosAdminUserId: adminUserId,
-  };
+  if (existingClient) {
+    await ensureClientPortalContactLinks(existingClient.id, emailsForLink);
+    const afterLink = await prisma.projectClientContact.findFirst({
+      where: {
+        ticketingUserId: existingClient.id,
+        OR: portalAccessOr,
+        project: { status: "ACTIVE" },
+      },
+      select: { id: true },
+    });
+    if (afterLink) {
+      return {
+        id: existingClient.id,
+        email: existingClient.email,
+        role: "CLIENT",
+        organizationId: existingClient.organizationId,
+        consultantVerified: existingClient.consultantVerified,
+        tbosRole: "client",
+        tbosAdminUserId: adminUserId,
+      };
+    }
+  }
+
+  return null;
 }
 
 async function resolveConsultantTicketingUser(

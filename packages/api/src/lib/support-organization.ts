@@ -24,8 +24,16 @@ export async function ensureSupportOrganizationForProject(projectId: string) {
     where: { projectId },
   });
   if (existing) {
+    if (!existing.active) {
+      await prisma.organization.update({
+        where: { id: existing.id },
+        data: { active: true },
+      });
+    }
     await syncConsultantAccessForOrganization(existing.id);
-    return existing;
+    return existing.active
+      ? existing
+      : await prisma.organization.findUniqueOrThrow({ where: { id: existing.id } });
   }
 
   const project = await prisma.project.findUnique({

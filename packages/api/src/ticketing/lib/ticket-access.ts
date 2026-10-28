@@ -1,5 +1,7 @@
 import { prisma } from "@techbubble/database";
 import type { TicketingAuthUser } from "../middleware/auth.js";
+import { ensureClientPortalContactLinks } from "./client-timesheet-projects.js";
+import { resolveTbosClientPortalIdentity } from "./client-portal-identity.js";
 
 const TBOS_ADMIN_ROLES = new Set(["admin"]);
 
@@ -31,18 +33,12 @@ export async function organizationIdsForClientPortal(
   tbosAdminUserId: string | null,
 ): Promise<string[]> {
   const projectIds = new Set<string>();
-  const contactIds = new Set<string>();
-  let adminEmail: string | null = null;
+  const portalAccessOr = [{ portalAccess: true }, { canApproveTimesheets: true }] as const;
 
+  let identity = { adminEmail: null as string | null, contactIds: [] as string[], contactEmails: [] as string[] };
   if (tbosAdminUserId) {
-    const admin = await prisma.adminUser.findUnique({
-      where: { id: tbosAdminUserId },
-      select: { mappedClientContactId: true, email: true },
-    });
-    adminEmail = admin?.email?.trim().toLowerCase() ?? null;
-    if (admin?.mappedClientContactId) {
-      contactIds.add(admin.mappedClientContactId);
-    }
+    identity = await resolveTbosClientPortalIdentity(tbosAdminUserId);
+    await ensureClientPortalContactLinks(ticketingUserId, identity.contactEmails);
 
     const approverProjects = await prisma.project.findMany({
       where: {
@@ -57,24 +53,21 @@ export async function organizationIdsForClientPortal(
     }
   }
 
-  const portalAccessOr = [{ portalAccess: true }, { canApproveTimesheets: true }] as const;
+  const contactEmailFilters =
+    identity.contactEmails.length > 0
+      ? identity.contactEmails.map((email) => ({
+          contact: { email: { equals: email, mode: "insensitive" as const } },
+        }))
+      : [];
+
   const portalLinks = await prisma.projectClientContact.findMany({
     where: {
       OR: [
         { ticketingUserId, OR: [...portalAccessOr] },
-        ...(contactIds.size
-          ? [
-              { contactId: { in: [...contactIds] }, OR: [...portalAccessOr] },
-            ]
+        ...(identity.contactIds.length
+          ? [{ contactId: { in: identity.contactIds }, OR: [...portalAccessOr] }]
           : []),
-        ...(adminEmail
-          ? [
-              {
-                contact: { email: { equals: adminEmail, mode: "insensitive" as const } },
-                OR: [...portalAccessOr],
-              },
-            ]
-          : []),
+        ...contactEmailFilters.map((filter) => ({ ...filter, OR: [...portalAccessOr] })),
       ],
       project: { status: "ACTIVE" },
     },
@@ -84,23 +77,23 @@ export async function organizationIdsForClientPortal(
     projectIds.add(link.projectId);
   }
 
-  let clientId: string | null = null;
-  for (const contactId of contactIds) {
-    const contact = await prisma.clientContact.findUnique({
-      where: { id: contactId },
+  const clientIds = new Set<string>();
+  if (identity.contactIds.length) {
+    const contacts = await prisma.clientContact.findMany({
+      where: { id: { in: identity.contactIds } },
       select: { clientId: true },
     });
-    if (contact?.clientId) {
-      clientId = contact.clientId;
-      break;
+    for (const row of contacts) {
+      if (row.clientId) clientIds.add(row.clientId);
     }
   }
 
-  if (clientId) {
+  for (const clientId of clientIds) {
     const clientProjects = await prisma.project.findMany({
       where: {
         clientId,
         status: "ACTIVE",
+        kind: "SUPPORT",
         supportOrganization: { active: true },
       },
       select: { id: true },
@@ -116,6 +109,7 @@ export async function organizationIdsForClientPortal(
     where: {
       id: { in: [...projectIds] },
       status: "ACTIVE",
+      kind: "SUPPORT",
       supportOrganization: { active: true },
     },
     select: { supportOrganization: { select: { id: true } } },
