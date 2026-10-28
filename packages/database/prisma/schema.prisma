@@ -1267,3 +1267,35 @@ model TicketAuditLog {
 
   @@index([ticketId, createdAt])
 }
+
+enum DebugCaptureTicketType {
+  BUG
+  ENHANCEMENT
+}
+
+enum DebugReportedEnvironment {
+  development
+  staging
+  production
+}
+
+model DebugCaptureTicket {
+  id                   String                   @id @default(cuid())
+  ticketId             String                   @unique
+  type                 DebugCaptureTicketType
+  reportedEnvironment  DebugReportedEnvironment @default(development)
+  userDescription      String                   @db.Text
+  reporterUserId       String
+  reporterEmail        String
+  reporterRole         String
+  currentUrl           String                   @db.Text
+  userAgent            String                   @db.Text
+  elementDiagnostics   Json
+  apiPrerequisite      Json?
+  screenshotUrl        String?
+  fullPayload          Json
+  createdAt            DateTime                 @default(now())
+
+  @@index([createdAt])
+  @@index([reporterUserId])
+}

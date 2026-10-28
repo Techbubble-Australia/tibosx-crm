@@ -27,9 +27,11 @@ import { contractRoutes } from "./routes/contracts";
 import { profileRoutes } from "./routes/profiles";
 import { adminUserRoutes } from "./routes/adminUsers";
 import { customerUserRoutes } from "./routes/customerUsers";
+import { debugCaptureTicketRoutes } from "./routes/debug-capture-tickets.js";
 import { authMiddleware } from "./middleware/auth";
 import { requireMfaEnrolled } from "./middleware/requireMfaEnrolled";
 import { requireRole, requireModule, requireAnyModule, blockModuleMutations } from "./middleware/requireRole";
+import { assertDevEnvMiddleware } from "./middleware/assertDevEnv.js";
 import { dashboardRoutes } from "./routes/dashboard";
 import { salesDashboardRoutes } from "./routes/sales-dashboard";
 import { credentialTemplateRoutes } from "./routes/credentialTemplates";
@@ -146,6 +148,14 @@ app.use(
   requireMfaEnrolled,
   requireRole("admin"),
   customerUserRoutes,
+);
+app.use(
+  "/api/admin/debug-capture-tickets",
+  authMiddleware,
+  requireMfaEnrolled,
+  requireRole("admin"),
+  assertDevEnvMiddleware,
+  debugCaptureTicketRoutes,
 );
 app.use(
   "/api/admin/workspace-groups",

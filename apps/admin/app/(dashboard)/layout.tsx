@@ -33,11 +33,13 @@ import {
   FileCode,
   ClipboardCheck,
   Ticket,
+  Bug,
 } from "lucide-react";
 import { UserAccountMenu } from "@/components/UserAccountMenu";
 import { HelpSupportHeaderButton } from "@/components/HelpSupportHeaderButton";
 import { ImpersonationBanner } from "@/components/users/ImpersonationBanner";
 import { ImpersonateUserModal } from "@/components/users/ImpersonateUserModal";
+import { DebugModeGate } from "@/components/debug/DebugModeGate";
 import { anyEffectiveRole, defaultLandingPath, formatRolesLabel } from "@/lib/admin-roles";
 import { AdminSessionProvider, useAdminSession } from "@/contexts/AdminSessionContext";
 import { MfaEnrollmentGuard } from "@/components/MfaEnrollmentGuard";
@@ -50,6 +52,7 @@ import { InactivityLogout } from "@/components/InactivityLogout";
 import { TicketPortalLink } from "@/components/TicketPortalLink";
 import { isCareerApplicationsPath, isJobListingsPath } from "@/lib/job-routes";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
+import { useIsDevelopmentAppEnv } from "@/lib/use-is-development-app-env";
 
 type NavItem = {
   href: string;
@@ -145,6 +148,7 @@ const navGroups: NavGroup[] = [
       { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin"] },
       { href: "/users/active", label: "Internal users", icon: UserCircle, roles: ["admin"] },
       { href: "/customer-users/active", label: "Customer users", icon: UserCircle, roles: ["admin"] },
+      { href: "/debug-capture", label: "Debug captures", icon: Bug, roles: ["admin"] },
     ],
   },
 ];
@@ -167,6 +171,9 @@ function headerTitle(pathname: string): string {
     if (pathname.startsWith("/support-tickets/projects")) return "Support projects";
     if (pathname.startsWith("/support-tickets/assignments")) return "Consultant access";
     return "Tickets";
+  }
+  if (pathname.startsWith("/debug-capture")) {
+    return "Debug captures";
   }
   if (pathname.startsWith("/customer-users")) {
     return "Customer users";
@@ -299,6 +306,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
   const [impersonateOpen, setImpersonateOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const { collapsed: sidebarCollapsed, toggle: toggleSidebar } = useSidebarCollapsed();
+  const isDevAppEnv = useIsDevelopmentAppEnv();
   const accessLabel = loading ? null : formatRolesLabel(role, additionalRoles);
 
   useEffect(() => {
@@ -330,6 +338,9 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         if (anyEffectiveRole(role, additionalRoles, ["customer_support"])) return false;
         return canAccessWorkspaceTimesheets;
       }
+      if (item.href === "/debug-capture" && !isDevAppEnv) {
+        return false;
+      }
       if (item.href.startsWith("/workspace/")) {
         if (hasAdmin) return false;
         if (item.href === "/workspace/timesheets") {
@@ -354,7 +365,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
           (group.id === "workspace" && canAccessWorkspaceTimesheets);
         return groupAllowed && group.items.length > 0;
       });
-      }, [role, additionalRoles, canAccessProjectManagementTimesheets, canAccessWorkspaceTimesheets, impersonation]);
+      }, [role, additionalRoles, canAccessProjectManagementTimesheets, canAccessWorkspaceTimesheets, impersonation, isDevAppEnv]);
 
   function toggleGroup(id: string) {
     setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -568,6 +579,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <MemberProfileCompletionGate />
             <InactivityLogout />
             <DashboardChrome>{children}</DashboardChrome>
+            <DebugModeGate />
           </MemberOnboardingGuard>
         </MfaEnrollmentGuard>
       </AppAlertProvider>
