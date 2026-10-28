@@ -16,6 +16,7 @@ import { MappedProfileSelect, type ProfileMapOption } from "@/components/users/M
 import { AdminUserFilesField, type UserFileRow } from "@/components/users/AdminUserFilesField";
 import { formatAdminUserActivityTitle } from "@/lib/admin-user-activity-display";
 import { UserPhotoField } from "@/components/users/UserPhotoField";
+import { AdminResetMfaSection } from "@/components/users/AdminResetMfaSection";
 import { UserAssignCredentialsModal } from "@/components/users/UserAssignCredentialsModal";
 import { RecordOfflineAgreementModal } from "@/components/users/RecordOfflineAgreementModal";
 import type { AdminRole } from "@/lib/admin-roles";
@@ -52,6 +53,7 @@ type UserDetail = {
   phone: string | null;
   active: boolean;
   mfaEnabled: boolean;
+  mfaEnrolledAt: string | null;
   passwordNeedsReset: boolean;
   profilePhotoUrl: string | null;
   role: string;
@@ -403,9 +405,22 @@ export default function EditUserPage() {
               </p>
             </div>
           ) : null}
-          {defaults.mfaEnabled ? (
-            <p className="text-xs text-gray-500">MFA is enabled. User manages it under Settings → Security.</p>
-          ) : null}
+          <AdminResetMfaSection
+            resetUrl={`/api/admin/users/${id}/reset-mfa`}
+            mfaEnabled={defaults.mfaEnabled}
+            mfaEnrolledAt={defaults.mfaEnrolledAt ?? null}
+            onReset={(next) =>
+              setDefaults((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      mfaEnabled: next.mfaEnabled,
+                      mfaEnrolledAt: next.mfaEnrolledAt,
+                    }
+                  : prev,
+              )
+            }
+          />
           <div className="space-y-2">
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Sends a sign-in email with a <strong>new temporary password</strong>. This overwrites any password

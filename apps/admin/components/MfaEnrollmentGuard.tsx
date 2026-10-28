@@ -11,29 +11,66 @@ export function MfaEnrollmentGuard({ children }: { children: React.ReactNode }) 
   const [allowed, setAllowed] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     setAllowed(false);
+
     void adminFetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data) => {
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+
+        if (!res.ok) {
+          router.replace("/login");
+          return;
+        }
+
         const impersonating = Boolean(data?.data?.impersonation?.impersonatorId);
-        const user = data?.data?.user;
+        const user = data?.data?.user as
+          | {
+              passwordNeedsReset?: boolean;
+              mfaEnabled?: boolean;
+              requiresMfaEnrollment?: boolean;
+            }
+          | undefined;
+
         if (impersonating) {
           setAllowed(true);
           return;
         }
+
         if (user?.passwordNeedsReset === true) {
           window.location.assign("/change-password");
           return;
         }
+
+        const requiresMfaEnrollment = Boolean(user?.requiresMfaEnrollment);
+        if (requiresMfaEnrollment) {
+          const resumeRes = await fetch("/api/auth/mfa/resume-session", {
+            method: "POST",
+            credentials: "include",
+          });
+          if (resumeRes.ok) {
+            setAllowed(true);
+            return;
+          }
+          window.location.assign("/mfa-setup");
+          return;
+        }
+
         if (user?.mfaEnabled === false) {
           window.location.assign("/mfa-setup");
           return;
         }
+
         setAllowed(true);
       })
       .catch(() => {
-        router.replace("/login");
+        if (!cancelled) router.replace("/login");
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [pathname, router]);
 
   if (!allowed) {

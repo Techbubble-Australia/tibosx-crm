@@ -28,6 +28,7 @@ import {
   profileKycFieldsFromMergedProfile,
   syncAdminUserProfileKycStatus,
 } from "../lib/admin-user-profile-kyc";
+import { resetMfaForAdminUser } from "../lib/admin-reset-user-mfa.js";
 
 const router: IRouter = Router();
 
@@ -997,6 +998,55 @@ router.put("/:id", async (req: AuthRequest, res) => {
     }
     console.error("Error updating admin user:", error);
     res.status(500).json({ error: "Failed to update user" });
+  }
+});
+
+router.post("/:id/reset-mfa", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.params.id;
+    if (!userId) return res.status(400).json({ error: "User id is required" });
+    if (req.user?.id === userId && !req.user?.impersonatorId) {
+      return res.status(400).json({
+        error: "Use Settings → Security to change your own MFA, or ask another administrator.",
+      });
+    }
+
+    const actorId = req.user?.impersonatorId ?? req.user?.id ?? "";
+    const guardError = await assertCanModifyAdminUser(actorId, userId, {});
+    if (guardError) return res.status(400).json({ error: guardError });
+
+    const existing = await prisma.adminUser.findUnique({
+      where: { id: userId },
+      select: { id: true, mfaEnrolledAt: true, totpSecretEnc: true },
+    });
+    if (!existing) return res.status(404).json({ error: "Not found" });
+
+    const result = await resetMfaForAdminUser(userId);
+    if (!result) return res.status(404).json({ error: "Not found" });
+
+    await prisma.$transaction(async (tx) => {
+      await logAdminUserFieldChange(
+        tx,
+        userId,
+        actorId,
+        "mfaEnrolledAt",
+        existing.mfaEnrolledAt?.toISOString() ?? (existing.totpSecretEnc ? "enrolled" : null),
+        "reset by administrator",
+      );
+    });
+
+    res.json({
+      message: result.hadEnrollment
+        ? "MFA has been reset. The user must set up authenticator again on next sign-in."
+        : "MFA enrollment cleared. The user will set up authenticator on next sign-in.",
+      data: {
+        mfaEnabled: result.mfaEnabled,
+        mfaEnrolledAt: result.mfaEnrolledAt,
+      },
+    });
+  } catch (error) {
+    console.error("Error resetting user MFA:", error);
+    res.status(500).json({ error: "Failed to reset MFA" });
   }
 });
 

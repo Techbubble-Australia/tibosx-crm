@@ -12,6 +12,7 @@ import {
   hashPasswordResetToken,
   PASSWORD_RESET_TTL_MS,
 } from "../lib/password-reset";
+import { resetMfaForCustomerUser } from "../lib/admin-reset-user-mfa.js";
 
 const router: IRouter = Router();
 
@@ -295,6 +296,34 @@ router.post("/:id/reset-password", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Error sending customer password reset:", error);
     res.status(500).json({ error: "Failed to send password reset email" });
+  }
+});
+
+router.post("/:id/reset-mfa", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.params.id;
+    if (!userId) return res.status(400).json({ error: "Invalid id" });
+    if (req.user?.id === userId && !req.user?.impersonatorId) {
+      return res.status(400).json({
+        error: "Use Settings → Security to change your own MFA, or ask another administrator.",
+      });
+    }
+
+    const result = await resetMfaForCustomerUser(userId);
+    if (!result) return res.status(404).json({ error: "Not found" });
+
+    res.json({
+      message: result.hadEnrollment
+        ? "MFA has been reset. The customer must set up authenticator again on next sign-in."
+        : "MFA enrollment cleared. The customer will set up authenticator on next sign-in.",
+      data: {
+        mfaEnabled: result.mfaEnabled,
+        mfaEnrolledAt: result.mfaEnrolledAt,
+      },
+    });
+  } catch (error) {
+    console.error("Error resetting customer MFA:", error);
+    res.status(500).json({ error: "Failed to reset MFA" });
   }
 });
 

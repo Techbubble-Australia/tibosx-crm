@@ -333,9 +333,16 @@ const profileUpdateSchema = z.object({
 router.post("/refresh-full-session", authMiddleware, async (req: AuthRequest, res) => {
   const u = req.user;
   if (!u) return res.status(401).json({ error: "Unauthorized" });
+
   if (req.mfaSetupRequired) {
+    const account = await findMfaAccountById(u.id);
+    if (account?.user.mfaEnabled && account.user.totpSecretEnc) {
+      const token = generateToken(mfaSessionUser(account));
+      return res.json({ data: { token } });
+    }
     return res.status(400).json({ error: "Complete password or MFA setup first" });
   }
+
   const token = await createFullSessionTokenForUserId(u.id, u.impersonatorId);
   if (!token) return res.status(401).json({ error: "Unauthorized" });
   res.json({ data: { token } });

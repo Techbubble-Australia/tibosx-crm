@@ -8,6 +8,7 @@ import { ArrowLeft, Loader2, Mail } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { messageFromApiError } from "@/lib/api-error";
 import { UserPhotoField } from "@/components/users/UserPhotoField";
+import { AdminResetMfaSection } from "@/components/users/AdminResetMfaSection";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm dark:border-gray-600 dark:bg-gray-800";
@@ -19,6 +20,7 @@ type CustomerDetail = {
   phone: string | null;
   active: boolean;
   mfaEnabled: boolean;
+  mfaEnrolledAt: string | null;
   passwordNeedsReset: boolean;
   profilePhotoUrl: string | null;
   mappedClientContact: {
@@ -53,8 +55,9 @@ export default function EditCustomerUserPage() {
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!detail) return;
+    const form = e.currentTarget;
+    const formData = new FormData(form);
     setSaving(true);
-    const formData = new FormData(e.currentTarget);
     try {
       const res = await adminFetch(`/api/admin/customer-users/${id}`, {
         method: "PATCH",
@@ -74,10 +77,8 @@ export default function EditCustomerUserPage() {
       const saved = data.data as CustomerDetail;
       setDetail(saved);
       setPasswordNeedsReset(saved.passwordNeedsReset);
+      form.querySelector<HTMLInputElement>('input[name="password"]')?.value = "";
       appAlert("Customer user saved. Password updates apply to TBOS sign-in for this email.");
-      const form = e.currentTarget;
-      const pwd = form.querySelector<HTMLInputElement>('input[name="password"]');
-      if (pwd) pwd.value = "";
     } catch (error) {
       appAlert(error instanceof Error ? error.message : "Failed to save");
     } finally {
@@ -123,21 +124,22 @@ export default function EditCustomerUserPage() {
             <input name="phone" required defaultValue={detail.phone ?? ""} className={inputClass} />
           </div>
         </div>
-        <div>
-          <span className="mb-1 block text-sm font-medium">MFA</span>
-          <span
-            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              detail.mfaEnabled
-                ? "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200"
-                : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-            }`}
-          >
-            {detail.mfaEnabled ? "Enabled" : "Off"}
-          </span>
-          <p className="mt-1 text-xs text-gray-500">
-            Customers enroll MFA on first login when required by security settings.
-          </p>
-        </div>
+        <AdminResetMfaSection
+          resetUrl={`/api/admin/customer-users/${id}/reset-mfa`}
+          mfaEnabled={detail.mfaEnabled}
+          mfaEnrolledAt={detail.mfaEnrolledAt}
+          onReset={(next) =>
+            setDetail((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    mfaEnabled: next.mfaEnabled,
+                    mfaEnrolledAt: next.mfaEnrolledAt,
+                  }
+                : prev,
+            )
+          }
+        />
         <div>
           <label className="mb-1 block text-sm font-medium">New password</label>
           <input name="password" type="password" minLength={8} className={inputClass} placeholder="Leave blank to keep current" />
