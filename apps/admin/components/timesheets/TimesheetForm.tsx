@@ -107,6 +107,10 @@ type Props = {
   showSubmitForApproval?: boolean;
   /** New timesheet: pick project before week grid and entries. */
   requireProjectFirst?: boolean;
+  /** Keep project + week on `/timesheets/new?projectId=&weekStart=` while navigating. */
+  syncNewTimesheetQuery?: boolean;
+  /** Parent is loading another timesheet id after week navigation. */
+  weekNavigationLoading?: boolean;
 };
 
 type LineEntry = {
@@ -314,6 +318,8 @@ export function TimesheetForm({
   submitForApprovalLoading = false,
   showSubmitForApproval = false,
   requireProjectFirst = false,
+  syncNewTimesheetQuery = false,
+  weekNavigationLoading = false,
 }: Props) {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectOption[]>([]);
@@ -338,7 +344,8 @@ export function TimesheetForm({
   const weekDateInputRef = useRef<HTMLInputElement>(null);
 
   const status = defaults.status ?? "DRAFT";
-  const allowProjectWeekNavigation = !readOnly;
+  /** Allow week/project navigation on saved timesheets (including submitted) for viewing other weeks. */
+  const allowProjectWeekNavigation = !readOnly || Boolean(defaults.id);
   const formEditable = !readOnly && status === "DRAFT";
   const entryEditable = formEditable && !weekConflict;
   const panelReadOnly = Boolean(selection && !entryEditable);
@@ -444,6 +451,23 @@ export function TimesheetForm({
   useEffect(() => {
     if (defaults.projectId) setProjectId(defaults.projectId);
   }, [defaults.projectId]);
+
+  useEffect(() => {
+    if (defaults.id || !defaults.startDate) return;
+    const snapped = snapToMondayInput(toDateInput(defaults.startDate));
+    if (snapped && snapped !== weekMonday) {
+      setWeekMonday(snapped);
+    }
+  }, [defaults.id, defaults.startDate, weekMonday]);
+
+  useEffect(() => {
+    if (!syncNewTimesheetQuery || defaults.id) return;
+    const params = new URLSearchParams();
+    if (projectId) params.set("projectId", projectId);
+    if (weekMonday) params.set("weekStart", weekMonday);
+    const path = params.toString() ? `/timesheets/new?${params}` : "/timesheets/new";
+    router.replace(path, { scroll: false });
+  }, [syncNewTimesheetQuery, defaults.id, projectId, weekMonday, router]);
 
   useEffect(() => {
     if (defaults.id) {
@@ -591,7 +615,7 @@ export function TimesheetForm({
         const existing = data.data as { id?: string; status?: string } | null;
         if (existing?.id) {
           if (existing.id !== defaults.id) {
-            router.replace(`/timesheets/${existing.id}`);
+            router.replace(`/timesheets/${existing.id}`, { scroll: false });
           } else {
             setWeekConflict(false);
           }
@@ -599,7 +623,7 @@ export function TimesheetForm({
         }
         if (weekOrProjectChangedFromRecord) {
           const params = new URLSearchParams({ projectId, weekStart: weekMonday });
-          router.replace(`/timesheets/new?${params}`);
+          router.replace(`/timesheets/new?${params}`, { scroll: false });
           return;
         }
         setWeekConflict(false);
@@ -792,9 +816,7 @@ export function TimesheetForm({
     if (!allowProjectWeekNavigation || !projectId) return;
     const prev = prevProjectIdRef.current;
     const projectChanged = prev !== projectId;
-    const needsOpenWeek =
-      requireProjectFirst && !defaults.id && (!weekMonday || projectChanged);
-    if (!projectChanged && !needsOpenWeek) return;
+    if (!projectChanged) return;
     prevProjectIdRef.current = projectId;
     projectEntryPointPendingRef.current = true;
     setWeekConflict(false);
@@ -804,7 +826,7 @@ export function TimesheetForm({
       .then((data) => {
         const row = data.data as { weekStart?: string; existingTimesheetId?: string | null };
         if (row.existingTimesheetId) {
-          router.replace(`/timesheets/${row.existingTimesheetId}`);
+          router.replace(`/timesheets/${row.existingTimesheetId}`, { scroll: false });
           return;
         }
         if (row.weekStart) {
@@ -932,8 +954,10 @@ export function TimesheetForm({
                 submitted or draft timesheets.
               </p>
             ) : null}
-            {entryPointLoading ? (
-              <p className="mt-3 text-sm text-gray-500">Loading open timesheet week…</p>
+            {entryPointLoading || weekNavigationLoading ? (
+              <p className="mt-3 text-sm text-gray-500">
+                {entryPointLoading ? "Loading open timesheet week…" : "Loading timesheet…"}
+              </p>
             ) : null}
           </div>
 

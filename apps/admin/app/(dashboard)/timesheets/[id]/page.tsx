@@ -197,10 +197,10 @@ export default function TimesheetDetailPage() {
           </div>
         ) : null}
 
-        {isLoading ? (
-          <p className="text-sm text-gray-400">Loading…</p>
-        ) : loadError ? (
+        {loadError && !timesheet ? (
           <p className="text-sm text-red-600 dark:text-red-400">{loadError}</p>
+        ) : isLoading && !timesheet ? (
+          <p className="text-sm text-gray-400">Loading…</p>
         ) : !timesheet ? (
           <p className="text-sm text-gray-400">Timesheet not found.</p>
         ) : (
@@ -209,6 +209,7 @@ export default function TimesheetDetailPage() {
             onSubmit={handleSubmit}
             isSaving={isSaving}
             readOnly={status !== "DRAFT"}
+            weekNavigationLoading={isLoading}
             showSubmitForApproval={canSubmitTimesheet}
             submitForApprovalLoading={actionLoading}
             onSubmitForApproval={() => void submitForApproval()}

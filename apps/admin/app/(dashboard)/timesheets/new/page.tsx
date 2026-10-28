@@ -1,8 +1,8 @@
 "use client";
 import { appAlert } from "@/lib/app-alert";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
@@ -11,12 +11,21 @@ import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
 import { TimesheetForm, type TimesheetFormValues } from "@/components/timesheets/TimesheetForm";
 import { messageFromApiError } from "@/lib/api-error";
 
-export default function NewTimesheetPage() {
+function NewTimesheetPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { canCreateTimesheets, loading: sessionLoading } = useAdminSession();
   const [isSaving, setIsSaving] = useState(false);
 
-  const initialDefaults = useMemo((): Partial<TimesheetFormValues> => ({}), []);
+  const queryProjectId = searchParams.get("projectId")?.trim() || undefined;
+  const queryWeekStart = searchParams.get("weekStart")?.trim() || undefined;
+
+  const initialDefaults = useMemo((): Partial<TimesheetFormValues> => {
+    const next: Partial<TimesheetFormValues> = {};
+    if (queryProjectId) next.projectId = queryProjectId;
+    if (queryWeekStart) next.startDate = queryWeekStart;
+    return next;
+  }, [queryProjectId, queryWeekStart]);
 
   useEffect(() => {
     if (!sessionLoading && !canCreateTimesheets) {
@@ -73,10 +82,19 @@ export default function NewTimesheetPage() {
           title="New Timesheet"
           defaults={initialDefaults}
           requireProjectFirst
+          syncNewTimesheetQuery
           onSubmit={handleSubmit}
           isSaving={isSaving}
         />
       </div>
     </ProjectManagementGuard>
+  );
+}
+
+export default function NewTimesheetPage() {
+  return (
+    <Suspense fallback={<p className="text-sm text-gray-400">Loading…</p>}>
+      <NewTimesheetPageInner />
+    </Suspense>
   );
 }
