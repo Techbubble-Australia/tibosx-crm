@@ -1,0 +1,18 @@
+# Copy to railway.toml only for local `railway up` (see scripts/railway-deploy-all.sh).
+# Do not commit railway.toml — it overrides per-service config on GitHub deploys.
+#
+# Per-service configs in repo:
+#   railway.api.toml
+#   railway.web.toml
+#   railway.admin.toml
+#   railway.debug-portal.toml
+#
+# On Railway (recommended when Config-as-code misbehaves), set on EACH service:
+#   RAILWAY_DOCKERFILE_PATH=Dockerfile.api | Dockerfile.web | Dockerfile.admin | Dockerfile.debug-portal
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.api"
+
+[deploy]
+startCommand = "sh packages/api/scripts/start-production.sh"

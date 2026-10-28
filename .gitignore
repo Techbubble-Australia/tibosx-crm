@@ -55,3 +55,7 @@ pnpm-debug.log*
 # Uploads
 uploads
 public/uploads
+
+# Railway CLI copies a service-specific file here during deploy; must not be committed
+railway.toml
+.railway.toml.bak

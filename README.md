@@ -93,12 +93,25 @@ Create the following services in Railway:
 2. **API** - Deploy from `Dockerfile.api`
 3. **Web** - Deploy from `Dockerfile.web`
 4. **Admin** - Deploy from `Dockerfile.admin`
+5. **Debug portal** - Deploy from `Dockerfile.debug-portal` (debug capture ticket review UI)
 
 Enable monorepo auto-deploy by setting each service to use the matching config file:
 
 - API service config: `railway.api.toml`
 - Web service config: `railway.web.toml`
 - Admin service config: `railway.admin.toml`
+- Debug portal service config: `railway.debug-portal.toml`
+
+**If Config-as-code still builds the wrong app** (e.g. logs show `Dockerfile.admin` on the debug service), set a **service variable** on that service (same pattern as API/Web/Admin):
+
+| Service | `RAILWAY_DOCKERFILE_PATH` | Start command |
+|---------|---------------------------|---------------|
+| API | `Dockerfile.api` | (from `railway.api.toml`) |
+| Web | `Dockerfile.web` | `node apps/web/server.js` |
+| Admin | `Dockerfile.admin` | `node apps/admin/server.js` |
+| Debug portal | `Dockerfile.debug-portal` | `node apps/debug-portal/server.js` |
+
+Do **not** commit `railway.toml` at the repo root — it forces one Dockerfile for every service that falls back to it. Use `railway.toml.example` as a reference; CLI deploys copy the correct file via `scripts/railway-deploy-all.sh`.
 
 Important for monorepo workspaces: each Railway service must use the repository root as the service Root Directory (not `apps/web`, `apps/admin`, or `packages/api`).
 If the Root Directory points to a subfolder, Railway will not have workspace package context and deploys fail with `ERR_PNPM_WORKSPACE_PKG_NOT_FOUND`.
@@ -130,6 +143,7 @@ npm run deploy:railway
 npm run deploy:railway:api
 npm run deploy:railway:web
 npm run deploy:railway:admin
+npm run deploy:railway:debug-portal
 ```
 
 Or deploy automatically via GitHub integration.
