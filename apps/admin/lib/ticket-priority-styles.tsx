@@ -9,7 +9,7 @@ export function ticketPriorityDotClass(priority: string | null | undefined): str
     case "HIGH":
       return "bg-red-500 ring-1 ring-red-200";
     case "URGENT":
-      return "bg-red-600 ring-1 ring-red-300";
+      return "bg-[#800000] ring-1 ring-[#b91c1c]/40";
     default:
       return "bg-gray-500 ring-1 ring-gray-200";
   }

@@ -113,6 +113,10 @@ type Props = {
   syncNewTimesheetQuery?: boolean;
   /** Parent is loading another timesheet id after week navigation. */
   weekNavigationLoading?: boolean;
+  /** Current `/timesheets/[id]` route param — used to refetch when week nav returns to the same id. */
+  routeTimesheetId?: string;
+  /** Week navigation found an existing timesheet (for-week); parent should reload full detail. */
+  onWeekTimesheetResolved?: (detail: TimesheetFormValues) => void;
 };
 
 type LineEntry = {
@@ -322,6 +326,8 @@ export function TimesheetForm({
   requireProjectFirst = false,
   syncNewTimesheetQuery = false,
   weekNavigationLoading = false,
+  routeTimesheetId,
+  onWeekTimesheetResolved,
 }: Props) {
   const router = useRouter();
   const { canCreateTimesheets } = useAdminSession();
@@ -340,6 +346,8 @@ export function TimesheetForm({
   const [fileUrls, setFileUrls] = useState<string[]>(defaults.fileUrls ?? []);
   const [uploading, setUploading] = useState(false);
   const [weekConflict, setWeekConflict] = useState(false);
+  /** After week navigation on a saved sheet: wait for for-week before showing "no timesheet" hint. */
+  const [weekBrowseHint, setWeekBrowseHint] = useState<"idle" | "loading" | "empty">("idle");
   const [projectBounds, setProjectBounds] = useState<{ start: string; end: string } | null>(null);
   const [selection, setSelection] = useState<CellSelection | null>(null);
   const [panelHours, setPanelHours] = useState("");
@@ -347,6 +355,7 @@ export function TimesheetForm({
   const weekDateInputRef = useRef<HTMLInputElement>(null);
 
   const status = defaults.status ?? "DRAFT";
+  const statusBadgeKey = !defaults.id && status === "DRAFT" ? "DRAFT_UNSAVED" : status;
   /** Allow week/project navigation on saved timesheets (including submitted) for viewing other weeks. */
   const allowProjectWeekNavigation = !readOnly || Boolean(defaults.id);
   const formEditable = !readOnly && status === "DRAFT";
@@ -632,6 +641,12 @@ export function TimesheetForm({
   }, [projectBounds, formEditable, defaults.id, weekInProject, weekMonday]);
 
   useEffect(() => {
+    if (weekMonday === loadedMonday && projectId === loadedProjectId) {
+      setWeekBrowseHint("idle");
+    }
+  }, [weekMonday, loadedMonday, projectId, loadedProjectId]);
+
+  useEffect(() => {
     if (!projectId || !weekMonday) {
       setWeekConflict(false);
       return;
@@ -648,12 +663,17 @@ export function TimesheetForm({
     if (projectEntryPointPendingRef.current) {
       return;
     }
+    if (weekOrProjectChangedFromRecord && !formEditable) {
+      setWeekBrowseHint("loading");
+    }
     void adminFetch(`/api/admin/timesheets/for-week?${forWeekQueryParams()}`)
       .then((r) => r.json())
       .then((data) => {
-        const existing = data.data as { id?: string; status?: string } | null;
+        const existing = data.data as TimesheetFormValues | null;
         if (existing?.id) {
-          if (existing.id !== defaults.id) {
+          setWeekBrowseHint("idle");
+          onWeekTimesheetResolved?.(existing);
+          if (routeTimesheetId !== existing.id) {
             router.replace(`/timesheets/${existing.id}`, { scroll: false });
           } else {
             setWeekConflict(false);
@@ -662,10 +682,12 @@ export function TimesheetForm({
         }
         if (weekOrProjectChangedFromRecord) {
           if (formEditable && canCreateTimesheets) {
+            setWeekBrowseHint("idle");
             const params = new URLSearchParams({ projectId, weekStart: weekMonday });
             if (timesheetMemberUserId) params.set("memberUserId", timesheetMemberUserId);
             router.replace(`/timesheets/new?${params}`, { scroll: false });
           } else {
+            setWeekBrowseHint("empty");
             setLines([emptyLine()]);
             setComments("");
             setFileUrls([]);
@@ -674,9 +696,13 @@ export function TimesheetForm({
           }
           return;
         }
+        setWeekBrowseHint("idle");
         setWeekConflict(false);
       })
-      .catch(() => setWeekConflict(false));
+      .catch(() => {
+        setWeekBrowseHint("idle");
+        setWeekConflict(false);
+      });
   }, [
     defaults.id,
     allowProjectWeekNavigation,
@@ -688,6 +714,8 @@ export function TimesheetForm({
     router,
     timesheetMemberUserId,
     canCreateTimesheets,
+    routeTimesheetId,
+    onWeekTimesheetResolved,
   ]);
 
   useEffect(() => {
@@ -856,11 +884,9 @@ export function TimesheetForm({
       ? `${defaults.projectNumber} — ${defaults.projectTitle}`
       : projectSelectOptions.find((row) => row.id === projectId)?.label || "") || "";
 
-  const saveButtonLabel = defaults.id ? "Save Draft" : "Add Timesheet";
-  const navigatedToEmptyWeek =
-    Boolean(defaults.id) &&
-    !formEditable &&
-    (weekMonday !== loadedMonday || projectId !== loadedProjectId);
+  const saveButtonLabel = "Save Draft";
+  const navigatedToEmptyWeek = weekBrowseHint === "empty";
+  const weekBrowseLoading = weekBrowseHint === "loading";
 
   function hasUnsavedChanges(): boolean {
     if (!formEditable) return false;
@@ -978,7 +1004,7 @@ export function TimesheetForm({
           <div className="border-b border-gray-100 px-5 py-2.5 dark:border-gray-800">
             <div className="flex items-start justify-between gap-4">
               <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{pageTitle}</h1>
-              <TimesheetStatusBadge status={status} />
+              <TimesheetStatusBadge status={statusBadgeKey} />
             </div>
 
             <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -1078,7 +1104,7 @@ export function TimesheetForm({
                 submitted or draft timesheets.
               </p>
             ) : null}
-            {entryPointLoading || weekNavigationLoading ? (
+            {entryPointLoading || weekNavigationLoading || weekBrowseLoading ? (
               <p className="mt-3 text-sm text-gray-500">
                 {entryPointLoading ? "Loading open timesheet week…" : "Loading timesheet…"}
               </p>
@@ -1309,7 +1335,9 @@ export function TimesheetForm({
                 Total: {hoursTotal.toFixed(2)} hrs
               </p>
               <p className="text-xs text-gray-500">
-                {TIMESHEET_STATUS_LABELS[status]} timesheet
+                {statusBadgeKey === "DRAFT_UNSAVED"
+                  ? "Draft - Unsaved timesheet"
+                  : `${TIMESHEET_STATUS_LABELS[status as TimesheetStatus] ?? status} timesheet`}
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">

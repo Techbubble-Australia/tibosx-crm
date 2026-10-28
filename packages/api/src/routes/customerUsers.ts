@@ -68,6 +68,7 @@ const updateSchema = z.object({
   password: z.string().min(8).optional(),
   profilePhotoUrl: z.string().max(2000).optional().nullable(),
   mappedClientContactId: z.string().min(1).optional().nullable(),
+  passwordNeedsReset: z.boolean().optional(),
 });
 
 router.get("/", async (_req, res) => {
@@ -140,6 +141,9 @@ router.patch("/:id", async (req: AuthRequest, res) => {
     if (input.mappedClientContactId !== undefined) {
       patch.mappedClientContactId = input.mappedClientContactId;
     }
+    if (input.passwordNeedsReset !== undefined) {
+      patch.passwordNeedsReset = input.passwordNeedsReset;
+    }
     if (input.password) {
       patch.passwordHash = await bcrypt.hash(input.password, 10);
       patch.passwordNeedsReset = false;
@@ -162,6 +166,9 @@ router.patch("/:id", async (req: AuthRequest, res) => {
       if (input.password) {
         adminSync.passwordHash = patch.passwordHash;
         adminSync.passwordNeedsReset = false;
+      }
+      if (input.passwordNeedsReset !== undefined) {
+        adminSync.passwordNeedsReset = input.passwordNeedsReset;
       }
       await tx.adminUser.updateMany({
         where: {

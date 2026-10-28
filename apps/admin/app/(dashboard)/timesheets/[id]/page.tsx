@@ -1,7 +1,7 @@
 "use client";
 import { appAlert, appConfirm } from "@/lib/app-alert";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Download } from "lucide-react";
@@ -25,23 +25,37 @@ export default function TimesheetDetailPage() {
   const [showReject, setShowReject] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  useEffect(() => {
+  const loadTimesheet = useCallback(async (timesheetId: string) => {
     setLoadError(null);
     setIsLoading(true);
-    void adminFetch(`/api/admin/timesheets/${id}`)
-      .then(async (r) => {
-        const data = await r.json();
-        if (!r.ok) {
-          throw new Error(messageFromApiError(data, r.status === 403 ? "You cannot view this timesheet" : "Timesheet not found"));
-        }
-        setTimesheet(data.data as TimesheetFormValues & { canApprove?: boolean; canSubmit?: boolean });
-      })
-      .catch((error) => {
-        setTimesheet(null);
-        setLoadError(error instanceof Error ? error.message : "Failed to load timesheet");
-      })
-      .finally(() => setIsLoading(false));
-  }, [id]);
+    try {
+      const r = await adminFetch(`/api/admin/timesheets/${timesheetId}`);
+      const data = await r.json();
+      if (!r.ok) {
+        throw new Error(
+          messageFromApiError(data, r.status === 403 ? "You cannot view this timesheet" : "Timesheet not found"),
+        );
+      }
+      setTimesheet(data.data as TimesheetFormValues & { canApprove?: boolean; canSubmit?: boolean });
+    } catch (error) {
+      setTimesheet(null);
+      setLoadError(error instanceof Error ? error.message : "Failed to load timesheet");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTimesheet(id);
+  }, [id, loadTimesheet]);
+
+  const handleWeekTimesheetResolved = useCallback(
+    (detail: TimesheetFormValues) => {
+      if (!detail.id || detail.id !== id) return;
+      void loadTimesheet(detail.id);
+    },
+    [id, loadTimesheet],
+  );
 
   async function handleSubmit(payload: Record<string, unknown>) {
     setIsSaving(true);
@@ -216,7 +230,10 @@ export default function TimesheetDetailPage() {
           <p className="text-sm text-gray-400">Timesheet not found.</p>
         ) : (
           <TimesheetForm
+            key={`${timesheet.id}-${timesheet.startDate}-${timesheet.status}`}
             defaults={timesheet}
+            routeTimesheetId={id}
+            onWeekTimesheetResolved={handleWeekTimesheetResolved}
             onSubmit={handleSubmit}
             isSaving={isSaving}
             readOnly={formReadOnly}

@@ -328,9 +328,18 @@ router.get("/:id", async (req: TicketingRequest, res) => {
   const { enrichTicketsProjectLabels } = await import("../lib/ticket-project-label.js");
   const [withProject] = await enrichTicketsProjectLabels([ticket]);
 
+  const { resolveTicketProjectId, isValidProjectTicketAssignee } = await import(
+    "../../lib/ticket-project-assignees.js"
+  );
+  const projectId = await resolveTicketProjectId(ticket);
+  const canSelfAssign = Boolean(
+    projectId && (await isValidProjectTicketAssignee(projectId, user.id, user.id)),
+  );
+
   res.json({
     data: {
       ...serializeTicket(withProject ?? ticket),
+      canSelfAssign,
       attachments: ticket.attachments,
       messages,
       auditLogs,

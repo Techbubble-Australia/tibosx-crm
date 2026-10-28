@@ -3,6 +3,7 @@ import { TIMESHEET_STATUS_LABELS, type TimesheetStatus } from "@/lib/project-typ
 export function timesheetStatusBadgeClass(status: string): string {
   switch (status) {
     case "DRAFT":
+    case "DRAFT_UNSAVED":
       return "bg-gray-100 text-gray-800 ring-gray-200";
     case "SUBMITTED":
       return "bg-amber-100 text-amber-900 ring-amber-200";
@@ -14,7 +15,10 @@ export function timesheetStatusBadgeClass(status: string): string {
 }
 
 export function TimesheetStatusBadge({ status }: { status: TimesheetStatus | string }) {
-  const label = TIMESHEET_STATUS_LABELS[status as TimesheetStatus] ?? status;
+  const label =
+    status === "DRAFT_UNSAVED"
+      ? "Draft - Unsaved"
+      : (TIMESHEET_STATUS_LABELS[status as TimesheetStatus] ?? status);
   return (
     <span
       className={`inline-flex rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${timesheetStatusBadgeClass(status)}`}

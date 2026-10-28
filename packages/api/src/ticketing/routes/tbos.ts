@@ -312,9 +312,19 @@ router.get("/tickets/:id", async (req: TbosRequest, res) => {
   const { enrichTicketsProjectLabels } = await import("../lib/ticket-project-label.js");
   const [withProject] = await enrichTicketsProjectLabels([ticket]);
 
+  const actorId = await resolveTbosActorUserId(tbosUser);
+  const { resolveTicketProjectId, isValidProjectTicketAssignee } = await import(
+    "../../lib/ticket-project-assignees.js"
+  );
+  const projectId = await resolveTicketProjectId(ticket);
+  const canSelfAssign = Boolean(
+    projectId && actorId && (await isValidProjectTicketAssignee(projectId, actorId, actorId)),
+  );
+
   res.json({
     data: {
       ...serializeTicketRow(withProject ?? ticket),
+      canSelfAssign,
       attachments: ticket.attachments,
       messages,
       auditLogs: (await enrichTicketAuditLogsForDisplay(ticket.auditLogs)).map((log) => ({

@@ -197,7 +197,7 @@ export function UsersListPage({ activeOnly }: { activeOnly: boolean }) {
             {activeOnly ? "Active internal users" : "Inactive internal users"}
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Add and manage internal TBOS accounts. Assign roles to control what each user can access.
+            Add and manage internal TIBOSX accounts. Assign roles to control what each user can access.
           </p>
         </div>
         <Link

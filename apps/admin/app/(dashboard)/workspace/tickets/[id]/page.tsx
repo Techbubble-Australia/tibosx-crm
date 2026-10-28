@@ -54,6 +54,7 @@ type TicketDetail = {
   organization?: { name: string };
   projectLabel?: string | null;
   projectId?: string | null;
+  canSelfAssign?: boolean;
   resolutionNotes?: string | null;
   messages: Message[];
   attachments: { id: string; fileName: string; fileUrl: string; fileSize?: number | null }[];
@@ -195,6 +196,7 @@ export default function TicketDetailPage() {
   const showAssignToMe =
     ticketAllowsAssignToMe(ticket.status) &&
     canEditAssignee &&
+    Boolean(ticket.canSelfAssign) &&
     Boolean(me?.id) &&
     ticket.assignedToId !== me?.id;
   const statusKey = normalizeTicketStatusKey(ticket.status);

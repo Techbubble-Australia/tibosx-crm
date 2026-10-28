@@ -39,6 +39,7 @@ type TicketDetail = {
   resolutionNotes?: string | null;
   projectLabel?: string | null;
   projectId?: string | null;
+  canSelfAssign?: boolean;
   organization?: { id: string; name: string };
   createdBy?: { id?: string; name: string; email: string };
   updatedBy?: { id?: string; name: string; email: string } | null;
@@ -198,6 +199,7 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
   const showAssignToMe =
     ticketAllowsAssignToMe(ticket?.status ?? "") &&
     canManageAssignee &&
+    Boolean(ticket?.canSelfAssign) &&
     Boolean(session?.ticketingUserId) &&
     ticket?.assignedToId !== session?.ticketingUserId;
   const isCreator = staffImpersonating
