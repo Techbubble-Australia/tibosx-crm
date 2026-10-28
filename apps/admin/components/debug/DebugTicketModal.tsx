@@ -18,6 +18,8 @@ function trafficLogHint(reason: string | undefined): string {
       return "Inferred from recent adminFetch traffic on this page.";
   }
 }
+
+function Accordion({
   title,
   children,
   defaultOpen = false,

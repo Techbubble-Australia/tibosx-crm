@@ -50,8 +50,11 @@ case "${1:-all}" in
   admin)
     deploy_service "admin" "railway.admin.toml"
     ;;
+  debug-portal)
+    deploy_service "debug-portal" "railway.debug-portal.toml"
+    ;;
   *)
-    echo "Usage: $0 [all|api|web|admin]"
+    echo "Usage: $0 [all|api|web|admin|debug-portal]"
     exit 1
     ;;
 esac
