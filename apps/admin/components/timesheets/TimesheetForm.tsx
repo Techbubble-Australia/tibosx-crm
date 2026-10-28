@@ -875,6 +875,13 @@ export function TimesheetForm({
   async function applyWeekChange(nextMonday: string) {
     const snapped = snapToMondayInput(nextMonday);
     if (snapped === weekMonday) return;
+    if (projectBounds && !weekOverlapsProjectRange(snapped, projectBounds.start, projectBounds.end)) {
+      void appAlert(
+        `That week is outside this project’s contract period (${formatLongDate(projectBounds.start)} – ${formatLongDate(projectBounds.end)}).`,
+        "Can’t change week",
+      );
+      return;
+    }
     if (hasUnsavedChanges()) {
       const ok = await appConfirm("Timesheet entries are not saved. Do you want to continue?", {
         title: "Unsaved changes",
@@ -883,6 +890,35 @@ export function TimesheetForm({
       if (!ok) return;
     }
     setWeekMonday(snapped);
+  }
+
+  function explainWeekShiftBlocked(direction: "prev" | "next"): string {
+    if (!allowProjectWeekNavigation) {
+      return "Week navigation isn’t available for this timesheet view.";
+    }
+    if (!weekMonday) {
+      return "Select a project first to load a timesheet week, then you can move between weeks.";
+    }
+    if (projectBounds && weekMondayBounds) {
+      const contractRange = `${formatLongDate(projectBounds.start)} – ${formatLongDate(projectBounds.end)}`;
+      if (direction === "prev") {
+        return `There is no earlier week within this project’s contract period (${contractRange}).`;
+      }
+      return `There is no later week within this project’s contract period (${contractRange}).`;
+    }
+    return direction === "prev"
+      ? "You can’t go to an earlier week from here."
+      : "You can’t go to a later week from here.";
+  }
+
+  async function attemptWeekShift(direction: "prev" | "next") {
+    const canShift = direction === "prev" ? canShiftWeekPrev : canShiftWeekNext;
+    if (!canShift) {
+      void appAlert(explainWeekShiftBlocked(direction), "Can’t change week");
+      return;
+    }
+    const delta = direction === "prev" ? -7 : 7;
+    await applyWeekChange(shiftWeek(weekMonday, delta));
   }
 
   const prevProjectIdRef = useRef(defaults.projectId ?? "");
@@ -990,9 +1026,11 @@ export function TimesheetForm({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600"
-                    disabled={!canShiftWeekPrev}
-                    onClick={() => void applyWeekChange(shiftWeek(weekMonday, -7))}
+                    className={`flex h-10 w-10 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-600 ${
+                      canShiftWeekPrev ? "" : "cursor-not-allowed opacity-40 hover:bg-transparent"
+                    }`}
+                    aria-disabled={!canShiftWeekPrev}
+                    onClick={() => void attemptWeekShift("prev")}
                     aria-label="Previous week"
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -1021,9 +1059,11 @@ export function TimesheetForm({
                   </div>
                   <button
                     type="button"
-                    className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600"
-                    disabled={!canShiftWeekNext}
-                    onClick={() => void applyWeekChange(shiftWeek(weekMonday, 7))}
+                    className={`flex h-10 w-10 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-600 ${
+                      canShiftWeekNext ? "" : "cursor-not-allowed opacity-40 hover:bg-transparent"
+                    }`}
+                    aria-disabled={!canShiftWeekNext}
+                    onClick={() => void attemptWeekShift("next")}
                     aria-label="Next week"
                   >
                     <ChevronRight className="h-4 w-4" />
