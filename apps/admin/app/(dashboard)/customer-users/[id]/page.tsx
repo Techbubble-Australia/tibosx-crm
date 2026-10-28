@@ -77,7 +77,8 @@ export default function EditCustomerUserPage() {
       const saved = data.data as CustomerDetail;
       setDetail(saved);
       setPasswordNeedsReset(saved.passwordNeedsReset);
-      form.querySelector<HTMLInputElement>('input[name="password"]')?.value = "";
+      const passwordInput = form.querySelector<HTMLInputElement>('input[name="password"]');
+      if (passwordInput) passwordInput.value = "";
       appAlert("Customer user saved. Password updates apply to TBOS sign-in for this email.");
     } catch (error) {
       appAlert(error instanceof Error ? error.message : "Failed to save");
