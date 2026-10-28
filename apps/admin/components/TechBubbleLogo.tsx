@@ -19,6 +19,13 @@ const SIDEBAR_LOGO = {
   height: 28,
 };
 
+/** Square mark for collapsed sidebar (no horizontal wordmark squeeze). */
+const SIDEBAR_ICON = {
+  src: "/techbubble-logo.png",
+  width: 40,
+  height: 40,
+};
+
 /** Official TechBubble logo PNGs. */
 export function TechBubbleLogo({
   className = "",
@@ -26,13 +33,26 @@ export function TechBubbleLogo({
   variant = "stacked",
   showProductLabel = false,
 }: TechBubbleLogoProps) {
-  const useSidebarLogo = variant === "sidebar" && !compact;
+  if (compact) {
+    return (
+      <img
+        src={SIDEBAR_ICON.src}
+        alt="TechBubble"
+        width={SIDEBAR_ICON.width}
+        height={SIDEBAR_ICON.height}
+        className={`size-9 shrink-0 object-contain dark:brightness-0 dark:invert ${className}`}
+        decoding="async"
+      />
+    );
+  }
+
+  const useSidebarLogo = variant === "sidebar";
   const asset = useSidebarLogo ? SIDEBAR_LOGO : STACKED_LOGO;
-  const heightClass = compact ? "h-7" : useSidebarLogo ? "h-7" : "h-10";
+  const heightClass = useSidebarLogo ? "h-7" : "h-10";
 
   return (
     <span
-      className={`inline-flex min-w-0 ${useSidebarLogo && showProductLabel && !compact ? "flex-col items-start gap-1" : "items-center gap-2"} ${className}`}
+      className={`inline-flex min-w-0 ${useSidebarLogo && showProductLabel ? "flex-col items-start gap-1" : "items-center gap-2"} ${className}`}
     >
       <img
         src={asset.src}
@@ -42,7 +62,7 @@ export function TechBubbleLogo({
         className={`w-auto max-w-full shrink-0 ${heightClass} dark:brightness-0 dark:invert`}
         decoding="async"
       />
-      {showProductLabel && !compact ? (
+      {showProductLabel ? (
         <span className="whitespace-nowrap text-sm font-bold leading-none tracking-wide text-gray-900 dark:text-gray-100">
           TIBOSX
         </span>

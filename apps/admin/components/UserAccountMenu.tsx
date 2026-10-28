@@ -13,6 +13,8 @@ type Props = {
   onSignOut: () => void;
   canImpersonate?: boolean;
   onImpersonate?: () => void;
+  /** e.g. "Project member", "Administrator" */
+  accessLabel?: string | null;
 };
 
 export function UserAccountMenu({
@@ -23,6 +25,7 @@ export function UserAccountMenu({
   onSignOut,
   canImpersonate,
   onImpersonate,
+  accessLabel,
 }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -47,8 +50,11 @@ export function UserAccountMenu({
         aria-haspopup="menu"
       >
         <UserAvatar name={name} email={email} photoUrl={photoUrl} size="sm" />
-        <span className="hidden min-w-0 truncate font-medium text-gray-900 dark:text-gray-100 sm:inline">
-          {displayName}
+        <span className="hidden min-w-0 flex-col truncate sm:flex">
+          <span className="truncate font-medium text-gray-900 dark:text-gray-100">{displayName}</span>
+          {accessLabel ? (
+            <span className="truncate text-xs font-normal text-gray-500 dark:text-gray-400">{accessLabel}</span>
+          ) : null}
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-gray-500" />
       </button>
@@ -57,6 +63,13 @@ export function UserAccountMenu({
           role="menu"
           className="absolute right-0 z-50 mt-1 w-52 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
         >
+          <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-800">
+            <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{displayName}</p>
+            <p className="truncate text-xs text-gray-500 dark:text-gray-400">{email}</p>
+            {accessLabel ? (
+              <p className="mt-1 text-xs font-medium text-sky-700 dark:text-sky-300">{accessLabel}</p>
+            ) : null}
+          </div>
           <Link
             href={profileHref}
             role="menuitem"

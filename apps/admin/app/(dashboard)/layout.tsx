@@ -38,7 +38,7 @@ import { UserAccountMenu } from "@/components/UserAccountMenu";
 import { HelpSupportHeaderButton } from "@/components/HelpSupportHeaderButton";
 import { ImpersonationBanner } from "@/components/users/ImpersonationBanner";
 import { ImpersonateUserModal } from "@/components/users/ImpersonateUserModal";
-import { anyEffectiveRole, defaultLandingPath } from "@/lib/admin-roles";
+import { anyEffectiveRole, defaultLandingPath, formatRolesLabel } from "@/lib/admin-roles";
 import { AdminSessionProvider, useAdminSession } from "@/contexts/AdminSessionContext";
 import { MfaEnrollmentGuard } from "@/components/MfaEnrollmentGuard";
 import { MemberOnboardingGuard } from "@/components/MemberOnboardingGuard";
@@ -299,6 +299,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
   const [impersonateOpen, setImpersonateOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const { collapsed: sidebarCollapsed, toggle: toggleSidebar } = useSidebarCollapsed();
+  const accessLabel = loading ? null : formatRolesLabel(role, additionalRoles);
 
   useEffect(() => {
     setOpenGroups((prev) => {
@@ -366,15 +367,29 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
           sidebarCollapsed ? "w-[4.5rem]" : "w-64"
         }`}
       >
-        <div className={`min-w-0 p-4 ${sidebarCollapsed ? "px-2" : "p-6"}`}>
-          <div className="flex items-center justify-between gap-2">
-            <Link href={defaultLandingPath(role)} className="flex min-w-0 items-center gap-2">
-              <TechBubbleLogo variant="sidebar" compact={sidebarCollapsed} showProductLabel />
+        <div className={`min-w-0 ${sidebarCollapsed ? "px-2 py-3" : "p-6"}`}>
+          <div
+            className={
+              sidebarCollapsed
+                ? "flex flex-col items-center gap-2"
+                : "flex items-start justify-between gap-2"
+            }
+          >
+            <Link
+              href={defaultLandingPath(role, additionalRoles)}
+              className={sidebarCollapsed ? "shrink-0" : "flex min-w-0 flex-1 items-center gap-2"}
+              title="TechBubble TIBOSX"
+            >
+              <TechBubbleLogo
+                variant="sidebar"
+                compact={sidebarCollapsed}
+                showProductLabel={!sidebarCollapsed}
+              />
             </Link>
             <button
               type="button"
               onClick={toggleSidebar}
-              className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+              className="shrink-0 rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100"
               aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
               title={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
             >
@@ -382,9 +397,36 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
             </button>
           </div>
           {!sidebarCollapsed ? (
-            <p className="mt-1 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
-              AI-powered Business Operating System
-            </p>
+            <>
+              <p className="mt-1 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
+                AI-powered Business Operating System
+              </p>
+              {!loading && accessLabel ? (
+                <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-950/60">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                    Signed in as
+                  </p>
+                  <p className="mt-0.5 text-xs font-medium leading-snug text-gray-800 dark:text-gray-200">
+                    {accessLabel}
+                  </p>
+                  {impersonation ? (
+                    <p className="mt-1 text-[11px] font-medium text-amber-800 dark:text-amber-200">
+                      Impersonating another user
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          ) : !loading && accessLabel ? (
+            <div
+              className="mt-2 w-full rounded-md bg-gray-50 px-1 py-1.5 text-center dark:bg-gray-950/60"
+              title={`Signed in as: ${accessLabel}${impersonation ? " (impersonating)" : ""}`}
+            >
+              <p className="text-[9px] font-semibold uppercase leading-tight tracking-wide text-gray-400">Role</p>
+              <p className="mt-0.5 line-clamp-2 text-[10px] font-medium leading-tight text-gray-700 dark:text-gray-300">
+                {accessLabel}
+              </p>
+            </div>
           ) : null}
         </div>
 
@@ -497,6 +539,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
                 email={email}
                 photoUrl={profilePhotoUrl}
                 profileHref="/settings/profile"
+                accessLabel={accessLabel}
                 canImpersonate={role === "admin" && !impersonation}
                 onImpersonate={() => setImpersonateOpen(true)}
                 onSignOut={() => {
