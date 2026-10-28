@@ -25,7 +25,7 @@ function extractAgreementBody(html: string): string {
 }
 
 export function AgreementOnboardingGate() {
-  const { sessionLoaded, memberOnboarding, refreshSession } = useAdminSession();
+  const { sessionLoaded, memberOnboarding, refreshSession, impersonation } = useAdminSession();
   const [agreement, setAgreement] = useState<AgreementData | null>(null);
   const [loading, setLoading] = useState(true);
   const [signatures, setSignatures] = useState<Record<string, string>>({});
@@ -41,7 +41,7 @@ export function AgreementOnboardingGate() {
   const bodyHtml = useMemo(() => (agreement ? extractAgreementBody(agreement.html) : ""), [agreement]);
   const allSigned = captureIds.length > 0 && signedCaptureIds.length === captureIds.length;
   const showModal =
-    sessionLoaded && needsAgreementSigning && agreement && !agreement.signed;
+    sessionLoaded && !impersonation && needsAgreementSigning && agreement && !agreement.signed;
 
   useEffect(() => {
     if (!sessionLoaded) return;

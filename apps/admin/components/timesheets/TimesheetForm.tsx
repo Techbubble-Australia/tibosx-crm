@@ -39,6 +39,7 @@ import {
   sanitizeHoursInput,
   weekOverlapsProjectRange,
   projectWeekMondayBounds,
+  weekSundayIsoFromMonday,
 } from "@/lib/timesheet-week";
 
 export type TimesheetEntryValues = {
@@ -349,10 +350,7 @@ export function TimesheetForm({
   );
   const loadedProjectId = defaults.projectId ?? "";
 
-  const weekSun = useMemo(() => {
-    const mon = new Date(`${weekMonday}T00:00:00.000Z`);
-    return toDateInputUtc(sundayOfWeek(mon));
-  }, [weekMonday]);
+  const weekSun = useMemo(() => weekSundayIsoFromMonday(weekMonday), [weekMonday]);
 
   const weekDays = useMemo(() => weekDatesFromMonday(weekMonday), [weekMonday]);
   const weekMondayBounds = useMemo(() => {
@@ -360,12 +358,12 @@ export function TimesheetForm({
     return projectWeekMondayBounds(projectBounds.start, projectBounds.end);
   }, [projectBounds]);
   const weekInProject = useMemo(() => {
-    if (!projectBounds) return true;
+    if (!weekMonday || !projectBounds) return true;
     return weekOverlapsProjectRange(weekMonday, projectBounds.start, projectBounds.end);
   }, [projectBounds, weekMonday]);
 
   const canShiftWeekPrev = useMemo(() => {
-    if (!allowProjectWeekNavigation) return false;
+    if (!weekMonday || !allowProjectWeekNavigation) return false;
     if (!weekMondayBounds) return true;
     const prev = shiftWeek(weekMonday, -7);
     return (
@@ -375,7 +373,7 @@ export function TimesheetForm({
   }, [allowProjectWeekNavigation, weekMonday, weekMondayBounds, projectBounds]);
 
   const canShiftWeekNext = useMemo(() => {
-    if (!allowProjectWeekNavigation) return false;
+    if (!weekMonday || !allowProjectWeekNavigation) return false;
     if (!weekMondayBounds) return true;
     const next = shiftWeek(weekMonday, 7);
     return (

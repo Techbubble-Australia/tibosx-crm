@@ -20,7 +20,16 @@ export function sundayOfWeek(date = new Date()): Date {
 }
 
 export function toDateInputUtc(date: Date): string {
+  if (Number.isNaN(date.getTime())) return "";
   return date.toISOString().slice(0, 10);
+}
+
+/** Sunday (UTC) for a Monday ISO date, or "" when the Monday value is missing/invalid. */
+export function weekSundayIsoFromMonday(mondayInput: string): string {
+  if (!mondayInput) return "";
+  const mon = new Date(`${mondayInput}T00:00:00.000Z`);
+  if (Number.isNaN(mon.getTime())) return "";
+  return toDateInputUtc(sundayOfWeek(mon));
 }
 
 export function weekDatesFromMonday(mondayInput: string): { key: WeekdayKey; label: string; iso: string }[] {
