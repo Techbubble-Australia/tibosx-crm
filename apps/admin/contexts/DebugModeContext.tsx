@@ -14,12 +14,19 @@ import { messageFromApiError } from "@/lib/api-error";
 import { readUploadImageUrlFromJson } from "@/lib/upload-response";
 import { captureApiPrerequisite, type ApiPrerequisiteCapture } from "@/lib/debug/api-prerequisite";
 import { captureElementDiagnostics, type ElementDiagnostics } from "@/lib/debug/css-selector";
+import {
+  captureElementScreenshot,
+  captureViewportDiagnostics,
+  captureViewportScreenshot,
+} from "@/lib/debug/screenshot";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { useIsDevelopmentAppEnv } from "@/lib/use-is-development-app-env";
 
 const DEBUG_STORAGE_KEY = "tbos-debug-mode-active";
 
 export type DebugCaptureType = "BUG" | "ENHANCEMENT";
-export type ReportedEnvironment = "development" | "staging" | "production";
+/** Environments we expose in the UI (DB may still store legacy `staging`). */
+export type ReportedEnvironment = "development" | "production";
 
 export type UserMetadataSnapshot = {
   userId: string;
@@ -50,6 +57,8 @@ type DebugModeContextValue = {
   draft: DebugCaptureDraft | null;
   setDraftField: <K extends keyof DebugCaptureDraft>(key: K, value: DebugCaptureDraft[K]) => void;
   openTicketFromElement: (el: Element) => Promise<void>;
+  openTicketFromViewport: () => Promise<void>;
+  recaptureViewport: () => Promise<void>;
   buildPayloadJson: () => string;
   submitTicket: () => Promise<{ ok: boolean; error?: string }>;
   copyPayloadJson: () => Promise<boolean>;
@@ -78,6 +87,8 @@ function dataUrlToFile(dataUrl: string, filename: string): File | null {
 
 export function DebugModeProvider({ children }: { children: ReactNode }) {
   const { userId, role, email } = useAdminSession();
+  const isDevelopmentAppEnv = useIsDevelopmentAppEnv();
+  const defaultReportedEnvironment: ReportedEnvironment = isDevelopmentAppEnv ? "development" : "production";
   const [isDebugActive, setIsDebugActive] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [captureLoading, setCaptureLoading] = useState(false);
@@ -140,26 +151,15 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
       setCaptureLoading(true);
       setModalOpen(true);
       try {
-        const [userMetadata, apiPrerequisite] = await Promise.all([
+        const [userMetadata, apiPrerequisite, screenshotDataUrl] = await Promise.all([
           resolveUserMetadata(),
           captureApiPrerequisite(el),
+          captureElementScreenshot(el as HTMLElement),
         ]);
-        let screenshotDataUrl: string | null = null;
-        try {
-          const html2canvas = (await import("html2canvas")).default;
-          const canvas = await html2canvas(el as HTMLElement, {
-            backgroundColor: "#ffffff",
-            scale: 1,
-            logging: false,
-          });
-          screenshotDataUrl = canvas.toDataURL("image/png");
-        } catch {
-          screenshotDataUrl = null;
-        }
         setDraft({
           ticketId: `TICK-${Date.now()}`,
           type: "BUG",
-          reportedEnvironment: "development",
+          reportedEnvironment: defaultReportedEnvironment,
           userDescription: "",
           elementDiagnostics: captureElementDiagnostics(el),
           apiPrerequisite,
@@ -170,8 +170,50 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
         setCaptureLoading(false);
       }
     },
-    [resolveUserMetadata],
+    [defaultReportedEnvironment, resolveUserMetadata],
   );
+
+  const openTicketFromViewport = useCallback(async () => {
+    setCaptureLoading(true);
+    setModalOpen(true);
+    try {
+      const [userMetadata, screenshotDataUrl] = await Promise.all([
+        resolveUserMetadata(),
+        captureViewportScreenshot(),
+      ]);
+      setDraft({
+        ticketId: `TICK-${Date.now()}`,
+        type: "BUG",
+        reportedEnvironment: defaultReportedEnvironment,
+        userDescription: "",
+        elementDiagnostics: captureViewportDiagnostics(),
+        apiPrerequisite: null,
+        screenshotDataUrl,
+        userMetadata,
+      });
+    } finally {
+      setCaptureLoading(false);
+    }
+  }, [defaultReportedEnvironment, resolveUserMetadata]);
+
+  const recaptureViewport = useCallback(async () => {
+    setCaptureLoading(true);
+    try {
+      const screenshotDataUrl = await captureViewportScreenshot();
+      setDraft((prev) =>
+        prev
+          ? {
+              ...prev,
+              elementDiagnostics: captureViewportDiagnostics(),
+              apiPrerequisite: null,
+              screenshotDataUrl,
+            }
+          : prev,
+      );
+    } finally {
+      setCaptureLoading(false);
+    }
+  }, []);
 
   const buildPayloadObject = useCallback(() => {
     if (!draft) return null;
@@ -277,6 +319,8 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
       draft,
       setDraftField,
       openTicketFromElement,
+      openTicketFromViewport,
+      recaptureViewport,
       buildPayloadJson,
       submitTicket,
       copyPayloadJson,
@@ -290,6 +334,8 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
       draft,
       setDraftField,
       openTicketFromElement,
+      openTicketFromViewport,
+      recaptureViewport,
       buildPayloadJson,
       submitTicket,
       copyPayloadJson,

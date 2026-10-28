@@ -31,6 +31,7 @@ export function AppAlertProvider({ children }: { children: React.ReactNode }) {
       {children}
       {modal ? (
         <div
+          data-debug-ui
           className="fixed inset-0 z-[200] flex items-center justify-center bg-black/45 p-4"
           role="presentation"
           onMouseDown={(e) => {

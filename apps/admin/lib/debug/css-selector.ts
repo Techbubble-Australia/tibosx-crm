@@ -51,6 +51,7 @@ export type ElementDiagnostics = {
     width: number;
     height: number;
   };
+  captureScope?: "element" | "viewport";
 };
 
 export function captureElementDiagnostics(el: Element): ElementDiagnostics {
@@ -68,5 +69,6 @@ export function captureElementDiagnostics(el: Element): ElementDiagnostics {
       width: Math.round(rect.width),
       height: Math.round(rect.height),
     },
+    captureScope: "element",
   };
 }

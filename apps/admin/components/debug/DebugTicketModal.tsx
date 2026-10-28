@@ -41,6 +41,7 @@ export function DebugTicketModal() {
     buildPayloadJson,
     submitTicket,
     copyPayloadJson,
+    recaptureViewport,
   } = useDebugMode();
   const [saving, setSaving] = useState(false);
 
@@ -54,8 +55,8 @@ export function DebugTicketModal() {
         appAlert(result.error ?? "Failed to save");
         return;
       }
-      appAlert("Debug capture saved.");
       closeModal();
+      appAlert("Debug capture saved.");
     } finally {
       setSaving(false);
     }
@@ -110,7 +111,6 @@ export function DebugTicketModal() {
                   }
                 >
                   <option value="development">Development</option>
-                  <option value="staging">Staging</option>
                   <option value="production">Production</option>
                 </select>
               </div>
@@ -128,17 +128,45 @@ export function DebugTicketModal() {
 
               {draft.screenshotDataUrl ? (
                 <div>
-                  <p className="mb-1 text-sm font-medium">Element screenshot</p>
+                  <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium">
+                      {draft.elementDiagnostics.captureScope === "viewport"
+                        ? "Screen capture"
+                        : "Element screenshot"}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={captureLoading || saving}
+                      onClick={() => void recaptureViewport()}
+                      className="rounded border border-gray-200 px-2 py-1 text-xs font-medium dark:border-gray-600"
+                    >
+                      Recapture screen
+                    </button>
+                  </div>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={draft.screenshotDataUrl}
-                    alt="Captured element"
-                    className="max-h-40 rounded border border-gray-200 dark:border-gray-700"
+                    alt={draft.elementDiagnostics.captureScope === "viewport" ? "Screen capture" : "Captured element"}
+                    className={`max-w-full rounded border border-gray-200 dark:border-gray-700 ${
+                      draft.elementDiagnostics.captureScope === "viewport" ? "max-h-72" : "max-h-40"
+                    }`}
                   />
                 </div>
-              ) : null}
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm text-gray-500">No screenshot captured.</p>
+                  <button
+                    type="button"
+                    disabled={captureLoading || saving}
+                    onClick={() => void recaptureViewport()}
+                    className="rounded border border-gray-200 px-2 py-1 text-xs font-medium dark:border-gray-600"
+                  >
+                    Capture screen
+                  </button>
+                </div>
+              )}
 
-              <Accordion title="DOM metadata" defaultOpen>
+              <Accordion title={draft.elementDiagnostics.captureScope === "viewport" ? "Screen metadata" : "DOM metadata"} defaultOpen>
                 <dl className="space-y-1 text-xs text-gray-700 dark:text-gray-300">
                   <div>
                     <dt className="font-medium">Tag</dt>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { Bug } from "lucide-react";
+import { Bug, Monitor } from "lucide-react";
 import { useDebugMode } from "@/contexts/DebugModeContext";
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -13,7 +13,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 export function DebugToolbar() {
-  const { isDebugActive, toggleDebug } = useDebugMode();
+  const { isDebugActive, toggleDebug, openTicketFromViewport } = useDebugMode();
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -27,7 +27,18 @@ export function DebugToolbar() {
   }, [toggleDebug]);
 
   return (
-    <div className="fixed bottom-4 right-4 z-[150] flex items-center gap-2">
+    <div data-debug-ui className="fixed bottom-4 right-4 z-[150] flex items-center gap-2">
+      {isDebugActive ? (
+        <button
+          type="button"
+          onClick={() => void openTicketFromViewport()}
+          className="inline-flex items-center gap-2 rounded-full border border-sky-500 bg-white px-3 py-2 text-xs font-semibold text-sky-800 shadow-lg dark:border-sky-400 dark:bg-gray-900 dark:text-sky-100"
+          title="Capture visible screen as debug ticket"
+        >
+          <Monitor className="h-4 w-4" />
+          Screen
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={toggleDebug}

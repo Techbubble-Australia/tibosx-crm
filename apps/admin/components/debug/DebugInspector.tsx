@@ -10,27 +10,27 @@ type HoverBox = {
   height: number;
 };
 
+function isExemptFromDebugCapture(el: Element | null): boolean {
+  if (!el) return false;
+  return Boolean(el.closest("[data-debug-ui], [role='alertdialog']"));
+}
+
 export function DebugInspector() {
-  const { isDebugActive, openTicketFromElement } = useDebugMode();
+  const { isDebugActive, modalOpen, openTicketFromElement } = useDebugMode();
   const [hoverBox, setHoverBox] = useState<HoverBox | null>(null);
   const [cursor, setCursor] = useState({ x: 0, y: 0 });
   const hoveredRef = useRef<Element | null>(null);
 
   useEffect(() => {
-    if (!isDebugActive) {
+    if (!isDebugActive || modalOpen) {
       setHoverBox(null);
       hoveredRef.current = null;
       return;
     }
 
-    function isDebugUi(el: Element | null): boolean {
-      if (!el) return false;
-      return Boolean(el.closest("[data-debug-ui]"));
-    }
-
     function onMouseMove(e: MouseEvent) {
       const target = e.target instanceof Element ? e.target : null;
-      if (!target || isDebugUi(target)) {
+      if (!target || isExemptFromDebugCapture(target)) {
         setHoverBox(null);
         hoveredRef.current = null;
         return;
@@ -52,9 +52,9 @@ export function DebugInspector() {
     }
 
     function onClick(e: MouseEvent) {
-      if (!isDebugActive) return;
+      if (!isDebugActive || modalOpen) return;
       const target = e.target instanceof Element ? e.target : null;
-      if (!target || isDebugUi(target)) return;
+      if (!target || isExemptFromDebugCapture(target)) return;
       e.preventDefault();
       e.stopPropagation();
       void openTicketFromElement(target);
@@ -68,9 +68,9 @@ export function DebugInspector() {
       document.removeEventListener("mouseout", onMouseOut, true);
       document.removeEventListener("click", onClick, true);
     };
-  }, [isDebugActive, openTicketFromElement]);
+  }, [isDebugActive, modalOpen, openTicketFromElement]);
 
-  if (!isDebugActive) return null;
+  if (!isDebugActive || modalOpen) return null;
 
   return (
     <div data-debug-ui className="pointer-events-none fixed inset-0 z-[145]">
