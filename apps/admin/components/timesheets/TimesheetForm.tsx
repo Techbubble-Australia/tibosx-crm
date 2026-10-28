@@ -23,6 +23,7 @@ import { TIMESHEET_STATUS_LABELS, type TimesheetStatus } from "@/lib/project-typ
 import { formatTimesheetActivityTitle } from "@/lib/timesheet-activity-display";
 import { TimesheetStatusBadge } from "@/lib/timesheet-status-styles";
 import { TimesheetProfileWarningBanner } from "@/components/timesheets/TimesheetProfileWarningBanner";
+import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { appAlert, appConfirm } from "@/lib/app-alert";
 import {
   type DailyComments,
@@ -323,6 +324,7 @@ export function TimesheetForm({
   weekNavigationLoading = false,
 }: Props) {
   const router = useRouter();
+  const { canCreateTimesheets } = useAdminSession();
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [projectId, setProjectId] = useState(defaults.projectId ?? "");
   const [cases, setCases] = useState<CaseOption[]>([]);
@@ -659,9 +661,17 @@ export function TimesheetForm({
           return;
         }
         if (weekOrProjectChangedFromRecord) {
-          const params = new URLSearchParams({ projectId, weekStart: weekMonday });
-          if (timesheetMemberUserId) params.set("memberUserId", timesheetMemberUserId);
-          router.replace(`/timesheets/new?${params}`, { scroll: false });
+          if (formEditable && canCreateTimesheets) {
+            const params = new URLSearchParams({ projectId, weekStart: weekMonday });
+            if (timesheetMemberUserId) params.set("memberUserId", timesheetMemberUserId);
+            router.replace(`/timesheets/new?${params}`, { scroll: false });
+          } else {
+            setLines([emptyLine()]);
+            setComments("");
+            setFileUrls([]);
+            setSelection(null);
+            setWeekConflict(false);
+          }
           return;
         }
         setWeekConflict(false);
@@ -670,23 +680,49 @@ export function TimesheetForm({
   }, [
     defaults.id,
     allowProjectWeekNavigation,
+    formEditable,
     loadedMonday,
     loadedProjectId,
     projectId,
     weekMonday,
     router,
     timesheetMemberUserId,
+    canCreateTimesheets,
   ]);
 
   useEffect(() => {
-    if (!formEditable) return;
+    if (!defaults.id) return;
+    if (weekMonday !== loadedMonday || projectId !== loadedProjectId) return;
+    const loaded = linesFromDefaults(defaults);
+    setLines(loaded.length ? loaded : [emptyLine()]);
+    setComments(defaults.comments ?? "");
+    setFileUrls(defaults.fileUrls ?? []);
+    setSelection(null);
+  }, [
+    weekMonday,
+    loadedMonday,
+    loadedProjectId,
+    projectId,
+    defaults.id,
+    defaults.startDate,
+    defaults.entries,
+    defaults.dailyHours,
+    defaults.ticketId,
+    defaults.opportunityId,
+    defaults.targetLabel,
+    defaults.comments,
+    defaults.fileUrls,
+  ]);
+
+  useEffect(() => {
     const loadedMonday = snapToMondayInput(toDateInput(defaults.startDate));
     if (weekMonday === loadedMonday) return;
+    if (!formEditable && !allowProjectWeekNavigation) return;
     setLines([emptyLine()]);
     setComments("");
     setFileUrls([]);
     setSelection(null);
-  }, [weekMonday, formEditable, defaults.startDate]);
+  }, [weekMonday, formEditable, allowProjectWeekNavigation, defaults.startDate]);
 
   useEffect(() => {
     if (defaults.id || !projectId || !weekMonday) return;
@@ -821,6 +857,10 @@ export function TimesheetForm({
       : projectSelectOptions.find((row) => row.id === projectId)?.label || "") || "";
 
   const saveButtonLabel = defaults.id ? "Save Draft" : "Add Timesheet";
+  const navigatedToEmptyWeek =
+    Boolean(defaults.id) &&
+    !formEditable &&
+    (weekMonday !== loadedMonday || projectId !== loadedProjectId);
 
   function hasUnsavedChanges(): boolean {
     if (!formEditable) return false;
@@ -890,6 +930,11 @@ export function TimesheetForm({
         {conflictMessage ? (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             {conflictMessage}
+          </div>
+        ) : null}
+        {navigatedToEmptyWeek ? (
+          <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+            No timesheet for this project and week.
           </div>
         ) : null}
 
