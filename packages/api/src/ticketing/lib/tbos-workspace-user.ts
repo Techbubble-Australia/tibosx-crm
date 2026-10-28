@@ -78,7 +78,7 @@ async function resolveClientTicketingUser(
     },
   });
   if (existingClient) {
-    await ensureClientPortalContactLinks(existingClient.id, emailsForLink);
+    await ensureClientPortalContactLinks(existingClient.id, emailsForLink, identity.contactIds);
     const afterLink = await prisma.projectClientContact.findFirst({
       where: {
         ticketingUserId: existingClient.id,

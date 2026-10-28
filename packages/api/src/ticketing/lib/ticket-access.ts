@@ -38,7 +38,7 @@ export async function organizationIdsForClientPortal(
   let identity = { adminEmail: null as string | null, contactIds: [] as string[], contactEmails: [] as string[] };
   if (tbosAdminUserId) {
     identity = await resolveTbosClientPortalIdentity(tbosAdminUserId);
-    await ensureClientPortalContactLinks(ticketingUserId, identity.contactEmails);
+    await ensureClientPortalContactLinks(ticketingUserId, identity.contactEmails, identity.contactIds);
 
     const approverProjects = await prisma.project.findMany({
       where: {
@@ -93,7 +93,6 @@ export async function organizationIdsForClientPortal(
       where: {
         clientId,
         status: "ACTIVE",
-        kind: "SUPPORT",
         supportOrganization: { active: true },
       },
       select: { id: true },
@@ -105,16 +104,15 @@ export async function organizationIdsForClientPortal(
 
   if (projectIds.size === 0) return [];
 
-  const rows = await prisma.project.findMany({
+  const orgs = await prisma.organization.findMany({
     where: {
-      id: { in: [...projectIds] },
-      status: "ACTIVE",
-      kind: "SUPPORT",
-      supportOrganization: { active: true },
+      active: true,
+      projectId: { in: [...projectIds] },
+      project: { status: "ACTIVE" },
     },
-    select: { supportOrganization: { select: { id: true } } },
+    select: { id: true },
   });
-  return rows.map((row) => row.supportOrganization!.id);
+  return orgs.map((row) => row.id);
 }
 
 /** Orgs for ACTIVE SUPPORT projects where the TBOS user is a project or support-group member. */

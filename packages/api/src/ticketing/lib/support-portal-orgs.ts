@@ -24,34 +24,32 @@ export async function listSupportPortalOrganizations(
         ? { id: { in: scopeOrganizationIds } }
         : { id: { in: [] as string[] } };
 
-  const rows = await prisma.project.findMany({
+  const orgs = await prisma.organization.findMany({
     where: {
-      status: "ACTIVE",
-      kind: "SUPPORT",
-      supportOrganization: {
-        active: true,
-        ...orgScope,
-      },
+      active: true,
+      projectId: { not: null },
+      project: { status: "ACTIVE" },
+      ...orgScope,
     },
-    orderBy: { projectNumber: "asc" },
+    orderBy: { name: "asc" },
     select: {
       id: true,
-      projectNumber: true,
-      title: true,
-      supportOrganization: {
-        select: { id: true, name: true, slug: true },
+      name: true,
+      slug: true,
+      project: {
+        select: { id: true, projectNumber: true, title: true },
       },
     },
   });
 
-  return rows
-    .filter((row) => row.supportOrganization)
+  return orgs
+    .filter((row) => row.project)
     .map((row) => ({
-      id: row.supportOrganization!.id,
-      name: `${row.projectNumber} — ${row.title}`,
-      slug: row.supportOrganization!.slug,
-      projectId: row.id,
-      projectNumber: row.projectNumber,
-      projectTitle: row.title,
+      id: row.id,
+      name: `${row.project!.projectNumber} — ${row.project!.title}`,
+      slug: row.slug,
+      projectId: row.project!.id,
+      projectNumber: row.project!.projectNumber,
+      projectTitle: row.project!.title,
     }));
 }

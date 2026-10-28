@@ -4,23 +4,34 @@ import { provisionClientPortalUser } from "../../lib/support-project.js";
 
 const portalAccessOr = [{ portalAccess: true }, { canApproveTimesheets: true }];
 
-/** Link portal / approver client contacts to this ticketing user when CRM email matches. */
+/** Link portal / approver client contacts to this ticketing user when CRM email or contact id matches. */
 export async function ensureClientPortalContactLinks(
   ticketingUserId: string,
   emails: string[],
+  contactIds: string[] = [],
 ): Promise<void> {
   const normalized = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean))];
-  if (!normalized.length) return;
+  const idSet = [...new Set(contactIds.filter(Boolean))];
+  if (!normalized.length && !idSet.length) return;
 
   const pending = await prisma.projectClientContact.findMany({
     where: {
-      OR: portalAccessOr,
+      OR: [
+        ...(normalized.length
+          ? [
+              {
+                OR: portalAccessOr,
+                contact: {
+                  OR: normalized.map((email) => ({
+                    email: { equals: email, mode: "insensitive" as const },
+                  })),
+                },
+              },
+            ]
+          : []),
+        ...(idSet.length ? [{ contactId: { in: idSet }, OR: portalAccessOr }] : []),
+      ],
       project: { status: "ACTIVE" },
-      contact: {
-        OR: normalized.map((email) => ({
-          email: { equals: email, mode: "insensitive" as const },
-        })),
-      },
       NOT: { ticketingUserId },
     },
     include: {

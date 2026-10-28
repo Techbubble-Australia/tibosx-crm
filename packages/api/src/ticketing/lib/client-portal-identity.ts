@@ -10,10 +10,16 @@ export type TbosClientPortalIdentity = {
 export async function resolveTbosClientPortalIdentity(
   tbosAdminUserId: string,
 ): Promise<TbosClientPortalIdentity> {
-  const admin = await prisma.adminUser.findUnique({
-    where: { id: tbosAdminUserId },
-    select: { email: true, mappedClientContactId: true },
-  });
+  const [admin, customerById] = await Promise.all([
+    prisma.adminUser.findUnique({
+      where: { id: tbosAdminUserId },
+      select: { email: true, mappedClientContactId: true },
+    }),
+    prisma.customerUser.findUnique({
+      where: { id: tbosAdminUserId },
+      select: { email: true, mappedClientContactId: true },
+    }),
+  ]);
 
   const contactIds = new Set<string>();
   const contactEmails = new Set<string>();
@@ -22,12 +28,19 @@ export async function resolveTbosClientPortalIdentity(
   if (admin?.mappedClientContactId) {
     contactIds.add(admin.mappedClientContactId);
   }
+  if (customerById?.mappedClientContactId) {
+    contactIds.add(customerById.mappedClientContactId);
+  }
   if (adminEmail) {
     contactEmails.add(adminEmail);
   }
+  if (customerById?.email?.trim()) {
+    contactEmails.add(customerById.email.trim().toLowerCase());
+  }
 
   const customer =
-    adminEmail || admin?.mappedClientContactId
+    customerById ??
+    (adminEmail || admin?.mappedClientContactId
       ? await prisma.customerUser.findFirst({
           where: {
             OR: [
@@ -41,7 +54,7 @@ export async function resolveTbosClientPortalIdentity(
           },
           select: { mappedClientContactId: true, email: true },
         })
-      : null;
+      : null);
 
   if (customer?.mappedClientContactId) {
     contactIds.add(customer.mappedClientContactId);
