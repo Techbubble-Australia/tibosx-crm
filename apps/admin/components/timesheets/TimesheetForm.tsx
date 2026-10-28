@@ -73,6 +73,7 @@ export type TimesheetFormValues = {
   targetLabel?: string;
   projectNumber?: string;
   projectTitle?: string;
+  memberUserId?: string;
   activityLogs?: Array<{
     id: string;
     action: string;
@@ -356,6 +357,45 @@ export function TimesheetForm({
     [defaults.startDate],
   );
   const loadedProjectId = defaults.projectId ?? "";
+  const timesheetMemberUserId = defaults.memberUserId?.trim() || "";
+
+  const projectSelectOptions = useMemo(() => {
+    const list = [...projects];
+    if (!projectId) return list;
+    if (list.some((row) => row.id === projectId)) return list;
+    const label =
+      defaults.projectNumber && defaults.projectTitle
+        ? `${defaults.projectNumber} — ${defaults.projectTitle}`
+        : defaults.targetLabel?.includes(" — ")
+          ? defaults.targetLabel
+          : "Selected project";
+    return [{ id: projectId, label, kind: "DELIVERY" }, ...list];
+  }, [
+    projects,
+    projectId,
+    defaults.projectNumber,
+    defaults.projectTitle,
+    defaults.targetLabel,
+  ]);
+
+  function forWeekQueryParams(): string {
+    const params = new URLSearchParams({
+      projectId,
+      startDate: weekMonday,
+    });
+    if (timesheetMemberUserId) {
+      params.set("memberUserId", timesheetMemberUserId);
+    }
+    return params.toString();
+  }
+
+  function projectCasesQuery(): string {
+    const weekQuery = weekMonday ? `&weekStart=${encodeURIComponent(weekMonday)}` : "";
+    const memberQuery = timesheetMemberUserId
+      ? `&asMemberUserId=${encodeURIComponent(timesheetMemberUserId)}`
+      : "";
+    return `/api/admin/timesheets/project-cases?projectId=${encodeURIComponent(projectId)}${weekQuery}${memberQuery}`;
+  }
 
   const weekSun = useMemo(() => weekSundayIsoFromMonday(weekMonday), [weekMonday]);
 
@@ -389,7 +429,7 @@ export function TimesheetForm({
     );
   }, [allowProjectWeekNavigation, weekMonday, weekMondayBounds, projectBounds]);
 
-  const projectLabel = projects.find((p) => p.id === projectId)?.label ?? "";
+  const projectLabel = projectSelectOptions.find((p) => p.id === projectId)?.label ?? "";
 
   function dayWithinProject(iso: string) {
     if (!projectBounds) return true;
@@ -465,9 +505,10 @@ export function TimesheetForm({
     const params = new URLSearchParams();
     if (projectId) params.set("projectId", projectId);
     if (weekMonday) params.set("weekStart", weekMonday);
+    if (timesheetMemberUserId) params.set("memberUserId", timesheetMemberUserId);
     const path = params.toString() ? `/timesheets/new?${params}` : "/timesheets/new";
     router.replace(path, { scroll: false });
-  }, [syncNewTimesheetQuery, defaults.id, projectId, weekMonday, router]);
+  }, [syncNewTimesheetQuery, defaults.id, projectId, weekMonday, timesheetMemberUserId, router]);
 
   useEffect(() => {
     if (defaults.id) {
@@ -510,29 +551,27 @@ export function TimesheetForm({
         if (
           projectId &&
           !list.some((row) => row.id === projectId) &&
-          projectId !== defaults.projectId
+          projectId !== defaults.projectId &&
+          !defaults.projectNumber
         ) {
           setProjectId("");
-        } else if (!projectId && defaults.projectId && list.some((row) => row.id === defaults.projectId)) {
+        } else if (!projectId && defaults.projectId) {
           setProjectId(defaults.projectId);
         } else if (!projectId && list.length === 1) {
           setProjectId(list[0]!.id);
         }
       });
-  }, [defaults.projectId, projectId, weekMonday]);
+  }, [defaults.projectId, defaults.projectNumber, projectId, weekMonday]);
 
   useEffect(() => {
     if (!projectId) {
       setCases([]);
       return;
     }
-    const weekQuery = weekMonday ? `&weekStart=${encodeURIComponent(weekMonday)}` : "";
-    void adminFetch(
-      `/api/admin/timesheets/project-cases?projectId=${encodeURIComponent(projectId)}${weekQuery}`,
-    )
+    void adminFetch(projectCasesQuery())
       .then((r) => r.json())
       .then((data) => setCases((data.data as CaseOption[]) ?? []));
-  }, [projectId, weekMonday]);
+  }, [projectId, weekMonday, timesheetMemberUserId]);
 
   useEffect(() => {
     if (!projectId) {
@@ -607,9 +646,7 @@ export function TimesheetForm({
     if (projectEntryPointPendingRef.current) {
       return;
     }
-    void adminFetch(
-      `/api/admin/timesheets/for-week?projectId=${encodeURIComponent(projectId)}&startDate=${encodeURIComponent(weekMonday)}`,
-    )
+    void adminFetch(`/api/admin/timesheets/for-week?${forWeekQueryParams()}`)
       .then((r) => r.json())
       .then((data) => {
         const existing = data.data as { id?: string; status?: string } | null;
@@ -623,6 +660,7 @@ export function TimesheetForm({
         }
         if (weekOrProjectChangedFromRecord) {
           const params = new URLSearchParams({ projectId, weekStart: weekMonday });
+          if (timesheetMemberUserId) params.set("memberUserId", timesheetMemberUserId);
           router.replace(`/timesheets/new?${params}`, { scroll: false });
           return;
         }
@@ -637,6 +675,7 @@ export function TimesheetForm({
     projectId,
     weekMonday,
     router,
+    timesheetMemberUserId,
   ]);
 
   useEffect(() => {
@@ -779,7 +818,7 @@ export function TimesheetForm({
   const projectDisplayLabel =
     (defaults.projectNumber && defaults.projectTitle
       ? `${defaults.projectNumber} — ${defaults.projectTitle}`
-      : projects.find((row) => row.id === projectId)?.label || "") || "";
+      : projectSelectOptions.find((row) => row.id === projectId)?.label || "") || "";
 
   const saveButtonLabel = defaults.id ? "Save Draft" : "Add Timesheet";
 
@@ -891,7 +930,7 @@ export function TimesheetForm({
                     required
                   >
                     <option value="">Select project…</option>
-                    {projects.map((row) => (
+                    {projectSelectOptions.map((row) => (
                       <option key={row.id} value={row.id}>{row.label}</option>
                     ))}
                   </select>

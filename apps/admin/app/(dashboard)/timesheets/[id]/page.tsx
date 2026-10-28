@@ -14,7 +14,7 @@ import { messageFromApiError } from "@/lib/api-error";
 
 export default function TimesheetDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { isEffectiveProjectMember } = useAdminSession();
+  const { isEffectiveProjectMember, userId, role } = useAdminSession();
   const [timesheet, setTimesheet] = useState<
     (TimesheetFormValues & { canApprove?: boolean; canSubmit?: boolean }) | null
   >(null);
@@ -168,6 +168,10 @@ export default function TimesheetDetailPage() {
   const awaitingClient =
     status === "SUBMITTED" && timesheet?.approverKind === "CLIENT_CONTACT" && !pmCanAct;
   const canSubmitTimesheet = Boolean(timesheet?.canSubmit) && isEffectiveProjectMember;
+  const viewingOthersSheet = Boolean(
+    timesheet?.memberUserId && userId && timesheet.memberUserId !== userId,
+  );
+  const formReadOnly = status !== "DRAFT" || viewingOthersSheet;
 
   return (
     <ProjectManagementGuard>
@@ -197,6 +201,13 @@ export default function TimesheetDetailPage() {
           </div>
         ) : null}
 
+        {timesheet && viewingOthersSheet ? (
+          <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">
+            Viewing {timesheet.memberName ? `${timesheet.memberName}'s` : "another member's"} timesheet
+            (read-only). Week navigation shows that member&apos;s records for this project.
+          </div>
+        ) : null}
+
         {loadError && !timesheet ? (
           <p className="text-sm text-red-600 dark:text-red-400">{loadError}</p>
         ) : isLoading && !timesheet ? (
@@ -208,7 +219,7 @@ export default function TimesheetDetailPage() {
             defaults={timesheet}
             onSubmit={handleSubmit}
             isSaving={isSaving}
-            readOnly={status !== "DRAFT"}
+            readOnly={formReadOnly}
             weekNavigationLoading={isLoading}
             showSubmitForApproval={canSubmitTimesheet}
             submitForApprovalLoading={actionLoading}

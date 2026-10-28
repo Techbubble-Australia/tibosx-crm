@@ -5,6 +5,8 @@ import { listActiveProjectMembershipsForUser } from "./project-member-resolution
 export type TimesheetAccessFlags = {
   projectManagementTimesheets: boolean;
   workspaceTimesheets: boolean;
+  /** User has an active project assignment and can create/submit their own timesheets. */
+  canLogOwnTimesheets: boolean;
 };
 
 export async function getTimesheetAccessForUser(
@@ -14,7 +16,12 @@ export async function getTimesheetAccessForUser(
 ): Promise<TimesheetAccessFlags> {
   const roles = effectiveRoleList(primaryRole, additionalRoles);
   if (roles.some((r) => r === "admin" || r === "project_manager" || r === "project_member")) {
-    return { projectManagementTimesheets: true, workspaceTimesheets: false };
+    const memberships = await listActiveProjectMembershipsForUser(userId);
+    return {
+      projectManagementTimesheets: true,
+      workspaceTimesheets: false,
+      canLogOwnTimesheets: memberships.length > 0,
+    };
   }
 
   const memberships = await listActiveProjectMembershipsForUser(userId);
@@ -48,7 +55,7 @@ export async function getTimesheetAccessForUser(
   const workspaceTimesheets =
     roles.includes("client") && !roles.includes("customer_support") && Boolean(approverLink);
 
-  return { projectManagementTimesheets, workspaceTimesheets };
+  return { projectManagementTimesheets, workspaceTimesheets, canLogOwnTimesheets: false };
 }
 
 /** Timesheets a TBOS client user may view as the assigned client approver. */

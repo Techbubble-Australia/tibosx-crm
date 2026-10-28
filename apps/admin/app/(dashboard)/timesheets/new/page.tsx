@@ -19,13 +19,15 @@ function NewTimesheetPageInner() {
 
   const queryProjectId = searchParams.get("projectId")?.trim() || undefined;
   const queryWeekStart = searchParams.get("weekStart")?.trim() || undefined;
+  const queryMemberUserId = searchParams.get("memberUserId")?.trim() || undefined;
 
   const initialDefaults = useMemo((): Partial<TimesheetFormValues> => {
     const next: Partial<TimesheetFormValues> = {};
     if (queryProjectId) next.projectId = queryProjectId;
     if (queryWeekStart) next.startDate = queryWeekStart;
+    if (queryMemberUserId) next.memberUserId = queryMemberUserId;
     return next;
-  }, [queryProjectId, queryWeekStart]);
+  }, [queryProjectId, queryWeekStart, queryMemberUserId]);
 
   useEffect(() => {
     if (!sessionLoading && !canCreateTimesheets) {

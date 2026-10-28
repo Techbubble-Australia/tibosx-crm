@@ -305,7 +305,7 @@ async function mapDetailWithActions(
   let canApprove =
     row.status === "SUBMITTED" &&
     row.approverKind !== "CLIENT_CONTACT" &&
-    ((row.project && canActAsTimesheetApprover(actorId, role, row.project)) ||
+    ((row.project && canActAsTimesheetApprover(actorId, roles, row.project)) ||
       row.opportunity?.ownerId === actorId);
   if (
     !canApprove &&
@@ -320,8 +320,7 @@ async function mapDetailWithActions(
   }
   const canSubmit = row.memberUserId === actorId && row.status === "DRAFT";
   const canDelete =
-    (canManageAllTimesheets(role) &&
-      (row.status === "DRAFT" || row.status === "SUBMITTED")) ||
+    (roles.includes("admin") && (row.status === "DRAFT" || row.status === "SUBMITTED")) ||
     (row.memberUserId === actorId && row.status === "DRAFT");
   return {
     ...mapDetail(row),
@@ -535,6 +534,7 @@ async function findNextOpenTimesheetWeek(
 async function resolveTimesheetEntryPoint(req: AuthRequest, res: Response) {
   const actorId = getActorId(req);
   const role = req.user?.role ?? "";
+  const roles = await effectiveRolesForUser(actorId, role);
   if (!(await actorMayLogTimesheets(actorId, role))) {
     return res.status(403).json({ error: "Only project members can create timesheets" });
   }
@@ -542,7 +542,9 @@ async function resolveTimesheetEntryPoint(req: AuthRequest, res: Response) {
     typeof req.query.projectId === "string" ? req.query.projectId.trim() : "";
   const memberships = await listActiveProjectMembershipsForUser(actorId);
   if (!memberships.length) {
-    return res.status(404).json({ error: "No active project assignments" });
+    return res.status(403).json({
+      error: "You must be assigned to an active project before creating timesheets",
+    });
   }
   const match =
     (preferredProjectId && memberships.find((row) => row.project.id === preferredProjectId)) ||
@@ -566,11 +568,8 @@ async function resolveTimesheetEntryPoint(req: AuthRequest, res: Response) {
   });
 }
 
-/** Log/edit own timesheets: project_member role, PM/admin, or active project membership. */
+/** Log/edit own timesheets: active project membership required (admin/PM included when assigned). */
 async function actorMayLogTimesheets(actorId: string, role: string): Promise<boolean> {
-  if (canManageAllTimesheets(role)) return true;
-  const roles = await effectiveRolesForUser(actorId, role);
-  if (hasEffectiveRole(roles, "project_member")) return true;
   const memberships = await listActiveProjectMembershipsForUser(actorId);
   return memberships.length > 0;
 }
@@ -579,6 +578,7 @@ router.get("/active-projects", async (req: AuthRequest, res) => {
   try {
     const actorId = getActorId(req);
     const role = req.user?.role ?? "";
+    const roles = await effectiveRolesForUser(actorId, role);
     const weekStart =
       typeof req.query.weekStart === "string" && req.query.weekStart.trim()
         ? req.query.weekStart.trim()
@@ -586,36 +586,58 @@ router.get("/active-projects", async (req: AuthRequest, res) => {
     const projectMemberships = await listActiveProjectMembershipsForUser(actorId);
     const options: Array<{ id: string; label: string; kind: string }> = [];
     const seen = new Set<string>();
-    for (const row of projectMemberships) {
+
+    function pushProject(project: {
+      id: string;
+      projectNumber: string;
+      title: string;
+      kind: string;
+      startDate: Date;
+      endDate: Date;
+    }) {
+      if (seen.has(project.id)) return;
       if (weekStart) {
-        const { startDate, endDate } = projectDateBoundsIso(row.project);
-        if (!weekOverlapsProjectRange(weekStart, startDate, endDate)) continue;
+        const { startDate, endDate } = projectDateBoundsIso(project);
+        if (!weekOverlapsProjectRange(weekStart, startDate, endDate)) return;
       }
-      if (seen.has(row.project.id)) continue;
-      seen.add(row.project.id);
+      seen.add(project.id);
       options.push({
-        id: row.project.id,
-        label: `${row.project.projectNumber} — ${row.project.title}`,
-        kind: row.project.kind,
+        id: project.id,
+        label: `${project.projectNumber} — ${project.title}`,
+        kind: project.kind,
       });
     }
-    if (canManageAllTimesheets(role) || isProjectManagerRole(role)) {
+
+    for (const row of projectMemberships) {
+      pushProject(row.project);
+    }
+
+    if (roles.includes("admin")) {
+      const allActive = await prisma.project.findMany({
+        where: { status: "ACTIVE" },
+        select: {
+          id: true,
+          projectNumber: true,
+          title: true,
+          kind: true,
+          startDate: true,
+          endDate: true,
+        },
+        orderBy: { projectNumber: "asc" },
+      });
+      for (const project of allActive) {
+        pushProject(project);
+      }
+    } else if (roles.some((r) => r === "project_manager" || r === "admin")) {
       const managed = await prisma.project.findMany({
-        where: { projectManagerId: actorId, status: "ACTIVE" },
+        where: {
+          status: "ACTIVE",
+          OR: [{ projectManagerId: actorId }, { timesheetApproverUserId: actorId }],
+        },
         select: { id: true, projectNumber: true, title: true, kind: true, startDate: true, endDate: true },
       });
       for (const project of managed) {
-        if (seen.has(project.id)) continue;
-        if (weekStart) {
-          const { startDate, endDate } = projectDateBoundsIso(project);
-          if (!weekOverlapsProjectRange(weekStart, startDate, endDate)) continue;
-        }
-        seen.add(project.id);
-        options.push({
-          id: project.id,
-          label: `${project.projectNumber} — ${project.title}`,
-          kind: project.kind,
-        });
+        pushProject(project);
       }
     }
     res.json({ data: options });
@@ -628,28 +650,44 @@ router.get("/active-projects", async (req: AuthRequest, res) => {
 router.get("/project-cases", async (req: AuthRequest, res) => {
   try {
     const actorId = getActorId(req);
+    const role = req.user?.role ?? "";
+    const roles = await effectiveRolesForUser(actorId, role);
     const projectId = typeof req.query.projectId === "string" ? req.query.projectId : "";
     const weekStart =
       typeof req.query.weekStart === "string" && req.query.weekStart.trim()
         ? req.query.weekStart.trim()
         : null;
+    const asMemberUserId =
+      typeof req.query.asMemberUserId === "string" && req.query.asMemberUserId.trim()
+        ? req.query.asMemberUserId.trim()
+        : actorId;
     if (!projectId) return res.status(400).json({ error: "projectId is required" });
 
-    const hasMembership = await userHasActiveProjectMembership(actorId, projectId);
-    if (!hasMembership) return res.status(403).json({ error: "Forbidden" });
-    const whereMember = await projectMemberWhereForUser(actorId);
-    const membership = await prisma.projectMember.findFirst({
-      where: { ...whereMember, projectId, project: { status: "ACTIVE" } },
-      include: {
-        project: { select: { kind: true, projectNumber: true, title: true } },
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, status: "ACTIVE" },
+      select: {
+        kind: true,
+        projectNumber: true,
+        title: true,
+        projectManagerId: true,
+        timesheetApproverUserId: true,
       },
     });
-    if (!membership?.project) return res.status(403).json({ error: "Forbidden" });
+    if (!project) return res.status(404).json({ error: "Project not found" });
+
+    const hasMembership = await userHasActiveProjectMembership(asMemberUserId, projectId);
+    if (asMemberUserId !== actorId) {
+      if (!canActAsTimesheetApprover(actorId, roles, project)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+    } else if (!hasMembership && !roles.includes("admin")) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
 
     const projectOption = {
       kind: "project" as const,
       id: projectId,
-      label: `${membership.project.projectNumber} — ${membership.project.title}`,
+      label: `${project.projectNumber} — ${project.title}`,
     };
     const tickets = await listTimesheetTicketsForProject(projectId, weekStart);
     const ticketOptions = tickets.map((row) => ({
@@ -659,18 +697,21 @@ router.get("/project-cases", async (req: AuthRequest, res) => {
       label: `${row.ticketNumber} — ${row.subject} (${formatTicketStatusLabel(row.status)})`,
     }));
 
-    if (membership.project.kind === "SUPPORT") {
+    if (project.kind === "SUPPORT") {
       return res.json({
         data: [projectOption, ...ticketOptions],
       });
     }
 
+    const opportunityWhere: Prisma.OpportunityWhereInput = {
+      active: true,
+      status: { in: ["IN_PROGRESS", "ACCEPTED", "PROPOSAL"] },
+    };
+    if (!(roles.includes("admin") && !hasMembership)) {
+      opportunityWhere.ownerId = asMemberUserId;
+    }
     const opportunities = await prisma.opportunity.findMany({
-      where: {
-        active: true,
-        status: { in: ["IN_PROGRESS", "ACCEPTED", "PROPOSAL"] },
-        ownerId: actorId,
-      },
+      where: opportunityWhere,
       select: { id: true, name: true },
       orderBy: { updatedAt: "desc" },
       take: 50,
@@ -924,20 +965,38 @@ router.get("/recent-submitted", async (req: AuthRequest, res) => {
 router.get("/for-week", async (req: AuthRequest, res) => {
   try {
     const actorId = getActorId(req);
+    const role = req.user?.role ?? "";
+    const roles = await effectiveRolesForUser(actorId, role);
     const projectId = typeof req.query.projectId === "string" ? req.query.projectId : "";
     const startDateRaw = typeof req.query.startDate === "string" ? req.query.startDate : "";
+    const memberUserIdRaw =
+      typeof req.query.memberUserId === "string" && req.query.memberUserId.trim()
+        ? req.query.memberUserId.trim()
+        : actorId;
     if (!projectId || !startDateRaw) {
       return res.status(400).json({ error: "projectId and startDate are required" });
+    }
+    if (memberUserIdRaw !== actorId) {
+      const projectForAccess = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { projectManagerId: true, timesheetApproverUserId: true },
+      });
+      if (!projectForAccess || !canActAsTimesheetApprover(actorId, roles, projectForAccess)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
     }
     const startDate = new Date(`${startDateRaw}T00:00:00.000Z`);
     if (Number.isNaN(startDate.getTime())) {
       return res.status(400).json({ error: "Invalid startDate" });
     }
     const row = await prisma.timesheet.findFirst({
-      where: { memberUserId: actorId, projectId, startDate },
+      where: { memberUserId: memberUserIdRaw, projectId, startDate },
       include: detailInclude,
     });
     if (!row) return res.json({ data: null });
+    const accessWhere = await timesheetAccessWhere(req);
+    const allowed = await prisma.timesheet.findFirst({ where: { id: row.id, ...accessWhere } });
+    if (!allowed) return res.json({ data: null });
     res.json({ data: mapDetail(row) });
   } catch (error) {
     console.error("Error fetching timesheet for week:", error);
@@ -1401,7 +1460,8 @@ router.delete("/:id", async (req: AuthRequest, res) => {
   try {
     const actorId = getActorId(req);
     const role = req.user?.role ?? "";
-    const canManageAll = canManageAllTimesheets(role);
+    const roles = await effectiveRolesForUser(actorId, role);
+    const canManageAll = roles.includes("admin");
     const existing = await prisma.timesheet.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: "Not found" });
 
@@ -1568,8 +1628,9 @@ router.post("/:id/approve", async (req: AuthRequest, res) => {
       },
     });
     if (!existing) return res.status(404).json({ error: "Not found" });
+    const roles = await effectiveRolesForUser(actorId, role);
     const canApproveProject =
-      existing.project && canActAsTimesheetApprover(actorId, role, existing.project);
+      existing.project && canActAsTimesheetApprover(actorId, roles, existing.project);
     const ownsOpportunity = existing.opportunity?.ownerId === actorId;
     const canApproveAsClient = await clientContactCanActOnTimesheet(actorId, existing);
     if (!canApproveProject && !ownsOpportunity && !canApproveAsClient) {
@@ -1622,8 +1683,9 @@ router.post("/:id/reject", async (req: AuthRequest, res) => {
       },
     });
     if (!existing) return res.status(404).json({ error: "Not found" });
+    const roles = await effectiveRolesForUser(actorId, role);
     const canRejectProject =
-      existing.project && canActAsTimesheetApprover(actorId, role, existing.project);
+      existing.project && canActAsTimesheetApprover(actorId, roles, existing.project);
     const ownsOpportunity = existing.opportunity?.ownerId === actorId;
     const canRejectAsClient = await clientContactCanActOnTimesheet(actorId, existing);
     if (!canRejectProject && !ownsOpportunity && !canRejectAsClient) {

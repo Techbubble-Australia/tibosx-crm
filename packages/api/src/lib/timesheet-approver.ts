@@ -24,14 +24,15 @@ export async function isValidTimesheetApproverUserId(userId: string): Promise<bo
 
 export function canActAsTimesheetApprover(
   actorId: string,
-  role: string,
+  roles: string[] | string,
   project:
     | { timesheetApproverUserId: string | null; projectManagerId?: string | null }
     | null
     | undefined,
 ): boolean {
   if (!project) return false;
-  if (role === "admin") return true;
+  const effective = Array.isArray(roles) ? roles : effectiveRoleList(roles, null);
+  if (effective.includes("admin")) return true;
   if (project.timesheetApproverUserId === actorId) return true;
   if (project.projectManagerId === actorId) return true;
   return false;
