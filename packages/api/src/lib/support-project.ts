@@ -119,6 +119,38 @@ export async function provisionClientPortalUser(projectClientContactId: string, 
     data: { ticketingUserId: updated.id },
   });
 
+  const tbosClientAdmin = await prisma.adminUser.findFirst({
+    where: {
+      active: true,
+      role: "client",
+      OR: [
+        { mappedClientContactId: link.contactId },
+        { email: { equals: email, mode: "insensitive" } },
+      ],
+    },
+    select: { id: true },
+  });
+  let tbosUserId = tbosClientAdmin?.id ?? null;
+  if (!tbosUserId) {
+    const tbosCustomer = await prisma.customerUser.findFirst({
+      where: {
+        active: true,
+        OR: [
+          { mappedClientContactId: link.contactId },
+          { email: { equals: email, mode: "insensitive" } },
+        ],
+      },
+      select: { id: true },
+    });
+    tbosUserId = tbosCustomer?.id ?? null;
+  }
+  if (tbosUserId && updated.tbosAdminUserId !== tbosUserId) {
+    await prisma.ticketingUser.update({
+      where: { id: updated.id },
+      data: { tbosAdminUserId: tbosUserId, tbosRole: "client" },
+    });
+  }
+
   return { email, temporaryPassword: existing ? undefined : tempPassword };
 }
 

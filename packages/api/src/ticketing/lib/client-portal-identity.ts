@@ -94,3 +94,73 @@ export async function resolveTbosClientPortalIdentity(
     contactEmails: [...contactEmails],
   };
 }
+
+/** TBOS login ids for the same person (customer user row + client admin user row). */
+export async function resolveTbosClientUserIds(tbosUserId: string): Promise<string[]> {
+  const ids = new Set<string>([tbosUserId]);
+
+  const admin = await prisma.adminUser.findUnique({
+    where: { id: tbosUserId },
+    select: { email: true, mappedClientContactId: true },
+  });
+  const customer = admin
+    ? null
+    : await prisma.customerUser.findUnique({
+        where: { id: tbosUserId },
+        select: { email: true, mappedClientContactId: true },
+      });
+
+  const email = (admin?.email ?? customer?.email)?.trim().toLowerCase() ?? "";
+  const mappedClientContactId = admin?.mappedClientContactId ?? customer?.mappedClientContactId ?? null;
+
+  if (email) {
+    const adminByEmail = await prisma.adminUser.findFirst({
+      where: { active: true, role: "client", email: { equals: email, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (adminByEmail) ids.add(adminByEmail.id);
+    const customerByEmail = await prisma.customerUser.findFirst({
+      where: { active: true, email: { equals: email, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (customerByEmail) ids.add(customerByEmail.id);
+  }
+
+  if (mappedClientContactId) {
+    const adminByContact = await prisma.adminUser.findFirst({
+      where: { active: true, mappedClientContactId },
+      select: { id: true },
+    });
+    if (adminByContact) ids.add(adminByContact.id);
+    const customerByContact = await prisma.customerUser.findFirst({
+      where: { active: true, mappedClientContactId },
+      select: { id: true },
+    });
+    if (customerByContact) ids.add(customerByContact.id);
+  }
+
+  return [...ids];
+}
+
+/** Merge CRM contacts for a TBOS client session (handles customer-only and split admin/customer rows). */
+export async function resolveLinkedTbosClientPortalIdentity(
+  tbosUserId: string,
+): Promise<TbosClientPortalIdentity> {
+  const tbosIds = await resolveTbosClientUserIds(tbosUserId);
+  const contactIds = new Set<string>();
+  const contactEmails = new Set<string>();
+  let adminEmail: string | null = null;
+
+  for (const id of tbosIds) {
+    const part = await resolveTbosClientPortalIdentity(id);
+    if (!adminEmail && part.adminEmail) adminEmail = part.adminEmail;
+    for (const cid of part.contactIds) contactIds.add(cid);
+    for (const rowEmail of part.contactEmails) contactEmails.add(rowEmail);
+  }
+
+  return {
+    adminEmail,
+    contactIds: [...contactIds],
+    contactEmails: [...contactEmails],
+  };
+}

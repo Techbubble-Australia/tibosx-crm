@@ -1,7 +1,10 @@
 import { prisma } from "@techbubble/database";
 import type { TicketingAuthUser } from "../middleware/auth.js";
 import { ensureClientPortalContactLinks } from "./client-timesheet-projects.js";
-import { resolveTbosClientPortalIdentity } from "./client-portal-identity.js";
+import {
+  resolveLinkedTbosClientPortalIdentity,
+  resolveTbosClientUserIds,
+} from "./client-portal-identity.js";
 
 const TBOS_ADMIN_ROLES = new Set(["admin"]);
 
@@ -32,77 +35,153 @@ export async function organizationIdsForClientPortal(
   ticketingUserId: string,
   tbosAdminUserId: string | null,
 ): Promise<string[]> {
-  const projectIds = new Set<string>();
   const portalAccessOr = [{ portalAccess: true }, { canApproveTimesheets: true }] as const;
+  const projectIds = new Set<string>();
 
-  let identity = { adminEmail: null as string | null, contactIds: [] as string[], contactEmails: [] as string[] };
-  if (tbosAdminUserId) {
-    identity = await resolveTbosClientPortalIdentity(tbosAdminUserId);
-    await ensureClientPortalContactLinks(ticketingUserId, identity.contactEmails, identity.contactIds);
+  const tu = await prisma.ticketingUser.findUnique({
+    where: { id: ticketingUserId },
+    select: {
+      email: true,
+      tbosAdminUserId: true,
+      projectClientLink: {
+        select: {
+          projectId: true,
+          contactId: true,
+          portalAccess: true,
+          canApproveTimesheets: true,
+        },
+      },
+    },
+  });
+  if (!tu) return [];
 
+  let adminId = tbosAdminUserId ?? tu.tbosAdminUserId ?? null;
+  if (!adminId) {
+    const adminById = await prisma.adminUser.findUnique({
+      where: { id: ticketingUserId },
+      select: { id: true, role: true, active: true },
+    });
+    if (adminById?.active && adminById.role === "client") {
+      adminId = adminById.id;
+    }
+  }
+  if (!adminId) {
+    const customerById = await prisma.customerUser.findUnique({
+      where: { id: ticketingUserId },
+      select: { id: true, active: true },
+    });
+    if (customerById?.active) {
+      adminId = customerById.id;
+    }
+  }
+  if (!adminId) {
+    const adminByEmail = await prisma.adminUser.findFirst({
+      where: {
+        active: true,
+        role: "client",
+        email: { equals: tu.email, mode: "insensitive" },
+      },
+      select: { id: true },
+    });
+    adminId = adminByEmail?.id ?? null;
+  }
+  if (!adminId) {
+    const customerByEmail = await prisma.customerUser.findFirst({
+      where: {
+        active: true,
+        email: { equals: tu.email, mode: "insensitive" },
+      },
+      select: { id: true },
+    });
+    adminId = customerByEmail?.id ?? null;
+  }
+
+  const contactIds = new Set<string>();
+  const contactEmails = new Set<string>();
+  if (tu.email.trim()) contactEmails.add(tu.email.trim().toLowerCase());
+
+  if (adminId) {
+    const identity = await resolveLinkedTbosClientPortalIdentity(adminId);
+    for (const id of identity.contactIds) contactIds.add(id);
+    for (const email of identity.contactEmails) contactEmails.add(email);
+
+    await ensureClientPortalContactLinks(ticketingUserId, [...contactEmails], [...contactIds]);
+
+    const tbosActorIds = await resolveTbosClientUserIds(adminId);
     const approverProjects = await prisma.project.findMany({
       where: {
         status: "ACTIVE",
-        timesheetApproverUserId: tbosAdminUserId,
-        supportOrganization: { active: true },
+        timesheetApproverUserId: { in: tbosActorIds },
       },
       select: { id: true },
     });
-    for (const row of approverProjects) {
-      projectIds.add(row.id);
-    }
+    for (const row of approverProjects) projectIds.add(row.id);
   }
 
-  const contactEmailFilters =
-    identity.contactEmails.length > 0
-      ? identity.contactEmails.map((email) => ({
-          contact: { email: { equals: email, mode: "insensitive" as const } },
-        }))
-      : [];
+  if (
+    tu.projectClientLink &&
+    (tu.projectClientLink.portalAccess || tu.projectClientLink.canApproveTimesheets)
+  ) {
+    projectIds.add(tu.projectClientLink.projectId);
+    contactIds.add(tu.projectClientLink.contactId);
+  }
 
-  const portalLinks = await prisma.projectClientContact.findMany({
+  if (contactEmails.size) {
+    const contacts = await prisma.clientContact.findMany({
+      where: {
+        OR: [...contactEmails].map((email) => ({
+          email: { equals: email, mode: "insensitive" as const },
+        })),
+      },
+      select: { id: true },
+    });
+    for (const row of contacts) contactIds.add(row.id);
+  }
+
+  if (contactIds.size) {
+    const byContact = await prisma.projectClientContact.findMany({
+      where: {
+        contactId: { in: [...contactIds] },
+        OR: [...portalAccessOr],
+        project: { status: "ACTIVE" },
+      },
+      select: { projectId: true },
+    });
+    for (const row of byContact) projectIds.add(row.projectId);
+  }
+
+  const byTicketingUser = await prisma.projectClientContact.findFirst({
     where: {
-      OR: [
-        { ticketingUserId, OR: [...portalAccessOr] },
-        ...(identity.contactIds.length
-          ? [{ contactId: { in: identity.contactIds }, OR: [...portalAccessOr] }]
-          : []),
-        ...contactEmailFilters.map((filter) => ({ ...filter, OR: [...portalAccessOr] })),
-      ],
+      ticketingUserId,
+      OR: [...portalAccessOr],
       project: { status: "ACTIVE" },
     },
-    select: { projectId: true },
+    select: { projectId: true, contactId: true },
   });
-  for (const link of portalLinks) {
-    projectIds.add(link.projectId);
-  }
-
-  const clientIds = new Set<string>();
-  if (identity.contactIds.length) {
-    const contacts = await prisma.clientContact.findMany({
-      where: { id: { in: identity.contactIds } },
-      select: { clientId: true },
-    });
-    for (const row of contacts) {
-      if (row.clientId) clientIds.add(row.clientId);
-    }
-  }
-
-  for (const clientId of clientIds) {
-    const clientProjects = await prisma.project.findMany({
+  if (byTicketingUser) {
+    projectIds.add(byTicketingUser.projectId);
+    contactIds.add(byTicketingUser.contactId);
+    const siblings = await prisma.projectClientContact.findMany({
       where: {
-        clientId,
-        status: "ACTIVE",
-        supportOrganization: { active: true },
+        contactId: byTicketingUser.contactId,
+        OR: [...portalAccessOr],
+        project: { status: "ACTIVE" },
       },
-      select: { id: true },
+      select: { projectId: true },
     });
-    for (const row of clientProjects) {
-      projectIds.add(row.id);
-    }
+    for (const row of siblings) projectIds.add(row.projectId);
   }
 
   if (projectIds.size === 0) return [];
+
+  const { ensureSupportOrganizationForProject } = await import("../../lib/support-organization.js");
+  for (const projectId of projectIds) {
+    try {
+      await ensureSupportOrganizationForProject(projectId);
+    } catch {
+      /* skip missing projects */
+    }
+  }
 
   const orgs = await prisma.organization.findMany({
     where: {

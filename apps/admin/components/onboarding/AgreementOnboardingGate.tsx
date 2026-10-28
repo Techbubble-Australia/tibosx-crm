@@ -41,7 +41,7 @@ export function AgreementOnboardingGate() {
   const bodyHtml = useMemo(() => (agreement ? extractAgreementBody(agreement.html) : ""), [agreement]);
   const allSigned = captureIds.length > 0 && signedCaptureIds.length === captureIds.length;
   const showModal =
-    sessionLoaded && !impersonation && needsAgreementSigning && agreement && !agreement.signed;
+    sessionLoaded && needsAgreementSigning && agreement && !agreement.signed;
 
   useEffect(() => {
     if (!sessionLoaded) return;
@@ -97,6 +97,11 @@ export function AgreementOnboardingGate() {
               <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                 Sign your agreement before using TIBOSX.AI. Click each highlighted signature field.
               </p>
+              {impersonation ? (
+                <p className="mt-2 text-sm font-medium text-amber-800 dark:text-amber-200">
+                  You are impersonating this user — signing will count as their agreement.
+                </p>
+              ) : null}
             </div>
             {captureIds.some((id) => !signedCaptureIds.includes(id)) ? (
               <button

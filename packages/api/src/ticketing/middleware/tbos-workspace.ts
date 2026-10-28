@@ -1,4 +1,5 @@
 import type { Response, NextFunction } from "express";
+import { prisma } from "@techbubble/database";
 import type { AuthRequest } from "../../middleware/auth.js";
 import { effectiveRoleList } from "../../lib/admin-roles.js";
 import {
@@ -41,6 +42,18 @@ export async function tbosWorkspaceTicketingMiddleware(
             ? "No support portal access linked to your client contact. Ask your administrator to enable portal access on your project."
             : "Could not provision your support workspace account",
       });
+    }
+    if (workspaceRole === "client" && ticketingUser.tbosAdminUserId !== tbosUser.id) {
+      await prisma.ticketingUser.updateMany({
+        where: { tbosAdminUserId: tbosUser.id, id: { not: ticketingUser.id } },
+        data: { tbosAdminUserId: null },
+      });
+      await prisma.ticketingUser.update({
+        where: { id: ticketingUser.id },
+        data: { tbosAdminUserId: tbosUser.id, tbosRole: "client" },
+      });
+      ticketingUser.tbosAdminUserId = tbosUser.id;
+      ticketingUser.tbosRole = "client";
     }
     req.ticketingUser = ticketingUser;
     next();
