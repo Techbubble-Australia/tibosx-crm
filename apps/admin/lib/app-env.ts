@@ -4,6 +4,11 @@ export function normalizeAppEnv(value: string | undefined): "development" | "pro
   return raw === "development" ? "development" : "production";
 }
 
+/** Set `ENV` or `TBOS_ENV` on the admin service (must be uppercase key in Railway/host). */
+export function readAppEnvRaw(): string | undefined {
+  return process.env.ENV ?? process.env.TBOS_ENV ?? process.env.NEXT_PUBLIC_TBOS_ENV;
+}
+
 export function isDevelopmentAppEnv(): boolean {
-  return normalizeAppEnv(process.env.ENV) === "development";
+  return normalizeAppEnv(readAppEnvRaw()) === "development";
 }
