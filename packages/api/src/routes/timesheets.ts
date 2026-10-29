@@ -16,6 +16,7 @@ import { effectiveRolesForUser, hasEffectiveRole } from "../lib/admin-roles";
 import { getMemberOnboardingStatus } from "../lib/member-onboarding";
 import { notifyAsync } from "../lib/notifications";
 import { mondayOfWeek, sundayOfWeek, TIMESHEET_STATUSES, TIMESHEET_STATUS_LABELS } from "../lib/project-types";
+import { buildTimesheetTemplateCsv } from "../lib/timesheet-export-template.js";
 import { formatZodError } from "../lib/zod-error";
 import {
   listActiveProjectMembershipsForUser,
@@ -144,6 +145,35 @@ function serializeActivity(row: {
   };
 }
 
+function resolveTimesheetApproverLabel(row: {
+  approverKind: string | null;
+  project?: {
+    projectManager?: { name: string | null; email: string } | null;
+    timesheetApprover?: { name: string | null; email: string } | null;
+  } | null;
+  projectClientContact?: { contact: { name: string; email: string } } | null;
+}): string {
+  const projectApproverName =
+    row.project?.timesheetApprover?.name ||
+    row.project?.timesheetApprover?.email ||
+    row.project?.projectManager?.name ||
+    row.project?.projectManager?.email ||
+    "";
+  if (row.approverKind === "CLIENT_CONTACT") {
+    const raw =
+      row.projectClientContact?.contact.name?.trim() ||
+      row.projectClientContact?.contact.email?.trim() ||
+      "";
+    if (raw) return raw.replace(/\s*\(client\)\s*$/i, "").trim() || raw;
+    if (projectApproverName.trim()) return projectApproverName;
+    return "Client contact";
+  }
+  if (row.approverKind === "PM") {
+    return projectApproverName || "Project manager";
+  }
+  return projectApproverName;
+}
+
 function serializeTimesheet(row: {
   id: string;
   projectId: string | null;
@@ -162,10 +192,12 @@ function serializeTimesheet(row: {
   comments: string | null;
   createdAt: Date;
   updatedAt: Date;
-  project?: {
+    project?: {
     id: string;
     title: string;
     projectNumber: string;
+    clientId?: string;
+    client?: { id: string; name: string } | null;
     projectManagerId: string;
     projectManager?: { name: string | null; email: string } | null;
     timesheetApprover?: { name: string | null; email: string } | null;
@@ -195,29 +227,11 @@ function serializeTimesheet(row: {
     ticketId: row.ticketId,
     approverKind: row.approverKind,
     projectClientContactId: row.projectClientContactId,
-    approverLabel: (() => {
-      const projectApproverName =
-        row.project?.timesheetApprover?.name ||
-        row.project?.timesheetApprover?.email ||
-        row.project?.projectManager?.name ||
-        row.project?.projectManager?.email ||
-        "";
-      if (row.approverKind === "CLIENT_CONTACT") {
-        const raw =
-          row.projectClientContact?.contact.name?.trim() ||
-          row.projectClientContact?.contact.email?.trim() ||
-          "";
-        if (raw) return raw.replace(/\s*\(client\)\s*$/i, "").trim() || raw;
-        if (projectApproverName.trim()) return projectApproverName;
-        return "Client contact";
-      }
-      if (row.approverKind === "PM") {
-        return projectApproverName || "Project manager";
-      }
-      return projectApproverName;
-    })(),
+    approverLabel: resolveTimesheetApproverLabel(row),
     projectTitle: row.project?.title ?? "",
     projectNumber: row.project?.projectNumber ?? "",
+    clientId: row.project?.clientId ?? row.project?.client?.id ?? "",
+    clientName: row.project?.client?.name ?? "",
     opportunityName: row.opportunity?.name ?? "",
     targetLabel: multiLineLabel
       ? multiLineLabel
@@ -1061,8 +1075,16 @@ router.get("/export", async (req: AuthRequest, res) => {
     const rows = await prisma.timesheet.findMany({
       where,
       include: {
-        project: { select: { projectNumber: true, title: true } },
+        project: {
+          select: {
+            projectNumber: true,
+            title: true,
+            projectManager: { select: { name: true, email: true } },
+            timesheetApprover: { select: { name: true, email: true } },
+          },
+        },
         memberUser: { select: { name: true, email: true } },
+        projectClientContact: { include: { contact: { select: { name: true, email: true } } } },
         entries: {
           orderBy: { sortOrder: "asc" },
           include: {
@@ -1078,83 +1100,24 @@ router.get("/export", async (req: AuthRequest, res) => {
       return res.status(404).json({ error: "Timesheet not found" });
     }
 
-    const header = [
-      "Timesheet ID",
-      "Status",
-      "Member",
-      "Project Number",
-      "Project Title",
-      "Week Start",
-      "Week End",
-      "Entry",
-      "Mon",
-      "Tue",
-      "Wed",
-      "Thu",
-      "Fri",
-      "Sat",
-      "Sun",
-      "Entry Total Hours",
-      "Timesheet Comments",
-    ]
-      .map(csvEscape)
-      .join(",");
-
-    const lines: string[] = [header];
-    for (const ts of rows) {
-      const weekStart = ts.startDate.toISOString().slice(0, 10);
-      const weekEnd = ts.endDate.toISOString().slice(0, 10);
-      const member = ts.memberUser?.name || ts.memberUser?.email || "";
-      const status =
-        TIMESHEET_STATUS_LABELS[ts.status as keyof typeof TIMESHEET_STATUS_LABELS] ?? ts.status;
-      const comments = ts.comments ?? "";
-      const base = [
-        ts.id,
-        status,
-        member,
-        ts.project?.projectNumber ?? "",
-        ts.project?.title ?? "",
-        weekStart,
-        weekEnd,
-      ];
-
-      if (ts.entries.length === 0) {
-        const hours = (ts.dailyHours ?? {}) as Record<string, number>;
-        const total = sumDailyHours(hours);
-        const cols = [
-          ...base,
-          total > 0
-            ? ts.project
-              ? `${ts.project.projectNumber} — ${ts.project.title}`
-              : "Project time"
-            : "",
-          ...WEEKDAY_KEYS.map((k) => hours[k] ?? ""),
-          total,
-          comments,
-        ];
-        lines.push(cols.map(csvEscape).join(","));
-        continue;
-      }
-
-      for (const entry of ts.entries) {
-        const hours = (entry.dailyHours ?? {}) as Record<string, number>;
-        const label = entryLabel({ ...entry, project: ts.project ?? null });
-        const total = sumDailyHours(hours);
-        const cols = [
-          ...base,
-          label,
-          ...WEEKDAY_KEYS.map((k) => hours[k] ?? ""),
-          total,
-          comments,
-        ];
-        lines.push(cols.map(csvEscape).join(","));
-      }
-    }
+    const hydrated = await Promise.all(rows.map((row) => hydrateTimesheetApproverRow(row)));
+    const exportRows = hydrated.map((row) => ({
+      startDate: row.startDate,
+      endDate: row.endDate,
+      status: row.status,
+      comments: row.comments,
+      dailyHours: row.dailyHours,
+      dailyComments: row.dailyComments,
+      memberUser: row.memberUser,
+      project: row.project,
+      entries: row.entries,
+      approverLabel: resolveTimesheetApproverLabel(row),
+    }));
 
     const filename = timesheetId ? `timesheet-${timesheetId}.csv` : "timesheets.csv";
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.send(lines.join("\n"));
+    res.send(buildTimesheetTemplateCsv(exportRows));
   } catch (error) {
     console.error("Error exporting timesheets:", error);
     res.status(500).json({ error: "Failed to export timesheets" });
@@ -1172,6 +1135,8 @@ router.get("/", async (req: AuthRequest, res) => {
             id: true,
             title: true,
             projectNumber: true,
+            clientId: true,
+            client: { select: { id: true, name: true } },
             projectManagerId: true,
             timesheetApproverUserId: true,
             projectManager: { select: { name: true, email: true } },
@@ -1474,9 +1439,6 @@ router.delete("/:id", async (req: AuthRequest, res) => {
     if (!existing) return res.status(404).json({ error: "Not found" });
 
     if (canManageAll) {
-      if (existing.status !== "DRAFT" && existing.status !== "SUBMITTED") {
-        return res.status(400).json({ error: "Only draft or submitted timesheets can be deleted" });
-      }
       await prisma.timesheet.delete({ where: { id: existing.id } });
       return res.json({ data: { id: existing.id } });
     }

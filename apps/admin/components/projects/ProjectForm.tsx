@@ -112,6 +112,9 @@ export type ProjectFormValues = {
     email: string;
     credentialsReady: boolean;
   }>;
+  ticketPrefix?: string;
+  ticketNumberDigits?: number;
+  ticketSettingsLocked?: boolean;
 };
 
 type ClientOption = { id: string; name: string };
@@ -144,6 +147,8 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
     defaults.projectManagerId ?? defaultProjectManagerId ?? "",
   );
   const [forCustomerSupport, setForCustomerSupport] = useState(defaults.kind === "SUPPORT");
+  const [ticketPrefix, setTicketPrefix] = useState(defaults.ticketPrefix ?? "TKT");
+  const [ticketNumberDigits, setTicketNumberDigits] = useState(defaults.ticketNumberDigits ?? 5);
   const [supportClientContacts, setSupportClientContacts] = useState<SupportClientContactRow[]>(
     ((defaults.clientContacts as Array<{
       contactId: string;
@@ -292,6 +297,14 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
       appAlert("Select at least one client contact when Customer Support is enabled.");
       return;
     }
+    if (forCustomerSupport && !ticketPrefix.trim()) {
+      appAlert("Ticket prefix is required for customer support projects.");
+      return;
+    }
+    if (forCustomerSupport && (ticketNumberDigits < 1 || ticketNumberDigits > 10)) {
+      appAlert("Number of ticket digits must be between 1 and 10.");
+      return;
+    }
     await onSubmit({
       title: title.trim(),
       description: description.trim(),
@@ -307,6 +320,8 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
       actuals,
       forCustomerSupport,
       supportClientContacts: forCustomerSupport ? supportClientContacts : [],
+      ticketPrefix: forCustomerSupport ? ticketPrefix.trim().toUpperCase() : undefined,
+      ticketNumberDigits: forCustomerSupport ? ticketNumberDigits : undefined,
     });
   }
 
@@ -636,6 +651,11 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
           onEnabledChange={setForCustomerSupport}
           rows={supportClientContacts}
           onRowsChange={setSupportClientContacts}
+          ticketPrefix={ticketPrefix}
+          onTicketPrefixChange={setTicketPrefix}
+          ticketNumberDigits={ticketNumberDigits}
+          onTicketNumberDigitsChange={setTicketNumberDigits}
+          ticketSettingsLocked={defaults.ticketSettingsLocked}
         />
 
         {defaults.id && (kind === "SUPPORT" || forCustomerSupport) ? (

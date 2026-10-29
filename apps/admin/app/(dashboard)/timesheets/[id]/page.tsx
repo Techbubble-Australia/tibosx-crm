@@ -2,7 +2,7 @@
 import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Download } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
@@ -11,9 +11,13 @@ import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
 import { TimesheetForm, type TimesheetFormValues } from "@/components/timesheets/TimesheetForm";
 import { TimesheetRejectDialog } from "@/components/timesheets/TimesheetRejectDialog";
 import { messageFromApiError } from "@/lib/api-error";
+import { timesheetsListHref } from "@/lib/timesheet-list-query";
 
 export default function TimesheetDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  const listBack = searchParams.get("list");
+  const backHref = timesheetsListHref(listBack);
   const { isEffectiveProjectMember, userId, role } = useAdminSession();
   const [timesheet, setTimesheet] = useState<
     (TimesheetFormValues & { canApprove?: boolean; canSubmit?: boolean }) | null
@@ -190,7 +194,7 @@ export default function TimesheetDetailPage() {
   return (
     <ProjectManagementGuard>
       <div>
-        <Link href="/timesheets" className="mb-1 inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100">
+        <Link href={backHref} className="mb-1 inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100">
           <ArrowLeft className="h-4 w-4" /> Back to timesheets
         </Link>
 

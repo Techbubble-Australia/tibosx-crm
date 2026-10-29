@@ -6,7 +6,7 @@ import { tbosAuthMiddleware, requireTbosAdmin, type TbosRequest } from "../middl
 import { assignedOrganizationIds } from "../lib/ticket-access.js";
 import { resolveTbosActorUserId } from "../lib/tbos-actor.js";
 import { enrichTicketAuditLogsForDisplay, logTicketAudit } from "../lib/ticket-audit.js";
-import { nextTicketNumber } from "../lib/ticket-number.js";
+import { allocateTicketNumber } from "../lib/ticket-number.js";
 import { saveTicketUpload } from "../lib/upload-storage.js";
 import { streamTicketAttachmentFile } from "../lib/serve-ticket-attachment.js";
 import {
@@ -233,8 +233,8 @@ router.post("/tickets", async (req: TbosRequest, res) => {
   }
 
   const actorId = await resolveTbosActorUserId(tbosUser);
-  const ticketNumber = await nextTicketNumber();
   const projectId = org.projectId ?? null;
+  const ticketNumber = await allocateTicketNumber(projectId);
   const ticket = await prisma.ticket.create({
     data: {
       ticketNumber,

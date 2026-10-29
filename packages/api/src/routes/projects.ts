@@ -92,6 +92,14 @@ const projectSchema = z.object({
       }),
     )
     .optional(),
+  ticketPrefix: z
+    .string()
+    .trim()
+    .min(1)
+    .max(20)
+    .regex(/^[A-Za-z0-9-]+$/, "Ticket prefix may only contain letters, numbers, and hyphens")
+    .optional(),
+  ticketNumberDigits: z.coerce.number().int().min(1).max(10).optional(),
   contractId: z.string().optional().nullable(),
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
@@ -120,6 +128,36 @@ async function allocateProjectNumber(): Promise<string> {
     if (match) max = Math.max(max, Number.parseInt(match[1] ?? "0", 10));
   }
   return `PRJ${String(max + 1).padStart(3, "0")}`;
+}
+
+async function projectHasTickets(projectId: string): Promise<boolean> {
+  const hit = await prisma.ticket.findFirst({ where: { projectId }, select: { id: true } });
+  return Boolean(hit);
+}
+
+function normalizedTicketPrefix(raw: string | undefined): string {
+  return (raw?.trim() || "TKT").toUpperCase();
+}
+
+function normalizedTicketDigits(raw: number | undefined): number {
+  const digits = raw ?? 5;
+  return digits >= 1 && digits <= 10 ? digits : 5;
+}
+
+async function assertTicketSettingsEditable(
+  projectId: string,
+  existing: { ticketPrefix: string; ticketNumberDigits: number },
+  next: { ticketPrefix: string; ticketNumberDigits: number },
+) {
+  if (
+    existing.ticketPrefix === next.ticketPrefix &&
+    existing.ticketNumberDigits === next.ticketNumberDigits
+  ) {
+    return;
+  }
+  if (await projectHasTickets(projectId)) {
+    throw new Error("TICKET_SETTINGS_LOCKED");
+  }
 }
 
 function serializeEstimate(row: {
@@ -236,6 +274,8 @@ function serializeProject(row: {
   contractId: string | null;
   startDate: Date;
   endDate: Date;
+  ticketPrefix?: string;
+  ticketNumberDigits?: number;
   fileUrls: unknown;
   createdAt: Date;
   updatedAt: Date;
@@ -250,6 +290,7 @@ function serializeProject(row: {
   supportOrganization?: { id: string; name: string; slug: string } | null;
   clientContacts?: unknown;
   supportGroup?: { members?: unknown } | null;
+  _count?: { tickets: number };
 }) {
   const fileUrls = Array.isArray(row.fileUrls)
     ? row.fileUrls.filter((url): url is string => typeof url === "string")
@@ -275,6 +316,8 @@ function serializeProject(row: {
     contractTitle: row.contract?.title ?? null,
     startDate: row.startDate.toISOString(),
     endDate: row.endDate.toISOString(),
+    ticketPrefix: row.ticketPrefix ?? "TKT",
+    ticketNumberDigits: row.ticketNumberDigits ?? 5,
     fileUrls,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -287,6 +330,7 @@ function serializeProject(row: {
     supportOrganizationSlug: row.supportOrganization?.slug ?? null,
     clientContacts: Array.isArray(row.clientContacts) ? row.clientContacts : [],
     supportGroupMembers: Array.isArray(row.supportGroup?.members) ? row.supportGroup.members : [],
+  ticketSettingsLocked: (row._count?.tickets ?? 0) > 0,
   };
 }
 
@@ -463,7 +507,13 @@ function mapDetail(row: NonNullable<Awaited<ReturnType<typeof fetchProject>>>) {
 }
 
 async function fetchProject(id: string) {
-  return prisma.project.findUnique({ where: { id }, include: detailInclude });
+  return prisma.project.findUnique({
+    where: { id },
+    include: {
+      ...detailInclude,
+      _count: { select: { tickets: true } },
+    },
+  });
 }
 
 router.get("/", async (req: AuthRequest, res) => {
@@ -811,6 +861,8 @@ router.post("/", async (req: AuthRequest, res) => {
           contractId: data.contractId ?? null,
           startDate: data.startDate,
           endDate: data.endDate,
+          ticketPrefix: normalizedTicketPrefix(data.ticketPrefix),
+          ticketNumberDigits: normalizedTicketDigits(data.ticketNumberDigits),
           fileUrls: data.fileUrls ?? [],
         },
       });
@@ -877,6 +929,28 @@ router.put("/:id", async (req: AuthRequest, res) => {
       });
     }
 
+    const nextTicketPrefix = normalizedTicketPrefix(data.ticketPrefix ?? existing.ticketPrefix);
+    const nextTicketDigits = normalizedTicketDigits(data.ticketNumberDigits ?? existing.ticketNumberDigits);
+    const supportEnabled =
+      data.forCustomerSupport !== undefined ? data.forCustomerSupport : existing.kind === "SUPPORT";
+    if (supportEnabled && !nextTicketPrefix) {
+      return res.status(400).json({ error: "Ticket prefix is required for customer support projects" });
+    }
+    try {
+      await assertTicketSettingsEditable(projectId, existing, {
+        ticketPrefix: nextTicketPrefix,
+        ticketNumberDigits: nextTicketDigits,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === "TICKET_SETTINGS_LOCKED") {
+        return res.status(400).json({
+          error:
+            "Ticket prefix and digit settings cannot be changed while this project has tickets. Delete all tickets first.",
+        });
+      }
+      throw error;
+    }
+
     const contract = data.contractId
       ? await prisma.contract.findUnique({
           where: { id: data.contractId },
@@ -928,6 +1002,8 @@ router.put("/:id", async (req: AuthRequest, res) => {
           contractId: afterSnapshot.contractId,
           startDate: afterSnapshot.startDate,
           endDate: afterSnapshot.endDate,
+          ticketPrefix: nextTicketPrefix,
+          ticketNumberDigits: nextTicketDigits,
           fileUrls: data.fileUrls ?? [],
         },
       });

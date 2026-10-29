@@ -24,6 +24,11 @@ type Props = {
   onEnabledChange: (value: boolean) => void;
   rows: SupportClientContactRow[];
   onRowsChange: (rows: SupportClientContactRow[]) => void;
+  ticketPrefix: string;
+  onTicketPrefixChange: (value: string) => void;
+  ticketNumberDigits: number;
+  onTicketNumberDigitsChange: (value: number) => void;
+  ticketSettingsLocked?: boolean;
 };
 
 export function ProjectCustomerSupportSettings({
@@ -33,6 +38,11 @@ export function ProjectCustomerSupportSettings({
   onEnabledChange,
   rows,
   onRowsChange,
+  ticketPrefix,
+  onTicketPrefixChange,
+  ticketNumberDigits,
+  onTicketNumberDigitsChange,
+  ticketSettingsLocked = false,
 }: Props) {
   const [available, setAvailable] = useState<AvailableContact[]>([]);
 
@@ -82,7 +92,48 @@ export function ProjectCustomerSupportSettings({
       </label>
 
       {enabled ? (
-        <div className="mt-6">
+        <div className="mt-6 space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-800 dark:text-gray-200">
+                Ticket prefix *
+              </label>
+              <input
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm uppercase dark:border-gray-600 dark:bg-gray-800"
+                value={ticketPrefix}
+                onChange={(e) => onTicketPrefixChange(e.target.value.toUpperCase())}
+                required
+                disabled={ticketSettingsLocked}
+                maxLength={20}
+                pattern="[A-Za-z0-9-]+"
+                title="Letters, numbers, and hyphens only"
+              />
+              {ticketSettingsLocked ? (
+                <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                  Locked while this project has tickets. Delete all tickets to change prefix or digits.
+                </p>
+              ) : null}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-800 dark:text-gray-200">
+                No. of digits *
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
+                value={ticketNumberDigits}
+                onChange={(e) => onTicketNumberDigitsChange(Number.parseInt(e.target.value, 10) || 5)}
+                required
+                disabled={ticketSettingsLocked}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Example: {ticketPrefix.trim() || "TKT"}-{String(1).padStart(Math.min(Math.max(ticketNumberDigits, 1), 10), "0")}
+              </p>
+            </div>
+          </div>
+          <div>
           <h4 className="mb-2 text-sm font-medium text-gray-800 dark:text-gray-200">Client access</h4>
           {!clientId ? (
             <p className="text-sm text-gray-500">Select a client to configure client access.</p>
@@ -139,6 +190,7 @@ export function ProjectCustomerSupportSettings({
               </table>
             </div>
           )}
+          </div>
         </div>
       ) : null}
     </section>

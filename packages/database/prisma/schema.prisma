@@ -761,6 +761,10 @@ model Project {
   contractVariation    ContractVariation?  @relation(fields: [contractVariationId], references: [id], onDelete: SetNull)
   startDate            DateTime
   endDate          DateTime
+  /// Support ticket number prefix (e.g. TKT). Used when kind is SUPPORT.
+  ticketPrefix         String              @default("TKT")
+  /// Zero-padded sequence width for support ticket numbers.
+  ticketNumberDigits   Int                 @default(5)
   fileUrls         Json?
   members          ProjectMember[]
   estimates        ProjectEstimate[]
@@ -1177,7 +1181,7 @@ model ConsultantOrganization {
 
 model Ticket {
   id             String         @id @default(cuid())
-  ticketNumber   String         @unique
+  ticketNumber   String
   organizationId String
   organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   projectId      String?
@@ -1204,6 +1208,7 @@ model Ticket {
   timesheets       Timesheet[]
   timesheetEntries TimesheetEntry[]
 
+  @@unique([projectId, ticketNumber])
   @@index([organizationId, status])
   @@index([projectId])
   @@index([createdAt])

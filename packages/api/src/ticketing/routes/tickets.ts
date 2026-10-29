@@ -13,7 +13,7 @@ import {
   formatTicketAssigneeAuditValue,
   logTicketAudit,
 } from "../lib/ticket-audit.js";
-import { nextTicketNumber } from "../lib/ticket-number.js";
+import { allocateTicketNumber } from "../lib/ticket-number.js";
 import {
   canAccessTicketOrganization,
   canSelectOrganizationForNewTicket,
@@ -212,8 +212,8 @@ router.post("/", async (req: TicketingRequest, res) => {
   });
   if (!org) return res.status(400).json({ error: "Invalid organization" });
 
-  const ticketNumber = await nextTicketNumber();
   const projectId = org.projectId ?? null;
+  const ticketNumber = await allocateTicketNumber(projectId);
   const ticket = await prisma.ticket.create({
     data: {
       ticketNumber,
