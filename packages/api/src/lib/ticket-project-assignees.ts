@@ -132,7 +132,11 @@ export async function listProjectTicketAssignees(projectId: string | null | unde
         (!tu || !isEligibleAssignee({ ...tu, tbosAdminUserId: tu.tbosAdminUserId ?? null, tbosRole: tu.tbosRole ?? null })) &&
         member.projectMember?.adminUserId
       ) {
-        await provisionSupportMemberConsultant(projectId, member.projectMember.adminUserId, member.projectMember.id);
+        try {
+          await provisionSupportMemberConsultant(projectId, member.projectMember.adminUserId, member.projectMember.id);
+        } catch (error) {
+          console.error("support group member provisioning failed", member.id, error);
+        }
         const refreshed = await prisma.projectSupportGroupMember.findUnique({
           where: { id: member.id },
           include: {

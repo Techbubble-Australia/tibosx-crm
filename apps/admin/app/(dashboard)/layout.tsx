@@ -153,62 +153,6 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-function headerTitle(pathname: string): string {
-  if (pathname.startsWith("/settings/profile")) {
-    return "My profile";
-  }
-  if (pathname.startsWith("/workspace")) {
-    if (pathname.startsWith("/workspace/tickets/new")) return "Create ticket";
-    if (pathname.startsWith("/workspace/tickets/")) return "Ticket";
-    if (pathname.startsWith("/workspace/tickets")) return "Tickets";
-    if (pathname.startsWith("/workspace/timesheets")) return "Approve/Reject Timesheets";
-    return "Dashboard";
-  }
-  if (pathname.startsWith("/support-tickets")) {
-    if (pathname.startsWith("/support-tickets/new")) return "Create ticket";
-    if (pathname.startsWith("/support-tickets/dashboard")) return "Dashboard";
-    if (pathname.match(/^\/support-tickets\/[^/]+$/)) return "Ticket";
-    if (pathname.startsWith("/support-tickets/projects")) return "Support projects";
-    if (pathname.startsWith("/support-tickets/assignments")) return "Consultant access";
-    return "Tickets";
-  }
-  if (pathname.startsWith("/debug-capture")) {
-    return "Debug captures";
-  }
-  if (pathname.startsWith("/customer-users")) {
-    return "Customer users";
-  }
-  if (pathname.startsWith("/users")) {
-    return "Internal users";
-  }
-  if (isCareerApplicationsPath(pathname)) {
-    return "Career Applications";
-  }
-  if (isJobListingsPath(pathname)) {
-    return "Job Listings";
-  }
-  if (pathname.startsWith("/opportunities")) {
-    return "Opportunities";
-  }
-  if (pathname.startsWith("/contracts")) {
-    return "Contracts";
-  }
-  if (pathname.startsWith("/invoices")) {
-    return "Invoices";
-  }
-  if (pathname.startsWith("/sales/dashboard")) {
-    return "Sales Dashboard";
-  }
-  if (pathname.startsWith("/clients")) {
-    return "Clients";
-  }
-  for (const group of navGroups) {
-    const hit = group.items.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
-    if (hit) return hit.label;
-  }
-  return "TIBOSX.AI";
-}
-
 function pathUnder(prefix: string, pathname: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
@@ -539,8 +483,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
 
       <main className="min-w-0 flex-1 bg-gray-50 dark:bg-gray-950">
         <ImpersonationBanner />
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-6 py-4 dark:border-gray-700 dark:bg-gray-900 lg:px-8">
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{headerTitle(pathname)}</h1>
+        <header className="flex flex-wrap items-center justify-end gap-3 border-b border-gray-200 bg-white px-6 py-4 dark:border-gray-700 dark:bg-gray-900 lg:px-8">
           <div className="flex items-center gap-3">
             <TicketPortalLink />
             {!loading && email ? <HelpSupportHeaderButton /> : null}

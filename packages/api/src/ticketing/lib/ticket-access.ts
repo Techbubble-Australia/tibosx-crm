@@ -5,6 +5,7 @@ import {
   resolveLinkedTbosClientPortalIdentity,
   resolveTbosClientUserIds,
 } from "./client-portal-identity.js";
+import { TICKETABLE_PROJECT_WHERE } from "./support-portal-orgs.js";
 
 const TBOS_ADMIN_ROLES = new Set(["admin"]);
 
@@ -258,19 +259,17 @@ export async function canSelectOrganizationForNewTicket(
   organizationId: string,
 ): Promise<boolean> {
   const scopeIds = await scopeOrganizationIdsForPortal(user);
-  if (scopeIds === null) {
-    const org = await prisma.organization.findFirst({
-      where: {
-        id: organizationId,
-        active: true,
-        projectId: { not: null },
-        project: { status: "ACTIVE" },
-      },
-      select: { id: true },
-    });
-    return !!org;
-  }
-  return scopeIds.includes(organizationId);
+  if (scopeIds !== null && !scopeIds.includes(organizationId)) return false;
+  const org = await prisma.organization.findFirst({
+    where: {
+      id: organizationId,
+      active: true,
+      projectId: { not: null },
+      project: TICKETABLE_PROJECT_WHERE,
+    },
+    select: { id: true },
+  });
+  return !!org;
 }
 
 export async function ticketOrganizationFilter(

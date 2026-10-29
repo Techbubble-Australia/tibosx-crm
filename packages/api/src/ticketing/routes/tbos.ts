@@ -14,7 +14,7 @@ import {
   slugifySupportOrganizationName,
   syncConsultantAccessForOrganization,
 } from "../../lib/support-organization.js";
-import { listSupportPortalOrganizations } from "../lib/support-portal-orgs.js";
+import { listSupportPortalOrganizations, TICKETABLE_PROJECT_WHERE } from "../lib/support-portal-orgs.js";
 import {
   canPerformLifecycleAction,
   nextStatusForLifecycleAction,
@@ -224,11 +224,13 @@ router.post("/tickets", async (req: TbosRequest, res) => {
     where: {
       ...orgWhere,
       projectId: { not: null },
-      project: { status: "ACTIVE" },
+      project: TICKETABLE_PROJECT_WHERE,
     },
     select: { id: true, projectId: true },
   });
-  if (!org) return res.status(400).json({ error: "Invalid organization" });
+  if (!org) {
+    return res.status(400).json({ error: "Tickets can only be created for active Customer Support projects" });
+  }
 
   const actorId = await resolveTbosActorUserId(tbosUser);
   const ticketNumber = await nextTicketNumber();
@@ -317,9 +319,14 @@ router.get("/tickets/:id", async (req: TbosRequest, res) => {
     "../../lib/ticket-project-assignees.js"
   );
   const projectId = await resolveTicketProjectId(ticket);
-  const canSelfAssign = Boolean(
-    projectId && actorId && (await isValidProjectTicketAssignee(projectId, actorId, actorId)),
-  );
+  let canSelfAssign = false;
+  try {
+    canSelfAssign = Boolean(
+      projectId && actorId && (await isValidProjectTicketAssignee(projectId, actorId, actorId)),
+    );
+  } catch (error) {
+    console.error("ticket canSelfAssign check failed", ticket.id, error);
+  }
 
   res.json({
     data: {

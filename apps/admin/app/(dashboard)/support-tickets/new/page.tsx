@@ -96,7 +96,12 @@ export default function AdminNewTicketPage() {
       <form onSubmit={onSubmit} className="space-y-5 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
         <div>
           <label className="mb-1 block text-sm font-medium">Project *</label>
-          {orgs.length <= 1 && orgs.length > 0 ? (
+          {orgs.length === 0 ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              No active Customer Support projects available. Enable Customer Support on a project to raise tickets
+              against it.
+            </p>
+          ) : orgs.length === 1 ? (
             <input readOnly value={orgs[0]?.name ?? ""} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800" />
           ) : (
             <select

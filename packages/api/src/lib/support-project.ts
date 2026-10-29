@@ -249,17 +249,22 @@ export async function provisionSupportMemberConsultant(projectId: string, adminU
   });
 
   const group = await ensureProjectSupportGroup(projectId);
+  const consultantRowInGroup = await prisma.projectSupportGroupMember.findFirst({
+    where: { groupId: group.id, ticketingUserId: consultant.id, NOT: { projectMemberId } },
+    select: { id: true },
+  });
+  const ticketingUserId = consultantRowInGroup ? null : consultant.id;
   await prisma.projectSupportGroupMember.upsert({
     where: { projectMemberId },
     create: {
       groupId: group.id,
       projectMemberId,
       adminUserId,
-      ticketingUserId: consultant.id,
+      ticketingUserId,
     },
     update: {
       adminUserId,
-      ticketingUserId: consultant.id,
+      ...(ticketingUserId ? { ticketingUserId } : {}),
     },
   });
 }

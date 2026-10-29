@@ -237,6 +237,7 @@ export default function TimesheetDetailPage() {
             onSubmit={handleSubmit}
             isSaving={isSaving}
             readOnly={formReadOnly}
+            canStartTimesheetForEmptyWeek={!viewingOthersSheet && isEffectiveProjectMember}
             weekNavigationLoading={isLoading}
             showSubmitForApproval={canSubmitTimesheet}
             submitForApprovalLoading={actionLoading}

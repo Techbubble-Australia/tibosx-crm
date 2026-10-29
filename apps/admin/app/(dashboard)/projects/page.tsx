@@ -3,13 +3,14 @@ import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { LayoutGrid, List, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { PROJECT_STATUS_LABELS, type ProjectStatus } from "@/lib/project-types";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { SortableTh, toggleSortKey, type SortDir } from "@/components/ui/SortableTh";
+import { ViewModeToggle, type ViewMode } from "@/components/ui/ViewModeToggle";
 
 type ProjectRow = {
   id: string;
@@ -22,8 +23,6 @@ type ProjectRow = {
   endDate: string;
 };
 
-type ViewMode = "table" | "cards";
-
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
 }
@@ -35,7 +34,7 @@ export default function ProjectsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [clientFilter, setClientFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [sortKey, setSortKey] = useState<
     "projectNumber" | "title" | "clientName" | "status" | "projectManagerName" | "startDate"
   >("projectNumber");
@@ -135,32 +134,11 @@ export default function ProjectsPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-lg border border-gray-200 p-0.5 dark:border-gray-600">
-              <button
-                type="button"
-                onClick={() => setViewMode("table")}
-                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-sm ${
-                  viewMode === "table" ? "bg-gray-100 dark:bg-gray-800" : ""
-                }`}
-                aria-pressed={viewMode === "table"}
-              >
-                <List className="h-4 w-4" /> Table
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("cards")}
-                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-sm ${
-                  viewMode === "cards" ? "bg-gray-100 dark:bg-gray-800" : ""
-                }`}
-                aria-pressed={viewMode === "cards"}
-              >
-                <LayoutGrid className="h-4 w-4" /> Cards
-              </button>
-            </div>
+            <ViewModeToggle mode={viewMode} onChange={setViewMode} />
             {canManageProjects ? (
               <Link
                 href="/projects/new"
-                className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
+                className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
               >
                 <Plus className="h-4 w-4" /> New project
               </Link>
@@ -207,7 +185,7 @@ export default function ProjectsPage() {
           <p className="text-sm text-gray-400">Loading…</p>
         ) : sorted.length === 0 ? (
           <p className="text-sm text-gray-400">No projects yet.</p>
-        ) : viewMode === "cards" ? (
+        ) : viewMode === "card" ? (
           <div className="space-y-8">
             {groupedByClient.map(([clientName, projects]) => (
               <section key={clientName}>

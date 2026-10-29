@@ -74,16 +74,22 @@ export default function TicketDetailPage() {
   const [saving, setSaving] = useState(false);
   const [assignees, setAssignees] = useState<Assignee[]>([]);
   const [resolutionNotes, setResolutionNotes] = useState("");
+  const [loadError, setLoadError] = useState("");
 
   function reload() {
     void workspaceFetch(`/tickets/${id}`)
-      .then((res) => res.json())
-      .then((data) => {
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.data) {
+          throw new Error(typeof data?.error === "string" ? data.error : "Could not load this ticket");
+        }
         const t = data.data as TicketDetail;
+        setLoadError("");
         setTicket(t);
         setDescription(t.description);
         setResolutionNotes(t.resolutionNotes ?? "");
-      });
+      })
+      .catch((err) => setLoadError(err instanceof Error ? err.message : "Could not load this ticket"));
   }
 
   useEffect(() => {
@@ -179,6 +185,9 @@ export default function TicketDetailPage() {
   }
 
   if (!ticket) {
+    if (loadError) {
+      return <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{loadError}</p>;
+    }
     return <p className="text-gray-500">Loading…</p>;
   }
 

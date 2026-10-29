@@ -6,12 +6,26 @@ import { useSearchParams } from "next/navigation";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { SortableTh, toggleSortKey, type SortDir } from "@/components/ui/SortableTh";
 import Link from "next/link";
-import { Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
-import { TICKET_STATUS_FILTER_ENTRIES } from "@/lib/support-ticket-labels";
+import {
+  TICKET_STATUS_FILTER_ENTRIES,
+  normalizeTicketStatusKey,
+  ticketStatusLabel,
+} from "@/lib/support-ticket-labels";
 import { TicketPriorityBadge } from "@/lib/ticket-priority-styles";
 import { TicketStatusBadge } from "@/lib/ticket-status-styles";
+import { ViewModeToggle, type ViewMode } from "@/components/ui/ViewModeToggle";
+
+const CARD_STATUS_ORDER = [
+  "OPEN",
+  "IN_PROGRESS",
+  "PENDING_CLIENT",
+  "RESOLVED",
+  "CLOSED",
+  "CANCELLED",
+] as const;
 
 type TicketRow = {
   id: string;
@@ -37,6 +51,7 @@ export default function SupportTicketsPage() {
   const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [sortKey, setSortKey] = useState<"ticketNumber" | "subject" | "project" | "priority" | "status" | "updatedAt">(
     "updatedAt",
   );
@@ -69,6 +84,19 @@ export default function SupportTicketsPage() {
     const start = (page - 1) * pageSize;
     return sortedRows.slice(start, start + pageSize);
   }, [sortedRows, page, pageSize]);
+
+  const groupedByStatus = useMemo(() => {
+    const map = new Map<string, TicketRow[]>();
+    for (const row of sortedRows) {
+      const key = normalizeTicketStatusKey(row.status) || "OPEN";
+      const list = map.get(key) ?? [];
+      list.push(row);
+      map.set(key, list);
+    }
+    return CARD_STATUS_ORDER
+      .map((key) => ({ key, label: ticketStatusLabel(key), items: map.get(key) ?? [] }))
+      .filter((section) => section.items.length > 0);
+  }, [sortedRows]);
 
   function handleSort(
     key: "ticketNumber" | "subject" | "project" | "priority" | "status" | "updatedAt",
@@ -118,19 +146,22 @@ export default function SupportTicketsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Tickets</h1>
-          <p className="text-sm text-gray-500">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Tickets</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             {role === "admin" ? "All client support projects" : "Projects assigned to you"}
           </p>
         </div>
-        <Link
-          href="/support-tickets/new"
-          className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
-        >
-          Create ticket
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+          <Link
+            href="/support-tickets/new"
+            className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+          >
+            <Plus className="h-4 w-4" /> Create ticket
+          </Link>
+        </div>
       </div>
 
       {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
@@ -160,6 +191,42 @@ export default function SupportTicketsPage() {
         </select>
       </div>
 
+      {viewMode === "card" ? (
+        rows.length === 0 ? (
+          <p className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900">
+            No tickets found.
+          </p>
+        ) : (
+          <div className="space-y-8">
+            {groupedByStatus.map((section) => (
+              <section key={section.key}>
+                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">{section.label}</h3>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {section.items.map((row) => (
+                    <Link
+                      key={row.id}
+                      href={`/support-tickets/${row.id}`}
+                      className="flex flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-sky-200 hover:shadow-md dark:border-gray-700 dark:bg-gray-900"
+                    >
+                      <div className="mb-2 flex items-start justify-between gap-2">
+                        <span className="font-semibold text-sky-700 dark:text-sky-400">{row.ticketNumber}</span>
+                        <TicketStatusBadge status={row.status} />
+                      </div>
+                      <p className="mb-1 line-clamp-2 font-medium text-gray-900 dark:text-gray-100">{row.subject}</p>
+                      <p className="mb-1 line-clamp-1 text-xs text-gray-500">{row.projectLabel?.trim() || "—"}</p>
+                      <p className="mb-3 text-xs text-gray-500">{row.assignedTo?.name ?? "Unassigned"}</p>
+                      <div className="mt-auto flex items-center justify-between gap-2">
+                        <TicketPriorityBadge priority={row.priority} />
+                        <span className="text-xs text-gray-400">{new Date(row.updatedAt).toLocaleDateString()}</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        )
+      ) : (
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
         <table className="min-w-full text-sm">
           <thead className="border-b bg-gray-50 text-left text-gray-500 dark:bg-gray-800">
@@ -246,6 +313,7 @@ export default function SupportTicketsPage() {
           pageSizeOptions={[10, 20, 50, 100]}
         />
       </div>
+      )}
     </div>
   );
 }

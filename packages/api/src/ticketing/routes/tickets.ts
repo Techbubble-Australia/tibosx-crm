@@ -203,7 +203,7 @@ router.post("/", async (req: TicketingRequest, res) => {
   }
 
   if (!(await canSelectOrganizationForNewTicket(user, organizationId))) {
-    return res.status(400).json({ error: "Invalid organization" });
+    return res.status(400).json({ error: "Tickets can only be created for active Customer Support projects" });
   }
 
   const org = await prisma.organization.findFirst({
@@ -332,9 +332,12 @@ router.get("/:id", async (req: TicketingRequest, res) => {
     "../../lib/ticket-project-assignees.js"
   );
   const projectId = await resolveTicketProjectId(ticket);
-  const canSelfAssign = Boolean(
-    projectId && (await isValidProjectTicketAssignee(projectId, user.id, user.id)),
-  );
+  let canSelfAssign = false;
+  try {
+    canSelfAssign = Boolean(projectId && (await isValidProjectTicketAssignee(projectId, user.id, user.id)));
+  } catch (error) {
+    console.error("ticket canSelfAssign check failed", ticket.id, error);
+  }
 
   res.json({
     data: {

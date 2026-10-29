@@ -117,6 +117,8 @@ type Props = {
   routeTimesheetId?: string;
   /** Week navigation found an existing timesheet (for-week); parent should reload full detail. */
   onWeekTimesheetResolved?: (detail: TimesheetFormValues) => void;
+  /** Owner viewing their own (possibly submitted) sheet: empty weeks open a new editable timesheet. */
+  canStartTimesheetForEmptyWeek?: boolean;
 };
 
 type LineEntry = {
@@ -328,6 +330,7 @@ export function TimesheetForm({
   weekNavigationLoading = false,
   routeTimesheetId,
   onWeekTimesheetResolved,
+  canStartTimesheetForEmptyWeek = false,
 }: Props) {
   const router = useRouter();
   const { canCreateTimesheets } = useAdminSession();
@@ -369,6 +372,9 @@ export function TimesheetForm({
   );
   const loadedProjectId = defaults.projectId ?? "";
   const timesheetMemberUserId = defaults.memberUserId?.trim() || "";
+  /** Saved sheet loaded, but the picker now points at a different week/project (status belongs to the loaded sheet). */
+  const browsingOtherWeek =
+    Boolean(defaults.id) && (weekMonday !== loadedMonday || projectId !== loadedProjectId);
 
   const projectSelectOptions = useMemo(() => {
     const list = [...projects];
@@ -503,13 +509,15 @@ export function TimesheetForm({
     if (defaults.projectId) setProjectId(defaults.projectId);
   }, [defaults.projectId]);
 
+  /** Apply `weekStart` from the URL only when it changes; user week navigation must not be reverted. */
+  const appliedDefaultStartRef = useRef(defaults.startDate);
   useEffect(() => {
     if (defaults.id || !defaults.startDate) return;
+    if (appliedDefaultStartRef.current === defaults.startDate) return;
+    appliedDefaultStartRef.current = defaults.startDate;
     const snapped = snapToMondayInput(toDateInput(defaults.startDate));
-    if (snapped && snapped !== weekMonday) {
-      setWeekMonday(snapped);
-    }
-  }, [defaults.id, defaults.startDate, weekMonday]);
+    if (snapped) setWeekMonday(snapped);
+  }, [defaults.id, defaults.startDate]);
 
   useEffect(() => {
     if (!syncNewTimesheetQuery || defaults.id) return;
@@ -681,7 +689,7 @@ export function TimesheetForm({
           return;
         }
         if (weekOrProjectChangedFromRecord) {
-          if (formEditable && canCreateTimesheets) {
+          if (canCreateTimesheets && (formEditable || canStartTimesheetForEmptyWeek)) {
             setWeekBrowseHint("idle");
             const params = new URLSearchParams({ projectId, weekStart: weekMonday });
             if (timesheetMemberUserId) params.set("memberUserId", timesheetMemberUserId);
@@ -714,6 +722,7 @@ export function TimesheetForm({
     router,
     timesheetMemberUserId,
     canCreateTimesheets,
+    canStartTimesheetForEmptyWeek,
     routeTimesheetId,
     onWeekTimesheetResolved,
   ]);
@@ -1004,7 +1013,7 @@ export function TimesheetForm({
           <div className="border-b border-gray-100 px-5 py-2.5 dark:border-gray-800">
             <div className="flex items-start justify-between gap-4">
               <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{pageTitle}</h1>
-              <TimesheetStatusBadge status={statusBadgeKey} />
+              {browsingOtherWeek ? null : <TimesheetStatusBadge status={statusBadgeKey} />}
             </div>
 
             <div className="mt-3 grid gap-3 md:grid-cols-2">

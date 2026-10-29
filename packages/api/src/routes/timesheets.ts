@@ -37,7 +37,6 @@ import {
 } from "../lib/timesheet-entries";
 import {
   assertTimesheetWithinProjectDates,
-  effectiveTimesheetProjectDateBoundsIso,
   projectDateBoundsIso,
   projectWeekMondayBounds,
   snapWeekMondayToInput,
@@ -502,10 +501,28 @@ async function findNextOpenTimesheetWeek(
     select: { startDate: true, endDate: true, status: true },
   });
   if (!project) return null;
-  const { startDate, endDate } = effectiveTimesheetProjectDateBoundsIso(project);
+  const { startDate, endDate } = projectDateBoundsIso(project);
   const bounds = projectWeekMondayBounds(startDate, endDate);
-  let monday = snapWeekMondayToInput(new Date().toISOString());
-  if (monday < bounds.min) monday = bounds.min;
+  const currentMonday = snapWeekMondayToInput(new Date().toISOString());
+
+  async function existingFor(weekStart: string) {
+    return prisma.timesheet.findFirst({
+      where: {
+        memberUserId: actorId,
+        projectId,
+        startDate: new Date(`${weekStart}T00:00:00.000Z`),
+      },
+      select: { id: true, status: true },
+    });
+  }
+
+  if (currentMonday > bounds.max) {
+    const existing = await existingFor(bounds.max);
+    return { weekStart: bounds.max, existingTimesheetId: existing?.id };
+  }
+
+  let monday = currentMonday < bounds.min ? bounds.min : currentMonday;
+  const fallbackMonday = monday;
 
   for (let i = 0; i < 156; i++) {
     if (monday > bounds.max) break;
@@ -513,14 +530,7 @@ async function findNextOpenTimesheetWeek(
       monday = addDaysIso(monday, 7);
       continue;
     }
-    const existing = await prisma.timesheet.findFirst({
-      where: {
-        memberUserId: actorId,
-        projectId,
-        startDate: new Date(`${monday}T00:00:00.000Z`),
-      },
-      select: { id: true, status: true },
-    });
+    const existing = await existingFor(monday);
     if (!existing) return { weekStart: monday };
     if (existing.status === "DRAFT") {
       return { weekStart: monday, existingTimesheetId: existing.id };
@@ -528,7 +538,9 @@ async function findNextOpenTimesheetWeek(
     // SUBMITTED or APPROVED — advance to the next week without an existing timesheet.
     monday = addDaysIso(monday, 7);
   }
-  return null;
+  // Every remaining week is logged: open the current week so the member can still browse back.
+  const existing = await existingFor(fallbackMonday);
+  return { weekStart: fallbackMonday, existingTimesheetId: existing?.id };
 }
 
 async function resolveTimesheetEntryPoint(req: AuthRequest, res: Response) {
@@ -837,7 +849,7 @@ router.get("/target-meta", async (req: AuthRequest, res) => {
       });
       if (!project) return res.status(404).json({ error: "Project not found" });
       const approvers = await buildProjectApprovers(projectId);
-      const { startDate, endDate } = effectiveTimesheetProjectDateBoundsIso(project);
+      const { startDate, endDate } = projectDateBoundsIso(project);
       return res.json({
         data: {
           kind: "project",
@@ -1019,13 +1031,9 @@ async function assertTimesheetProjectDateRules(
     select: { startDate: true, endDate: true, status: true },
   });
   if (!project) throw new Error("PROJECT_NOT_FOUND");
-  const effective = effectiveTimesheetProjectDateBoundsIso(project);
   const weekMondayIso = startDate.toISOString().slice(0, 10);
   assertTimesheetWithinProjectDates(
-    {
-      startDate: new Date(`${effective.startDate}T00:00:00.000Z`),
-      endDate: new Date(`${effective.endDate}T00:00:00.000Z`),
-    },
+    project,
     weekMondayIso,
     resolved.entryRows,
     resolved.dailyHours ?? null,

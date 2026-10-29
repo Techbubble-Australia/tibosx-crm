@@ -819,12 +819,14 @@ model ProjectSupportGroupMember {
   projectMember   ProjectMember?     @relation(fields: [projectMemberId], references: [id], onDelete: SetNull)
   adminUserId     String?
   adminUser       AdminUser?         @relation("SupportGroupMember", fields: [adminUserId], references: [id], onDelete: SetNull)
-  ticketingUserId String?            @unique
+  ticketingUserId String?
   ticketingUser   TicketingUser?     @relation("SupportGroupConsultant", fields: [ticketingUserId], references: [id], onDelete: SetNull)
   createdAt       DateTime           @default(now())
 
+  @@unique([groupId, ticketingUserId])
   @@index([groupId])
   @@index([adminUserId])
+  @@index([ticketingUserId])
 }
 
 model ProjectMember {
@@ -1154,7 +1156,7 @@ model TicketingUser {
   auditLogs               TicketAuditLog[]         @relation("AuditActor")
   consultantOrganizations ConsultantOrganization[]
   projectClientLink       ProjectClientContact?    @relation("ProjectClientPortalUser")
-  supportGroupMember      ProjectSupportGroupMember? @relation("SupportGroupConsultant")
+  supportGroupMembers     ProjectSupportGroupMember[] @relation("SupportGroupConsultant")
 
   @@index([organizationId])
   @@index([role])

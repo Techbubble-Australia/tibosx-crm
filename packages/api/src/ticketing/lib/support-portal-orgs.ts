@@ -9,8 +9,11 @@ export type PortalOrganizationRow = {
   projectTitle: string | null;
 };
 
+/** Only ACTIVE Customer Support projects accept new tickets. */
+export const TICKETABLE_PROJECT_WHERE = { status: "ACTIVE", kind: "SUPPORT" } as const;
+
 /**
- * One row per ACTIVE TBOS project that has an enabled support portal org.
+ * One row per ACTIVE Customer Support (kind SUPPORT) TBOS project that has an enabled support portal org.
  * Orphan orgs (no project / deleted project) are excluded so the create-ticket list
  * matches the Projects module.
  */
@@ -28,7 +31,7 @@ export async function listSupportPortalOrganizations(
     where: {
       active: true,
       projectId: { not: null },
-      project: { status: "ACTIVE" },
+      project: TICKETABLE_PROJECT_WHERE,
       ...orgScope,
     },
     orderBy: { name: "asc" },

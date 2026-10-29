@@ -12,23 +12,6 @@ export function projectDateBoundsIso(project: { startDate: Date; endDate: Date }
   };
 }
 
-/** Active delivery projects may continue timesheet entry after the stored contract end date. */
-export function effectiveTimesheetProjectDateBoundsIso(project: {
-  startDate: Date;
-  endDate: Date;
-  status?: string | null;
-}) {
-  const bounds = projectDateBoundsIso(project);
-  const status = (project.status ?? "").trim().toUpperCase();
-  if (status === "ACTIVE" || status === "ON_HOLD") {
-    const today = toDateInputUtc(new Date());
-    if (bounds.endDate < today) {
-      return { ...bounds, endDate: today };
-    }
-  }
-  return bounds;
-}
-
 export function weekDayIso(weekMondayIso: string, key: WeekdayKey): string {
   const index = WEEKDAY_KEYS.indexOf(key);
   const monday = new Date(`${weekMondayIso}T00:00:00.000Z`);

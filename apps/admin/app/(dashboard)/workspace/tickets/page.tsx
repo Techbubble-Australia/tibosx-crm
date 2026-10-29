@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { SortableTh, toggleSortKey, type SortDir } from "@/components/ui/SortableTh";
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { workspaceFetch } from "@/lib/workspace-fetch";
 import {
   TICKET_STATUS_FILTER_ENTRIES,
@@ -118,9 +119,9 @@ export default function TicketsPage() {
           <ViewModeToggle mode={viewMode} onChange={setViewMode} />
           <Link
             href="/workspace/tickets/new"
-            className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+            className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
           >
-            Create ticket
+            <Plus className="h-4 w-4" /> Create ticket
           </Link>
           <input
             value={q}
