@@ -7,6 +7,9 @@
  *   PROD_DATABASE_URL="postgresql://..." DEV_DATABASE_URL="postgresql://..." \
  *     pnpm --filter @techbubble/database db:clone-prod-to-dev
  *
+ * If dump/restore already succeeded and only anonymization failed:
+ *   SKIP_DUMP=1 DEV_DATABASE_URL="postgresql://..." PROD_DATABASE_URL=x \
+ *     pnpm --filter @techbubble/database db:clone-prod-to-dev
  * Whitelisted emails are left unchanged (see ANONYMIZE_EMAIL_ALLOWLIST).
  */
 import { spawnSync } from "node:child_process";
@@ -110,16 +113,32 @@ async function anonymizeDevDatabase(devUrl: string) {
       });
     }
 
-    const contacts = await prisma.clientContact.findMany({
+    const customerUsers = await prisma.customerUser.findMany({
       select: { id: true, email: true, phone: true },
+    });
+    for (const row of customerUsers) {
+      if (keepEmail(row.email)) continue;
+      await prisma.customerUser.update({
+        where: { id: row.id },
+        data: {
+          email: anonymizedEmail(row.email, "CustomerUser", row.id),
+          phone: row.phone ? anonymizedPhone(row.phone, "CustomerUser", row.id) : null,
+        },
+      });
+    }
+
+    const contacts = await prisma.clientContact.findMany({
+      select: { id: true, email: true, phoneCountryCode: true, phoneNumber: true },
     });
     for (const row of contacts) {
       if (keepEmail(row.email)) continue;
+      const fakePhone = anonymizedPhone(row.phoneNumber, "ClientContact", row.id);
       await prisma.clientContact.update({
         where: { id: row.id },
         data: {
           email: anonymizedEmail(row.email, "ClientContact", row.id),
-          phone: row.phone ? anonymizedPhone(row.phone, "ClientContact", row.id) : null,
+          phoneCountryCode: "+61",
+          phoneNumber: fakePhone.replace(/^\+61/, ""),
         },
       });
     }
@@ -159,11 +178,19 @@ async function anonymizeDevDatabase(devUrl: string) {
 }
 
 async function main() {
+  const skipDump = process.env.SKIP_DUMP === "1" || process.env.SKIP_DUMP === "true";
+  const devUrl = requireEnv("DEV_DATABASE_URL");
+
+  if (skipDump) {
+    console.log("SKIP_DUMP set — anonymizing development only (no dump/restore).");
+    await anonymizeDevDatabase(devUrl);
+    console.log("Done.");
+    return;
+  }
+
   assertPostgresCliOnPath();
 
   const prodUrl = requireEnv("PROD_DATABASE_URL");
-  const devUrl = requireEnv("DEV_DATABASE_URL");
-
   const workDir = mkdtempSync(join(tmpdir(), "tbos-prod-clone-"));
   const dumpPath = join(workDir, "prod.dump");
 
