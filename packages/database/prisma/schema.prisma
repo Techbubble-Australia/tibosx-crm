@@ -1201,6 +1201,13 @@ model Ticket {
   updatedAt      DateTime       @updatedAt
   closedAt         DateTime?
   resolutionNotes  String?        @db.Text
+  /// Initial estimated effort (hours) set while in progress.
+  estimatedEffortHours Decimal?   @db.Decimal(8, 2)
+  effortAnalysis       Decimal?   @db.Decimal(8, 2)
+  effortBuild          Decimal?   @db.Decimal(8, 2)
+  effortTest           Decimal?   @db.Decimal(8, 2)
+  effortDocument       Decimal?   @db.Decimal(8, 2)
+  effortSupport        Decimal?   @db.Decimal(8, 2)
 
   messages    TicketMessage[]
   attachments TicketAttachment[]

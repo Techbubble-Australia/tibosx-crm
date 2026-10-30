@@ -18,6 +18,12 @@ function labelForField(field: string, value: string): string {
 }
 
 export function formatTicketAuditLine(log: TicketAuditRow): string {
+  const actorName = log.actor?.name?.trim();
+  const actorSuffix = actorName ? ` - ${actorName}` : "";
+  if (log.action === "ESTIMATED_EFFORT") {
+    const hours = log.newValue?.trim() || "—";
+    return `Estimated effort: ${hours} hrs${actorSuffix}`;
+  }
   const actor = log.actor?.name ? ` · ${log.actor.name}` : "";
   if (log.action === "MESSAGE_ADDED") return `Message added${actor}`;
   if (log.action === "ATTACHMENT_ADDED") return `Attachment added${actor}`;

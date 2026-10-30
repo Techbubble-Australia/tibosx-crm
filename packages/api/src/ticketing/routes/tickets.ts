@@ -31,6 +31,13 @@ import type { WorkspaceRequest } from "../middleware/tbos-workspace.js";
 import { autoCloseStaleResolvedTickets } from "../lib/auto-close-resolved-tickets.js";
 import { notifyAsync } from "../../lib/notifications";
 import { serializeTicketRow, ticketDetailIncludes } from "../lib/serialize-ticket.js";
+import {
+  applyEffortBreakdown,
+  applyEstimatedEffortHours,
+  estimatedEffortBodySchema,
+  ticketIsInProgress,
+} from "../lib/ticket-effort-handlers.js";
+import { effortBreakdownSchema, serializeTicketEffort } from "../lib/ticket-effort.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -661,6 +668,62 @@ router.post("/:id/attachments", async (req: TicketingRequest, res) => {
   });
 
   res.status(201).json({ data: attachment });
+});
+
+router.post("/:id/estimated-effort", async (req: TicketingRequest, res) => {
+  const user = req.ticketingUser!;
+  const parsed = estimatedEffortBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Validation error", details: parsed.error.errors });
+  }
+
+  const existing = await prisma.ticket.findUnique({ where: { id: req.params.id } });
+  if (!existing || !(await canAccessTicketOrganization(user, existing.organizationId))) {
+    return res.status(404).json({ error: "Ticket not found" });
+  }
+  if (!ticketIsInProgress(existing.status)) {
+    return res.status(400).json({ error: "Estimated effort can only be set while the ticket is in progress" });
+  }
+  if (user.role !== "CLIENT" && user.role !== "CONSULTANT") {
+    return res.status(403).json({ error: "Not allowed to set estimated effort" });
+  }
+
+  const previous = serializeTicketEffort(existing).estimatedEffortHours;
+  await applyEstimatedEffortHours(existing.id, user.id, parsed.data.estimatedEffortHours, previous);
+
+  const updated = await prisma.ticket.findUnique({
+    where: { id: existing.id },
+    include: ticketDetailIncludes,
+  });
+  res.json({ data: updated ? serializeTicket(updated) : null });
+});
+
+router.patch("/:id/effort-breakdown", async (req: TicketingRequest, res) => {
+  const user = req.ticketingUser!;
+  const parsed = effortBreakdownSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Validation error", details: parsed.error.errors });
+  }
+
+  const existing = await prisma.ticket.findUnique({ where: { id: req.params.id } });
+  if (!existing || !(await canAccessTicketOrganization(user, existing.organizationId))) {
+    return res.status(404).json({ error: "Ticket not found" });
+  }
+  if (!ticketIsInProgress(existing.status)) {
+    return res.status(400).json({ error: "Effort breakdown can only be updated while the ticket is in progress" });
+  }
+  if (user.role !== "CLIENT" && user.role !== "CONSULTANT") {
+    return res.status(403).json({ error: "Not allowed to update effort breakdown" });
+  }
+
+  const current = serializeTicketEffort(existing);
+  await applyEffortBreakdown(existing.id, user.id, parsed.data, current);
+
+  const updated = await prisma.ticket.findUnique({
+    where: { id: existing.id },
+    include: ticketDetailIncludes,
+  });
+  res.json({ data: updated ? serializeTicket(updated) : null });
 });
 
 export { router as ticketRoutes };

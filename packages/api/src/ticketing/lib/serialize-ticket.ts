@@ -1,4 +1,5 @@
 import type { TicketPriority, TicketStatus, TicketType } from "@techbubble/database";
+import { serializeTicketEffort } from "./ticket-effort.js";
 
 function ticketingUserLabel(user?: { name: string; email: string } | null) {
   if (!user) return null;
@@ -21,6 +22,12 @@ export function serializeTicketRow(row: {
   updatedAt: Date;
   closedAt: Date | null;
   resolutionNotes?: string | null;
+  estimatedEffortHours?: { toString(): string } | number | null;
+  effortAnalysis?: { toString(): string } | number | null;
+  effortBuild?: { toString(): string } | number | null;
+  effortTest?: { toString(): string } | number | null;
+  effortDocument?: { toString(): string } | number | null;
+  effortSupport?: { toString(): string } | number | null;
   organization?: {
     id: string;
     name: string;
@@ -67,6 +74,7 @@ export function serializeTicketRow(row: {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     closedAt: row.closedAt?.toISOString() ?? null,
+    ...serializeTicketEffort(row),
   };
 }
 

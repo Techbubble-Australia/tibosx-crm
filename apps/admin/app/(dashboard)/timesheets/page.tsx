@@ -32,6 +32,7 @@ type TimesheetRow = {
   startDate: string;
   endDate: string;
   status: TimesheetStatus;
+  totalHours?: number;
   approverKind?: string | null;
   approverLabel?: string;
 };
@@ -262,10 +263,12 @@ export default function TimesheetsPage() {
         throw new Error(messageFromApiError(data, "Failed to export timesheets"));
       }
       const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const match = disposition.match(/filename=\"?([^\";]+)\"?/i);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "timesheets.csv";
+      a.download = match?.[1] ?? "timesheets_export.xlsx";
       a.click();
       URL.revokeObjectURL(url);
     } catch (error) {
@@ -324,7 +327,7 @@ export default function TimesheetsPage() {
                 disabled={exporting || selected.size === 0}
                 className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600"
               >
-                <Download className="h-4 w-4" /> Export CSV
+                <Download className="h-4 w-4" /> Export Excel
               </button>
             ) : null}
             {isEffectiveProjectMember && selected.size > 0 ? (
@@ -482,15 +485,16 @@ export default function TimesheetsPage() {
                         className="px-4 py-2 text-left"
                       />
                     ) : null}
-                    <SortableTh
-                      label="Status"
-                      sortKey="status"
-                      activeKey={sortKey}
-                      dir={sortDir}
-                      onSort={handleSort}
-                      className="px-4 py-2 text-left"
-                    />
-                    <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Approver</th>
+                  <SortableTh
+                    label="Status"
+                    sortKey="status"
+                    activeKey={sortKey}
+                    dir={sortDir}
+                    onSort={handleSort}
+                    className="px-4 py-2 text-left"
+                  />
+                  <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Total hours</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Approver</th>
                     <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
                   </tr>
                 </thead>
@@ -534,14 +538,12 @@ export default function TimesheetsPage() {
                         {canManageProjects ? (
                           <td className="px-4 py-2 text-gray-500">{row.memberName}</td>
                         ) : null}
-                        <td className="px-4 py-2">
-                          <TimesheetStatusBadge status={row.status} />
-                          {row.status === "SUBMITTED" && row.approverKind === "CLIENT_CONTACT" ? (
-                            <span className="mt-0.5 block text-xs text-sky-600 dark:text-sky-400">
-                              Awaiting approval
-                            </span>
-                          ) : null}
-                        </td>
+                    <td className="px-4 py-2">
+                      <TimesheetStatusBadge status={row.status} />
+                    </td>
+                    <td className="px-4 py-2 text-gray-700 dark:text-gray-300">
+                      {typeof row.totalHours === "number" ? row.totalHours : "—"}
+                    </td>
                         <td className="max-w-[10rem] px-4 py-2 text-gray-600 dark:text-gray-400">
                           <span className="block truncate" title={row.approverLabel ?? ""}>
                             {row.approverLabel ?? "—"}

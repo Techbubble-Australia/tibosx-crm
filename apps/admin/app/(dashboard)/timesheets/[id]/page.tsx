@@ -133,11 +133,13 @@ export default function TimesheetDetailPage() {
         const data = await res.json().catch(() => ({}));
         throw new Error(messageFromApiError(data, "Failed to export timesheet"));
       }
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const match = disposition.match(/filename=\"?([^\";]+)\"?/i);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `timesheet-${id}.csv`;
+      a.download = match?.[1] ?? "timesheet.xlsx";
       a.click();
       URL.revokeObjectURL(url);
     } catch (error) {
@@ -206,7 +208,7 @@ export default function TimesheetDetailPage() {
               disabled={exporting}
               className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600"
             >
-              <Download className="h-4 w-4" /> Export CSV
+              <Download className="h-4 w-4" /> Export Excel
             </button>
           </div>
         ) : null}

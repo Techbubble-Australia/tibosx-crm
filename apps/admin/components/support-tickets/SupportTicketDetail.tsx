@@ -18,6 +18,11 @@ import { type TicketAuditRow } from "@/lib/ticket-audit-display";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { TicketEditableSubject } from "@/components/support-tickets/TicketEditableSubject";
 import { TicketResolutionNotesSection } from "@/components/support-tickets/TicketResolutionNotesSection";
+import {
+  TicketEffortBreakdownSection,
+  TicketEstimatedEffortSection,
+  type EffortBreakdown,
+} from "@/components/support-tickets/TicketEffortSections";
 import { TicketRecordLayout, TicketAttributeField } from "@/components/support-tickets/TicketRecordLayout";
 import { TicketPriorityBadge, TicketPriorityDot } from "@/lib/ticket-priority-styles";
 import { normalizeTicketStatusKey } from "@/lib/support-ticket-labels";
@@ -54,6 +59,9 @@ type TicketDetail = {
   }[];
   attachments: { id: string; fileName: string; fileUrl: string; fileSize?: number | null }[];
   auditLogs?: TicketAuditRow[];
+  estimatedEffortHours?: number | null;
+  effortBreakdown?: EffortBreakdown;
+  effortBreakdownTotal?: number | null;
 };
 
 export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
@@ -240,8 +248,60 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
     </>
   ) : null;
 
+  const showEffortFields =
+    statusKey === "IN_PROGRESS" && (portalRole === "CLIENT" || portalRole === "CONSULTANT");
+
+  async function saveEstimatedEffort(ticketId: string, hours: number) {
+    const res = await adminFetch(`/api/admin/ticketing/tickets/${ticketId}/estimated-effort`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estimatedEffortHours: hours }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save");
+    reload();
+  }
+
+  async function saveEffortBreakdown(ticketId: string, payload: EffortBreakdown) {
+    const res = await adminFetch(`/api/admin/ticketing/tickets/${ticketId}/effort-breakdown`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save");
+    reload();
+  }
+
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto max-w-6xl space-y-4">
+      {showEffortFields ? (
+        <TicketEstimatedEffortSection
+          ticketId={ticket.id}
+          status={ticket.status}
+          initialHours={ticket.estimatedEffortHours ?? null}
+          disabled={saving}
+          onSaved={reload}
+          saveEstimatedEffort={saveEstimatedEffort}
+        />
+      ) : null}
+      <TicketEffortBreakdownSection
+        ticketId={ticket.id}
+        status={ticket.status}
+        breakdown={
+          ticket.effortBreakdown ?? {
+            effortAnalysis: null,
+            effortBuild: null,
+            effortTest: null,
+            effortDocument: null,
+            effortSupport: null,
+          }
+        }
+        total={ticket.effortBreakdownTotal ?? null}
+        disabled={saving}
+        onSaved={reload}
+        saveBreakdown={saveEffortBreakdown}
+      />
       <TicketRecordLayout
         breadcrumbs={[
           { label: "Support", href: "/support-tickets" },

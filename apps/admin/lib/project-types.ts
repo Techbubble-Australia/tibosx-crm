@@ -22,7 +22,7 @@ export type TimesheetStatus = (typeof TIMESHEET_STATUSES)[number];
 
 export const TIMESHEET_STATUS_LABELS: Record<TimesheetStatus, string> = {
   DRAFT: "Draft",
-  SUBMITTED: "Submitted",
+  SUBMITTED: "Submitted - Awaiting Approval",
   APPROVED: "Approved",
 };
 

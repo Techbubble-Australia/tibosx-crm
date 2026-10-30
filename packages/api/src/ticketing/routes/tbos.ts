@@ -24,6 +24,13 @@ import {
 import { autoCloseStaleResolvedTickets } from "../lib/auto-close-resolved-tickets.js";
 import { notifyAsync } from "../../lib/notifications/index.js";
 import { serializeTicketRow, ticketDetailIncludes } from "../lib/serialize-ticket.js";
+import {
+  applyEffortBreakdown,
+  applyEstimatedEffortHours,
+  estimatedEffortBodySchema,
+  ticketIsInProgress,
+} from "../lib/ticket-effort-handlers.js";
+import { effortBreakdownSchema, serializeTicketEffort } from "../lib/ticket-effort.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -790,6 +797,66 @@ router.get("/consultants", requireTbosAdmin, async (_req, res) => {
       organizations: r.consultantOrganizations.map((c) => c.organization),
     })),
   });
+});
+
+async function tbosTicketForEffort(req: TbosRequest) {
+  const tbosUser = req.tbosUser!;
+  const orgScope = await orgFilterForTbos(tbosUser);
+  const existing = await prisma.ticket.findFirst({
+    where: { id: req.params.id, ...orgScope },
+  });
+  if (!existing) return null;
+  const actorId = await resolveTbosActorUserId(tbosUser);
+  const actorTicketing = await prisma.ticketingUser.findUnique({
+    where: { id: actorId },
+    select: { id: true, role: true },
+  });
+  if (actorTicketing?.role !== "CLIENT" && actorTicketing?.role !== "CONSULTANT") {
+    return { error: "Not allowed to update estimated effort" as const };
+  }
+  if (!ticketIsInProgress(existing.status)) {
+    return { error: "Estimated effort can only be set while the ticket is in progress" as const };
+  }
+  return { existing, actorId };
+}
+
+router.post("/tickets/:id/estimated-effort", async (req: TbosRequest, res) => {
+  const parsed = estimatedEffortBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Validation error", details: parsed.error.errors });
+  }
+  const ctx = await tbosTicketForEffort(req);
+  if (!ctx) return res.status(404).json({ error: "Ticket not found" });
+  if ("error" in ctx) return res.status(400).json({ error: ctx.error });
+  const previous = serializeTicketEffort(ctx.existing).estimatedEffortHours;
+  await applyEstimatedEffortHours(
+    ctx.existing.id,
+    ctx.actorId,
+    parsed.data.estimatedEffortHours,
+    previous,
+  );
+  const updated = await prisma.ticket.findUnique({
+    where: { id: ctx.existing.id },
+    include: ticketDetailIncludes,
+  });
+  res.json({ data: updated ? serializeTicketRow(updated) : null });
+});
+
+router.patch("/tickets/:id/effort-breakdown", async (req: TbosRequest, res) => {
+  const parsed = effortBreakdownSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Validation error", details: parsed.error.errors });
+  }
+  const ctx = await tbosTicketForEffort(req);
+  if (!ctx) return res.status(404).json({ error: "Ticket not found" });
+  if ("error" in ctx) return res.status(400).json({ error: ctx.error });
+  const current = serializeTicketEffort(ctx.existing);
+  await applyEffortBreakdown(ctx.existing.id, ctx.actorId, parsed.data, current);
+  const updated = await prisma.ticket.findUnique({
+    where: { id: ctx.existing.id },
+    include: ticketDetailIncludes,
+  });
+  res.json({ data: updated ? serializeTicketRow(updated) : null });
 });
 
 export { router as tbosRoutes };

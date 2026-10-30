@@ -16,7 +16,7 @@ import { effectiveRolesForUser, hasEffectiveRole } from "../lib/admin-roles";
 import { getMemberOnboardingStatus } from "../lib/member-onboarding";
 import { notifyAsync } from "../lib/notifications";
 import { mondayOfWeek, sundayOfWeek, TIMESHEET_STATUSES, TIMESHEET_STATUS_LABELS } from "../lib/project-types";
-import { buildTimesheetTemplateCsv } from "../lib/timesheet-export-template.js";
+import { buildTimesheetExportFilename, buildTimesheetXlsxBuffer } from "../lib/timesheet-export-xlsx.js";
 import { formatZodError } from "../lib/zod-error";
 import {
   listActiveProjectMembershipsForUser,
@@ -35,6 +35,7 @@ import {
   sumDailyHours,
   timesheetEntryInputSchema,
   WEEKDAY_KEYS,
+  type DailyHours,
 } from "../lib/timesheet-entries";
 import {
   assertTimesheetWithinProjectDates,
@@ -214,6 +215,13 @@ function serializeTimesheet(row: {
     : [];
   const status = row.status as keyof typeof TIMESHEET_STATUS_LABELS;
   const serializedEntries = row.entries ?? [];
+  const totalHours =
+    serializedEntries.length > 0
+      ? serializedEntries.reduce(
+          (sum, entry) => sum + sumDailyHours((entry.dailyHours ?? {}) as DailyHours),
+          0,
+        )
+      : sumDailyHours((row.dailyHours ?? {}) as DailyHours);
   const multiLineLabel =
     serializedEntries.length > 0
       ? serializedEntries.length === 1
@@ -246,7 +254,11 @@ function serializeTimesheet(row: {
     startDate: row.startDate.toISOString(),
     endDate: row.endDate.toISOString(),
     status: row.status,
-    statusLabel: TIMESHEET_STATUS_LABELS[status] ?? row.status,
+    statusLabel:
+      row.status === "SUBMITTED"
+        ? "Submitted - Awaiting Approval"
+        : (TIMESHEET_STATUS_LABELS[status] ?? row.status),
+    totalHours,
     fileUrls,
     dailyHours: row.dailyHours ?? null,
     dailyComments: row.dailyComments ?? null,
@@ -1112,12 +1124,17 @@ router.get("/export", async (req: AuthRequest, res) => {
       project: row.project,
       entries: row.entries,
       approverLabel: resolveTimesheetApproverLabel(row),
+      rejectReason: row.rejectReason,
     }));
 
-    const filename = timesheetId ? `timesheet-${timesheetId}.csv` : "timesheets.csv";
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    const filename = buildTimesheetExportFilename(exportRows);
+    const buffer = await buildTimesheetXlsxBuffer(exportRows);
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.send(buildTimesheetTemplateCsv(exportRows));
+    res.send(buffer);
   } catch (error) {
     console.error("Error exporting timesheets:", error);
     res.status(500).json({ error: "Failed to export timesheets" });
