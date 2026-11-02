@@ -2,7 +2,17 @@ import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:
 import { generateSecret, generateURI, verify } from "otplib";
 
 const ALGO = "aes-256-gcm";
-const MFA_ISSUER = process.env.MFA_ISSUER_NAME?.trim() || "TIBOSX.AI";
+const DEFAULT_MFA_ISSUER = "TIBOSX.AI";
+const DEV_MFA_ISSUER = "DEV.TIBOSX.AI";
+
+/** Issuer in authenticator apps (otpauth). Dev uses a distinct name so prod and dev QR codes do not collide. */
+export function mfaIssuerName(): string {
+  const explicit = process.env.MFA_ISSUER_NAME?.trim();
+  if (explicit) return explicit;
+  const env = (process.env.ENV ?? process.env.TBOS_ENV ?? "").trim().toLowerCase();
+  if (env === "development") return DEV_MFA_ISSUER;
+  return DEFAULT_MFA_ISSUER;
+}
 
 function deriveEncryptionKey(): Buffer {
   const material = process.env.MFA_ENCRYPTION_KEY || process.env.JWT_SECRET || "dev-only-mfa-key";
@@ -32,7 +42,7 @@ export function decryptTotpSecret(payload: string): string {
 export function createTotpEnrollment(email: string): { secret: string; otpauthUrl: string } {
   const secret = generateSecret();
   const otpauthUrl = generateURI({
-    issuer: MFA_ISSUER,
+    issuer: mfaIssuerName(),
     label: email,
     secret,
   });

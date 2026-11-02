@@ -1125,6 +1125,16 @@ router.post("/password/forgot", async (req, res) => {
         ? adminForgot
         : (customerForgot ?? adminForgot);
 
+    if (!account && process.env.ENV?.trim().toLowerCase() === "development") {
+      console.info("[password-forgot] No resettable TBOS account for this email in the current database.", {
+        email: normalizedEmail,
+        foundAdmin: Boolean(adminUser),
+        foundCustomer: Boolean(customer),
+        adminHasPassword: Boolean(adminUser?.passwordHash),
+        customerHasPassword: Boolean(customer?.passwordHash),
+      });
+    }
+
     if (account) {
       const rawToken = generatePasswordResetToken();
       const tokenHash = hashPasswordResetToken(rawToken);
