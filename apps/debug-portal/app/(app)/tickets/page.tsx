@@ -5,10 +5,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { Loader2, Plus } from "lucide-react";
 import { ChevronSelect } from "@/components/ChevronSelect";
+import { FilterField } from "@/components/ui/FilterField";
+import { PageHeader } from "@/components/ui/PageHeader";
 import {
   TICKET_STATUSES,
   TICKET_STATUS_LABELS,
+  formatEnvironment,
+  formatTicketType,
   statusBadgeClass,
+  typeBadgeClass,
   type TicketStatus,
 } from "@/lib/tickets";
 
@@ -116,32 +121,33 @@ function TicketsListInner() {
       ? [{ reporterUserId: reporterFilter, reporterEmail: "Selected reporter" }]
       : [];
 
+  const countLabel =
+    total === 0 && !loading
+      ? "No tickets match your filters"
+      : `${total} ticket${total === 1 ? "" : "s"}`;
+
   return (
-    <div className="space-y-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Debug capture tickets</h1>
-          <p className="text-sm text-slate-600">
-            {total} ticket{total === 1 ? "" : "s"}
-          </p>
-        </div>
-        <Link
-          href="/tickets/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
-        >
-          <Plus className="h-4 w-4" />
-          New ticket
-        </Link>
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto sm:ml-auto">
-          <div className="flex items-center gap-2">
-            <label htmlFor="reporter-filter" className="text-sm text-slate-600">
-              Reporter
-            </label>
+    <div className="space-y-6">
+      <PageHeader
+        title="Tickets"
+        description="Review debug captures from TBOS and tickets you filed here."
+        action={
+          <Link href="/tickets/new" className="dp-btn-primary">
+            <Plus className="h-4 w-4" aria-hidden />
+            New ticket
+          </Link>
+        }
+      />
+
+      <div className="dp-card p-4 sm:p-5">
+        <p className="mb-4 text-sm font-medium text-slate-800">{countLabel}</p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
+          <FilterField label="Reporter" htmlFor="reporter-filter" className="sm:max-w-[18rem]">
             <ChevronSelect
               id="reporter-filter"
               value={reporterFilter}
               onChange={onReporterChange}
-              className="min-w-[12rem]"
+              className="block w-full min-w-0"
               aria-label="Filter by reporter"
             >
               <option value="">All reporters</option>
@@ -151,76 +157,97 @@ function TicketsListInner() {
                 </option>
               ))}
             </ChevronSelect>
-          </div>
-          <div className="flex items-center gap-2">
-            <label htmlFor="status-filter" className="text-sm text-slate-600">
-              Status
-            </label>
+          </FilterField>
+          <FilterField label="Status" htmlFor="status-filter">
             <ChevronSelect
               id="status-filter"
               value={statusFilter}
               onChange={setStatusFilter}
-              className="min-w-[9rem]"
+              className="block w-full min-w-0"
               aria-label="Filter by status"
             >
-              <option value="">All</option>
+              <option value="">All statuses</option>
               {TICKET_STATUSES.map((s) => (
                 <option key={s} value={s}>
                   {TICKET_STATUS_LABELS[s]}
                 </option>
               ))}
             </ChevronSelect>
-          </div>
+          </FilterField>
         </div>
       </div>
 
       {loading ? (
-        <div className="flex h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        <div className="dp-card flex h-48 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-sky-500" aria-label="Loading" />
         </div>
       ) : rows.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
-          No tickets found.
-        </p>
+        <div className="dp-card px-6 py-12 text-center">
+          <p className="text-sm text-slate-600">No tickets to show.</p>
+          <Link href="/tickets/new" className="dp-btn-primary mt-4 inline-flex">
+            <Plus className="h-4 w-4" />
+            Create your first ticket
+          </Link>
+        </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3 font-medium">Ticket</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Type</th>
-                <th className="px-4 py-3 font-medium">Env</th>
-                <th className="px-4 py-3 font-medium">Reporter</th>
-                <th className="px-4 py-3 font-medium">Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/80">
-                  <td className="px-4 py-3">
-                    <Link href={`/tickets/${row.id}`} className="font-medium text-sky-700 hover:underline">
-                      {row.ticketId}
-                    </Link>
-                    <p className="mt-0.5 line-clamp-1 max-w-md text-xs text-slate-500">{row.userDescription}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(row.status)}`}
-                    >
-                      {TICKET_STATUS_LABELS[row.status] ?? row.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">{row.type}</td>
-                  <td className="px-4 py-3 capitalize">{row.reportedEnvironment}</td>
-                  <td className="px-4 py-3 text-slate-600">{row.reporterEmail}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-slate-600">
-                    {new Date(row.createdAt).toLocaleString("en-AU")}
-                  </td>
+        <div className="dp-card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-[720px] w-full text-left">
+              <thead className="border-b border-slate-200 bg-slate-50/90">
+                <tr>
+                  <th className="dp-table-head">Ticket</th>
+                  <th className="dp-table-head">Status</th>
+                  <th className="dp-table-head">Type</th>
+                  <th className="dp-table-head">Environment</th>
+                  <th className="dp-table-head hidden lg:table-cell">Reporter</th>
+                  <th className="dp-table-head">Created</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {rows.map((row) => (
+                  <tr key={row.id} className="transition-colors hover:bg-slate-50/80">
+                    <td className="dp-table-cell max-w-xs">
+                      <Link
+                        href={`/tickets/${row.id}`}
+                        className="font-semibold text-sky-700 hover:text-sky-800 hover:underline"
+                      >
+                        {row.ticketId}
+                      </Link>
+                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">
+                        {row.userDescription}
+                      </p>
+                    </td>
+                    <td className="dp-table-cell">
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(row.status)}`}
+                      >
+                        {TICKET_STATUS_LABELS[row.status] ?? row.status}
+                      </span>
+                    </td>
+                    <td className="dp-table-cell">
+                      <span
+                        className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${typeBadgeClass(row.type)}`}
+                      >
+                        {formatTicketType(row.type)}
+                      </span>
+                    </td>
+                    <td className="dp-table-cell whitespace-nowrap">
+                      {formatEnvironment(row.reportedEnvironment)}
+                    </td>
+                    <td className="dp-table-cell hidden max-w-[10rem] truncate text-slate-600 lg:table-cell">
+                      {row.reporterEmail}
+                    </td>
+                    <td className="dp-table-cell whitespace-nowrap text-slate-600">
+                      {new Date(row.createdAt).toLocaleString("en-AU", {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                      })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
@@ -231,8 +258,8 @@ export default function TicketsListPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        <div className="flex h-48 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-sky-500" />
         </div>
       }
     >

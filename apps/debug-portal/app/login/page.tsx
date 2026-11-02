@@ -35,59 +35,56 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+    <div className="flex min-h-screen items-center justify-center px-4 py-12">
+      <div className="dp-card w-full max-w-md p-8 sm:p-10">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-sky-100 text-sky-700">
-            <Bug className="h-6 w-6" />
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-sky-600 text-white shadow-sm">
+            <Bug className="h-7 w-7" aria-hidden />
           </div>
-          <h1 className="text-xl font-semibold">Debug ticket portal</h1>
-          <p className="mt-1 text-sm text-slate-600">Admin accounts only · MFA not required here</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Debug portal</h1>
+          <p className="mt-2 text-sm text-slate-600">Sign in with your TBOS admin account. MFA is not required here.</p>
         </div>
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-5">
           {error ? (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+            <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
               {error}
             </p>
           ) : null}
           <div>
-            <label className="mb-1 block text-sm font-medium" htmlFor="email">
+            <label className="dp-label" htmlFor="email">
               Email
             </label>
             <div className="relative">
-              <Mail className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Mail className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" aria-hidden />
               <input
                 id="email"
                 name="email"
                 type="email"
                 required
                 autoComplete="username"
-                className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm"
+                placeholder="you@company.com"
+                className="dp-input pl-9"
               />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium" htmlFor="password">
+            <label className="dp-label" htmlFor="password">
               Password
             </label>
             <div className="relative">
-              <Lock className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Lock className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" aria-hidden />
               <input
                 id="password"
                 name="password"
                 type="password"
                 required
                 autoComplete="current-password"
-                className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm"
+                className="dp-input pl-9"
               />
             </div>
           </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-sky-600 py-2.5 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-60"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          <button type="submit" disabled={loading} className="dp-btn-primary w-full">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
             Sign in
           </button>
         </form>

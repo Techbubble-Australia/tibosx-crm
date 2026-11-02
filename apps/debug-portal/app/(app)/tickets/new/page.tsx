@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowLeft, Loader2, Upload, X } from "lucide-react";
+import { Loader2, Upload, X } from "lucide-react";
 import { ChevronSelect } from "@/components/ChevronSelect";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { readUploadImageUrlFromJson } from "@/lib/upload-response";
 
 type TicketType = "BUG" | "ENHANCEMENT";
@@ -42,7 +43,7 @@ export default function NewTicketPage() {
     e.preventDefault();
     setError("");
     if (!userDescription.trim()) {
-      setError("Description is required.");
+      setError("Please add a description so others can understand the issue.");
       return;
     }
 
@@ -87,47 +88,49 @@ export default function NewTicketPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <Link href="/tickets" className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900">
-        <ArrowLeft className="h-4 w-4" />
-        All tickets
-      </Link>
+      <PageHeader
+        backHref="/tickets"
+        backLabel="All tickets"
+        title="New ticket"
+        description="Report a bug or enhancement that is not tied to a TBOS screen capture (API, infra, process, etc.)."
+      />
 
-      <div>
-        <h1 className="text-2xl font-semibold">New ticket</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          File a bug or enhancement that is not tied to a TBOS admin UI capture (API issues, infra, process, etc.).
-        </p>
-      </div>
+      <form onSubmit={(e) => void onSubmit(e)} className="dp-card space-y-6 p-5 sm:p-6">
+        {error ? (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+            {error}
+          </p>
+        ) : null}
 
-      <form onSubmit={(e) => void onSubmit(e)} className="space-y-5 rounded-xl border border-slate-200 bg-white p-5">
-        {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
-
-        <div className="flex flex-wrap gap-2">
-          {(["BUG", "ENHANCEMENT"] as TicketType[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setType(t)}
-              className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
-                type === t
-                  ? "border-sky-600 bg-sky-50 text-sky-800"
-                  : "border-slate-200 text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              {t === "BUG" ? "Bug" : "Enhancement"}
-            </button>
-          ))}
-        </div>
+        <fieldset>
+          <legend className="dp-label">Type</legend>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(["BUG", "ENHANCEMENT"] as TicketType[]).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setType(t)}
+                className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                  type === t
+                    ? "border-sky-600 bg-sky-50 text-sky-900 ring-2 ring-sky-500/20"
+                    : "border-slate-300 bg-white text-slate-700 hover:border-slate-400"
+                }`}
+              >
+                {t === "BUG" ? "Bug" : "Enhancement"}
+              </button>
+            ))}
+          </div>
+        </fieldset>
 
         <div>
-          <label htmlFor="env" className="mb-1 block text-sm font-medium text-slate-800">
+          <label htmlFor="env" className="dp-label">
             Environment
           </label>
           <ChevronSelect
             id="env"
             value={reportedEnvironment}
             onChange={(v) => setReportedEnvironment(v as ReportedEnvironment)}
-            className="w-full min-w-0"
+            className="block w-full max-w-xs"
             aria-label="Reported environment"
           >
             <option value="development">Development</option>
@@ -136,7 +139,7 @@ export default function NewTicketPage() {
         </div>
 
         <div>
-          <label htmlFor="related-url" className="mb-1 block text-sm font-medium text-slate-800">
+          <label htmlFor="related-url" className="dp-label">
             Related URL <span className="font-normal text-slate-500">(optional)</span>
           </label>
           <input
@@ -144,13 +147,13 @@ export default function NewTicketPage() {
             type="url"
             value={currentUrl}
             onChange={(e) => setCurrentUrl(e.target.value)}
-            placeholder="https://… or page where you saw the issue"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+            placeholder="https://…"
+            className="dp-input"
           />
         </div>
 
         <div>
-          <label htmlFor="description" className="mb-1 block text-sm font-medium text-slate-800">
+          <label htmlFor="description" className="dp-label">
             Description <span className="text-red-600">*</span>
           </label>
           <textarea
@@ -159,19 +162,19 @@ export default function NewTicketPage() {
             rows={6}
             value={userDescription}
             onChange={(e) => setUserDescription(e.target.value)}
-            placeholder="What happened, expected behavior, steps to reproduce, logs, etc."
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+            placeholder="What happened, what you expected, steps to reproduce, logs, etc."
+            className="dp-input min-h-[8rem] resize-y"
           />
         </div>
 
         <div>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-sm font-medium text-slate-800">Screenshot (optional)</span>
+            <span className="dp-label mb-0">Screenshot (optional)</span>
             {previewUrl ? (
               <button
                 type="button"
                 onClick={() => onPickScreenshot(null)}
-                className="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-slate-900"
+                className="dp-btn-ghost py-1 text-xs text-slate-600"
               >
                 <X className="h-3.5 w-3.5" />
                 Remove
@@ -183,11 +186,11 @@ export default function NewTicketPage() {
             <img
               src={previewUrl}
               alt="Screenshot preview"
-              className="mb-2 max-h-48 rounded-lg border border-slate-100 object-contain"
+              className="mb-3 max-h-56 rounded-lg border border-slate-200 bg-slate-50 object-contain p-1"
             />
           ) : null}
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100">
-            <Upload className="h-4 w-4" />
+          <label className="dp-btn-secondary inline-flex cursor-pointer">
+            <Upload className="h-4 w-4" aria-hidden />
             Choose image
             <input
               type="file"
@@ -196,21 +199,15 @@ export default function NewTicketPage() {
               onChange={(e) => onPickScreenshot(e.target.files?.[0] ?? null)}
             />
           </label>
+          <p className="mt-2 text-xs text-slate-500">PNG, JPEG, GIF, or WebP · max 10 MB</p>
         </div>
 
-        <div className="flex flex-wrap gap-2 pt-2">
-          <button
-            type="submit"
-            disabled={submitting}
-            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
-          >
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+        <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-4">
+          <button type="submit" disabled={submitting} className="dp-btn-primary">
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
             Create ticket
           </button>
-          <Link
-            href="/tickets"
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
+          <Link href="/tickets" className="dp-btn-secondary">
             Cancel
           </Link>
         </div>
