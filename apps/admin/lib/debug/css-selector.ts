@@ -72,3 +72,10 @@ export function captureElementDiagnostics(el: Element): ElementDiagnostics {
     captureScope: "element",
   };
 }
+
+/** Prefer the interactive control when the click target is an icon or text inside a link/button. */
+export function resolveCaptureTarget(el: Element): HTMLElement {
+  const control = el.closest("a, button");
+  if (control instanceof HTMLElement) return control;
+  return el instanceof HTMLElement ? el : (el.parentElement as HTMLElement);
+}

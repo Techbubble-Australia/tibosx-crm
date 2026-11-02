@@ -17,6 +17,7 @@ async function captureViewportCanvas(): Promise<HTMLCanvasElement | null> {
       backgroundColor: "#ffffff",
       scale,
       logging: false,
+      useCORS: true,
       x: window.scrollX,
       y: window.scrollY,
       width: window.innerWidth,
@@ -30,6 +31,28 @@ async function captureViewportCanvas(): Promise<HTMLCanvasElement | null> {
   }
 }
 
+function drawElementHighlight(canvas: HTMLCanvasElement, el: HTMLElement): void {
+  const rect = el.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return;
+
+  const scale = captureScale();
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const x = rect.left * scale;
+  const y = rect.top * scale;
+  const w = rect.width * scale;
+  const h = rect.height * scale;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(14, 165, 233, 0.12)";
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = "#0284c7";
+  ctx.lineWidth = Math.max(2, 2 * scale);
+  ctx.strokeRect(x + ctx.lineWidth / 2, y + ctx.lineWidth / 2, w - ctx.lineWidth, h - ctx.lineWidth);
+  ctx.restore();
+}
+
 /** Visible viewport screenshot (excludes debug toolbar / modals). */
 export async function captureViewportScreenshot(): Promise<string | null> {
   const canvas = await captureViewportCanvas();
@@ -37,30 +60,23 @@ export async function captureViewportScreenshot(): Promise<string | null> {
 }
 
 /**
- * Crops an element from the viewport capture instead of rendering the node alone.
- * html2canvas mis-draws flex-centered text on buttons when the subtree is isolated.
+ * Full viewport capture with the inspected element outlined — avoids cropping, which
+ * mis-renders flex buttons/links (bold text, wrong padding) when html2canvas isolates pixels.
  */
 export async function captureElementScreenshot(el: HTMLElement): Promise<string | null> {
   const canvas = await captureViewportCanvas();
   if (!canvas) return null;
+  drawElementHighlight(canvas, el);
+  return canvas.toDataURL("image/png");
+}
 
-  const rect = el.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return null;
-
-  const scale = captureScale();
-  const sx = Math.max(0, Math.floor(rect.left * scale));
-  const sy = Math.max(0, Math.floor(rect.top * scale));
-  const sw = Math.min(Math.ceil(rect.width * scale), canvas.width - sx);
-  const sh = Math.min(Math.ceil(rect.height * scale), canvas.height - sy);
-  if (sw <= 0 || sh <= 0) return null;
-
-  const cropped = document.createElement("canvas");
-  cropped.width = sw;
-  cropped.height = sh;
-  const ctx = cropped.getContext("2d");
-  if (!ctx) return null;
-  ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
-  return cropped.toDataURL("image/png");
+export async function captureViewportScreenshotWithElementHighlight(
+  el: HTMLElement | null | undefined,
+): Promise<string | null> {
+  const canvas = await captureViewportCanvas();
+  if (!canvas) return null;
+  if (el) drawElementHighlight(canvas, el);
+  return canvas.toDataURL("image/png");
 }
 
 export function captureViewportDiagnostics(): ElementDiagnostics {
@@ -78,4 +94,15 @@ export function captureViewportDiagnostics(): ElementDiagnostics {
     },
     captureScope: "viewport",
   };
+}
+
+/** Resolve element from diagnostics for recapture (best-effort). */
+export function resolveElementFromDiagnostics(diagnostics: ElementDiagnostics): HTMLElement | null {
+  if (diagnostics.captureScope === "viewport" || !diagnostics.cssSelector) return null;
+  try {
+    const node = document.querySelector(diagnostics.cssSelector);
+    return node instanceof HTMLElement ? node : null;
+  } catch {
+    return null;
+  }
 }
