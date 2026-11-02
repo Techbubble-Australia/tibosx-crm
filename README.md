@@ -109,7 +109,9 @@ Enable monorepo auto-deploy by setting each service to use the matching config f
 | API | `Dockerfile.api` | (from `railway.api.toml`) |
 | Web | `Dockerfile.web` | `node apps/web/server.js` |
 | Admin | `Dockerfile.admin` | `node apps/admin/server.js` |
-| Debug portal | `Dockerfile.debug-portal` | `node apps/debug-portal/server.js` |
+| Debug portal | `Dockerfile.debug-portal` | `HOSTNAME=0.0.0.0 node apps/debug-portal/server.js` |
+
+**Debug portal service (Railway name is often `debug web`):** If deploy logs show `DATABASE_URL is required`, the service is running the **API** image/start command, not the debug portal. Set `RAILWAY_DOCKERFILE_PATH=Dockerfile.debug-portal`, point Config-as-code to `railway.debug-portal.toml`, and redeploy with `npm run deploy:railway:debug-portal`. Set `API_URL` to your TBOS API base URL and `JWT_SECRET` to the **same value as the API** (login signs the debug session cookie with it).
 
 Do **not** commit `railway.toml` at the repo root — it forces one Dockerfile for every service that falls back to it. Use `railway.toml.example` as a reference; CLI deploys copy the correct file via `scripts/railway-deploy-all.sh`.
 

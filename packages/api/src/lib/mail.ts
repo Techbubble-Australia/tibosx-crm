@@ -343,7 +343,7 @@ export async function sendPasswordResetEmail(input: {
   name: string;
   resetUrl: string;
 }): Promise<void> {
-  const resend = getResendClient();
+  const resend = requireResendClient();
   const greeting = input.name.trim() ? `Hello ${input.name.trim()},` : "Hello,";
   const text = `We received a request to reset the password for your TIBOSX account.\n\nReset your password here (link expires in 1 hour):\n${input.resetUrl}\n\nIf you did not request this, you can ignore this email.`;
   const bodyHtml = `<p>We received a request to reset the password for your <strong>TIBOSX</strong> account.</p><p><a href="${escapeHtml(input.resetUrl)}">Reset your password</a> (link expires in 1 hour).</p><p>If you did not request this, you can ignore this email.</p>`;
@@ -354,11 +354,6 @@ export async function sendPasswordResetEmail(input: {
     bodyHtml,
     bodyText: text,
   });
-
-  if (!resend) {
-    console.info("[password-reset-email] RESEND not configured; would send to", input.to, built.subject, input.resetUrl);
-    return;
-  }
 
   const { error } = await resend.emails.send({
     from: getTbosMailFrom(),

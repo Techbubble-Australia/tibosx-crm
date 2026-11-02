@@ -1,10 +1,8 @@
 import { sendUserInviteEmail } from "./mail.js";
+import { tbosAdminPublicBase } from "./tbos-public-url.js";
 
 export function tbosLoginUrl(): string {
-  return (process.env.ADMIN_PUBLIC_URL || process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3002").replace(
-    /\/$/,
-    "",
-  );
+  return tbosAdminPublicBase();
 }
 
 export async function emailTbosUserInvite(input: {

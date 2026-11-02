@@ -29,6 +29,7 @@ import {
   PASSWORD_RESET_TTL_MS,
 } from "../lib/password-reset";
 import { sendPasswordResetEmail } from "../lib/mail";
+import { assertTbosAdminPublicBaseForEmail } from "../lib/tbos-public-url";
 import { tbosLoginUrl } from "../lib/user-invite";
 import { helpSupportRoutes } from "./help-support.js";
 const router: IRouter = Router();
@@ -1111,20 +1112,30 @@ router.post("/password/forgot", async (req, res) => {
       select: { id: true, email: true, name: true, role: true, active: true, passwordHash: true },
     });
 
-    const adminForgot =
-      adminUser?.active !== false && adminUser?.passwordHash && adminUser.role !== "client"
-        ? { kind: "admin" as const, row: adminUser }
-        : null;
     const customerForgot =
       customer?.active !== false && customer?.passwordHash
         ? { kind: "customer" as const, row: customer }
         : null;
-    const account = adminForgot ?? customerForgot;
+    const adminForgot =
+      adminUser?.active !== false && adminUser?.passwordHash
+        ? { kind: "admin" as const, row: adminUser }
+        : null;
+    const account =
+      adminForgot && adminUser && adminUser.role !== "client"
+        ? adminForgot
+        : (customerForgot ?? adminForgot);
 
     if (account) {
       const rawToken = generatePasswordResetToken();
       const tokenHash = hashPasswordResetToken(rawToken);
       const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+
+      try {
+        assertTbosAdminPublicBaseForEmail();
+      } catch (configErr) {
+        console.error("Password reset link config error:", configErr);
+        return res.status(503).json({ error: "Could not send reset email. Try again later." });
+      }
 
       const resetUrl = `${tbosLoginUrl()}/reset-password?token=${encodeURIComponent(rawToken)}`;
       try {

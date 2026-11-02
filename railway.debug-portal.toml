@@ -4,7 +4,7 @@ dockerfilePath = "Dockerfile.debug-portal"
 watchPatterns = ["apps/debug-portal/**", "packages/config/**", "pnpm-lock.yaml", "pnpm-workspace.yaml", "package.json", "Dockerfile.debug-portal"]
 
 [deploy]
-startCommand = "node apps/debug-portal/server.js"
+startCommand = "HOSTNAME=0.0.0.0 node apps/debug-portal/server.js"
 healthcheckPath = "/login"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"

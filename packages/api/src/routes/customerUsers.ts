@@ -6,6 +6,7 @@ import { prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth";
 import { assertMappedContactAvailable } from "../lib/admin-user-contact-map";
 import { emailTbosUserInvite, tbosLoginUrl } from "../lib/user-invite";
+import { assertTbosAdminPublicBaseForEmail } from "../lib/tbos-public-url";
 import { sendPasswordResetEmail } from "../lib/mail";
 import {
   generatePasswordResetToken,
@@ -265,6 +266,7 @@ router.post("/:id/reset-password", async (req: AuthRequest, res) => {
     const resetUrl = `${tbosLoginUrl()}/reset-password?token=${encodeURIComponent(rawToken)}`;
 
     try {
+      assertTbosAdminPublicBaseForEmail();
       await sendPasswordResetEmail({
         to: user.email,
         name: user.name?.trim() || "",

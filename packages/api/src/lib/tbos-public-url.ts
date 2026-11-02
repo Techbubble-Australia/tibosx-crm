@@ -8,6 +8,24 @@ export function tbosAdminPublicBase(): string {
   ).replace(/\/$/, "");
 }
 
+/** Ensures password-reset and invite links have a usable host (throws if misconfigured). */
+export function assertTbosAdminPublicBaseForEmail(): void {
+  const base = tbosAdminPublicBase();
+  let parsed: URL;
+  try {
+    parsed = new URL(base.includes("://") ? base : `https://${base}`);
+  } catch {
+    throw new Error(
+      "ADMIN_PUBLIC_URL is invalid. Set the public TBOS admin URL on the API service (e.g. https://tibosx.ai.techbubble.net.au).",
+    );
+  }
+  if (!parsed.hostname) {
+    throw new Error(
+      "ADMIN_PUBLIC_URL is missing a hostname. Set the full public TBOS admin URL on the API service.",
+    );
+  }
+}
+
 export function workspaceTimesheetsUrl(): string {
   return `${tbosAdminPublicBase()}/workspace/timesheets/submitted`;
 }
