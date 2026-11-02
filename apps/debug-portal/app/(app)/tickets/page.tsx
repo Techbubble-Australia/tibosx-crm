@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { ChevronSelect } from "@/components/ChevronSelect";
 import {
   TICKET_STATUSES,
   TICKET_STATUS_LABELS,
@@ -56,12 +57,16 @@ export default function TicketsListPage() {
           <h1 className="text-2xl font-semibold">Debug capture tickets</h1>
           <p className="text-sm text-slate-600">{total} ticket{total === 1 ? "" : "s"}</p>
         </div>
-        <div>
-          <label className="mr-2 text-sm text-slate-600">Status</label>
-          <select
+        <div className="flex items-center gap-2">
+          <label htmlFor="status-filter" className="text-sm text-slate-600">
+            Status
+          </label>
+          <ChevronSelect
+            id="status-filter"
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            onChange={setStatusFilter}
+            className="min-w-[9rem]"
+            aria-label="Filter by status"
           >
             <option value="">All</option>
             {TICKET_STATUSES.map((s) => (
@@ -69,7 +74,7 @@ export default function TicketsListPage() {
                 {TICKET_STATUS_LABELS[s]}
               </option>
             ))}
-          </select>
+          </ChevronSelect>
         </div>
       </div>
 

@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Copy, ExternalLink, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { StatusSelect } from "@/components/StatusSelect";
+import { buildAgentIssuePrompt, resolveTicketScreenshotUrl } from "@/lib/agent-prompt";
 import {
-  TICKET_STATUSES,
   TICKET_STATUS_LABELS,
   statusBadgeClass,
-  resolveScreenshotUrl,
   type TicketStatus,
 } from "@/lib/tickets";
 
@@ -19,6 +19,7 @@ type TicketDetail = {
   status: TicketStatus;
   reportedEnvironment: string;
   userDescription: string;
+  reporterUserId: string;
   reporterEmail: string;
   reporterRole: string;
   currentUrl: string;
@@ -30,6 +31,43 @@ type TicketDetail = {
   createdAt: string;
 };
 
+type ElementDiagnosticsShape = {
+  tagName?: string;
+  id?: string | null;
+  className?: string | null;
+  cssSelector?: string;
+  innerText?: string | null;
+  captureScope?: string;
+  boundingRect?: { top: number; left: number; width: number; height: number };
+};
+
+type ApiPrerequisiteShape = {
+  endpoint?: string;
+  method?: string;
+  status?: number | null;
+  latencyMs?: number;
+  captureSource?: string;
+  payloadCaptured?: unknown;
+};
+
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid gap-1 sm:grid-cols-[9rem_1fr] sm:gap-3">
+      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
+      <dd className="text-sm text-slate-800">{children}</dd>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+      <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
+      <div className="mt-3 space-y-3">{children}</div>
+    </section>
+  );
+}
+
 export default function TicketDetailPage() {
   const params = useParams();
   const id = params.id as string;
@@ -38,6 +76,8 @@ export default function TicketDetailPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState<TicketStatus>("PENDING");
+  const [copyHint, setCopyHint] = useState("");
+  const [agentPrompt, setAgentPrompt] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,6 +89,7 @@ export default function TicketDetailPage() {
       const ticket = data.data as TicketDetail;
       setRow(ticket);
       setStatus(ticket.status);
+      setAgentPrompt(buildAgentIssuePrompt(ticket));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
       setRow(null);
@@ -60,6 +101,11 @@ export default function TicketDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const shot = useMemo(() => (row ? resolveTicketScreenshotUrl(row) : null), [row]);
+
+  const el = (row?.elementDiagnostics ?? {}) as ElementDiagnosticsShape;
+  const api = (row?.apiPrerequisite ?? null) as ApiPrerequisiteShape | null;
 
   async function saveStatus() {
     if (!row) return;
@@ -74,11 +120,23 @@ export default function TicketDetailPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Update failed");
-      setRow(data.data as TicketDetail);
+      const updated = data.data as TicketDetail;
+      setRow(updated);
+      setAgentPrompt(buildAgentIssuePrompt(updated));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Update failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function copyText(text: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyHint(label);
+      window.setTimeout(() => setCopyHint(""), 2000);
+    } catch {
+      setCopyHint("Copy failed");
     }
   }
 
@@ -102,8 +160,6 @@ export default function TicketDetailPage() {
     );
   }
 
-  const shot = resolveScreenshotUrl(row.screenshotUrl);
-
   return (
     <div className="space-y-6">
       <Link href="/tickets" className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900">
@@ -117,30 +173,17 @@ export default function TicketDetailPage() {
           <p className="mt-1 text-sm text-slate-600">
             {row.type} · {row.reportedEnvironment} · {new Date(row.createdAt).toLocaleString("en-AU")}
           </p>
-          <p className="mt-1 text-sm text-slate-600">
-            {row.reporterEmail} ({row.reporterRole})
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(row.status)}`}>
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusBadgeClass(row.status)}`}>
             {TICKET_STATUS_LABELS[row.status]}
           </span>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as TicketStatus)}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-          >
-            {TICKET_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {TICKET_STATUS_LABELS[s]}
-              </option>
-            ))}
-          </select>
+          <StatusSelect value={status} onChange={setStatus} aria-label="Ticket status" />
           <button
             type="button"
             disabled={saving || status === row.status}
             onClick={() => void saveStatus()}
-            className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? "Saving…" : "Update status"}
           </button>
@@ -148,51 +191,160 @@ export default function TicketDetailPage() {
       </div>
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {copyHint ? <p className="text-sm text-emerald-700">{copyHint}</p> : null}
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-800">Description</h2>
-        <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{row.userDescription}</p>
-      </section>
+      <Section title="Capture overview">
+        <dl className="space-y-2">
+          <DetailRow label="Reporter">
+            {row.reporterEmail} · {row.reporterRole}
+            <span className="block text-xs text-slate-500">User id: {row.reporterUserId}</span>
+          </DetailRow>
+          <DetailRow label="Page URL">
+            <a
+              href={row.currentUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 break-all text-sky-700 hover:underline"
+            >
+              {row.currentUrl}
+              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+            </a>
+          </DetailRow>
+          <DetailRow label="User agent">
+            <span className="break-all text-xs text-slate-600">{row.userAgent}</span>
+          </DetailRow>
+        </dl>
+      </Section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-800">Page URL</h2>
-        <a href={row.currentUrl} target="_blank" rel="noreferrer" className="mt-2 block break-all text-sm text-sky-700">
-          {row.currentUrl}
-        </a>
-      </section>
+      <Section title="Screenshot">
+        {shot ? (
+          <div className="space-y-2">
+            <a
+              href={shot}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-sm text-sky-700 hover:underline"
+            >
+              Open full size
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={shot}
+              alt="Debug capture screenshot"
+              className="max-h-[520px] w-full max-w-full rounded-lg border border-slate-100 object-contain bg-slate-50"
+            />
+          </div>
+        ) : (
+          <p className="text-sm text-slate-600">
+            No screenshot on this ticket. Captures from TBOS debug mode upload an image when you submit; older tickets
+            may only have JSON metadata.
+          </p>
+        )}
+      </Section>
 
-      {shot ? (
-        <section className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="mb-2 text-sm font-semibold text-slate-800">Screenshot</h2>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={shot} alt="Capture" className="max-h-[480px] max-w-full rounded border border-slate-100" />
-        </section>
-      ) : null}
+      <Section title="Description">
+        <p className="whitespace-pre-wrap text-sm text-slate-700">
+          {row.userDescription.trim() || "(No description.)"}
+        </p>
+      </Section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-800">Element / screen metadata</h2>
-        <pre className="mt-2 max-h-64 overflow-auto rounded bg-slate-950 p-3 text-xs text-slate-100">
-          {JSON.stringify(row.elementDiagnostics, null, 2)}
-        </pre>
-      </section>
-
-      {row.apiPrerequisite ? (
-        <section className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-800">API prerequisite</h2>
-          <pre className="mt-2 max-h-64 overflow-auto rounded bg-slate-950 p-3 text-xs text-slate-100">
-            {JSON.stringify(row.apiPrerequisite, null, 2)}
+      <Section title="Element / screen context">
+        {el.cssSelector || el.tagName ? (
+          <dl className="space-y-2">
+            {el.captureScope ? <DetailRow label="Scope">{el.captureScope}</DetailRow> : null}
+            {el.tagName ? <DetailRow label="Tag">{el.tagName}</DetailRow> : null}
+            {el.id ? <DetailRow label="Id">{el.id}</DetailRow> : null}
+            {el.className ? <DetailRow label="Classes">{el.className}</DetailRow> : null}
+            {el.cssSelector ? (
+              <DetailRow label="Selector">
+                <code className="block break-all rounded bg-slate-100 px-2 py-1 text-xs">{el.cssSelector}</code>
+              </DetailRow>
+            ) : null}
+            {el.innerText ? <DetailRow label="Text">{el.innerText}</DetailRow> : null}
+            {el.boundingRect ? (
+              <DetailRow label="Rect">
+                top {el.boundingRect.top}, left {el.boundingRect.left}, {el.boundingRect.width}×
+                {el.boundingRect.height} px
+              </DetailRow>
+            ) : null}
+          </dl>
+        ) : (
+          <p className="text-sm text-slate-600">No element diagnostics recorded.</p>
+        )}
+        <details className="text-sm">
+          <summary className="cursor-pointer text-slate-600 hover:text-slate-900">Raw JSON</summary>
+          <pre className="mt-2 max-h-48 overflow-auto rounded bg-slate-950 p-3 text-xs text-slate-100">
+            {JSON.stringify(row.elementDiagnostics, null, 2)}
           </pre>
-        </section>
+        </details>
+      </Section>
+
+      {api?.endpoint ? (
+        <Section title="API prerequisite">
+          <dl className="space-y-2">
+            <DetailRow label="Request">
+              <code className="text-xs">
+                {api.method ?? "GET"} {api.endpoint}
+              </code>
+            </DetailRow>
+            {api.status != null ? <DetailRow label="Status">{api.status}</DetailRow> : null}
+            {typeof api.latencyMs === "number" ? <DetailRow label="Latency">{api.latencyMs} ms</DetailRow> : null}
+            {api.captureSource ? <DetailRow label="Source">{api.captureSource}</DetailRow> : null}
+          </dl>
+          <pre className="max-h-64 overflow-auto rounded bg-slate-950 p-3 text-xs text-slate-100">
+            {JSON.stringify(api.payloadCaptured, null, 2)}
+          </pre>
+        </Section>
       ) : null}
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-800">Full payload</h2>
-        <pre className="mt-2 max-h-96 overflow-auto rounded bg-slate-950 p-3 text-xs text-slate-100">
+      <Section title="AI agent brief">
+        <p className="text-sm text-slate-600">
+          Structured summary for Cursor or another coding agent: context, reproduction hints, API snapshot, and fix
+          instructions.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void copyText(agentPrompt, "Agent brief copied.")}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+          >
+            <Copy className="h-4 w-4" />
+            Copy for agent
+          </button>
+          <button
+            type="button"
+            onClick={() => setAgentPrompt(buildAgentIssuePrompt(row))}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Regenerate
+          </button>
+        </div>
+        <div className="relative">
+          <Sparkles className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-violet-500" aria-hidden />
+          <textarea
+            readOnly
+            value={agentPrompt}
+            rows={16}
+            className="w-full resize-y rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 font-mono text-xs leading-relaxed text-slate-800"
+          />
+        </div>
+      </Section>
+
+      <Section title="Full payload">
+        <button
+          type="button"
+          onClick={() => void copyText(JSON.stringify(row.fullPayload, null, 2), "Full JSON copied.")}
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm hover:bg-slate-50"
+        >
+          <Copy className="h-4 w-4" />
+          Copy JSON
+        </button>
+        <pre className="max-h-96 overflow-auto rounded bg-slate-950 p-3 text-xs text-slate-100">
           {JSON.stringify(row.fullPayload, null, 2)}
         </pre>
-      </section>
-
-      <p className="text-xs text-slate-500 break-all">User agent: {row.userAgent}</p>
+      </Section>
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import { resolveMediaPreviewUrl } from "@/lib/media-url";
+
 export const TICKET_STATUSES = ["PENDING", "IN_PROGRESS", "FOR_REVIEW", "COMPLETED"] as const;
 
 export type TicketStatus = (typeof TICKET_STATUSES)[number];
@@ -25,13 +27,5 @@ export function statusBadgeClass(status: TicketStatus): string {
 }
 
 export function resolveScreenshotUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  const t = url.trim();
-  if (t.startsWith("http://") || t.startsWith("https://")) return t;
-  if (t.startsWith("/uploads/")) {
-    const base = process.env.NEXT_PUBLIC_API_URL?.trim().replace(/\/$/, "");
-    if (base) return `${base}${t}`;
-    return t;
-  }
-  return t;
+  return resolveMediaPreviewUrl(url);
 }
