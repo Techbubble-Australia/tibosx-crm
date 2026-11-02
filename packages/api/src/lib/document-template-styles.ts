@@ -44,12 +44,20 @@ h3.docx-subsection-title,
   margin: 14px 0 8px;
 }
 .template-canvas img,
-img.docx-logo {
+img.docx-logo,
+img.docx-inline-image {
   max-width: 240px;
   height: auto;
   margin: 0 0 12px;
   display: block;
 }
+.docx-header-images img.docx-logo { margin-bottom: 16px; }
+.template-canvas hr {
+  border: none;
+  border-top: 1px solid #111;
+  margin: 14px 0;
+}
+.template-canvas p.docx-list-paragraph { margin: 0.2em 0; padding-left: 1.25em; text-indent: -1.25em; }
 table.docx-table {
   width: 100%;
   max-width: 100%;

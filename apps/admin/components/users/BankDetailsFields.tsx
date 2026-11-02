@@ -2,6 +2,7 @@
 
 import { COUNTRY_OPTIONS } from "@/lib/country-options";
 import { COUNTRY_OTHER, mergeCountryValue, splitCountryValue } from "@/lib/country-form";
+import { BANK_PAYROLL_NOTES_LABEL } from "@/lib/bank-details-copy";
 
 export type BankDetailsFormValue = {
   bankName: string;
@@ -25,6 +26,9 @@ export function validateBankDetailsForm(value: BankDetailsFormValue): string | n
     return "Enter bank country name when Other is selected.";
   }
   if (!value.bsb.trim()) return "BSB / Routing / IFSC is required.";
+  if (!value.notes.trim()) {
+    return `${BANK_PAYROLL_NOTES_LABEL} This field is required (enter 'Not applicable' if none).`;
+  }
   return null;
 }
 
@@ -77,7 +81,7 @@ export function bankDetailsToApi(value: BankDetailsFormValue): Record<string, st
     country,
     swiftCode: value.swiftCode.trim() || undefined,
     bsb,
-    notes: value.notes.trim() || undefined,
+    notes: value.notes.trim(),
   } as Record<string, string>;
 }
 
@@ -183,13 +187,14 @@ export function BankDetailsFields({ value, onChange, readOnly, showTaxNumber }: 
       ) : null}
       <div className="sm:col-span-2">
         <label className="mb-1 block text-sm font-medium">
-          Country-specific superannuation or payroll compliance details.
+          {BANK_PAYROLL_NOTES_LABEL} *
         </label>
         <textarea
           className={readOnly ? `${inputClass} bg-gray-50 dark:bg-gray-950` : inputClass}
           rows={2}
           value={value.notes}
           readOnly={readOnly}
+          required={!readOnly}
           onChange={(e) => patch({ notes: e.target.value })}
         />
       </div>

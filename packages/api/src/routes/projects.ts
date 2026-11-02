@@ -131,7 +131,14 @@ async function allocateProjectNumber(): Promise<string> {
 }
 
 async function projectHasTickets(projectId: string): Promise<boolean> {
-  const hit = await prisma.ticket.findFirst({ where: { projectId }, select: { id: true } });
+  const org = await prisma.organization.findFirst({
+    where: { projectId },
+    select: { id: true },
+  });
+  const hit = await prisma.ticket.findFirst({
+    where: org ? { OR: [{ projectId }, { organizationId: org.id }] } : { projectId },
+    select: { id: true },
+  });
   return Boolean(hit);
 }
 
@@ -146,13 +153,12 @@ function normalizedTicketDigits(raw: number | undefined): number {
 
 async function assertTicketSettingsEditable(
   projectId: string,
-  existing: { ticketPrefix: string; ticketNumberDigits: number },
+  existing: { ticketPrefix: string | null; ticketNumberDigits: number | null },
   next: { ticketPrefix: string; ticketNumberDigits: number },
 ) {
-  if (
-    existing.ticketPrefix === next.ticketPrefix &&
-    existing.ticketNumberDigits === next.ticketNumberDigits
-  ) {
+  const prevPrefix = (existing.ticketPrefix ?? "TKT").toUpperCase();
+  const prevDigits = existing.ticketNumberDigits ?? 5;
+  if (prevPrefix === next.ticketPrefix && prevDigits === next.ticketNumberDigits) {
     return;
   }
   if (await projectHasTickets(projectId)) {
@@ -1004,7 +1010,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
           endDate: afterSnapshot.endDate,
           ticketPrefix: nextTicketPrefix,
           ticketNumberDigits: nextTicketDigits,
-          fileUrls: data.fileUrls ?? [],
+          fileUrls: data.fileUrls ?? existing.fileUrls ?? [],
         },
       });
       const estimates =
@@ -1035,7 +1041,11 @@ router.put("/:id", async (req: AuthRequest, res) => {
         if (error instanceof Error && error.message === "CLIENT_ACCESS_REQUIRED") {
           return res.status(400).json({ error: "Select at least one client contact for customer support access." });
         }
-        throw error;
+        console.error("Customer support settings update failed:", error);
+        return res.status(400).json({
+          error:
+            error instanceof Error ? error.message : "Failed to update customer support settings for this project.",
+        });
       }
     }
 
@@ -1055,8 +1065,16 @@ router.put("/:id", async (req: AuthRequest, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
     }
+    if (error instanceof Error && error.message === "TICKET_SETTINGS_LOCKED") {
+      return res.status(400).json({
+        error:
+          "Ticket prefix and digit settings cannot be changed while this project has tickets. Delete all tickets first.",
+      });
+    }
     console.error("Error updating project:", error);
-    res.status(500).json({ error: "Failed to update project" });
+    const message =
+      error instanceof Error && error.message ? error.message : "Failed to update project";
+    res.status(500).json({ error: message });
   }
 });
 

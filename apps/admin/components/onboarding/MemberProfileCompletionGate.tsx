@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { BANK_PAYROLL_NOTES_LABEL } from "@/lib/bank-details-copy";
 import { COUNTRY_OPTIONS } from "@/lib/country-options";
 import { COUNTRY_OTHER, mergeCountryValue, splitCountryValue } from "@/lib/country-form";
 import { readUploadImageUrlFromJson } from "@/lib/upload-response";
@@ -127,9 +128,10 @@ export function MemberProfileCompletionGate() {
       !accountNumber.trim() ||
       !bankCountry ||
       !bsb.trim() ||
+      !bankNotes.trim() ||
       !taxNumber.trim()
     ) {
-      appAlert("Complete all required bank details (including tax number and BSB/Routing/IFSC).");
+      appAlert("Complete all required bank details (including tax number, BSB/Routing/IFSC, and payroll compliance notes).");
       return;
     }
     if (bankCountrySelect === COUNTRY_OTHER && !bankCountryOther.trim()) {
@@ -180,7 +182,7 @@ export function MemberProfileCompletionGate() {
             country: bankCountry,
             swiftCode: swiftCode.trim() || undefined,
             bsb: bsb.trim(),
-            notes: bankNotes.trim() || undefined,
+            notes: bankNotes.trim(),
           },
           idProofUrl,
           addressProofUrl,
@@ -247,10 +249,14 @@ export function MemberProfileCompletionGate() {
                 value={taxNumber}
                 onChange={(e) => setTaxNumber(e.target.value)}
               />
+              <label className="mb-1 block text-sm font-medium sm:col-span-2">
+                {BANK_PAYROLL_NOTES_LABEL} *
+              </label>
               <textarea
                 className={`${inputClass} sm:col-span-2`}
                 rows={2}
-                placeholder="Country-specific superannuation or payroll compliance details."
+                required
+                placeholder="Not applicable"
                 value={bankNotes}
                 onChange={(e) => setBankNotes(e.target.value)}
               />

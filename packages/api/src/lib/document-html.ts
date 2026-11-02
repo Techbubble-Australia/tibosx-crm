@@ -1,4 +1,5 @@
 import mammoth from "mammoth";
+import JSZip from "jszip";
 import { cleanPlaceholdersInHtml } from "./credential-template-vars";
 import { wrapTemplateHtml } from "./credential-template-render";
 
@@ -9,11 +10,9 @@ const MAMMOTH_STYLE_MAP = [
   "p[style-name='Heading 2'] => h2.docx-section-title:fresh",
   "p[style-name='Heading 3'] => h3.docx-subsection-title:fresh",
   "p[style-name='Heading 4'] => h4:fresh",
+  "p[style-name='List Paragraph'] => p.docx-list-paragraph:fresh",
   "r[style-name='Strong'] => strong",
   "table => table.docx-table:fresh",
-  "tr => tr:fresh",
-  "td => td:fresh",
-  "th => th:fresh",
 ];
 
 export async function convertDocxBufferToHtml(buffer: Buffer): Promise<string> {
@@ -41,7 +40,9 @@ export async function convertDocxBufferToHtml(buffer: Buffer): Promise<string> {
       result.messages.map((message) => message.message).join("; "),
     );
   }
-  return enhanceImportedHtml(result.value.trim());
+  const headerImages = await extractDocxHeaderImagesHtml(buffer);
+  const merged = prependUniqueHeaderImages(result.value.trim(), headerImages);
+  return enhanceImportedHtml(merged);
 }
 
 function fixCommonTemplateTypos(html: string): string {
@@ -73,7 +74,7 @@ function enhanceImportedHtml(html: string): string {
 /** Word list items often import as plain paragraphs; restore visible bullets in the editor. */
 function normalizeBulletParagraphs(html: string): string {
   const bulletLead =
-    /^(?:&bull;|&#8226;|&#9679;|•|\u2022|\u00b7)\s+|<span[^>]*>\s*(?:&bull;|&#8226;|•|\u2022)\s*<\/span>\s*/i;
+    /^(?:&bull;|&#8226;|&#9679;|•|\u2022|\u00b7|\u2013|\u2014|-)\s+|<span[^>]*>\s*(?:&bull;|&#8226;|•|\u2022)\s*<\/span>\s*/i;
   const numberedLead = /^(\d+\.)\s+/;
 
   let next = html.replace(/<p([^>]*)>([\s\S]*?)<\/p>/gi, (full, _attrs, inner) => {
@@ -94,6 +95,20 @@ function normalizeBulletParagraphs(html: string): string {
   next = next.replace(
     /(?:<li class="docx-list-item(?! docx-list-item--numbered)[^>]*>[\s\S]*?<\/li>\s*)+/gi,
     (block) => `<ul class="docx-bullet-list">${block}</ul>`,
+  );
+  next = next.replace(
+    /(?:<p class="docx-list-paragraph"[^>]*>[\s\S]*?<\/p>\s*)+/gi,
+    (block) => {
+      const items = [...block.matchAll(/<p class="docx-list-paragraph"[^>]*>([\s\S]*?)<\/p>/gi)]
+        .map((match) => {
+          const inner = (match[1] ?? "").trim();
+          const text = inner.replace(bulletLead, "").trim();
+          return text ? `<li class="docx-list-item">${text}</li>` : "";
+        })
+        .filter(Boolean)
+        .join("");
+      return items ? `<ul class="docx-bullet-list">${items}</ul>` : block;
+    },
   );
   next = next.replace(
     /(?:<li class="docx-list-item docx-list-item--numbered"[^>]*>[\s\S]*?<\/li>\s*)+/gi,
@@ -237,6 +252,84 @@ function normalizeInlineHtml(value: string): string {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function mimeForMediaPath(zip: JSZip, mediaPath: string): Promise<string> {
+  const ext = mediaPath.split(".").pop()?.toLowerCase() ?? "png";
+  const defaults: Record<string, string> = {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    svg: "image/svg+xml",
+    webp: "image/webp",
+    emf: "image/x-emf",
+    wmf: "image/x-wmf",
+  };
+  const typesXml = await zip.file("[Content_Types].xml")?.async("string");
+  if (typesXml) {
+    const partName = mediaPath.replace(/^word\//, "word/");
+    const override = typesXml.match(
+      new RegExp(`PartName="/${partName.replace(/\//g, "/")}"[^>]+ContentType="([^"]+)"`, "i"),
+    );
+    if (override?.[1]) return override[1];
+  }
+  return defaults[ext] ?? "application/octet-stream";
+}
+
+function resolveDocxPartPath(target: string): string {
+  const normalized = target.replace(/^\.\.\//, "").replace(/^\//, "");
+  if (normalized.startsWith("word/")) return normalized;
+  return `word/${normalized}`;
+}
+
+/** Word often places logos in headers; mammoth only converts the document body. */
+async function extractDocxHeaderImagesHtml(buffer: Buffer): Promise<string> {
+  const zip = await JSZip.loadAsync(buffer);
+  const headerPaths = Object.keys(zip.files)
+    .filter((path) => /^word\/header\d+\.xml$/i.test(path))
+    .sort();
+
+  const images: string[] = [];
+  let logoAssigned = false;
+
+  for (const headerPath of headerPaths) {
+    const headerXml = await zip.file(headerPath)?.async("string");
+    if (!headerXml) continue;
+    const relsPath = headerPath.replace("word/", "word/_rels/").replace(".xml", ".xml.rels");
+    const relsXml = await zip.file(relsPath)?.async("string");
+    if (!relsXml) continue;
+
+    const relById = new Map<string, string>();
+    for (const match of relsXml.matchAll(/<Relationship[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"[^>]*\/>/g)) {
+      const id = match[1];
+      const target = match[2];
+      if (id && target) relById.set(id, resolveDocxPartPath(target));
+    }
+
+    for (const match of headerXml.matchAll(/r:embed="([^"]+)"/g)) {
+      const relId = match[1];
+      if (!relId) continue;
+      const target = relById.get(relId);
+      if (!target || !target.includes("/media/")) continue;
+      const mediaFile = zip.file(target);
+      if (!mediaFile) continue;
+      const data = await mediaFile.async("base64");
+      const contentType = await mimeForMediaPath(zip, target);
+      if (!contentType.startsWith("image/")) continue;
+      const cssClass = !logoAssigned ? "docx-logo" : "docx-inline-image";
+      logoAssigned = true;
+      images.push(`<img class="${cssClass}" alt="" src="data:${contentType};base64,${data}" />`);
+    }
+  }
+
+  return images.length ? `<div class="docx-header-images">${images.join("")}</div>` : "";
+}
+
+function prependUniqueHeaderImages(html: string, headerHtml: string): string {
+  if (!headerHtml.trim()) return html;
+  if (html.includes('class="docx-logo"') || html.includes("docx-header-images")) return html;
+  return `${headerHtml}${html}`;
 }
 
 export function readTextOrHtmlBuffer(buffer: Buffer, filename: string): string {

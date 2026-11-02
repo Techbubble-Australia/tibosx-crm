@@ -302,7 +302,7 @@ const bankDetailsSchema = z.object({
   country: z.string().trim().min(1).max(100),
   swiftCode: z.string().trim().max(50).optional(),
   bsb: z.string().trim().min(1).max(50),
-  notes: z.string().trim().max(2000).optional(),
+  notes: z.string().trim().min(1).max(2000),
 });
 
 const profileUpdateSchema = z.object({

@@ -72,7 +72,7 @@ const bankDetailsSchema = z.object({
   country: z.string().min(1).max(100),
   swiftCode: z.string().max(50).optional(),
   bsb: z.string().min(1).max(50),
-  notes: z.string().max(2000).optional(),
+  notes: z.string().min(1).max(2000),
 });
 
 const bankDetailsUpdateSchema = z

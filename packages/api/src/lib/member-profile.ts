@@ -43,7 +43,8 @@ export function bankDetailsComplete(value: unknown): boolean {
       bank.accountName?.trim() &&
       bank.accountNumber?.trim() &&
       countryValueComplete(bank.country) &&
-      bank.bsb?.trim(),
+      bank.bsb?.trim() &&
+      bank.notes?.trim(),
   );
 }
 
