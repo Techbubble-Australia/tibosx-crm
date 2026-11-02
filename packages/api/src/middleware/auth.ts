@@ -12,6 +12,7 @@ export const DEBUG_PORTAL_SESSION_COOKIE = "debug_portal_session";
 export const MFA_PENDING_PURPOSE = "mfa_pending";
 export const MFA_SETUP_REQUIRED_PURPOSE = "mfa_setup_required";
 export const PASSWORD_RESET_REQUIRED_PURPOSE = "password_reset_required";
+export const DEBUG_PORTAL_SSO_PURPOSE = "debug_portal_sso";
 
 export interface AuthUser {
   id: string;
@@ -110,6 +111,27 @@ export function verifyMfaPendingToken(token: string): AuthUser | null {
       return null;
     }
     return { id: decoded.id, email: decoded.email, role: decoded.role };
+  } catch {
+    return null;
+  }
+}
+
+export function generateDebugPortalSsoToken(payload: AuthUser): string {
+  return jwt.sign({ ...payload, purpose: DEBUG_PORTAL_SSO_PURPOSE }, JWT_SECRET, { expiresIn: "2m" });
+}
+
+export function verifyDebugPortalSsoToken(token: string): AuthUser | null {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    if (decoded.purpose !== DEBUG_PORTAL_SSO_PURPOSE || !decoded.id || !decoded.email) {
+      return null;
+    }
+    return {
+      id: decoded.id,
+      email: decoded.email,
+      role: decoded.role,
+      ...(decoded.additionalRoles?.length ? { additionalRoles: decoded.additionalRoles } : {}),
+    };
   } catch {
     return null;
   }

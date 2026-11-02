@@ -149,7 +149,6 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
   const openTicketFromElement = useCallback(
     async (el: Element) => {
       setCaptureLoading(true);
-      setModalOpen(true);
       try {
         const [userMetadata, apiPrerequisite, screenshotDataUrl] = await Promise.all([
           resolveUserMetadata(),
@@ -166,6 +165,7 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
           screenshotDataUrl,
           userMetadata,
         });
+        setModalOpen(true);
       } finally {
         setCaptureLoading(false);
       }
@@ -175,7 +175,6 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
 
   const openTicketFromViewport = useCallback(async () => {
     setCaptureLoading(true);
-    setModalOpen(true);
     try {
       const [userMetadata, screenshotDataUrl] = await Promise.all([
         resolveUserMetadata(),
@@ -191,6 +190,7 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
         screenshotDataUrl,
         userMetadata,
       });
+      setModalOpen(true);
     } finally {
       setCaptureLoading(false);
     }

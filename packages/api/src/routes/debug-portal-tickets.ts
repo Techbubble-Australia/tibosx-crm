@@ -56,8 +56,12 @@ router.get("/", async (req, res) => {
     const skip = Math.max(0, Number(req.query.offset) || 0);
     const statusRaw = typeof req.query.status === "string" ? req.query.status : undefined;
     const statusFilter = statusRaw ? statusSchema.safeParse(statusRaw) : null;
-    const where: Prisma.DebugCaptureTicketWhereInput =
-      statusFilter?.success ? { status: statusFilter.data } : {};
+    const reporterUserId =
+      typeof req.query.reporterUserId === "string" ? req.query.reporterUserId.trim() : "";
+    const where: Prisma.DebugCaptureTicketWhereInput = {
+      ...(statusFilter?.success ? { status: statusFilter.data } : {}),
+      ...(reporterUserId ? { reporterUserId } : {}),
+    };
 
     const [rows, total] = await Promise.all([
       prisma.debugCaptureTicket.findMany({
@@ -76,6 +80,20 @@ router.get("/", async (req, res) => {
   } catch (error) {
     console.error("debug portal list error:", error);
     res.status(500).json({ error: "Failed to list tickets" });
+  }
+});
+
+router.get("/reporters", async (_req, res) => {
+  try {
+    const rows = await prisma.debugCaptureTicket.findMany({
+      distinct: ["reporterUserId"],
+      select: { reporterUserId: true, reporterEmail: true },
+      orderBy: { reporterEmail: "asc" },
+    });
+    res.json({ data: rows });
+  } catch (error) {
+    console.error("debug portal reporters error:", error);
+    res.status(500).json({ error: "Failed to list reporters" });
   }
 });
 
