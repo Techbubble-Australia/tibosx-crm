@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { DEBUG_PORTAL_SESSION_COOKIE } from "@/lib/auth-cookie";
+import { debugPortalAbsoluteUrl } from "@/lib/public-origin";
 
 function jwtSecretKey() {
   return new TextEncoder().encode(
@@ -12,7 +13,7 @@ function jwtSecretKey() {
 const LOGIN = "/login";
 
 function redirectTo(request: NextRequest, pathname: string) {
-  return NextResponse.redirect(new URL(pathname, request.url));
+  return NextResponse.redirect(debugPortalAbsoluteUrl(request, pathname));
 }
 
 function hasAdminRole(role: string, additionalRoles: unknown): boolean {
