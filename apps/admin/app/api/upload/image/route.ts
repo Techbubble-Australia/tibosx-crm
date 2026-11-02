@@ -14,11 +14,12 @@ export async function POST(req: NextRequest) {
     const outbound = new FormData();
 
     for (const [key, value] of incoming.entries()) {
+      const upstreamKey = key === "file" && value instanceof Blob ? "image" : key;
       if (value instanceof Blob) {
         const filename = value instanceof File ? value.name : "image";
-        outbound.append(key, value, filename);
+        outbound.append(upstreamKey, value, filename);
       } else {
-        outbound.append(key, value);
+        outbound.append(upstreamKey, value);
       }
     }
 

@@ -257,11 +257,18 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
       const file = dataUrlToFile(draft.screenshotDataUrl, `${draft.ticketId}.png`);
       if (file) {
         const form = new FormData();
-        form.append("file", file);
+        form.append("image", file);
         const up = await adminFetch("/api/upload/image", { method: "POST", body: form });
         const upJson = await up.json().catch(() => ({}));
-        if (up.ok) {
-          screenshotUrl = readUploadImageUrlFromJson(upJson) || null;
+        if (!up.ok) {
+          return {
+            ok: false,
+            error: messageFromApiError(upJson, "Screenshot upload failed. The ticket was not saved."),
+          };
+        }
+        screenshotUrl = readUploadImageUrlFromJson(upJson) || null;
+        if (!screenshotUrl) {
+          return { ok: false, error: "Screenshot upload failed. The ticket was not saved." };
         }
       }
     }

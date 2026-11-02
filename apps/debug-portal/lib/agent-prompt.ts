@@ -1,4 +1,4 @@
-import { TICKET_STATUS_LABELS, type TicketStatus } from "@/lib/tickets";
+import type { TicketStatus } from "@/lib/tickets";
 import { resolveMediaPreviewUrl } from "@/lib/media-url";
 
 export type AgentPromptTicket = {
@@ -64,17 +64,10 @@ function formatJsonBlock(value: unknown, maxLen = 6000): string {
   }
 }
 
-function userMetadataFromPayload(fullPayload: unknown): Record<string, unknown> | null {
-  const payload = asRecord(fullPayload);
-  const meta = payload?.userMetadata;
-  return asRecord(meta);
-}
-
 /** Structured brief for a coding agent (Cursor, etc.) to reproduce and fix the reported issue. */
 export function buildAgentIssuePrompt(ticket: AgentPromptTicket): string {
   const el = (ticket.elementDiagnostics ?? {}) as ElementDiagnosticsShape;
   const api = ticket.apiPrerequisite as ApiPrerequisiteShape | null;
-  const meta = userMetadataFromPayload(ticket.fullPayload);
   const shot = screenshotUrlForTicket(ticket);
   const lines: string[] = [];
 
@@ -82,16 +75,7 @@ export function buildAgentIssuePrompt(ticket: AgentPromptTicket): string {
   lines.push("");
   lines.push("## Summary");
   lines.push(`- **Type:** ${ticket.type}`);
-  lines.push(`- **Workflow status:** ${TICKET_STATUS_LABELS[ticket.status]}`);
   lines.push(`- **Reported environment:** ${ticket.reportedEnvironment}`);
-  lines.push(`- **Captured at:** ${new Date(ticket.createdAt).toISOString()}`);
-  lines.push(`- **Reporter:** ${ticket.reporterEmail} (${ticket.reporterRole})`);
-  if (ticket.reporterUserId) {
-    lines.push(`- **Reporter user id:** ${ticket.reporterUserId}`);
-  }
-  if (meta?.clientIp && typeof meta.clientIp === "string") {
-    lines.push(`- **Client IP (at capture):** ${meta.clientIp}`);
-  }
   lines.push(`- **Page URL:** ${ticket.currentUrl}`);
   lines.push("");
 
