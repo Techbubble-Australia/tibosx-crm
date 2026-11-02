@@ -46,3 +46,17 @@ export function formatEnvironment(env: string): string {
 export function resolveScreenshotUrl(url: string | null | undefined): string | null {
   return resolveMediaPreviewUrl(url);
 }
+
+/** Next workflow status when advancing tickets in bulk (null = no bulk advance). */
+export function bulkAdvanceTargetStatus(from: TicketStatus): TicketStatus | null {
+  switch (from) {
+    case "PENDING":
+      return "IN_PROGRESS";
+    case "IN_PROGRESS":
+      return "FOR_REVIEW";
+    case "FOR_REVIEW":
+      return "COMPLETED";
+    default:
+      return null;
+  }
+}

@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
-import { Loader2, Plus } from "lucide-react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowRight, Loader2, Plus } from "lucide-react";
 import { ChevronSelect } from "@/components/ChevronSelect";
 import { FilterField } from "@/components/ui/FilterField";
 import { PageHeader } from "@/components/ui/PageHeader";
 import {
   TICKET_STATUSES,
   TICKET_STATUS_LABELS,
+  bulkAdvanceTargetStatus,
   formatEnvironment,
   formatTicketType,
   statusBadgeClass,
@@ -43,6 +44,26 @@ function TicketsListInner() {
   const [reporterFilter, setReporterFilter] = useState<string>("");
   const [reporters, setReporters] = useState<ReporterOption[]>([]);
   const [filtersReady, setFiltersReady] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkError, setBulkError] = useState("");
+
+  const filteredStatus = useMemo((): TicketStatus | null => {
+    if (!statusFilter) return null;
+    return TICKET_STATUSES.includes(statusFilter as TicketStatus) ? (statusFilter as TicketStatus) : null;
+  }, [statusFilter]);
+
+  const bulkTargetStatus = useMemo(
+    () => (filteredStatus ? bulkAdvanceTargetStatus(filteredStatus) : null),
+    [filteredStatus],
+  );
+
+  const showBulkActions = Boolean(bulkTargetStatus && filteredStatus);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setBulkError("");
+  }, [statusFilter, reporterFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,6 +147,58 @@ function TicketsListInner() {
       ? "No tickets match your filters"
       : `${total} ticket${total === 1 ? "" : "s"}`;
 
+  const allVisibleSelected =
+    rows.length > 0 && rows.every((row) => selectedIds.has(row.id));
+  const someVisibleSelected = rows.some((row) => selectedIds.has(row.id));
+
+  function toggleSelectAll() {
+    if (allVisibleSelected) {
+      setSelectedIds(new Set());
+      return;
+    }
+    setSelectedIds(new Set(rows.map((r) => r.id)));
+  }
+
+  function toggleRow(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function bulkAdvanceSelected() {
+    if (!bulkTargetStatus || selectedIds.size === 0) return;
+    setBulkSaving(true);
+    setBulkError("");
+    try {
+      const res = await fetch("/api/debug-portal/tickets/bulk-status", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ids: [...selectedIds],
+          status: bulkTargetStatus,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Bulk update failed");
+      }
+      setSelectedIds(new Set());
+      await load();
+    } catch (err) {
+      setBulkError(err instanceof Error ? err.message : "Bulk update failed");
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
+  const bulkButtonLabel = bulkTargetStatus
+    ? `Move to ${TICKET_STATUS_LABELS[bulkTargetStatus]}`
+    : "";
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -169,6 +242,34 @@ function TicketsListInner() {
             </ChevronSelect>
           </FilterField>
         </div>
+        {showBulkActions && rows.length > 0 && !loading ? (
+          <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-600">
+              Bulk update visible {TICKET_STATUS_LABELS[filteredStatus!].toLowerCase()} tickets
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={toggleSelectAll} className="dp-btn-ghost py-2 text-sm">
+                {allVisibleSelected ? "Clear selection" : "Select all on page"}
+              </button>
+              <button
+                type="button"
+                disabled={selectedIds.size === 0 || bulkSaving}
+                onClick={() => void bulkAdvanceSelected()}
+                className="dp-btn-primary py-2"
+              >
+                {bulkSaving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+                {bulkButtonLabel}
+                {selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
+                <ArrowRight className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+            {bulkError ? (
+              <p className="w-full text-sm text-red-700" role="alert">
+                {bulkError}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {loading ? (
@@ -189,6 +290,21 @@ function TicketsListInner() {
             <table className="min-w-[720px] w-full text-left">
               <thead className="border-b border-slate-200 bg-slate-50/90">
                 <tr>
+                  {showBulkActions ? (
+                    <th className="dp-table-head w-10">
+                      <span className="sr-only">Select</span>
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = someVisibleSelected && !allVisibleSelected;
+                        }}
+                        onChange={toggleSelectAll}
+                        aria-label={allVisibleSelected ? "Deselect all tickets" : "Select all tickets on page"}
+                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                      />
+                    </th>
+                  ) : null}
                   <th className="dp-table-head">Ticket</th>
                   <th className="dp-table-head">Status</th>
                   <th className="dp-table-head">Type</th>
@@ -200,6 +316,17 @@ function TicketsListInner() {
               <tbody className="divide-y divide-slate-100">
                 {rows.map((row) => (
                   <tr key={row.id} className="transition-colors hover:bg-slate-50/80">
+                    {showBulkActions ? (
+                      <td className="dp-table-cell w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(row.id)}
+                          onChange={() => toggleRow(row.id)}
+                          aria-label={`Select ${row.ticketId}`}
+                          className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                        />
+                      </td>
+                    ) : null}
                     <td className="dp-table-cell max-w-xs">
                       <Link
                         href={`/tickets/${row.id}`}

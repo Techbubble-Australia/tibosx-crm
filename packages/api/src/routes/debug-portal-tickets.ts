@@ -12,6 +12,24 @@ const patchSchema = z.object({
   status: statusSchema,
 });
 
+const bulkStatusSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(100),
+  status: statusSchema,
+});
+
+function bulkAdvanceFromStatus(to: z.infer<typeof statusSchema>): z.infer<typeof statusSchema> | null {
+  switch (to) {
+    case "IN_PROGRESS":
+      return "PENDING";
+    case "FOR_REVIEW":
+      return "IN_PROGRESS";
+    case "COMPLETED":
+      return "FOR_REVIEW";
+    default:
+      return null;
+  }
+}
+
 const portalCreateSchema = z.object({
   type: z.enum(["BUG", "ENHANCEMENT"]),
   reportedEnvironment: z.enum(["development", "staging", "production"]).default("development"),
@@ -210,6 +228,53 @@ router.get("/reporters", async (_req, res) => {
   } catch (error) {
     console.error("debug portal reporters error:", error);
     res.status(500).json({ error: "Failed to list reporters" });
+  }
+});
+
+router.patch("/bulk-status", async (req: AuthRequest, res) => {
+  try {
+    const { ids, status } = bulkStatusSchema.parse(req.body);
+    const requiredFrom = bulkAdvanceFromStatus(status);
+    if (!requiredFrom) {
+      return res.status(400).json({ error: "Invalid bulk target status" });
+    }
+
+    const uniqueIds = [...new Set(ids)];
+    const rows = await prisma.debugCaptureTicket.findMany({
+      where: { id: { in: uniqueIds } },
+      select: { id: true, status: true },
+    });
+
+    if (rows.length !== uniqueIds.length) {
+      return res.status(404).json({ error: "One or more tickets were not found" });
+    }
+
+    const invalid = rows.filter((r) => r.status !== requiredFrom);
+    if (invalid.length > 0) {
+      return res.status(400).json({
+        error: `All tickets must be ${requiredFrom} to move to ${status}`,
+        invalidIds: invalid.map((r) => r.id),
+      });
+    }
+
+    const result = await prisma.debugCaptureTicket.updateMany({
+      where: { id: { in: uniqueIds }, status: requiredFrom },
+      data: { status },
+    });
+
+    res.json({
+      data: {
+        updated: result.count,
+        status,
+        previousStatus: requiredFrom,
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("debug portal bulk status error:", error);
+    res.status(500).json({ error: "Failed to bulk update status" });
   }
 });
 
