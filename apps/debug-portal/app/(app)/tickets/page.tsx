@@ -131,12 +131,6 @@ function TicketsListInner() {
       <PageHeader
         title="Tickets"
         description="Review debug captures from TBOS and tickets you filed here."
-        action={
-          <Link href="/tickets/new" className="dp-btn-primary">
-            <Plus className="h-4 w-4" aria-hidden />
-            New ticket
-          </Link>
-        }
       />
 
       <div className="dp-card p-4 sm:p-5">
