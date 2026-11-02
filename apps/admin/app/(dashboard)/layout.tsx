@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { ReportedTicketsLink } from "@/components/ReportedTicketsLink";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -323,7 +322,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
           sidebarCollapsed ? "w-[4.5rem]" : "w-64"
         }`}
       >
-        <div className={`min-w-0 ${sidebarCollapsed ? "px-2 py-3" : "p-6"}`}>
+        <div className={`min-w-0 ${sidebarCollapsed ? "px-2 py-3" : "border-b border-gray-100 px-4 py-4 dark:border-gray-800"}`}>
           <div
             className={
               sidebarCollapsed
@@ -333,7 +332,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
           >
             <Link
               href={defaultLandingPath(role, additionalRoles)}
-              className={sidebarCollapsed ? "shrink-0" : "flex min-w-0 flex-1 items-center gap-2"}
+              className={sidebarCollapsed ? "shrink-0" : "min-w-0 flex-1 rounded-lg outline-offset-2 hover:opacity-95"}
               title="TechBubble TIBOSX"
             >
               <TechBubbleLogo
@@ -354,9 +353,6 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
           </div>
           {!sidebarCollapsed ? (
             <>
-              <p className="mt-1 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
-                AI-powered Business Operating System
-              </p>
               {!loading && accessLabel ? (
                 <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-950/60">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
@@ -462,12 +458,6 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
           })
           )}
         </nav>
-
-        {isDevAppEnv && !sidebarCollapsed ? (
-          <div className="border-t border-gray-100 px-2 py-2 dark:border-gray-800">
-            <ReportedTicketsLink variant="sidebar" />
-          </div>
-        ) : null}
 
         <div className={`border-t border-gray-200 dark:border-gray-700 ${sidebarCollapsed ? "p-2" : "p-4"}`}>
           <button

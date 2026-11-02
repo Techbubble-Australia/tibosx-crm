@@ -52,19 +52,24 @@ export function TechBubbleLogo({
 
   return (
     <span
-      className={`inline-flex min-w-0 ${useSidebarLogo && showProductLabel ? "flex-col items-start gap-1" : "items-center gap-2"} ${className}`}
+      className={`inline-flex min-w-0 items-center gap-3 ${useSidebarLogo && showProductLabel ? "" : "gap-2"} ${className}`}
     >
       <img
         src={asset.src}
         alt="TechBubble"
         width={asset.width}
         height={asset.height}
-        className={`w-auto max-w-full shrink-0 ${heightClass} dark:brightness-0 dark:invert`}
+        className={`w-auto max-w-[7.5rem] shrink-0 ${heightClass} dark:brightness-0 dark:invert`}
         decoding="async"
       />
       {showProductLabel ? (
-        <span className="whitespace-nowrap text-sm font-bold leading-none tracking-wide text-gray-900 dark:text-gray-100">
-          TIBOSX
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-[15px] font-bold leading-tight tracking-tight text-gray-900 dark:text-gray-100">
+            TIBOSX
+          </span>
+          <span className="text-[10px] font-medium leading-snug text-gray-500 dark:text-gray-400">
+            AI-powered Business Operating System
+          </span>
         </span>
       ) : null}
     </span>
