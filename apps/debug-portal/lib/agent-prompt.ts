@@ -76,6 +76,10 @@ export function buildAgentIssuePrompt(ticket: AgentPromptTicket): string {
   lines.push("## Summary");
   lines.push(`- **Type:** ${ticket.type}`);
   lines.push(`- **Reported environment:** ${ticket.reportedEnvironment}`);
+  const payloadMeta = asRecord(ticket.fullPayload);
+  if (payloadMeta?.source === "debug_portal_manual") {
+    lines.push(`- **Origin:** Manual ticket (filed from debug portal, not a TBOS UI capture)`);
+  }
   lines.push(`- **Page URL:** ${ticket.currentUrl}`);
   lines.push("");
 

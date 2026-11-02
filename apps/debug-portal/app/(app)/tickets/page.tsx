@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { ChevronSelect } from "@/components/ChevronSelect";
 import {
   TICKET_STATUSES,
@@ -118,14 +118,21 @@ function TicketsListInner() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Debug capture tickets</h1>
           <p className="text-sm text-slate-600">
             {total} ticket{total === 1 ? "" : "s"}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <Link
+          href="/tickets/new"
+          className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+        >
+          <Plus className="h-4 w-4" />
+          New ticket
+        </Link>
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto sm:ml-auto">
           <div className="flex items-center gap-2">
             <label htmlFor="reporter-filter" className="text-sm text-slate-600">
               Reporter

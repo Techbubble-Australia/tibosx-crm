@@ -12,6 +12,41 @@ const patchSchema = z.object({
   status: statusSchema,
 });
 
+const portalCreateSchema = z.object({
+  type: z.enum(["BUG", "ENHANCEMENT"]),
+  reportedEnvironment: z.enum(["development", "staging", "production"]).default("development"),
+  userDescription: z.string().min(1).max(20_000),
+  currentUrl: z.string().max(2000).optional(),
+  screenshotUrl: z.string().max(2000).nullable().optional(),
+});
+
+function asInputJson(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
+}
+
+function clientIpFromRequest(req: AuthRequest): string | null {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.trim()) {
+    return forwarded.split(",")[0]?.trim() ?? null;
+  }
+  if (Array.isArray(forwarded) && forwarded[0]) {
+    return forwarded[0].split(",")[0]?.trim() ?? null;
+  }
+  return req.ip ?? null;
+}
+
+function manualElementDiagnostics(): Prisma.InputJsonValue {
+  return {
+    tagName: "MANUAL",
+    id: null,
+    className: null,
+    cssSelector: "manual",
+    innerText: null,
+    boundingRect: { top: 0, left: 0, width: 0, height: 0 },
+    captureScope: "manual",
+  };
+}
+
 function serializeRow(row: {
   id: string;
   ticketId: string;
@@ -49,6 +84,87 @@ function serializeRow(row: {
     createdAt: row.createdAt.toISOString(),
   };
 }
+
+router.post("/", async (req: AuthRequest, res) => {
+  try {
+    const u = req.user;
+    if (!u?.id) return res.status(401).json({ error: "Unauthorized" });
+
+    const input = portalCreateSchema.parse(req.body);
+    const adminUser = await prisma.adminUser.findUnique({
+      where: { id: u.id },
+      select: { id: true, email: true, role: true, active: true },
+    });
+    if (!adminUser || adminUser.active === false) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const userAgent =
+      typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : "debug-portal";
+    const currentUrl = input.currentUrl?.trim() || "manual://debug-portal";
+    const clientIp = clientIpFromRequest(req);
+    const ticketId = `TICK-${Date.now()}`;
+    const elementDiagnostics = manualElementDiagnostics();
+
+    const fullPayload = {
+      source: "debug_portal_manual",
+      ticketId,
+      timestamp: new Date().toISOString(),
+      type: input.type,
+      reportedEnvironment: input.reportedEnvironment,
+      userDescription: input.userDescription,
+      userMetadata: {
+        userId: adminUser.id,
+        email: adminUser.email,
+        role: adminUser.role,
+        userAgent,
+        currentUrl,
+        clientIp,
+      },
+      elementDiagnostics,
+      apiPrerequisite: null,
+      screenshotUrl: input.screenshotUrl ?? null,
+    };
+
+    let attemptId = ticketId;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const row = await prisma.debugCaptureTicket.create({
+          data: {
+            ticketId: attemptId,
+            type: input.type,
+            reportedEnvironment: input.reportedEnvironment,
+            userDescription: input.userDescription.trim(),
+            reporterUserId: adminUser.id,
+            reporterEmail: adminUser.email,
+            reporterRole: adminUser.role,
+            currentUrl,
+            userAgent,
+            elementDiagnostics,
+            apiPrerequisite: undefined,
+            screenshotUrl: input.screenshotUrl ?? null,
+            fullPayload: asInputJson(fullPayload),
+          },
+        });
+        return res.status(201).json({ data: serializeRow(row) });
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code === "P2002" && attempt < 2) {
+          attemptId = `TICK-${Date.now()}-${attempt + 1}`;
+          continue;
+        }
+        throw err;
+      }
+    }
+    return res.status(500).json({ error: "Failed to create ticket" });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("debug portal create error:", error);
+    res.status(500).json({ error: "Failed to create ticket" });
+  }
+});
 
 router.get("/", async (req, res) => {
   try {

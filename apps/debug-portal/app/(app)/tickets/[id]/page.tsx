@@ -280,7 +280,11 @@ export default function TicketDetailPage() {
       </Section>
 
       <Section title="Element / screen context">
-        {el.cssSelector || el.tagName ? (
+        {el.captureScope === "manual" ? (
+          <p className="text-sm text-slate-600">
+            This ticket was created manually in the debug portal (not from an in-app element capture).
+          </p>
+        ) : el.cssSelector || el.tagName ? (
           <dl className="space-y-2">
             {el.captureScope ? <DetailRow label="Scope">{el.captureScope}</DetailRow> : null}
             {el.tagName ? <DetailRow label="Tag">{el.tagName}</DetailRow> : null}

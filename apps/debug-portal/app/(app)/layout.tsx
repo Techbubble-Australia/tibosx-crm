@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bug, LogOut } from "lucide-react";
+import { Bug, LogOut, Plus } from "lucide-react";
 
 export default function AppShellLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -23,9 +23,20 @@ export default function AppShellLayout({ children }: { children: React.ReactNode
             <span className="font-semibold">Debug tickets</span>
             <Link
               href="/tickets"
-              className={`ml-4 text-sm ${pathname === "/tickets" ? "font-medium text-sky-700" : "text-slate-600 hover:text-slate-900"}`}
+              className={`ml-4 text-sm ${
+                pathname === "/tickets" || (pathname.startsWith("/tickets/") && pathname !== "/tickets/new")
+                  ? "font-medium text-sky-700"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
             >
               All tickets
+            </Link>
+            <Link
+              href="/tickets/new"
+              className={`inline-flex items-center gap-1 text-sm ${pathname === "/tickets/new" ? "font-medium text-sky-700" : "text-slate-600 hover:text-slate-900"}`}
+            >
+              <Plus className="h-4 w-4" />
+              New ticket
             </Link>
           </div>
           <button

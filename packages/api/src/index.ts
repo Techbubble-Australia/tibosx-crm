@@ -167,6 +167,12 @@ app.use(
   debugPortalTicketRoutes,
 );
 app.use(
+  "/api/debug-portal/upload",
+  authMiddleware,
+  requireRole("admin"),
+  uploadRoutes,
+);
+app.use(
   "/api/admin/workspace-groups",
   authMiddleware,
   requireMfaEnrolled,
