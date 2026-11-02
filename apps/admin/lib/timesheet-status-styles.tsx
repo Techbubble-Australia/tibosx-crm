@@ -21,7 +21,7 @@ export function TimesheetStatusBadge({ status }: { status: TimesheetStatus | str
       : (TIMESHEET_STATUS_LABELS[status as TimesheetStatus] ?? status);
   return (
     <span
-      className={`inline-flex rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${timesheetStatusBadgeClass(status)}`}
+      className={`inline-flex whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${timesheetStatusBadgeClass(status)}`}
     >
       {label}
     </span>

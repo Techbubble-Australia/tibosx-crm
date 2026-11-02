@@ -1,4 +1,4 @@
-import { prisma } from "@techbubble/database";
+import { prisma, TicketingUserRole } from "@techbubble/database";
 import type { TicketingAuthUser } from "../middleware/auth.js";
 import { ensureClientPortalContactLinks } from "./client-timesheet-projects.js";
 import {
@@ -151,7 +151,7 @@ export async function organizationIdsForClientPortal(
     for (const row of byContact) projectIds.add(row.projectId);
   }
 
-  const byTicketingUser = await prisma.projectClientContact.findFirst({
+  const byTicketingUserLinks = await prisma.projectClientContact.findMany({
     where: {
       ticketingUserId,
       OR: [...portalAccessOr],
@@ -159,12 +159,28 @@ export async function organizationIdsForClientPortal(
     },
     select: { projectId: true, contactId: true },
   });
-  if (byTicketingUser) {
-    projectIds.add(byTicketingUser.projectId);
-    contactIds.add(byTicketingUser.contactId);
+  for (const link of byTicketingUserLinks) {
+    projectIds.add(link.projectId);
+    contactIds.add(link.contactId);
+  }
+  if (adminId) {
+    const byTbosAdminLinks = await prisma.projectClientContact.findMany({
+      where: {
+        ticketingUser: { tbosAdminUserId: adminId, role: TicketingUserRole.CLIENT, active: true },
+        OR: [...portalAccessOr],
+        project: { status: "ACTIVE" },
+      },
+      select: { projectId: true, contactId: true },
+    });
+    for (const link of byTbosAdminLinks) {
+      projectIds.add(link.projectId);
+      contactIds.add(link.contactId);
+    }
+  }
+  for (const contactId of contactIds) {
     const siblings = await prisma.projectClientContact.findMany({
       where: {
-        contactId: byTicketingUser.contactId,
+        contactId,
         OR: [...portalAccessOr],
         project: { status: "ACTIVE" },
       },

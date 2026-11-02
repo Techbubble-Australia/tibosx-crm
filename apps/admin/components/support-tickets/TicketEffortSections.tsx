@@ -13,6 +13,76 @@ type Props = {
   saveEstimatedEffort: (ticketId: string, hours: number) => Promise<void>;
 };
 
+type EffortSaveProps = {
+  ticketId: string;
+  status: string;
+  initialHours: number | null;
+  disabled?: boolean;
+  onSaved: () => void;
+  saveEstimatedEffort: (ticketId: string, hours: number) => Promise<void>;
+};
+
+/** Compact estimated-effort control for the ticket attributes bar (next to Assigned to). */
+export function TicketEstimatedEffortAttributeField({
+  ticketId,
+  status,
+  initialHours,
+  disabled,
+  onSaved,
+  saveEstimatedEffort,
+}: EffortSaveProps) {
+  const inProgress = normalizeTicketStatusKey(status) === "IN_PROGRESS";
+  const [value, setValue] = useState(initialHours != null ? initialHours.toFixed(2) : "");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setValue(initialHours != null ? initialHours.toFixed(2) : "");
+  }, [initialHours, ticketId]);
+
+  if (!inProgress) return null;
+
+  async function handleSave() {
+    const parsed = Number.parseFloat(value.replace(",", "."));
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      appAlert("Enter a valid number of hours (e.g. 8 or 08.00)");
+      return;
+    }
+    setSaving(true);
+    try {
+      await saveEstimatedEffort(ticketId, parsed);
+      setValue(parsed.toFixed(2));
+      onSaved();
+    } catch (error) {
+      appAlert(error instanceof Error ? error.message : "Failed to save estimated effort");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <input
+          type="text"
+          inputMode="decimal"
+          value={value}
+          disabled={disabled || saving}
+          onChange={(e) => setValue(e.target.value)}
+          className="w-20 rounded-lg border border-gray-200 px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
+          placeholder="08.00"
+        />
+        <span className="text-xs text-gray-500 dark:text-gray-400">Hrs</span>
+        <button
+          type="button"
+          disabled={disabled || saving}
+          onClick={() => void handleSave()}
+          className="rounded-lg bg-black px-2.5 py-1.5 text-xs font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+        >
+          {saving ? "…" : "Save"}
+        </button>
+      </div>
+  );
+}
+
 export function TicketEstimatedEffortSection({
   ticketId,
   status,

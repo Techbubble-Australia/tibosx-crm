@@ -64,7 +64,6 @@ export default function TimesheetsPage() {
   const isAdmin = role === "admin" || additionalRoles.includes("admin");
   const showCreateTimesheet = canCreateTimesheets;
   const [rows, setRows] = useState<TimesheetRow[]>([]);
-  const [clients, setClients] = useState<ClientOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
@@ -152,6 +151,17 @@ export default function TimesheetsPage() {
     return filteredRows.slice(start, start + pageSize);
   }, [filteredRows, page, pageSize]);
 
+  const clientOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      if (!row.clientId?.trim()) continue;
+      map.set(row.clientId, row.clientName?.trim() || row.clientId);
+    }
+    return [...map.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  }, [rows]);
+
   function handleSort(key: TimesheetListSortKey) {
     const next = toggleSortKey(key, sortKey, sortDir);
     setSortKey(next.key as TimesheetListSortKey);
@@ -171,10 +181,6 @@ export default function TimesheetsPage() {
 
   useEffect(() => {
     void fetchRows();
-    void adminFetch("/api/admin/clients")
-      .then((r) => r.json())
-      .then((data) => setClients((data.data as ClientOption[]) ?? []))
-      .catch(() => setClients([]));
   }, []);
 
   async function submitSelected() {
@@ -417,7 +423,7 @@ export default function TimesheetsPage() {
                   aria-label="Filter by client"
                 >
                   <option value="">All clients</option>
-                  {clients.map((client) => (
+                  {clientOptions.map((client) => (
                     <option key={client.id} value={client.id}>
                       {client.name}
                     </option>
@@ -444,8 +450,8 @@ export default function TimesheetsPage() {
                 </select>
               </div>
             </div>
-            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-              <table className="min-w-full text-sm">
+            <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+              <table className="min-w-[56rem] w-full text-sm">
                 <thead className="border-b border-gray-100 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
                   <tr>
                     <th className="w-10 px-4 py-2">
@@ -538,11 +544,13 @@ export default function TimesheetsPage() {
                         {canManageProjects ? (
                           <td className="px-4 py-2 text-gray-500">{row.memberName}</td>
                         ) : null}
-                    <td className="px-4 py-2">
+                    <td className="whitespace-nowrap px-4 py-2">
                       <TimesheetStatusBadge status={row.status} />
                     </td>
                     <td className="px-4 py-2 text-gray-700 dark:text-gray-300">
-                      {typeof row.totalHours === "number" ? row.totalHours : "—"}
+                      {typeof row.totalHours === "number" && Number.isFinite(row.totalHours)
+                        ? row.totalHours
+                        : "—"}
                     </td>
                         <td className="max-w-[10rem] px-4 py-2 text-gray-600 dark:text-gray-400">
                           <span className="block truncate" title={row.approverLabel ?? ""}>

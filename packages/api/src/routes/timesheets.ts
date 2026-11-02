@@ -1163,11 +1163,35 @@ router.get("/", async (req: AuthRequest, res) => {
         opportunity: { select: { id: true, name: true } },
         memberUser: { select: { id: true, name: true, email: true } },
         projectClientContact: { include: { contact: { select: { name: true, email: true } } } },
+        entries: {
+          orderBy: { sortOrder: "asc" },
+          select: {
+            id: true,
+            sortOrder: true,
+            dailyHours: true,
+            dailyComments: true,
+            billable: true,
+            opportunityId: true,
+            ticketId: true,
+            opportunity: { select: { name: true } },
+            ticket: { select: { ticketNumber: true, subject: true } },
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
     const hydrated = await Promise.all(rows.map((row) => hydrateTimesheetApproverRow(row)));
-    res.json({ data: hydrated.map((row) => serializeTimesheet({ ...row, activityLogs: [] })) });
+    res.json({
+      data: hydrated.map((row) =>
+        serializeTimesheet({
+          ...row,
+          activityLogs: [],
+          entries: row.entries?.map((entry) =>
+            serializeEntry({ ...entry, project: row.project ?? null }),
+          ) ?? [],
+        }),
+      ),
+    });
   } catch (error) {
     console.error("Error fetching timesheets:", error);
     res.status(500).json({ error: "Failed to fetch timesheets" });

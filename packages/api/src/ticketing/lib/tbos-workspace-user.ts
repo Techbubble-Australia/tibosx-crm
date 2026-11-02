@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
-import { prisma } from "@techbubble/database";
+import { prisma, TicketingUserRole } from "@techbubble/database";
 import type { TicketingAuthUser } from "../middleware/auth.js";
 import { syncConsultantOrganizationsForTbosUser } from "../../lib/support-organization.js";
 import { provisionClientPortalUser } from "../../lib/support-project.js";
@@ -28,17 +28,25 @@ async function resolveClientTicketingUser(
       ? [{ contactId: { in: identity.contactIds }, OR: portalAccessOr }]
       : []),
     ...contactEmailFilters.map((filter) => ({ ...filter, OR: portalAccessOr })),
+    {
+      ticketingUser: { tbosAdminUserId: adminUserId, role: TicketingUserRole.CLIENT, active: true },
+      OR: portalAccessOr,
+    },
   ];
-  const link = linkClauses.length
-    ? await prisma.projectClientContact.findFirst({
-        where: {
-          project: { status: "ACTIVE" },
-          OR: linkClauses,
-        },
-        include: { ticketingUser: true, project: { select: { supportOrganization: { select: { id: true } } } } },
-        orderBy: { updatedAt: "desc" },
-      })
-    : null;
+  const link =
+    linkClauses.length > 0
+      ? await prisma.projectClientContact.findFirst({
+          where: {
+            project: { status: "ACTIVE" },
+            OR: linkClauses,
+          },
+          include: {
+            ticketingUser: true,
+            project: { select: { supportOrganization: { select: { id: true } } } },
+          },
+          orderBy: { updatedAt: "desc" },
+        })
+      : null;
 
   if (link) {
     let tu = link.ticketingUser;
