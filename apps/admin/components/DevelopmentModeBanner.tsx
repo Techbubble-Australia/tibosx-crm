@@ -29,15 +29,17 @@ export function DevelopmentModeBanner() {
     <>
       <div
         role="status"
-        className="fixed left-0 right-0 top-0 z-[200] flex items-center justify-center gap-3 border-b border-amber-600/40 bg-amber-400 px-3 py-1.5 text-xs font-medium text-amber-950 dark:border-amber-500/30 dark:bg-amber-500 dark:text-amber-950"
+        className="fixed left-0 right-0 top-0 z-[200] border-b border-amber-600/40 bg-amber-400 px-3 py-1.5 dark:border-amber-500/30 dark:bg-amber-500"
       >
-        <span className="text-center">
-          Development mode — you are not on production. Changes here do not affect live TBOS data
-          unless this environment points at a production database.
-        </span>
-        <ReportedTicketsLink />
+        <div className="mx-auto flex max-w-[120rem] flex-wrap items-center justify-between gap-2">
+          <p className="min-w-0 flex-1 text-center text-xs font-medium text-amber-950 sm:text-left dark:text-amber-950">
+            Development mode — you are not on production. Changes here do not affect live TBOS data
+            unless this environment points at a production database.
+          </p>
+          <ReportedTicketsLink variant="banner" />
+        </div>
       </div>
-      <div className="h-[34px] shrink-0" aria-hidden />
+      <div className="h-10 shrink-0 sm:h-[34px]" aria-hidden />
     </>
   );
 }

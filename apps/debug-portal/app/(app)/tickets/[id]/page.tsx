@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Copy, ExternalLink, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowLeft, Copy, Download, ExternalLink, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { StatusSelect } from "@/components/StatusSelect";
 import { buildAgentIssuePrompt, resolveTicketScreenshotUrl } from "@/lib/agent-prompt";
 import {
@@ -140,6 +140,26 @@ export default function TicketDetailPage() {
     }
   }
 
+  async function downloadScreenshot() {
+    if (!shot || !row) return;
+    setCopyHint("");
+    try {
+      const res = await fetch(shot, { credentials: "include" });
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = `${row.ticketId.replace(/[^\w.-]+/g, "_")}-screenshot.png`;
+      anchor.click();
+      URL.revokeObjectURL(objectUrl);
+      setCopyHint("Screenshot downloaded.");
+      window.setTimeout(() => setCopyHint(""), 2000);
+    } catch {
+      setCopyHint("Could not download screenshot.");
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -219,15 +239,25 @@ export default function TicketDetailPage() {
       <Section title="Screenshot">
         {shot ? (
           <div className="space-y-2">
-            <a
-              href={shot}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-sm text-sky-700 hover:underline"
-            >
-              Open full size
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={shot}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-sky-700 hover:bg-slate-50"
+              >
+                Open full size
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+              <button
+                type="button"
+                onClick={() => void downloadScreenshot()}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50"
+              >
+                <Download className="h-4 w-4" />
+                Download screenshot
+              </button>
+            </div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={shot}

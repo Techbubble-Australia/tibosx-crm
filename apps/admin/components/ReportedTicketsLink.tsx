@@ -1,18 +1,37 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { ExternalLink, Loader2, Ticket } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { appAlert } from "@/lib/app-alert";
 import { debugPortalPublicUrl } from "@/lib/debug-portal-url";
 
-export function ReportedTicketsLink() {
+type Variant = "banner" | "sidebar";
+
+async function resolveDebugPortalBase(): Promise<string> {
+  const inlined = debugPortalPublicUrl();
+  if (inlined) return inlined;
+  try {
+    const res = await fetch("/api/app-env", { cache: "no-store" });
+    const data = (await res.json()) as { debugPortalUrl?: string | null };
+    if (typeof data.debugPortalUrl === "string" && data.debugPortalUrl.trim()) {
+      return data.debugPortalUrl.trim().replace(/\/$/, "");
+    }
+  } catch {
+    /* ignore */
+  }
+  return "";
+}
+
+export function ReportedTicketsLink({ variant = "banner" }: { variant?: Variant }) {
   const [loading, setLoading] = useState(false);
 
   async function openPortal() {
-    const base = debugPortalPublicUrl();
+    const base = await resolveDebugPortalBase();
     if (!base) {
-      appAlert("Debug portal URL is not configured. Set NEXT_PUBLIC_DEBUG_PORTAL_URL on the admin service.");
+      appAlert(
+        "Debug portal URL is not configured. Set DEBUG_PORTAL_PUBLIC_URL (or NEXT_PUBLIC_DEBUG_PORTAL_URL at build) on the admin service.",
+      );
       return;
     }
 
@@ -45,14 +64,26 @@ export function ReportedTicketsLink() {
     }
   }
 
+  const bannerClass =
+    "inline-flex shrink-0 items-center gap-1.5 rounded-md border border-amber-900/30 bg-white/90 px-2.5 py-1 text-xs font-semibold text-amber-950 shadow-sm hover:bg-white disabled:opacity-60 dark:border-amber-950/40 dark:bg-amber-950/20 dark:text-amber-50 dark:hover:bg-amber-950/30";
+  const sidebarClass =
+    "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100";
+
   return (
     <button
       type="button"
       disabled={loading}
       onClick={() => void openPortal()}
-      className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-amber-800/25 bg-amber-950/10 px-2.5 py-1 text-xs font-semibold text-amber-950 hover:bg-amber-950/15 disabled:opacity-60 dark:border-amber-950/20 dark:bg-amber-950/15 dark:hover:bg-amber-950/25"
+      className={variant === "sidebar" ? sidebarClass : bannerClass}
+      title="Open debug ticket portal (SSO)"
     >
-      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ExternalLink className="h-3.5 w-3.5" />}
+      {loading ? (
+        <Loader2 className={`animate-spin ${variant === "sidebar" ? "h-3.5 w-3.5" : "h-3.5 w-3.5"}`} />
+      ) : variant === "sidebar" ? (
+        <Ticket className="h-3.5 w-3.5 shrink-0 opacity-70" />
+      ) : (
+        <ExternalLink className="h-3.5 w-3.5" />
+      )}
       Reported tickets
     </button>
   );

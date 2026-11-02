@@ -12,11 +12,15 @@ const TBOS_ADMIN_LEGACY_HOST = "tibosx.ai.techbubble.com.au";
 const appEnv =
   process.env.ENV || process.env.TBOS_ENV || process.env.NEXT_PUBLIC_TBOS_ENV || "production";
 
+const debugPortalPublicUrl =
+  process.env.NEXT_PUBLIC_DEBUG_PORTAL_URL || process.env.DEBUG_PORTAL_PUBLIC_URL || "";
+
 const nextConfig = {
   output: 'standalone',
   transpilePackages: ["@techbubble/ui", "@techbubble/database"],
   env: {
     NEXT_PUBLIC_TBOS_ENV: appEnv,
+    NEXT_PUBLIC_DEBUG_PORTAL_URL: debugPortalPublicUrl,
   },
   // /api/* and /uploads/* proxied at request time (see app/api and app/uploads routes; runtime API_URL).
   async redirects() {

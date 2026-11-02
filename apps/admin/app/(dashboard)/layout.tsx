@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ReportedTicketsLink } from "@/components/ReportedTicketsLink";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -461,6 +462,12 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
           })
           )}
         </nav>
+
+        {isDevAppEnv && !sidebarCollapsed ? (
+          <div className="border-t border-gray-100 px-2 py-2 dark:border-gray-800">
+            <ReportedTicketsLink variant="sidebar" />
+          </div>
+        ) : null}
 
         <div className={`border-t border-gray-200 dark:border-gray-700 ${sidebarCollapsed ? "p-2" : "p-4"}`}>
           <button
