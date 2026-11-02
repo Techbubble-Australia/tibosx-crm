@@ -6,7 +6,10 @@ import {
   ticketOrigin,
   type AgentExportTicket,
 } from "../lib/debug-agent-brief.js";
-import { resolveDebugCaptureMediaUrl, screenshotUrlFromTicket } from "../lib/debug-media-url.js";
+import {
+  screenshotPathsFromTicket,
+  screenshotUrlFromTicket,
+} from "../lib/debug-media-url.js";
 
 const router: IRouter = Router();
 
@@ -115,14 +118,16 @@ function apiContextBlock(apiPrerequisite: unknown) {
 
 function serializeForAgent(row: DbRow, includeFullPayload: boolean) {
   const exportTicket = toAgentExportTicket(row);
-  const publicScreenshotUrl = screenshotUrlFromTicket(row);
-  const storagePath =
-    row.screenshotUrl?.trim() ||
-    (typeof (row.fullPayload as Record<string, unknown>)?.screenshotUrl === "string"
-      ? ((row.fullPayload as Record<string, unknown>).screenshotUrl as string)
-      : null);
+  const shotUrls = screenshotPathsFromTicket(row);
+  const publicScreenshotUrl = shotUrls.publicUrl ?? screenshotUrlFromTicket(row);
 
   const portalBase = process.env.DEBUG_PORTAL_PUBLIC_URL?.replace(/\/$/, "");
+
+  const screenshotNote = !shotUrls.relativePath
+    ? "No image attached to this ticket."
+    : publicScreenshotUrl
+      ? "Fetch screenshot.publicUrl (HTTPS). Images are served via /uploads on the debug portal or API."
+      : "Screenshot path is stored but no public base URL is configured. Set DEBUG_PORTAL_PUBLIC_URL and/or API_PUBLIC_URL on the API service.";
 
   return {
     id: row.id,
@@ -144,12 +149,12 @@ function serializeForAgent(row: DbRow, includeFullPayload: boolean) {
     element: elementBlock(row.elementDiagnostics),
     apiContext: apiContextBlock(row.apiPrerequisite),
     screenshot: {
-      available: Boolean(publicScreenshotUrl),
-      storagePath: storagePath ? resolveDebugCaptureMediaUrl(storagePath) ?? storagePath : null,
+      available: Boolean(shotUrls.relativePath && publicScreenshotUrl),
+      relativePath: shotUrls.relativePath,
       publicUrl: publicScreenshotUrl,
-      note: publicScreenshotUrl
-        ? "Fetch publicUrl for vision-capable agents; images are served from the API /uploads route."
-        : "No image attached to this ticket.",
+      portalUrl: shotUrls.portalUrl,
+      apiUrl: shotUrls.apiUrl,
+      note: screenshotNote,
     },
     agentBriefMarkdown: buildAgentIssueBriefMarkdown(exportTicket),
     links: portalBase ? { debugPortalDetail: `${portalBase}/tickets/${row.id}` } : undefined,
