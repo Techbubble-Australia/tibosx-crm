@@ -145,7 +145,7 @@ export function DebugTicketModal() {
                     <p className="text-sm font-medium">
                       {draft.elementDiagnostics.captureScope === "viewport"
                         ? "Screen capture"
-                        : "Screen capture (selected element outlined)"}
+                        : "Element screenshot"}
                     </p>
                     <button
                       type="button"
@@ -159,12 +159,10 @@ export function DebugTicketModal() {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={draft.screenshotDataUrl}
-                    alt={
-                      draft.elementDiagnostics.captureScope === "viewport"
-                        ? "Screen capture"
-                        : "Screen capture with selected element outlined"
-                    }
-                    className="max-h-72 max-w-full rounded border border-gray-200 dark:border-gray-700"
+                    alt={draft.elementDiagnostics.captureScope === "viewport" ? "Screen capture" : "Captured element"}
+                    className={`max-w-full rounded border border-gray-200 dark:border-gray-700 ${
+                      draft.elementDiagnostics.captureScope === "viewport" ? "max-h-72" : "max-h-40"
+                    }`}
                   />
                 </div>
               ) : (

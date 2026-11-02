@@ -13,13 +13,11 @@ import { adminFetch } from "@/lib/admin-api";
 import { messageFromApiError } from "@/lib/api-error";
 import { readUploadImageUrlFromJson } from "@/lib/upload-response";
 import { captureApiPrerequisite, type ApiPrerequisiteCapture } from "@/lib/debug/api-prerequisite";
-import { captureElementDiagnostics, resolveCaptureTarget, type ElementDiagnostics } from "@/lib/debug/css-selector";
+import { captureElementDiagnostics, type ElementDiagnostics } from "@/lib/debug/css-selector";
 import {
   captureElementScreenshot,
   captureViewportDiagnostics,
   captureViewportScreenshot,
-  captureViewportScreenshotWithElementHighlight,
-  resolveElementFromDiagnostics,
 } from "@/lib/debug/screenshot";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { useIsDevelopmentAppEnv } from "@/lib/use-is-development-app-env";
@@ -152,18 +150,17 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
     async (el: Element) => {
       setCaptureLoading(true);
       try {
-        const target = resolveCaptureTarget(el);
         const [userMetadata, apiPrerequisite, screenshotDataUrl] = await Promise.all([
           resolveUserMetadata(),
-          captureApiPrerequisite(target),
-          captureElementScreenshot(target),
+          captureApiPrerequisite(el),
+          captureElementScreenshot(el as HTMLElement),
         ]);
         setDraft({
           ticketId: `TICK-${Date.now()}`,
           type: "BUG",
           reportedEnvironment: defaultReportedEnvironment,
           userDescription: "",
-          elementDiagnostics: captureElementDiagnostics(target),
+          elementDiagnostics: captureElementDiagnostics(el),
           apiPrerequisite,
           screenshotDataUrl,
           userMetadata,
@@ -202,39 +199,18 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
   const recaptureViewport = useCallback(async () => {
     setCaptureLoading(true);
     try {
-      await new Promise<void>((resolve) => {
-        setDraft((prev) => {
-          void (async () => {
-            try {
-              if (!prev) return;
-              const isViewport = prev.elementDiagnostics.captureScope === "viewport";
-              let screenshotDataUrl: string | null;
-              if (isViewport) {
-                screenshotDataUrl = await captureViewportScreenshot();
-                setDraft((p) =>
-                  p
-                    ? {
-                        ...p,
-                        elementDiagnostics: captureViewportDiagnostics(),
-                        apiPrerequisite: null,
-                        screenshotDataUrl,
-                      }
-                    : p,
-                );
-              } else {
-                const el = resolveElementFromDiagnostics(prev.elementDiagnostics);
-                screenshotDataUrl = await captureViewportScreenshotWithElementHighlight(el);
-                setDraft((p) => (p ? { ...p, screenshotDataUrl } : p));
-              }
-            } finally {
-              setCaptureLoading(false);
-              resolve();
+      const screenshotDataUrl = await captureViewportScreenshot();
+      setDraft((prev) =>
+        prev
+          ? {
+              ...prev,
+              elementDiagnostics: captureViewportDiagnostics(),
+              apiPrerequisite: null,
+              screenshotDataUrl,
             }
-          })();
-          return prev;
-        });
-      });
-    } catch {
+          : prev,
+      );
+    } finally {
       setCaptureLoading(false);
     }
   }, []);
