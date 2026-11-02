@@ -322,12 +322,12 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
           sidebarCollapsed ? "w-[4.5rem]" : "w-64"
         }`}
       >
-        <div className={`min-w-0 ${sidebarCollapsed ? "px-2 py-3" : "border-b border-gray-100 px-4 py-4 dark:border-gray-800"}`}>
+        <div className={`min-w-0 ${sidebarCollapsed ? "px-2 py-3" : "border-b border-gray-100 px-4 py-5 dark:border-gray-800"}`}>
           <div
             className={
               sidebarCollapsed
                 ? "flex flex-col items-center gap-2"
-                : "flex items-start justify-between gap-2"
+                : "flex items-start justify-between gap-3"
             }
           >
             <Link
@@ -354,7 +354,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
           {!sidebarCollapsed ? (
             <>
               {!loading && accessLabel ? (
-                <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-950/60">
+                <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 dark:border-gray-800 dark:bg-gray-950/60">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
                     Signed in as
                   </p>

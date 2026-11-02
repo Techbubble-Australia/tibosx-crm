@@ -126,7 +126,7 @@ function serializeForAgent(row: DbRow, includeFullPayload: boolean) {
   const screenshotNote = !shotUrls.relativePath
     ? "No image attached to this ticket."
     : publicScreenshotUrl
-      ? "Fetch screenshot.publicUrl (HTTPS). Images are served via /uploads on the debug portal or API."
+      ? "Fetch screenshot.publicUrl (HTTPS). publicUrl prefers the API /uploads host; portalUrl uses debug-web when its /uploads proxy is deployed."
       : "Screenshot path is stored but no public base URL is configured. Set DEBUG_PORTAL_PUBLIC_URL and/or API_PUBLIC_URL on the API service.";
 
   return {

@@ -5,6 +5,8 @@ type TechBubbleLogoProps = {
   variant?: "stacked" | "sidebar";
   /** Show TIBOSX product label beside the logo (sidebar). */
   showProductLabel?: boolean;
+  /** Sidebar brand: logo above product title (recommended). */
+  stackedBrand?: boolean;
 };
 
 const STACKED_LOGO = {
@@ -32,6 +34,7 @@ export function TechBubbleLogo({
   compact = false,
   variant = "stacked",
   showProductLabel = false,
+  stackedBrand = true,
 }: TechBubbleLogoProps) {
   if (compact) {
     return (
@@ -48,7 +51,30 @@ export function TechBubbleLogo({
 
   const useSidebarLogo = variant === "sidebar";
   const asset = useSidebarLogo ? SIDEBAR_LOGO : STACKED_LOGO;
-  const heightClass = useSidebarLogo ? "h-7" : "h-10";
+  const heightClass = useSidebarLogo ? "h-8" : "h-10";
+
+  if (useSidebarLogo && showProductLabel && stackedBrand) {
+    return (
+      <span className={`flex flex-col items-start gap-3 py-0.5 ${className}`}>
+        <img
+          src={asset.src}
+          alt="TechBubble"
+          width={asset.width}
+          height={asset.height}
+          className={`w-auto max-w-[8.5rem] shrink-0 ${heightClass} dark:brightness-0 dark:invert`}
+          decoding="async"
+        />
+        <span className="flex flex-col gap-1 border-t border-gray-100 pt-3 dark:border-gray-800">
+          <span className="text-base font-bold leading-tight tracking-tight text-gray-900 dark:text-gray-100">
+            TIBOSX
+          </span>
+          <span className="max-w-[12rem] text-[11px] font-medium leading-snug text-gray-500 dark:text-gray-400">
+            AI-powered Business Operating System
+          </span>
+        </span>
+      </span>
+    );
+  }
 
   return (
     <span

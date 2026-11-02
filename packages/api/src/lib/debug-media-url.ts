@@ -55,7 +55,8 @@ export function resolveAgentScreenshotUrls(stored: string | null | undefined): A
   const apiUrl = apiBase ? `${apiBase}${relativePath}` : null;
   const adminUrl = adminBase ? `${adminBase}${relativePath}` : null;
 
-  const publicUrl = portalUrl ?? apiUrl ?? adminUrl;
+  /** Prefer direct API URL — always served by Express; portal /uploads requires debug-web proxy route. */
+  const publicUrl = apiUrl ?? portalUrl ?? adminUrl;
 
   return { relativePath, publicUrl, portalUrl, apiUrl: apiUrl ?? adminUrl };
 }
