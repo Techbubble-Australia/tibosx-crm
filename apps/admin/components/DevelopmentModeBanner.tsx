@@ -1,17 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { ReportedTicketsLink } from "@/components/ReportedTicketsLink";
+import { adminFetch } from "@/lib/admin-api";
 
 function isDevelopmentValue(value: string | undefined): boolean {
   return (value ?? "").trim().toLowerCase() === "development";
 }
 
+/** Debug portal SSO is admin-only (same rule as debug portal login). */
+function canOpenDebugPortal(role: unknown, additionalRoles: unknown): boolean {
+  if (role === "admin") return true;
+  return Array.isArray(additionalRoles) && additionalRoles.includes("admin");
+}
+
 /** Shown when `ENV=development` (or `TBOS_ENV`) on the admin service. */
 export function DevelopmentModeBanner() {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(() =>
     isDevelopmentValue(process.env.NEXT_PUBLIC_TBOS_ENV),
   );
+  const [showReportedTickets, setShowReportedTickets] = useState(false);
 
   useEffect(() => {
     if (visible) return;
@@ -22,6 +32,35 @@ export function DevelopmentModeBanner() {
       })
       .catch(() => undefined);
   }, [visible]);
+
+  useEffect(() => {
+    if (!visible) {
+      setShowReportedTickets(false);
+      return;
+    }
+    let cancelled = false;
+    void adminFetch("/api/auth/me")
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok) {
+          setShowReportedTickets(false);
+          return;
+        }
+        const user = data?.data?.user;
+        if (typeof user?.id !== "string" || !user.id) {
+          setShowReportedTickets(false);
+          return;
+        }
+        setShowReportedTickets(canOpenDebugPortal(user.role, user.additionalRoles));
+      })
+      .catch(() => {
+        if (!cancelled) setShowReportedTickets(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, pathname]);
 
   if (!visible) return null;
 
@@ -36,7 +75,7 @@ export function DevelopmentModeBanner() {
             Development mode — you are not on production. Changes here do not affect live TBOS data
             unless this environment points at a production database.
           </p>
-          <ReportedTicketsLink variant="banner" />
+          {showReportedTickets ? <ReportedTicketsLink variant="banner" /> : null}
         </div>
       </div>
       <div className="h-10 shrink-0 sm:h-[34px]" aria-hidden />
