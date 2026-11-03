@@ -79,7 +79,7 @@ export function HtmlEditor({
     "inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700";
 
   const editorClass =
-    "min-h-[200px] w-full rounded-b-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 empty:before:text-gray-400 empty:before:content-[attr(data-placeholder)] [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6 [&_li]:my-0.5";
+    "min-h-[200px] w-full rounded-b-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 empty:before:text-gray-400 empty:before:content-[attr(data-placeholder)] [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol_ol]:list-[lower-alpha] [&_ol_ol_ol]:list-[lower-roman] [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6 [&_li]:my-0.5";
 
   return (
     <div className={className}>
@@ -101,6 +101,12 @@ export function HtmlEditor({
         </button>
         <button type="button" className={toolbarBtn} onClick={() => runCommand("insertOrderedList")} aria-label="Numbered list">
           <ListOrdered className="h-4 w-4" />
+        </button>
+        <button type="button" className={toolbarBtn} onClick={() => runCommand("indent")} aria-label="Increase list level">
+          <span className="text-xs font-semibold">→</span>
+        </button>
+        <button type="button" className={toolbarBtn} onClick={() => runCommand("outdent")} aria-label="Decrease list level">
+          <span className="text-xs font-semibold">←</span>
         </button>
         <button type="button" className={toolbarBtn} onClick={insertLink} aria-label="Insert link">
           <Link2 className="h-4 w-4" />

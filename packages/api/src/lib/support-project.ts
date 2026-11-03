@@ -145,6 +145,10 @@ export async function provisionClientPortalUser(projectClientContactId: string, 
     tbosUserId = tbosCustomer?.id ?? null;
   }
   if (tbosUserId && updated.tbosAdminUserId !== tbosUserId) {
+    await prisma.ticketingUser.updateMany({
+      where: { tbosAdminUserId: tbosUserId, id: { not: updated.id } },
+      data: { tbosAdminUserId: null, tbosRole: null },
+    });
     await prisma.ticketingUser.update({
       where: { id: updated.id },
       data: { tbosAdminUserId: tbosUserId, tbosRole: "client" },
@@ -213,6 +217,10 @@ export async function provisionSupportMemberConsultant(projectId: string, adminU
   }
 
   if (consultant) {
+    await prisma.ticketingUser.updateMany({
+      where: { tbosAdminUserId: adminUserId, id: { not: consultant.id } },
+      data: { tbosAdminUserId: null, tbosRole: null },
+    });
     consultant = await prisma.ticketingUser.update({
       where: { id: consultant.id },
       data: {

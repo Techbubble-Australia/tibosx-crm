@@ -113,4 +113,55 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.get("/:id", async (req, res) => {
+  try {
+    const row = await prisma.contractInvoice.findUnique({
+      where: { id: req.params.id },
+      include: {
+        contract: {
+          select: {
+            id: true,
+            contractNumber: true,
+            title: true,
+            status: true,
+            currency: true,
+            client: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+    if (!row) return res.status(404).json({ error: "Invoice not found" });
+
+    res.json({
+      data: {
+        id: row.id,
+        contractId: row.contractId,
+        contractNumber: row.contract.contractNumber,
+        contractTitle: row.contract.title,
+        contractStatus: row.contract.status,
+        clientId: row.contract.client.id,
+        clientName: row.contract.client.name,
+        invoiceNumber: row.invoiceNumber,
+        reference: row.reference,
+        issueDate: row.issueDate.toISOString(),
+        dueDate: row.dueDate.toISOString(),
+        status: row.status,
+        currency: row.currency,
+        description: row.description,
+        qty: row.qty,
+        rate: toNumber(row.rate),
+        amount: toNumber(row.amount),
+        taxRate: toNumber(row.taxRate),
+        taxAmount: toNumber(row.taxAmount),
+        totalAmount: toNumber(row.totalAmount),
+        fileUrl: row.fileUrl,
+        defaultCurrency: row.contract.currency,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching invoice:", error);
+    res.status(500).json({ error: "Failed to fetch invoice" });
+  }
+});
+
 export { router as invoiceRoutes };

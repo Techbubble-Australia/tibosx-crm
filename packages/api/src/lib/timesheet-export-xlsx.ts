@@ -2,12 +2,9 @@ import ExcelJS from "exceljs";
 import { TIMESHEET_STATUS_LABELS } from "./project-types";
 import {
   entryHasHours,
-  entryLabel,
   sumDailyHours,
   WEEKDAY_KEYS,
-  type DailyComments,
   type DailyHours,
-  type WeekdayKey,
 } from "./timesheet-entries";
 
 type ExportEntry = {
@@ -77,16 +74,6 @@ function exportEntries(row: TimesheetXlsxRow): ExportEntry[] {
   return [];
 }
 
-function dayTaskLabel(
-  entry: ExportEntry,
-  project: TimesheetXlsxRow["project"],
-  key: WeekdayKey,
-): string {
-  const comment = ((entry.dailyComments as DailyComments)?.[key] ?? "").trim();
-  if (comment) return comment;
-  return entryLabel({ ...entry, project: project ?? null });
-}
-
 function sanitizeSheetName(raw: string): string {
   const cleaned = raw.replace(/[\\/*?:[\]]/g, " ").trim().slice(0, 31);
   return cleaned || "Timesheet";
@@ -113,36 +100,42 @@ function writeTimesheetSheet(sheet: ExcelJS.Worksheet, row: TimesheetXlsxRow) {
   const weekStartIso = row.startDate.toISOString().slice(0, 10);
   const member = row.memberUser?.name?.trim() || row.memberUser?.email?.trim() || "";
   const total = totalHours(row);
+  const projectName = projectListName(row.project ?? null);
 
-  sheet.addRow(["Project Name", projectListName(row.project ?? null)]);
-  sheet.addRow(["Member", member]);
-  sheet.addRow(["Status", timesheetStatusLabel(row.status)]);
-  sheet.addRow(["Total hours", total]);
+  sheet.addRow(["<Project Name>", projectName]);
+  sheet.addRow(["<Member>", member]);
+  sheet.addRow(["<Status>", timesheetStatusLabel(row.status)]);
+  sheet.addRow(["<Total hours>", total]);
 
   const dayHeaders = WEEKDAY_KEYS.map((_, i) => formatDayLabel(addUtcDays(weekStartIso, i)));
-  sheet.addRow(dayHeaders);
+  sheet.addRow(["", "", ...dayHeaders]);
 
   for (const entry of exportEntries(row)) {
     const hoursCells = WEEKDAY_KEYS.map((key) => {
       const hours = Number((entry.dailyHours as DailyHours)?.[key]) || 0;
       return hours > 0 ? hours : "";
     });
-    sheet.addRow(["Task name", ...hoursCells]);
-    const labelCells = WEEKDAY_KEYS.map((key) => {
-      const hours = Number((entry.dailyHours as DailyHours)?.[key]) || 0;
-      return hours > 0 ? dayTaskLabel(entry, row.project ?? null, key) : "";
-    });
-    sheet.addRow(labelCells);
+    sheet.addRow(["<Task name>", projectName, ...hoursCells]);
   }
 
-  sheet.addRow(["Timesheet comments", row.comments?.trim() ?? ""]);
-  sheet.addRow(["Approver", row.approverLabel]);
+  sheet.addRow(["<Timesheet comments>", row.comments?.trim() ?? ""]);
+  sheet.addRow(["<Approver>", row.approverLabel]);
 }
 
 export async function buildTimesheetWorkbook(rows: TimesheetXlsxRow[]): Promise<ExcelJS.Workbook> {
   const workbook = new ExcelJS.Workbook();
+  const usedNames = new Set<string>();
   rows.forEach((row, index) => {
-    const sheet = workbook.addWorksheet(sheetTitleForRow(row, index));
+    let title = sheetTitleForRow(row, index);
+    let sheetName = title;
+    let suffix = 2;
+    while (usedNames.has(sheetName)) {
+      const extra = ` (${suffix})`;
+      sheetName = sanitizeSheetName(`${title.slice(0, Math.max(1, 31 - extra.length))}${extra}`);
+      suffix += 1;
+    }
+    usedNames.add(sheetName);
+    const sheet = workbook.addWorksheet(sheetName);
     writeTimesheetSheet(sheet, row);
   });
   return workbook;

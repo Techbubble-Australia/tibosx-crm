@@ -95,6 +95,19 @@ type CaseOption = {
 function caseOptionLabel(row: CaseOption): string {
   return row.label;
 }
+
+function caseOptionsForLine(line: LineEntry, cases: CaseOption[], projectLabel?: string): CaseOption[] {
+  if (!line.caseKey.trim()) return cases;
+  if (cases.some((row) => `${row.kind}:${row.id}` === line.caseKey)) return cases;
+  const [kindRaw, id] = line.caseKey.split(":");
+  if (!id) return cases;
+  const kind = kindRaw as CaseOption["kind"];
+  const label =
+    line.label?.trim() ||
+    (kind === "project" ? projectLabel?.trim() : "") ||
+    line.caseKey;
+  return [{ kind, id, label: label || line.caseKey }, ...cases];
+}
 type ApproverOption = { kind: "PM" | "CLIENT_CONTACT"; id: string; label: string };
 
 type Props = {
@@ -1181,7 +1194,7 @@ export function TimesheetForm({
                                 disabled={!projectId}
                               >
                                 <option value="">Select task…</option>
-                                {cases.map((row) => (
+                                {caseOptionsForLine(line, cases, projectLabel).map((row) => (
                                   <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
                                     {caseOptionLabel(row)}
                                   </option>
@@ -1499,7 +1512,7 @@ export function TimesheetForm({
                 onChange={(e) => updateLine(selectedLine.key, { caseKey: e.target.value, label: undefined })}
               >
                 <option value="">Select task…</option>
-                {cases.map((row) => (
+                {caseOptionsForLine(selectedLine, cases, projectLabel).map((row) => (
                   <option key={`panel-${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
                     {caseOptionLabel(row)}
                   </option>

@@ -163,6 +163,12 @@ export function TemplateSignatureEditor({
         <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => runFormat("insertOrderedList")}>
           Numbered list
         </button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => runFormat("indent")} title="Increase list level">
+          Indent
+        </button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => runFormat("outdent")} title="Decrease list level">
+          Outdent
+        </button>
         <label className="inline-flex items-center gap-1 text-xs text-gray-600">
           Size
           <select

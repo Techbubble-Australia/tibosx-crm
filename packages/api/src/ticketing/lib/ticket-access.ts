@@ -112,6 +112,7 @@ export async function organizationIdsForClientPortal(
     const approverProjects = await prisma.project.findMany({
       where: {
         status: "ACTIVE",
+        kind: "SUPPORT",
         timesheetApproverUserId: { in: tbosActorIds },
       },
       select: { id: true },
@@ -204,7 +205,7 @@ export async function organizationIdsForClientPortal(
     where: {
       active: true,
       projectId: { in: [...projectIds] },
-      project: { status: "ACTIVE" },
+      project: { status: "ACTIVE", kind: "SUPPORT" },
     },
     select: { id: true },
   });
@@ -241,7 +242,7 @@ export async function organizationIdsForTbosProjectMember(
     where: {
       active: true,
       projectId: { in: [...projectIds] },
-      project: { status: "ACTIVE" },
+      project: { status: "ACTIVE", kind: "SUPPORT" },
     },
     select: { id: true },
   });

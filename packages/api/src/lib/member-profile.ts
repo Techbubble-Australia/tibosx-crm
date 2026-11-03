@@ -35,7 +35,7 @@ function countryValueComplete(country: string | undefined): boolean {
   return true;
 }
 
-export function bankDetailsComplete(value: unknown): boolean {
+export function bankDetailsCoreComplete(value: unknown): boolean {
   const bank = parseBankDetails(value);
   if (!bank) return false;
   return Boolean(
@@ -43,9 +43,14 @@ export function bankDetailsComplete(value: unknown): boolean {
       bank.accountName?.trim() &&
       bank.accountNumber?.trim() &&
       countryValueComplete(bank.country) &&
-      bank.bsb?.trim() &&
-      bank.notes?.trim(),
+      bank.bsb?.trim(),
   );
+}
+
+export function bankDetailsComplete(value: unknown): boolean {
+  const bank = parseBankDetails(value);
+  if (!bank) return false;
+  return bankDetailsCoreComplete(value) && Boolean(bank.notes?.trim());
 }
 
 export function addressComplete(user: {
@@ -84,6 +89,7 @@ export function emergencyContactsComplete(value: unknown): boolean {
 
 /** Project member / internal user profile KYC: bank, address, and at least one emergency contact. */
 export function memberProfileDetailsComplete(user: {
+  profileDetailsCompletedAt?: Date | null;
   addressLine1?: string | null;
   city?: string | null;
   state?: string | null;
@@ -92,9 +98,12 @@ export function memberProfileDetailsComplete(user: {
   bankDetails?: unknown;
   emergencyContacts?: unknown;
 }): boolean {
-  return (
-    addressComplete(user) &&
-    bankDetailsComplete(user.bankDetails) &&
-    emergencyContactsComplete(user.emergencyContacts)
-  );
+  if (!addressComplete(user) || !emergencyContactsComplete(user.emergencyContacts)) {
+    return false;
+  }
+  if (bankDetailsComplete(user.bankDetails)) return true;
+  if (user.profileDetailsCompletedAt && bankDetailsCoreComplete(user.bankDetails)) {
+    return true;
+  }
+  return false;
 }

@@ -59,7 +59,7 @@ function toDateInputValue(value: string) {
 }
 
 function invoiceDetailHref(row: InvoiceRow) {
-  return `/contracts/${row.contractId}#contract-invoice-${row.id}`;
+  return `/invoices/${row.id}`;
 }
 
 function SortHeader({

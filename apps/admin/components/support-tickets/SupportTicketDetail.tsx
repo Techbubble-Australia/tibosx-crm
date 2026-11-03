@@ -17,6 +17,7 @@ import { TicketStatusBadge } from "@/lib/ticket-status-styles";
 import { type TicketAuditRow } from "@/lib/ticket-audit-display";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { TicketEditableSubject } from "@/components/support-tickets/TicketEditableSubject";
+import { TicketEditableDescription } from "@/components/support-tickets/TicketEditableDescription";
 import { TicketResolutionNotesSection } from "@/components/support-tickets/TicketResolutionNotesSection";
 import {
   TicketEstimatedEffortAttributeField,
@@ -362,7 +363,11 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
             <div className="mb-2 flex items-center justify-between gap-2">
               <h2 className="font-semibold">Description</h2>
             </div>
-            <p className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{ticket.description}</p>
+            <TicketEditableDescription
+              description={ticket.description}
+              disabled={closedOrCancelled || saving}
+              onSave={(description) => patch({ description })}
+            />
           </>
         }
         attachments={

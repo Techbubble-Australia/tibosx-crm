@@ -5,7 +5,7 @@ import type { TicketingAuthUser } from "../middleware/auth.js";
 import { syncConsultantOrganizationsForTbosUser } from "../../lib/support-organization.js";
 import { provisionClientPortalUser } from "../../lib/support-project.js";
 import { ensureClientPortalContactLinks } from "./client-timesheet-projects.js";
-import { resolveLinkedTbosClientPortalIdentity } from "./client-portal-identity.js";
+import { resolveLinkedTbosClientPortalIdentity, resolveTbosClientUserIds } from "./client-portal-identity.js";
 
 const WORKSPACE_TBOS_ROLES = new Set(["client", "customer_support"]);
 
@@ -18,6 +18,7 @@ async function resolveClientTicketingUser(
   email: string,
 ): Promise<TicketingAuthUser | null> {
   const identity = await resolveLinkedTbosClientPortalIdentity(adminUserId);
+  const tbosActorIds = await resolveTbosClientUserIds(adminUserId);
   const portalAccessOr = [{ portalAccess: true }, { canApproveTimesheets: true }];
   const contactEmailFilters = identity.contactEmails.map((rowEmail) => ({
     contact: { email: { equals: rowEmail, mode: "insensitive" as const } },
@@ -31,6 +32,13 @@ async function resolveClientTicketingUser(
     {
       ticketingUser: { tbosAdminUserId: adminUserId, role: TicketingUserRole.CLIENT, active: true },
       OR: portalAccessOr,
+    },
+    {
+      project: {
+        status: "ACTIVE",
+        kind: "SUPPORT",
+        timesheetApproverUserId: { in: tbosActorIds },
+      },
     },
   ];
   const link =
@@ -65,6 +73,12 @@ async function resolveClientTicketingUser(
       tu = refreshed?.ticketingUser ?? null;
     }
     if (tu?.active && tu.role === "CLIENT") {
+      if (tu.tbosAdminUserId !== adminUserId) {
+        await prisma.ticketingUser.updateMany({
+          where: { tbosAdminUserId: adminUserId, id: { not: tu.id } },
+          data: { tbosAdminUserId: null, tbosRole: null },
+        });
+      }
       await prisma.ticketingUser.update({
         where: { id: tu.id },
         data: { tbosAdminUserId: adminUserId, tbosRole: "client" },
@@ -97,6 +111,10 @@ async function resolveClientTicketingUser(
   if (existingClient) {
     await ensureClientPortalContactLinks(existingClient.id, emailsForLink, identity.contactIds);
     if (existingClient.tbosAdminUserId !== adminUserId) {
+      await prisma.ticketingUser.updateMany({
+        where: { tbosAdminUserId: adminUserId, id: { not: existingClient.id } },
+        data: { tbosAdminUserId: null, tbosRole: null },
+      });
       await prisma.ticketingUser.update({
         where: { id: existingClient.id },
         data: { tbosAdminUserId: adminUserId, tbosRole: "client" },

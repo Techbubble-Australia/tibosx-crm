@@ -105,6 +105,9 @@ ul.docx-bullet-list {
 .template-canvas ul,
 ul.docx-bullet-list { list-style-type: disc; }
 .template-canvas ol { list-style-type: decimal; }
+.template-canvas ol ol { list-style-type: lower-alpha; }
+.template-canvas ol ol ol { list-style-type: lower-roman; }
+.template-canvas ol ol ol ol { list-style-type: decimal; }
 .template-canvas li,
 li.docx-list-item { display: list-item; margin: 0.2em 0; }
 .signature-block { border: 2px dashed #6b7280; padding: 14px 16px 28px; background: #fafafa; position: relative; }
