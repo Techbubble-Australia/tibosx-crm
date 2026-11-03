@@ -4,7 +4,9 @@ import {
   entryHasHours,
   sumDailyHours,
   WEEKDAY_KEYS,
+  type DailyComments,
   type DailyHours,
+  type WeekdayKey,
 } from "./timesheet-entries";
 
 type ExportEntry = {
@@ -96,30 +98,71 @@ export function buildTimesheetExportFilename(rows: TimesheetXlsxRow[]): string {
   return "timesheets_export.xlsx";
 }
 
+const DAY_COLUMN_COUNT = WEEKDAY_KEYS.length;
+const SHEET_COLUMN_COUNT = 1 + DAY_COLUMN_COUNT;
+
+function padRow(cells: (string | number)[]): (string | number)[] {
+  const row = [...cells];
+  while (row.length < SHEET_COLUMN_COUNT) row.push("");
+  return row.slice(0, SHEET_COLUMN_COUNT);
+}
+
+function dayComment(comments: unknown, key: WeekdayKey): string {
+  return (((comments as DailyComments)?.[key] ?? "") as string).trim();
+}
+
+function applySheetGridBorders(sheet: ExcelJS.Worksheet, fromRow: number, toRow: number) {
+  for (let r = fromRow; r <= toRow; r += 1) {
+    for (let c = 1; c <= SHEET_COLUMN_COUNT; c += 1) {
+      sheet.getCell(r, c).border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+    }
+  }
+}
+
 function writeTimesheetSheet(sheet: ExcelJS.Worksheet, row: TimesheetXlsxRow) {
   const weekStartIso = row.startDate.toISOString().slice(0, 10);
   const member = row.memberUser?.name?.trim() || row.memberUser?.email?.trim() || "";
   const total = totalHours(row);
   const projectName = projectListName(row.project ?? null);
 
-  sheet.addRow(["<Project Name>", projectName]);
-  sheet.addRow(["<Member>", member]);
-  sheet.addRow(["<Status>", timesheetStatusLabel(row.status)]);
-  sheet.addRow(["<Total hours>", total]);
+  const startRow = sheet.rowCount + 1;
+
+  sheet.addRow(padRow(["Project Name", projectName]));
+  sheet.addRow(padRow(["Member", member]));
+  sheet.addRow(padRow(["Status", timesheetStatusLabel(row.status)]));
+  sheet.addRow(padRow(["Total hours", total]));
+  sheet.addRow(padRow([]));
 
   const dayHeaders = WEEKDAY_KEYS.map((_, i) => formatDayLabel(addUtcDays(weekStartIso, i)));
-  sheet.addRow(["", "", ...dayHeaders]);
+  sheet.addRow(padRow(["Task name", ...dayHeaders]));
 
-  for (const entry of exportEntries(row)) {
+  const entries = exportEntries(row);
+  entries.forEach((entry, index) => {
     const hoursCells = WEEKDAY_KEYS.map((key) => {
       const hours = Number((entry.dailyHours as DailyHours)?.[key]) || 0;
       return hours > 0 ? hours : "";
     });
-    sheet.addRow(["<Task name>", projectName, ...hoursCells]);
-  }
+    sheet.addRow(padRow([`Task #${index + 1}`, ...hoursCells]));
 
-  sheet.addRow(["<Timesheet comments>", row.comments?.trim() ?? ""]);
-  sheet.addRow(["<Approver>", row.approverLabel]);
+    const commentCells = WEEKDAY_KEYS.map((key) => dayComment(entry.dailyComments, key));
+    sheet.addRow(padRow(["Task comments", ...commentCells]));
+  });
+
+  sheet.addRow(padRow(["Timesheet comments", row.comments?.trim() ?? ""]));
+  sheet.addRow(padRow(["Approver", row.approverLabel]));
+
+  const endRow = sheet.rowCount;
+  applySheetGridBorders(sheet, startRow, endRow);
+
+  sheet.getColumn(1).width = 18;
+  for (let c = 2; c <= SHEET_COLUMN_COUNT; c += 1) {
+    sheet.getColumn(c).width = 14;
+  }
 }
 
 export async function buildTimesheetWorkbook(rows: TimesheetXlsxRow[]): Promise<ExcelJS.Workbook> {
