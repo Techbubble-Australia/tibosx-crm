@@ -112,7 +112,7 @@ export default function EditCustomerUserPage() {
       <form onSubmit={(e) => void onSubmit(e)} className="space-y-4 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
         <UserPhotoField name={detail.name} email={detail.email} photoUrl={photoUrl} onChange={setPhotoUrl} />
         <div>
-          <label className="mb-1 block text-sm font-medium">Email *</label>
+          <label className="mb-1 block text-sm font-medium">Email <span className="text-red-500">*</span></label>
           <input name="email" type="email" required defaultValue={detail.email} className={inputClass} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -121,7 +121,7 @@ export default function EditCustomerUserPage() {
             <input name="name" defaultValue={detail.name ?? ""} className={inputClass} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Phone *</label>
+            <label className="mb-1 block text-sm font-medium">Phone <span className="text-red-500">*</span></label>
             <input name="phone" required defaultValue={detail.phone ?? ""} className={inputClass} />
           </div>
         </div>

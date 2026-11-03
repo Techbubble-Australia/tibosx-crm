@@ -37,6 +37,7 @@ import { requireRole, requireModule, requireAnyModule, blockModuleMutations } fr
 import { assertDevEnvMiddleware } from "./middleware/assertDevEnv.js";
 import { dashboardRoutes } from "./routes/dashboard";
 import { salesDashboardRoutes } from "./routes/sales-dashboard";
+import { projectDashboardRoutes } from "./routes/project-dashboard";
 import { credentialTemplateRoutes } from "./routes/credentialTemplates";
 import { projectRoutes } from "./routes/projects";
 import { timesheetRoutes } from "./routes/timesheets";
@@ -201,6 +202,13 @@ app.use(
   requireMfaEnrolled,
   requireModule("project_management"),
   timesheetRoutes,
+);
+app.use(
+  "/api/admin/project-dashboard",
+  authMiddleware,
+  requireMfaEnrolled,
+  requireModule("project_management"),
+  projectDashboardRoutes,
 );
 app.use(
   "/api/admin/notifications",

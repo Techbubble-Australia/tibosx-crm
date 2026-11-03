@@ -325,7 +325,7 @@ export default function EditUserPage() {
             onChange={setPhotoUrl}
           />
           <div>
-            <label className="mb-1 block text-sm font-medium">Email *</label>
+            <label className="mb-1 block text-sm font-medium">Email <span className="text-red-500">*</span></label>
             <input name="email" type="email" required defaultValue={defaults.email} className={inputClass} />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -334,12 +334,12 @@ export default function EditUserPage() {
               <input name="name" defaultValue={defaults.name ?? ""} className={inputClass} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Phone *</label>
+              <label className="mb-1 block text-sm font-medium">Phone <span className="text-red-500">*</span></label>
               <input name="phone" required defaultValue={defaults.phone ?? ""} className={inputClass} />
             </div>
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium">Roles *</label>
+            <label className="mb-2 block text-sm font-medium">Roles <span className="text-red-500">*</span></label>
             <AdminRolesMultiSelect
               value={roles}
               onChange={(next) => {
@@ -447,7 +447,7 @@ export default function EditUserPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label className="mb-1 block text-sm font-medium">
-                Address line 1{isClientUser ? "" : " *"}
+                Address line 1{isClientUser ? null : <span className="text-red-500"> *</span>}
               </label>
               <input
                 name="addressLine1"
@@ -469,15 +469,15 @@ export default function EditUserPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">City{isClientUser ? "" : " *"}</label>
+              <label className="mb-1 block text-sm font-medium">City{isClientUser ? null : <span className="text-red-500"> *</span>}</label>
               <input name="city" required={!isClientUser} defaultValue={defaults.city ?? ""} className={inputClass} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">State{isClientUser ? "" : " *"}</label>
+              <label className="mb-1 block text-sm font-medium">State{isClientUser ? null : <span className="text-red-500"> *</span>}</label>
               <input name="state" required={!isClientUser} defaultValue={defaults.state ?? ""} className={inputClass} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Country{isClientUser ? "" : " *"}</label>
+              <label className="mb-1 block text-sm font-medium">Country{isClientUser ? null : <span className="text-red-500"> *</span>}</label>
               <select name="country" required={!isClientUser} defaultValue={defaults.country ?? ""} className={inputClass}>
                 <option value="">Select country…</option>
                 {COUNTRY_OPTIONS.map((option) => (
@@ -499,7 +499,7 @@ export default function EditUserPage() {
             {emergencyContacts.map((contact, index) => (
               <div key={index} className="grid gap-3 rounded-lg border border-gray-100 p-4 dark:border-gray-800 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium">Name *</label>
+                  <label className="mb-1 block text-sm font-medium">Name <span className="text-red-500">*</span></label>
                   <input
                     className={inputClass}
                     value={contact.name}
@@ -523,7 +523,7 @@ export default function EditUserPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium">Email *</label>
+                  <label className="mb-1 block text-sm font-medium">Email <span className="text-red-500">*</span></label>
                   <input
                     className={inputClass}
                     type="email"
@@ -536,7 +536,7 @@ export default function EditUserPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium">Phone *</label>
+                  <label className="mb-1 block text-sm font-medium">Phone <span className="text-red-500">*</span></label>
                   <input
                     className={inputClass}
                     value={contact.phone ?? ""}

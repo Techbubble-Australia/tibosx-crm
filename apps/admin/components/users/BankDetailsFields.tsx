@@ -100,7 +100,7 @@ export function BankDetailsFields({ value, onChange, readOnly, showTaxNumber }: 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <div>
-        <label className="mb-1 block text-sm font-medium">Bank name *</label>
+        <label className="mb-1 block text-sm font-medium">Bank name <span className="text-red-500">*</span></label>
         <input
           className={readOnly ? `${inputClass} bg-gray-50 dark:bg-gray-950` : inputClass}
           value={value.bankName}
@@ -110,7 +110,7 @@ export function BankDetailsFields({ value, onChange, readOnly, showTaxNumber }: 
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Account name *</label>
+        <label className="mb-1 block text-sm font-medium">Account name <span className="text-red-500">*</span></label>
         <input
           className={readOnly ? `${inputClass} bg-gray-50 dark:bg-gray-950` : inputClass}
           value={value.accountName}
@@ -120,7 +120,7 @@ export function BankDetailsFields({ value, onChange, readOnly, showTaxNumber }: 
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Account number *</label>
+        <label className="mb-1 block text-sm font-medium">Account number <span className="text-red-500">*</span></label>
         <input
           className={readOnly ? `${inputClass} bg-gray-50 dark:bg-gray-950` : inputClass}
           value={value.accountNumber}
@@ -130,7 +130,7 @@ export function BankDetailsFields({ value, onChange, readOnly, showTaxNumber }: 
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Bank country *</label>
+        <label className="mb-1 block text-sm font-medium">Bank country <span className="text-red-500">*</span></label>
         <select
           className={readOnly ? `${inputClass} bg-gray-50 dark:bg-gray-950` : inputClass}
           value={value.countrySelect}
@@ -164,7 +164,7 @@ export function BankDetailsFields({ value, onChange, readOnly, showTaxNumber }: 
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">BSB / Routing / IFSC *</label>
+        <label className="mb-1 block text-sm font-medium">BSB / Routing / IFSC <span className="text-red-500">*</span></label>
         <input
           className={readOnly ? `${inputClass} bg-gray-50 dark:bg-gray-950` : inputClass}
           value={value.bsb}
@@ -175,7 +175,7 @@ export function BankDetailsFields({ value, onChange, readOnly, showTaxNumber }: 
       </div>
       {showTaxNumber ? (
         <div className="sm:col-span-2">
-          <label className="mb-1 block text-sm font-medium">Tax number *</label>
+          <label className="mb-1 block text-sm font-medium">Tax number <span className="text-red-500">*</span></label>
           <input
             className={readOnly ? `${inputClass} bg-gray-50 dark:bg-gray-950` : inputClass}
             value={value.taxNumber}
@@ -187,7 +187,7 @@ export function BankDetailsFields({ value, onChange, readOnly, showTaxNumber }: 
       ) : null}
       <div className="sm:col-span-2">
         <label className="mb-1 block text-sm font-medium">
-          {BANK_PAYROLL_NOTES_LABEL} *
+          {BANK_PAYROLL_NOTES_LABEL} <span className="text-red-500">*</span>
         </label>
         <textarea
           className={readOnly ? `${inputClass} bg-gray-50 dark:bg-gray-950` : inputClass}

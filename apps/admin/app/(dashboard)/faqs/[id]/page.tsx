@@ -77,17 +77,17 @@ export default function EditFaqPage() {
         <section className="bg-white p-6 rounded-xl border border-gray-200 space-y-4">
           <h3 className="font-semibold">FAQ Details</h3>
           <div>
-            <label className="block text-sm font-medium mb-1">Question *</label>
+            <label className="block text-sm font-medium mb-1">Question <span className="text-red-500">*</span></label>
             <input name="question" required defaultValue={faq.question as string}
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Answer *</label>
+            <label className="block text-sm font-medium mb-1">Answer <span className="text-red-500">*</span></label>
             <textarea name="answer" required rows={5} defaultValue={faq.answer as string}
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Category *</label>
+            <label className="block text-sm font-medium mb-1">Category <span className="text-red-500">*</span></label>
             <select name="category" required defaultValue={faq.category as string}
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm bg-white">
               <option value="pricing">Pricing</option>

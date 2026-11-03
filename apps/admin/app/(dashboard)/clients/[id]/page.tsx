@@ -155,7 +155,7 @@ export default function EditClientPage() {
         className="space-y-6 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900"
       >
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Name *</label>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Name <span className="text-red-500">*</span></label>
           <input name="name" required defaultValue={defaults.name} className={inputClass} />
         </div>
         <div>

@@ -373,17 +373,17 @@ export function ProfileForm({
         <h3 className="font-semibold text-gray-900 dark:text-gray-100">Candidate details</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className={labelClass}>First name *</label>
+            <label className={labelClass}>First name <span className="text-red-500">*</span></label>
             <input required value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inputClass} />
           </div>
           <div>
-            <label className={labelClass}>Last name *</label>
+            <label className={labelClass}>Last name <span className="text-red-500">*</span></label>
             <input required value={lastName} onChange={(e) => setLastName(e.target.value)} className={inputClass} />
           </div>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className={labelClass}>Email *</label>
+            <label className={labelClass}>Email <span className="text-red-500">*</span></label>
             <input
               type="email"
               required
@@ -393,7 +393,7 @@ export function ProfileForm({
             />
           </div>
           <div>
-            <label className={labelClass}>Phone *</label>
+            <label className={labelClass}>Phone <span className="text-red-500">*</span></label>
             <input
               type="tel"
               required
@@ -424,7 +424,7 @@ export function ProfileForm({
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className={labelClass}>Citizen *</label>
+            <label className={labelClass}>Citizen <span className="text-red-500">*</span></label>
             <select
               value={isCitizen ? "yes" : "no"}
               onChange={(e) => {
@@ -439,7 +439,7 @@ export function ProfileForm({
             </select>
           </div>
           <div>
-            <label className={labelClass}>Visa status {isCitizen ? "" : "*"}</label>
+            <label className={labelClass}>Visa status {isCitizen ? null : <span className="text-red-500">*</span>}</label>
             <input
               type="text"
               value={isCitizen ? "Citizen / permanent resident" : visaStatus}
@@ -453,7 +453,7 @@ export function ProfileForm({
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className={labelClass}>Country *</label>
+            <label className={labelClass}>Country <span className="text-red-500">*</span></label>
             <select
               required
               value={countryCode}
@@ -506,7 +506,7 @@ export function ProfileForm({
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className={labelClass}>Category *</label>
+            <label className={labelClass}>Category <span className="text-red-500">*</span></label>
             <select
               required
               value={category}
@@ -521,7 +521,7 @@ export function ProfileForm({
             </select>
           </div>
           <div>
-            <label className={labelClass}>Technology *</label>
+            <label className={labelClass}>Technology <span className="text-red-500">*</span></label>
             <select
               required
               value={technology}
@@ -538,7 +538,7 @@ export function ProfileForm({
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className={labelClass}>Level *</label>
+            <label className={labelClass}>Level <span className="text-red-500">*</span></label>
             <select
               required
               value={level}
@@ -551,7 +551,7 @@ export function ProfileForm({
             </select>
           </div>
           <div>
-            <label className={labelClass}>Relevant experience (years) *</label>
+            <label className={labelClass}>Relevant experience (years) <span className="text-red-500">*</span></label>
             <input
               type="number"
               required
@@ -695,7 +695,7 @@ export function ProfileForm({
         <h3 className="font-semibold text-gray-900 dark:text-gray-100">Rate & compensation</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
-            <label className={labelClass}>Currency *</label>
+            <label className={labelClass}>Currency <span className="text-red-500">*</span></label>
             <select required value={currency} onChange={(e) => setCurrency(e.target.value)} className={inputClass}>
               <option value="" disabled>Select currency…</option>
               {SALARY_CURRENCIES.map((c) => (
@@ -704,7 +704,7 @@ export function ProfileForm({
             </select>
           </div>
           <div>
-            <label className={labelClass}>Expected rate *</label>
+            <label className={labelClass}>Expected rate <span className="text-red-500">*</span></label>
             <input
               required
               inputMode="numeric"
@@ -715,7 +715,7 @@ export function ProfileForm({
             />
           </div>
           <div>
-            <label className={labelClass}>Mode *</label>
+            <label className={labelClass}>Mode <span className="text-red-500">*</span></label>
             <select required value={modeValue} onChange={(e) => setModeValue(e.target.value)} className={inputClass}>
               <option value="" disabled>Select mode…</option>
               {SALARY_MODES.map((m) => (
@@ -737,7 +737,7 @@ export function ProfileForm({
       </section>
 
       <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Documents *</h3>
+        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Documents <span className="text-red-500">*</span></h3>
         <p className="text-sm text-gray-500 dark:text-gray-400">
           Upload resume, visa copies, and other supporting documents (PDF, DOC, DOCX — max 5MB each, up to 10 files).
         </p>

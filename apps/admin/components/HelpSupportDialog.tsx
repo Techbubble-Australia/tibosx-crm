@@ -101,7 +101,7 @@ export function HelpSupportDialog({ open, onClose }: Props) {
           <form onSubmit={(e) => void onSubmit(e)} className="space-y-4 px-5 py-5">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                What do you need help with? *
+                What do you need help with? <span className="text-red-500">*</span>
               </label>
               <input
                 required
@@ -112,7 +112,7 @@ export function HelpSupportDialog({ open, onClose }: Props) {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Enter your message *
+                Enter your message <span className="text-red-500">*</span>
               </label>
               <textarea
                 required

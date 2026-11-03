@@ -60,7 +60,7 @@ export default function NewTestimonialPage() {
           <h3 className="font-semibold">Testimonial Content</h3>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Quote *</label>
+            <label className="block text-sm font-medium mb-1">Quote <span className="text-red-500">*</span></label>
             <textarea name="quote" required rows={5}
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
               placeholder="What did the client say? (without quotation marks)" />
@@ -68,13 +68,13 @@ export default function NewTestimonialPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Author Name *</label>
+              <label className="block text-sm font-medium mb-1">Author Name <span className="text-red-500">*</span></label>
               <input name="authorName" required
                 className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
                 placeholder="e.g. Haima Prakash" />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Initials *</label>
+              <label className="block text-sm font-medium mb-1">Initials <span className="text-red-500">*</span></label>
               <input name="authorInitials" required maxLength={3}
                 className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
                 placeholder="e.g. HP" />
@@ -82,14 +82,14 @@ export default function NewTestimonialPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Title / Position *</label>
+            <label className="block text-sm font-medium mb-1">Title / Position <span className="text-red-500">*</span></label>
             <input name="authorTitle" required
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
               placeholder="e.g. Sr. Manager, Chief Technology Office" />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Company *</label>
+            <label className="block text-sm font-medium mb-1">Company <span className="text-red-500">*</span></label>
             <input name="authorCompany" required
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
               placeholder="e.g. University of Sydney" />

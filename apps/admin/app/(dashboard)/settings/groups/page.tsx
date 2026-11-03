@@ -100,11 +100,11 @@ export default function WorkspaceGroupsPage() {
       <form onSubmit={(e) => void createGroup(e)} className="space-y-4 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
         <h3 className="font-medium text-gray-900 dark:text-gray-100">New group</h3>
         <div>
-          <label className="mb-1 block text-sm font-medium">Group name *</label>
+          <label className="mb-1 block text-sm font-medium">Group name <span className="text-red-500">*</span></label>
           <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Encore" required />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">Client *</label>
+          <label className="mb-1 block text-sm font-medium">Client <span className="text-red-500">*</span></label>
           <select className={inputClass} value={clientId} onChange={(e) => setClientId(e.target.value)} required>
             <option value="">Select client…</option>
             {clients.map((c) => (

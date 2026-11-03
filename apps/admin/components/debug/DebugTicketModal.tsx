@@ -129,7 +129,7 @@ export function DebugTicketModal() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium">Description *</label>
+                <label className="mb-1 block text-sm font-medium">Description <span className="text-red-500">*</span></label>
                 <textarea
                   rows={4}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"

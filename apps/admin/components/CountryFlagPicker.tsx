@@ -29,7 +29,7 @@ export function CountryFlagPicker({
 
   return (
     <div>
-      <label className={labelClassName}>Country &amp; flag *</label>
+      <label className={labelClassName}>Country &amp; flag <span className="text-red-500">*</span></label>
       <p className="mb-2 text-xs text-gray-500">
         Data from <span className="font-mono">i18n-iso-countries</span>; flag is the standard regional-indicator emoji for the ISO code.
       </p>

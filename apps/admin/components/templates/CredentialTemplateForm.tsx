@@ -226,7 +226,7 @@ export function CredentialTemplateForm({ defaults, onSubmit, isSaving }: Props) 
         <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Template details</h3>
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Name *</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Name <span className="text-red-500">*</span></label>
             <input
               className={inputClass}
               value={name}

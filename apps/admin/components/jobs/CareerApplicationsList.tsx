@@ -600,7 +600,7 @@ function InterviewFieldRow({
     <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/30">
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-medium uppercase tracking-wide text-amber-800 dark:text-amber-200">
-          Interview date & time{isInterviewEditable(status) ? " *" : ""}
+          Interview date & time{isInterviewEditable(status) ? <span className="text-red-500"> *</span> : null}
         </p>
         {editable && !editing ? (
           <button
@@ -712,7 +712,7 @@ function CommentsFieldRow({
               : "text-gray-600 dark:text-gray-300"
           }`}
         >
-          Comments{mandatory ? " *" : ""}
+          Comments{mandatory ? <span className="text-red-500"> *</span> : null}
         </p>
         {canEdit && !editing ? (
           <button

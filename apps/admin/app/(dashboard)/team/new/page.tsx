@@ -69,14 +69,14 @@ export default function NewTeamMemberPage() {
           <h3 className="font-semibold">Profile Details</h3>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Full Name *</label>
+            <label className="block text-sm font-medium mb-1">Full Name <span className="text-red-500">*</span></label>
             <input name="name" required
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
               placeholder="e.g. Nikita T" />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Role / Title *</label>
+            <label className="block text-sm font-medium mb-1">Role / Title <span className="text-red-500">*</span></label>
             <input name="role" required
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
               placeholder="e.g. Founder & Director" />
@@ -90,7 +90,7 @@ export default function NewTeamMemberPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Department *</label>
+            <label className="block text-sm font-medium mb-1">Department <span className="text-red-500">*</span></label>
             <TeamDepartmentSelect />
             <p className="mt-1 text-xs text-gray-500 dark:text-zinc-400">
               Options come from Site content → About page → Workforce → Team tabs (plus any department already used on a

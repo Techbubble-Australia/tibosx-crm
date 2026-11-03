@@ -211,16 +211,16 @@ export default function InvoiceDetailPage() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium">Issue date *</label>
+              <label className="mb-1 block text-sm font-medium">Issue date <span className="text-red-500">*</span></label>
               <input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} readOnly={!fieldsEditable} required className={inputClass} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Due date *</label>
+              <label className="mb-1 block text-sm font-medium">Due date <span className="text-red-500">*</span></label>
               <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required className={inputClass} />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Description *</label>
+            <label className="mb-1 block text-sm font-medium">Description <span className="text-red-500">*</span></label>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} readOnly={!fieldsEditable} required className={inputClass} />
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">

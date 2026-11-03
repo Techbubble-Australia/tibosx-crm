@@ -118,7 +118,7 @@ export function ClientContactsField({
               </div>
               <div className="space-y-3">
                 <div>
-                  <label className={labelClassName}>Contact name *</label>
+                  <label className={labelClassName}>Contact name <span className="text-red-500">*</span></label>
                   <input
                     required
                     value={contact.name}
@@ -128,7 +128,7 @@ export function ClientContactsField({
                   />
                 </div>
                 <div>
-                  <label className={labelClassName}>Contact email *</label>
+                  <label className={labelClassName}>Contact email <span className="text-red-500">*</span></label>
                   <input
                     type="email"
                     required
@@ -150,7 +150,7 @@ export function ClientContactsField({
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,140px)_1fr]">
                   <div>
-                    <label className={labelClassName}>Country code *</label>
+                    <label className={labelClassName}>Country code <span className="text-red-500">*</span></label>
                     <select
                       required
                       value={contact.phoneCountryCode}
@@ -166,7 +166,7 @@ export function ClientContactsField({
                     </select>
                   </div>
                   <div>
-                    <label className={labelClassName}>Contact phone *</label>
+                    <label className={labelClassName}>Contact phone <span className="text-red-500">*</span></label>
                     <input
                       type="tel"
                       required

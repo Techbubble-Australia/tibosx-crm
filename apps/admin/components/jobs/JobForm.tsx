@@ -292,7 +292,7 @@ export function JobForm({
         <h3 className="font-semibold text-gray-900 dark:text-gray-100">Job Details</h3>
 
         <div>
-          <label className={labelClass}>Job Title *</label>
+          <label className={labelClass}>Job Title <span className="text-red-500">*</span></label>
           <input
             name="title"
             required
@@ -312,7 +312,7 @@ export function JobForm({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className={labelClass}>Employment Type *</label>
+            <label className={labelClass}>Employment Type <span className="text-red-500">*</span></label>
             <select name="type" required defaultValue={defaults.type ?? "Full-time"} className={inputClass}>
               <option value="Full-time">Full-time</option>
               <option value="Contract">Contract</option>
@@ -321,7 +321,7 @@ export function JobForm({
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Contract, full-time, etc.</p>
           </div>
           <div>
-            <label className={labelClass}>Work Mode *</label>
+            <label className={labelClass}>Work Mode <span className="text-red-500">*</span></label>
             <select name="workMode" required defaultValue={defaults.workMode ?? "Remote"} className={inputClass}>
               <option value="Remote">Remote</option>
               <option value="Hybrid">Hybrid</option>
@@ -329,7 +329,7 @@ export function JobForm({
             </select>
           </div>
           <div>
-            <label className={labelClass}>Level *</label>
+            <label className={labelClass}>Level <span className="text-red-500">*</span></label>
             <select
               required
               value={level}
@@ -425,7 +425,7 @@ export function JobForm({
             </div>
           )}
           <div>
-            <label className={labelClass}>No. of positions *</label>
+            <label className={labelClass}>No. of positions <span className="text-red-500">*</span></label>
             <input
               type="number"
               required
@@ -441,7 +441,7 @@ export function JobForm({
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className={labelClass}>Category *</label>
+                <label className={labelClass}>Category <span className="text-red-500">*</span></label>
                 <select
                   name="category"
                   required
@@ -467,7 +467,7 @@ export function JobForm({
               </div>
 
               <div>
-                <label className={labelClass}>Technology *</label>
+                <label className={labelClass}>Technology <span className="text-red-500">*</span></label>
                 <select
                   name="technology"
                   required
@@ -499,7 +499,7 @@ export function JobForm({
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className={labelClass}>Department *</label>
+                <label className={labelClass}>Department <span className="text-red-500">*</span></label>
                 <select
                   name="department"
                   required
@@ -526,7 +526,7 @@ export function JobForm({
               </div>
 
               <div>
-                <label className={labelClass}>Client *</label>
+                <label className={labelClass}>Client <span className="text-red-500">*</span></label>
                 <select
                   name="clientId"
                   required

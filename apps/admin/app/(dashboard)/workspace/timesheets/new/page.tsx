@@ -103,7 +103,7 @@ export default function NewMemberTimesheetPage() {
       {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
       <form onSubmit={(e) => void onSubmit(e)} className="space-y-4 rounded-xl border border-slate-200 bg-white p-6">
         <div>
-          <label className="mb-1 block text-sm font-medium">Project or case *</label>
+          <label className="mb-1 block text-sm font-medium">Project or case <span className="text-red-500">*</span></label>
           <select
             required
             value={selected}
@@ -122,7 +122,7 @@ export default function NewMemberTimesheetPage() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium">Start date *</label>
+            <label className="mb-1 block text-sm font-medium">Start date <span className="text-red-500">*</span></label>
             <input
               type="date"
               required
@@ -132,7 +132,7 @@ export default function NewMemberTimesheetPage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">End date *</label>
+            <label className="mb-1 block text-sm font-medium">End date <span className="text-red-500">*</span></label>
             <input
               type="date"
               required

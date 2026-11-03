@@ -468,7 +468,7 @@ export default function ProfileSettingsPageInner() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="mb-1 block text-sm font-medium">
-              Address line 1{addressFieldsRequired ? " *" : ""}
+              Address line 1{addressFieldsRequired ? <span className="text-red-500"> *</span> : null}
             </label>
             <input
               className={inputClass}
@@ -482,7 +482,7 @@ export default function ProfileSettingsPageInner() {
             <input className={inputClass} value={addressLine2} onChange={(e) => setAddressLine2(e.target.value)} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Postcode{addressFieldsRequired ? " *" : ""}</label>
+            <label className="mb-1 block text-sm font-medium">Postcode{addressFieldsRequired ? <span className="text-red-500"> *</span> : null}</label>
             <input
               className={inputClass}
               value={postcode}
@@ -491,7 +491,7 @@ export default function ProfileSettingsPageInner() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">City{addressFieldsRequired ? " *" : ""}</label>
+            <label className="mb-1 block text-sm font-medium">City{addressFieldsRequired ? <span className="text-red-500"> *</span> : null}</label>
             <input
               className={inputClass}
               value={city}
@@ -500,7 +500,7 @@ export default function ProfileSettingsPageInner() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">State{addressFieldsRequired ? " *" : ""}</label>
+            <label className="mb-1 block text-sm font-medium">State{addressFieldsRequired ? <span className="text-red-500"> *</span> : null}</label>
             <input
               className={inputClass}
               value={stateRegion}
@@ -509,7 +509,7 @@ export default function ProfileSettingsPageInner() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Country{addressFieldsRequired ? " *" : ""}</label>
+            <label className="mb-1 block text-sm font-medium">Country{addressFieldsRequired ? <span className="text-red-500"> *</span> : null}</label>
             <select
               className={inputClass}
               value={countrySelect}
@@ -636,7 +636,7 @@ export default function ProfileSettingsPageInner() {
             {emergencyContacts.map((contact, index) => (
               <div key={index} className="grid gap-3 rounded-lg border border-gray-100 p-4 dark:border-gray-800 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Name *</label>
+                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Name <span className="text-red-500">*</span></label>
                   <input
                     className={inputClass}
                     value={contact.name}
@@ -653,7 +653,7 @@ export default function ProfileSettingsPageInner() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Email *</label>
+                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Email <span className="text-red-500">*</span></label>
                   <input
                     className={inputClass}
                     type="email"
@@ -664,7 +664,7 @@ export default function ProfileSettingsPageInner() {
                 </div>
                 <div className="flex gap-2 items-end">
                   <div className="min-w-0 flex-1">
-                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Phone *</label>
+                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Phone <span className="text-red-500">*</span></label>
                     <input
                       className={inputClass}
                       required

@@ -96,7 +96,7 @@ export function ProjectCustomerSupportSettings({
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-800 dark:text-gray-200">
-                Ticket prefix *
+                Ticket prefix <span className="text-red-500">*</span>
               </label>
               <input
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm uppercase dark:border-gray-600 dark:bg-gray-800"
@@ -116,7 +116,7 @@ export function ProjectCustomerSupportSettings({
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-800 dark:text-gray-200">
-                No. of digits *
+                No. of digits <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"

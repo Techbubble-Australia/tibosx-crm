@@ -111,7 +111,7 @@ export default function NewInvoicePage() {
 
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Contract *</label>
+            <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Contract <span className="text-red-500">*</span></label>
             <select value={contractId} onChange={(e) => setContractId(e.target.value)} required className={inputClass}>
               <option value="">Select contract…</option>
               {contracts.map((contract) => (
@@ -135,25 +135,25 @@ export default function NewInvoicePage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Issue date *</label>
+              <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Issue date <span className="text-red-500">*</span></label>
               <input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} required className={inputClass} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Due date *</label>
+              <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Due date <span className="text-red-500">*</span></label>
               <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required className={inputClass} />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Description *</label>
+            <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Description <span className="text-red-500">*</span></label>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} required className={inputClass} />
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Qty *</label>
+              <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Qty <span className="text-red-500">*</span></label>
               <input type="number" min="0" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} required className={inputClass} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Rate *</label>
+              <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Rate <span className="text-red-500">*</span></label>
               <input type="number" min="0" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} required className={inputClass} />
             </div>
             <div>

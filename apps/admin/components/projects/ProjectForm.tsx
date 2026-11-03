@@ -418,15 +418,15 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
               </div>
             ) : null}
             <div className={defaults.projectNumber ? "" : "sm:col-span-2"}>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Title *</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Title <span className="text-red-500">*</span></label>
               <input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} required />
             </div>
             <div className="sm:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Description *</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Description <span className="text-red-500">*</span></label>
               <textarea className={`${inputClass} min-h-[100px]`} value={description} onChange={(e) => setDescription(e.target.value)} required />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Client *</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Client <span className="text-red-500">*</span></label>
               <select className={inputClass} value={clientId} onChange={(e) => setClientId(e.target.value)} required>
                 <option value="">Select client…</option>
                 {clients.map((row) => (
@@ -435,7 +435,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Project type *</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Project type <span className="text-red-500">*</span></label>
               <select className={inputClass} value={kind} onChange={(e) => setKind(e.target.value as ProjectKind)}>
                 {PROJECT_KINDS.map((value) => (
                   <option key={value} value={value}>{PROJECT_KIND_LABELS[value]}</option>
@@ -443,7 +443,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Status *</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Status <span className="text-red-500">*</span></label>
               <select className={inputClass} value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus)}>
                 {PROJECT_STATUSES.map((value) => (
                   <option key={value} value={value}>{PROJECT_STATUS_LABELS[value]}</option>
@@ -451,7 +451,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Project manager *</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Project manager <span className="text-red-500">*</span></label>
               <select
                 className={inputClass}
                 value={projectManagerId}
@@ -486,11 +486,11 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
           <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Scheduling</h3>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Start date *</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Start date <span className="text-red-500">*</span></label>
               <input type="date" className={inputClass} value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">End date *</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">End date <span className="text-red-500">*</span></label>
               <input type="date" className={inputClass} value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
             </div>
           </div>

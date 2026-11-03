@@ -115,7 +115,7 @@ function NewUserPageInner() {
         className="space-y-4 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900"
       >
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Email *</label>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Email <span className="text-red-500">*</span></label>
           <input name="email" type="email" required className={inputClass} value={prefillEmail} onChange={(e) => setPrefillEmail(e.target.value)} />
         </div>
         <div>
@@ -123,16 +123,16 @@ function NewUserPageInner() {
           <input name="name" className={inputClass} value={prefillName} onChange={(e) => setPrefillName(e.target.value)} />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Phone *</label>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Phone <span className="text-red-500">*</span></label>
           <input name="phone" required className={inputClass} value={prefillPhone} onChange={(e) => setPrefillPhone(e.target.value)} />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Password *</label>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Password <span className="text-red-500">*</span></label>
           <input name="password" type="password" required minLength={8} className={inputClass} />
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Minimum 8 characters.</p>
         </div>
         <div>
-          <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">Roles *</label>
+          <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">Roles <span className="text-red-500">*</span></label>
           <AdminRolesMultiSelect value={roles} onChange={handleRolesChange} />
         </div>
         {roles.includes("client") ? (

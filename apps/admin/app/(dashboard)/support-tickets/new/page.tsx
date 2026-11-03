@@ -95,7 +95,7 @@ export default function AdminNewTicketPage() {
       {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
       <form onSubmit={onSubmit} className="space-y-5 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
         <div>
-          <label className="mb-1 block text-sm font-medium">Project *</label>
+          <label className="mb-1 block text-sm font-medium">Project <span className="text-red-500">*</span></label>
           {orgs.length === 0 ? (
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               No active Customer Support projects available. Enable Customer Support on a project to raise tickets
@@ -119,7 +119,7 @@ export default function AdminNewTicketPage() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium">Request type *</label>
+            <label className="mb-1 block text-sm font-medium">Request type <span className="text-red-500">*</span></label>
             <select required value={type} onChange={(e) => setType(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800">
               {Object.entries(TICKET_TYPE_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
@@ -127,7 +127,7 @@ export default function AdminNewTicketPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Priority *</label>
+            <label className="mb-1 block text-sm font-medium">Priority <span className="text-red-500">*</span></label>
             <select required value={priority} onChange={(e) => setPriority(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800">
               {TICKET_PRIORITIES.map((p) => (
                 <option key={p} value={p}>{TICKET_PRIORITY_LABELS[p]}</option>
@@ -136,11 +136,11 @@ export default function AdminNewTicketPage() {
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">Subject *</label>
+          <label className="mb-1 block text-sm font-medium">Subject <span className="text-red-500">*</span></label>
           <input required value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800" />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">Description *</label>
+          <label className="mb-1 block text-sm font-medium">Description <span className="text-red-500">*</span></label>
           <textarea required rows={6} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800" />
         </div>
         <FileUploadField files={files} onChange={setFiles} />

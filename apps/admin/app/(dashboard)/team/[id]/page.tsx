@@ -98,12 +98,12 @@ export default function EditTeamMemberPage() {
         <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-6">
           <h3 className="font-semibold">Profile Details</h3>
           <div>
-            <label className="block text-sm font-medium mb-1">Full Name *</label>
+            <label className="block text-sm font-medium mb-1">Full Name <span className="text-red-500">*</span></label>
             <input name="name" required defaultValue={member.name as string}
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Role / Title *</label>
+            <label className="block text-sm font-medium mb-1">Role / Title <span className="text-red-500">*</span></label>
             <input name="role" required defaultValue={member.role as string}
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" />
           </div>
@@ -114,7 +114,7 @@ export default function EditTeamMemberPage() {
               placeholder="e.g. Australia, India, USA" />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Department *</label>
+            <label className="block text-sm font-medium mb-1">Department <span className="text-red-500">*</span></label>
             <TeamDepartmentSelect
               defaultValue={String(member.department ?? "")}
               currentDepartment={String(member.department ?? "")}

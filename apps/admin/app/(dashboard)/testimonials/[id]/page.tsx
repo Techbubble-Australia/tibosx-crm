@@ -89,29 +89,29 @@ export default function EditTestimonialPage() {
         <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-6">
           <h3 className="font-semibold">Testimonial Content</h3>
           <div>
-            <label className="block text-sm font-medium mb-1">Quote *</label>
+            <label className="block text-sm font-medium mb-1">Quote <span className="text-red-500">*</span></label>
             <textarea name="quote" required rows={5} defaultValue={t.quote as string}
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Author Name *</label>
+              <label className="block text-sm font-medium mb-1">Author Name <span className="text-red-500">*</span></label>
               <input name="authorName" required defaultValue={t.authorName as string}
                 className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Initials *</label>
+              <label className="block text-sm font-medium mb-1">Initials <span className="text-red-500">*</span></label>
               <input name="authorInitials" required maxLength={3} defaultValue={t.authorInitials as string}
                 className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Title / Position *</label>
+            <label className="block text-sm font-medium mb-1">Title / Position <span className="text-red-500">*</span></label>
             <input name="authorTitle" required defaultValue={t.authorTitle as string}
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Company *</label>
+            <label className="block text-sm font-medium mb-1">Company <span className="text-red-500">*</span></label>
             <input name="authorCompany" required defaultValue={t.authorCompany as string}
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" />
           </div>

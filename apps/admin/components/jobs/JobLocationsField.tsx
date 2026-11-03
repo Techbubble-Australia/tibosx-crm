@@ -92,7 +92,7 @@ export function JobLocationsField({ value, onChange, inputClass, labelClass }: P
   return (
     <div className="space-y-3">
       <div>
-        <label className={labelClass}>Locations *</label>
+        <label className={labelClass}>Locations <span className="text-red-500">*</span></label>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           Use one row per country. Pick one city (or Any / Other). Use &quot;Add country&quot; only for a different
           country.

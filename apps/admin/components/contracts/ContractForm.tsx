@@ -1145,7 +1145,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       ) : null}
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Title *</label>
+        <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Title <span className="text-red-500">*</span></label>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -1157,7 +1157,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Client *</label>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Client <span className="text-red-500">*</span></label>
           <select
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
@@ -1172,7 +1172,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Type *</label>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Type <span className="text-red-500">*</span></label>
           <select
             value={type}
             onChange={(e) => setType(e.target.value as ContractType)}
@@ -1215,7 +1215,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Start date *</label>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Start date <span className="text-red-500">*</span></label>
           <input
             type="date"
             value={startDate}
@@ -1263,7 +1263,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {type === "T_AND_M" ? (
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Unit *</label>
+            <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Unit <span className="text-red-500">*</span></label>
             <select
               value={unit}
               onChange={(e) => setUnit(e.target.value as ContractUnit)}
@@ -1279,7 +1279,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
           </div>
         ) : null}
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Currency *</label>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Currency <span className="text-red-500">*</span></label>
           <select
             value={currency}
             onChange={(e) => setCurrency(e.target.value)}
@@ -1294,7 +1294,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
         </div>
         {showNumberOfUnits ? (
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">No. of units *</label>
+            <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">No. of units <span className="text-red-500">*</span></label>
             <input
               type="number"
               min="0.0001"
@@ -1310,7 +1310,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
         {showRate ? (
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
-              Rate{rateRequired ? " *" : ""}
+              Rate{rateRequired ? <span className="text-red-500"> *</span> : null}
             </label>
             <input
               type="number"
@@ -1329,7 +1329,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       {type === "T_AND_M" && (isEditable || workUnitMonths.length > 0) ? (
         <div className="space-y-2">
           <div>
-            <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Monthly work units *</h4>
+            <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Monthly work units <span className="text-red-500">*</span></h4>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Weekdays only (Mon–Fri), excluding public holidays. Hour unit = weekdays × 8.
             </p>
@@ -1345,7 +1345,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
-            Contract value{contractValueRequired ? " *" : ""}
+            Contract value{contractValueRequired ? <span className="text-red-500"> *</span> : null}
           </label>
           {contractValueReadOnly ? (
             <p className={`rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100 ${readOnlyClass}`}>
@@ -1522,7 +1522,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
             <div className="mb-4 space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/40">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Start date *</label>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Start date <span className="text-red-500">*</span></label>
                   <input
                     type="date"
                     value={variationDate}
@@ -1533,7 +1533,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                    End date{type === "T_AND_M" ? " *" : ""}
+                    End date{type === "T_AND_M" ? <span className="text-red-500"> *</span> : null}
                   </label>
                   <input
                     type="date"
@@ -1551,7 +1551,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                 <>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Qty *</label>
+                      <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Qty <span className="text-red-500">*</span></label>
                       <input
                         type="number"
                         min="0.0001"
@@ -1563,7 +1563,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                       <p className="mt-1 text-xs text-gray-500">Total of all work units</p>
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Rate *</label>
+                      <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Rate <span className="text-red-500">*</span></label>
                       <input
                         type="number"
                         min="0"
@@ -1581,7 +1581,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Monthly work units *</p>
+                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Monthly work units <span className="text-red-500">*</span></p>
                     <WorkUnitMonthsEditor
                       rows={variationWorkUnitMonths}
                       editable
@@ -1591,7 +1591,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                 </>
               ) : (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Variation value *</label>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Variation value <span className="text-red-500">*</span></label>
                   <input
                     type="number"
                     min="0"
@@ -1850,7 +1850,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Issue date *</label>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Issue date <span className="text-red-500">*</span></label>
                   <input
                     type="date"
                     value={invoiceIssueDate}
@@ -1861,7 +1861,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Due date *</label>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Due date <span className="text-red-500">*</span></label>
                   <input
                     type="date"
                     value={invoiceDueDate}
@@ -1873,7 +1873,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Description *</label>
+                <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Description <span className="text-red-500">*</span></label>
                 <textarea
                   value={invoiceDescription}
                   onChange={(e) => setInvoiceDescription(e.target.value)}
@@ -1898,7 +1898,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Qty *</label>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Qty <span className="text-red-500">*</span></label>
                   <input
                     type="number"
                     min="0.0001"
@@ -1911,7 +1911,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Rate *</label>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Rate <span className="text-red-500">*</span></label>
                   <input
                     type="number"
                     min="0"
@@ -1924,7 +1924,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Tax rate % *</label>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Tax rate % <span className="text-red-500">*</span></label>
                   <input
                     type="number"
                     min="0"

@@ -122,7 +122,7 @@ export default function NewTicketPage() {
       {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
       <form onSubmit={onSubmit} className="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div>
-          <label className="mb-1 block text-sm font-medium">Project *</label>
+          <label className="mb-1 block text-sm font-medium">Project <span className="text-red-500">*</span></label>
           {orgs.length === 0 ? (
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               No active support projects are linked to your account. Ask your administrator to enable portal access on
@@ -150,7 +150,7 @@ export default function NewTicketPage() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium">Request type *</label>
+            <label className="mb-1 block text-sm font-medium">Request type <span className="text-red-500">*</span></label>
             <select
               required
               value={type}
@@ -166,7 +166,7 @@ export default function NewTicketPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Priority *</label>
+            <label className="mb-1 block text-sm font-medium">Priority <span className="text-red-500">*</span></label>
             <select
               required
               value={priority}
@@ -180,11 +180,11 @@ export default function NewTicketPage() {
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">Subject *</label>
+          <label className="mb-1 block text-sm font-medium">Subject <span className="text-red-500">*</span></label>
           <input required value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Brief summary" />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">Description *</label>
+          <label className="mb-1 block text-sm font-medium">Description <span className="text-red-500">*</span></label>
           <textarea required rows={6} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Steps to reproduce, expected behavior, etc." />
         </div>
         <FileUploadField files={files} onChange={setFiles} />

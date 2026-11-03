@@ -326,7 +326,8 @@ export function defaultLandingPath(role: string, additional?: string[] | null): 
   if (role === "admin" || role === "sales") return "/sales/dashboard";
   if (role === "recruiter_admin" || role === "recruiter") return "/database/dashboard";
   if (role === "website") return "/pages";
-  if (role === "project_manager" || role === "project_member") return "/projects";
+  if (role === "project_manager") return "/projects/dashboard";
+  if (role === "project_member") return "/projects";
   return "/sales/dashboard";
 }
 

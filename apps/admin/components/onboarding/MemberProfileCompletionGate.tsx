@@ -220,7 +220,7 @@ export function MemberProfileCompletionGate() {
 
         <div className="mt-6 space-y-6">
           <section>
-            <h3 className="mb-3 font-medium">Bank details *</h3>
+            <h3 className="mb-3 font-medium">Bank details <span className="text-red-500">*</span></h3>
             <div className="grid gap-3 sm:grid-cols-2">
               <input className={inputClass} placeholder="Bank name *" value={bankName} onChange={(e) => setBankName(e.target.value)} />
               <input className={inputClass} placeholder="Account name *" value={accountName} onChange={(e) => setAccountName(e.target.value)} />
@@ -250,7 +250,7 @@ export function MemberProfileCompletionGate() {
                 onChange={(e) => setTaxNumber(e.target.value)}
               />
               <label className="mb-1 block text-sm font-medium sm:col-span-2">
-                {BANK_PAYROLL_NOTES_LABEL} *
+                {BANK_PAYROLL_NOTES_LABEL} <span className="text-red-500">*</span>
               </label>
               <textarea
                 className={`${inputClass} sm:col-span-2`}
@@ -264,7 +264,7 @@ export function MemberProfileCompletionGate() {
           </section>
 
           <section>
-            <h3 className="mb-3 font-medium">Address *</h3>
+            <h3 className="mb-3 font-medium">Address <span className="text-red-500">*</span></h3>
             <div className="grid gap-3 sm:grid-cols-2">
               <input className={`${inputClass} sm:col-span-2`} placeholder="Address line 1 *" value={addressLine1} onChange={(e) => setAddressLine1(e.target.value)} />
               <input className={inputClass} placeholder="City *" value={city} onChange={(e) => setCity(e.target.value)} />
@@ -289,11 +289,11 @@ export function MemberProfileCompletionGate() {
           </section>
 
           <section>
-            <h3 className="mb-3 font-medium">Emergency contact *</h3>
+            <h3 className="mb-3 font-medium">Emergency contact <span className="text-red-500">*</span></h3>
             {emergencyContacts.map((contact, index) => (
               <div key={index} className="mb-3 grid gap-2 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium">Name *</label>
+                  <label className="mb-1 block text-sm font-medium">Name <span className="text-red-500">*</span></label>
                   <input
                     className={inputClass}
                     value={contact.name}
@@ -317,7 +317,7 @@ export function MemberProfileCompletionGate() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium">Email *</label>
+                  <label className="mb-1 block text-sm font-medium">Email <span className="text-red-500">*</span></label>
                   <input
                     className={inputClass}
                     value={contact.email ?? ""}
@@ -329,7 +329,7 @@ export function MemberProfileCompletionGate() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium">Phone *</label>
+                  <label className="mb-1 block text-sm font-medium">Phone <span className="text-red-500">*</span></label>
                   <input
                     className={inputClass}
                     value={contact.phone ?? ""}
@@ -346,7 +346,7 @@ export function MemberProfileCompletionGate() {
 
           <section className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium">ID proof *</label>
+              <label className="mb-1 block text-sm font-medium">ID proof <span className="text-red-500">*</span></label>
               <input
                 type="file"
                 accept=".pdf,image/*"
@@ -361,7 +361,7 @@ export function MemberProfileCompletionGate() {
               {idProofUrl ? <p className="mt-1 text-xs text-green-600">Uploaded</p> : null}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Address proof *</label>
+              <label className="mb-1 block text-sm font-medium">Address proof <span className="text-red-500">*</span></label>
               <input
                 type="file"
                 accept=".pdf,image/*"

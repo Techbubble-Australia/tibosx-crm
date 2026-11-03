@@ -197,22 +197,22 @@ export function JobAddProfileForm({ jobId, jobTitle, jobCountry, onClose, onCrea
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className={labelClass}>First name *</label>
+              <label className={labelClass}>First name <span className="text-red-500">*</span></label>
               <input name="firstName" required className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Last name *</label>
+              <label className={labelClass}>Last name <span className="text-red-500">*</span></label>
               <input name="lastName" required className={inputClass} />
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className={labelClass}>Email *</label>
+              <label className={labelClass}>Email <span className="text-red-500">*</span></label>
               <input name="email" type="email" required className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Phone *</label>
+              <label className={labelClass}>Phone <span className="text-red-500">*</span></label>
               <input name="phone" required pattern={PHONE_PATTERN} className={inputClass} placeholder="+61412345678" />
             </div>
           </div>
@@ -229,7 +229,7 @@ export function JobAddProfileForm({ jobId, jobTitle, jobCountry, onClose, onCrea
           </div>
 
           <div>
-            <label className={labelClass}>City *</label>
+            <label className={labelClass}>City <span className="text-red-500">*</span></label>
             {cityOptions.length > 0 ? (
               <select value={city} onChange={(e) => setCity(e.target.value)} required className={inputClass}>
                 <option value="">Select city</option>
@@ -256,7 +256,7 @@ export function JobAddProfileForm({ jobId, jobTitle, jobCountry, onClose, onCrea
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
-              <label className={labelClass}>Salary currency *</label>
+              <label className={labelClass}>Salary currency <span className="text-red-500">*</span></label>
               <select name="salaryCurrency" required defaultValue="AUD" className={inputClass}>
                 {SALARY_CURRENCIES.map((c) => (
                   <option key={c.code} value={c.code}>
@@ -266,7 +266,7 @@ export function JobAddProfileForm({ jobId, jobTitle, jobCountry, onClose, onCrea
               </select>
             </div>
             <div>
-              <label className={labelClass}>Salary rate *</label>
+              <label className={labelClass}>Salary rate <span className="text-red-500">*</span></label>
               <input
                 value={salaryRateInput}
                 onChange={(e) => setSalaryRateInput(formatSalaryRateDisplay(e.target.value))}
@@ -276,7 +276,7 @@ export function JobAddProfileForm({ jobId, jobTitle, jobCountry, onClose, onCrea
               />
             </div>
             <div>
-              <label className={labelClass}>Salary mode *</label>
+              <label className={labelClass}>Salary mode <span className="text-red-500">*</span></label>
               <select name="salaryMode" required defaultValue="Yearly" className={inputClass}>
                 {SALARY_MODES.map((mode) => (
                   <option key={mode} value={mode}>
@@ -289,7 +289,7 @@ export function JobAddProfileForm({ jobId, jobTitle, jobCountry, onClose, onCrea
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className={labelClass}>Citizen / permanent resident? *</label>
+              <label className={labelClass}>Citizen / permanent resident? <span className="text-red-500">*</span></label>
               <select
                 value={isCitizen ? "yes" : "no"}
                 onChange={(e) => setIsCitizen(e.target.value === "yes")}
@@ -300,7 +300,7 @@ export function JobAddProfileForm({ jobId, jobTitle, jobCountry, onClose, onCrea
               </select>
             </div>
             <div>
-              <label className={labelClass}>Relevant experience (years) *</label>
+              <label className={labelClass}>Relevant experience (years) <span className="text-red-500">*</span></label>
               <input
                 value={relevantExperienceInput}
                 onChange={(e) => setRelevantExperienceInput(e.target.value.replace(/[^\d]/g, ""))}
@@ -313,13 +313,13 @@ export function JobAddProfileForm({ jobId, jobTitle, jobCountry, onClose, onCrea
 
           {!isCitizen ? (
             <div>
-              <label className={labelClass}>Visa status *</label>
+              <label className={labelClass}>Visa status <span className="text-red-500">*</span></label>
               <input value={visaStatus} onChange={(e) => setVisaStatus(e.target.value)} required className={inputClass} />
             </div>
           ) : null}
 
           <div>
-            <label className={labelClass}>Documents *</label>
+            <label className={labelClass}>Documents <span className="text-red-500">*</span></label>
             <input
               type="file"
               accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"

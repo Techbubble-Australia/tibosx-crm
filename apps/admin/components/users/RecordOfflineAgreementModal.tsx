@@ -117,7 +117,7 @@ export function RecordOfflineAgreementModal({ userId, open, onClose, onSaved }: 
         </p>
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium">Agreement template *</label>
+            <label className="mb-1 block text-sm font-medium">Agreement template <span className="text-red-500">*</span></label>
             <select
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
               value={templateId}
@@ -130,7 +130,7 @@ export function RecordOfflineAgreementModal({ userId, open, onClose, onSaved }: 
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Signed document *</label>
+            <label className="mb-1 block text-sm font-medium">Signed document <span className="text-red-500">*</span></label>
             <input
               type="file"
               accept=".pdf,image/*"

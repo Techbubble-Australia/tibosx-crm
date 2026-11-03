@@ -111,13 +111,13 @@ export function OpportunityFields({ defaults = {}, presetClientId = "", defaultO
   return (
     <>
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Name *</label>
+        <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Name <span className="text-red-500">*</span></label>
         <input name="name" required defaultValue={defaults.name ?? ""} className={inputClass} placeholder="e.g. ServiceNow AMS renewal" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Client *</label>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Client <span className="text-red-500">*</span></label>
           <select
             name="clientId"
             required
@@ -135,7 +135,7 @@ export function OpportunityFields({ defaults = {}, presetClientId = "", defaultO
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Location *</label>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Location <span className="text-red-500">*</span></label>
           <select name="location" required defaultValue={defaults.location ?? ""} className={inputClass}>
             <option value="">Select country…</option>
             {countryOptions.map((country) => (
@@ -146,7 +146,7 @@ export function OpportunityFields({ defaults = {}, presetClientId = "", defaultO
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Type *</label>
+        <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Type <span className="text-red-500">*</span></label>
         <select name="type" required defaultValue={defaults.type ?? "FIXED_PRICE"} className={inputClass}>
           {OPPORTUNITY_TYPES.map((type) => (
             <option key={type} value={type}>{OPPORTUNITY_TYPE_LABELS[type]}</option>
@@ -177,7 +177,7 @@ export function OpportunityFields({ defaults = {}, presetClientId = "", defaultO
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Owner *</label>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Owner <span className="text-red-500">*</span></label>
           <select
             name="ownerId"
             required
@@ -197,7 +197,7 @@ export function OpportunityFields({ defaults = {}, presetClientId = "", defaultO
           ) : null}
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Status *</label>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Status <span className="text-red-500">*</span></label>
           <select name="status" required defaultValue={defaults.status ?? "DRAFT"} className={inputClass}>
             {OPPORTUNITY_STATUSES.map((status) => (
               <option key={status} value={status}>{OPPORTUNITY_STATUS_LABELS[status]}</option>
@@ -208,7 +208,7 @@ export function OpportunityFields({ defaults = {}, presetClientId = "", defaultO
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Currency *</label>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Currency <span className="text-red-500">*</span></label>
           <select name="currency" required defaultValue={defaults.currency ?? "AUD"} className={inputClass}>
             {SALES_CURRENCIES.map((c) => (
               <option key={c.code} value={c.code}>{c.label}</option>
@@ -216,7 +216,7 @@ export function OpportunityFields({ defaults = {}, presetClientId = "", defaultO
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Estimated Value *</label>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Estimated Value <span className="text-red-500">*</span></label>
           <input
             name="amount"
             type="number"
