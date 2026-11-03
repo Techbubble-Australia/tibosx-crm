@@ -34,6 +34,9 @@ type ReporterOption = {
   reporterEmail: string;
 };
 
+/** URL marker so "All reporters" isn't mistaken for "no choice yet" (which defaults to the signed-in user). */
+const ALL_REPORTERS = "all";
+
 function TicketsListInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -84,7 +87,9 @@ function TicketsListInner() {
         }
 
         const fromUrl = searchParams.get("reporterUserId")?.trim() ?? "";
-        if (fromUrl) {
+        if (fromUrl === ALL_REPORTERS) {
+          setReporterFilter("");
+        } else if (fromUrl) {
           setReporterFilter(fromUrl);
         } else if (sessionId) {
           setReporterFilter(sessionId);
@@ -105,9 +110,8 @@ function TicketsListInner() {
     (value: string) => {
       setReporterFilter(value);
       const params = new URLSearchParams(searchParams.toString());
-      if (value) params.set("reporterUserId", value);
-      else params.delete("reporterUserId");
-      router.replace(params.toString() ? `/tickets?${params.toString()}` : "/tickets");
+      params.set("reporterUserId", value || ALL_REPORTERS);
+      router.replace(`/tickets?${params.toString()}`);
     },
     [router, searchParams],
   );
