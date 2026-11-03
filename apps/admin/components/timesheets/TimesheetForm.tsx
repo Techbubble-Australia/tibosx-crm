@@ -96,18 +96,6 @@ function caseOptionLabel(row: CaseOption): string {
   return row.label;
 }
 
-function caseOptionsForLine(line: LineEntry, cases: CaseOption[], projectLabel?: string): CaseOption[] {
-  if (!line.caseKey.trim()) return cases;
-  if (cases.some((row) => `${row.kind}:${row.id}` === line.caseKey)) return cases;
-  const [kindRaw, id] = line.caseKey.split(":");
-  if (!id) return cases;
-  const kind = kindRaw as CaseOption["kind"];
-  const label =
-    line.label?.trim() ||
-    (kind === "project" ? projectLabel?.trim() : "") ||
-    line.caseKey;
-  return [{ kind, id, label: label || line.caseKey }, ...cases];
-}
 type ApproverOption = { kind: "PM" | "CLIENT_CONTACT"; id: string; label: string };
 
 type Props = {
@@ -237,6 +225,61 @@ function caseKeyFromTargets(
   return "";
 }
 
+function effectiveCaseKey(line: LineEntry, projectId: string): string {
+  const trimmed = line.caseKey.trim();
+  if (trimmed) return trimmed;
+  if (projectId && sumDailyHours(line.dailyHours) > 0) return `project:${projectId}`;
+  return "";
+}
+
+function normalizeLineCaseKeys(lines: LineEntry[], projectId: string | null): LineEntry[] {
+  if (!projectId) return lines;
+  return lines.map((line) => {
+    const nextKey = effectiveCaseKey(line, projectId);
+    if (!nextKey || nextKey === line.caseKey) return line;
+    return { ...line, caseKey: nextKey };
+  });
+}
+
+function caseOptionsForLine(
+  line: LineEntry,
+  cases: CaseOption[],
+  projectLabel?: string,
+  projectDisplayLabel?: string,
+): CaseOption[] {
+  const caseKey = line.caseKey.trim();
+  if (!caseKey) return cases;
+  if (cases.some((row) => `${row.kind}:${row.id}` === caseKey)) return cases;
+  const colon = caseKey.indexOf(":");
+  if (colon <= 0) return cases;
+  const kindRaw = caseKey.slice(0, colon);
+  const id = caseKey.slice(colon + 1);
+  if (!id) return cases;
+  const kind = kindRaw as CaseOption["kind"];
+  const projectName = projectDisplayLabel?.trim() || projectLabel?.trim() || "";
+  const label =
+    line.label?.trim() ||
+    (kind === "project" ? projectName : "") ||
+    caseKey;
+  return [{ kind, id, label: label || caseKey }, ...cases];
+}
+
+function lineCaseLabel(
+  line: LineEntry,
+  cases: CaseOption[],
+  projectDisplayLabel: string,
+  projectId: string,
+): string {
+  const caseKey = effectiveCaseKey(line, projectId);
+  if (!caseKey) return "—";
+  return (
+    line.label?.trim() ||
+    cases.find((c) => `${c.kind}:${c.id}` === caseKey)?.label ||
+    (caseKey.startsWith("project:") && projectDisplayLabel ? projectDisplayLabel : "") ||
+    caseKey
+  );
+}
+
 function emptyLine(): LineEntry {
   return {
     key: newLineKey(),
@@ -249,8 +292,9 @@ function emptyLine(): LineEntry {
 
 function linesFromDefaults(defaults: Partial<TimesheetFormValues>): LineEntry[] {
   const projectId = defaults.projectId ?? null;
+  let rows: LineEntry[];
   if (defaults.entries?.length) {
-    return defaults.entries.map((row) => ({
+    rows = defaults.entries.map((row) => ({
       key: row.id ?? newLineKey(),
       id: row.id,
       caseKey: caseKeyFromTargets(row.ticketId, row.opportunityId, projectId),
@@ -259,22 +303,25 @@ function linesFromDefaults(defaults: Partial<TimesheetFormValues>): LineEntry[] 
       dailyComments: (row.dailyComments as DailyComments) ?? {},
       billable: row.billable ?? true,
     }));
+  } else {
+    const hours = (defaults.dailyHours as DailyHours) ?? emptyHours();
+    if (defaults.id && sumDailyHours(hours) > 0) {
+      rows = [
+        {
+          key: defaults.id,
+          id: defaults.id,
+          caseKey: caseKeyFromTargets(defaults.ticketId, defaults.opportunityId, projectId),
+          label: defaults.targetLabel,
+          dailyHours: hours,
+          dailyComments: (defaults.dailyComments as DailyComments) ?? {},
+          billable: true,
+        },
+      ];
+    } else {
+      rows = [];
+    }
   }
-  const hours = (defaults.dailyHours as DailyHours) ?? emptyHours();
-  if (defaults.id && sumDailyHours(hours) > 0) {
-    return [
-      {
-        key: defaults.id,
-        id: defaults.id,
-        caseKey: caseKeyFromTargets(defaults.ticketId, defaults.opportunityId, projectId),
-        label: defaults.targetLabel,
-        dailyHours: hours,
-        dailyComments: (defaults.dailyComments as DailyComments) ?? {},
-        billable: true,
-      },
-    ];
-  }
-  return [];
+  return normalizeLineCaseKeys(rows, projectId);
 }
 
 function linePayload(line: LineEntry) {
@@ -641,8 +688,14 @@ export function TimesheetForm({
     if (!projectId) return;
     setLines((prev) =>
       prev.map((line) => {
-        if (!line.caseKey.startsWith("project:")) return line;
+        if (!line.caseKey.startsWith("project:")) {
+          if (line.caseKey.trim() || sumDailyHours(line.dailyHours) === 0) return line;
+          return { ...line, caseKey: `project:${projectId}` };
+        }
         if (line.caseKey === `project:${projectId}`) return line;
+        if (sumDailyHours(line.dailyHours) > 0) {
+          return { ...line, caseKey: `project:${projectId}` };
+        }
         return { ...line, caseKey: "", label: undefined };
       }),
     );
@@ -1172,14 +1225,9 @@ export function TimesheetForm({
                 <tbody>
                   {lines.map((line) => {
                     const lineTotal = sumDailyHours(line.dailyHours);
-                    const caseLabel =
-                      line.label ||
-                      (line.caseKey
-                        ? cases.find((c) => `${c.kind}:${c.id}` === line.caseKey)?.label
-                        : undefined) ||
-                      (line.caseKey.startsWith("project:") && projectDisplayLabel
-                        ? projectDisplayLabel
-                        : undefined);
+                    const taskKey = effectiveCaseKey(line, projectId);
+                    const taskLine = taskKey ? { ...line, caseKey: taskKey } : line;
+                    const caseLabel = lineCaseLabel(line, cases, projectDisplayLabel, projectId);
                     return (
                       <tr key={line.key} className="border-b border-gray-100 dark:border-gray-800">
                         <td className="px-2 py-2 align-middle">
@@ -1187,14 +1235,19 @@ export function TimesheetForm({
                             {entryEditable ? (
                               <select
                                 className={`${selectClass} h-9 min-w-[10rem] text-xs`}
-                                value={line.caseKey}
+                                value={taskKey}
                                 onChange={(e) =>
                                   updateLine(line.key, { caseKey: e.target.value, label: undefined })
                                 }
                                 disabled={!projectId}
                               >
                                 <option value="">Select task…</option>
-                                {caseOptionsForLine(line, cases, projectLabel).map((row) => (
+                                {caseOptionsForLine(
+                                  taskLine,
+                                  cases,
+                                  projectLabel,
+                                  projectDisplayLabel,
+                                ).map((row) => (
                                   <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
                                     {caseOptionLabel(row)}
                                   </option>
@@ -1479,6 +1532,11 @@ export function TimesheetForm({
       </div>
 
       {selection && selectedLine && selectedDayIso ? (
+        (() => {
+          const panelTaskKey = effectiveCaseKey(selectedLine, projectId);
+          const panelTaskLine = panelTaskKey ? { ...selectedLine, caseKey: panelTaskKey } : selectedLine;
+          const panelTaskLabel = lineCaseLabel(selectedLine, cases, projectDisplayLabel, projectId);
+          return (
         <aside
           className="mt-4 w-full shrink-0 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-950 xl:mt-0 xl:w-[22rem] xl:border-l xl:shadow-[-4px_0_24px_rgba(0,0,0,0.06)]"
         >
@@ -1505,19 +1563,32 @@ export function TimesheetForm({
               <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Selected Task
               </label>
-              <select
-                className={selectClass}
-                value={selectedLine.caseKey}
-                disabled={panelReadOnly}
-                onChange={(e) => updateLine(selectedLine.key, { caseKey: e.target.value, label: undefined })}
-              >
-                <option value="">Select task…</option>
-                {caseOptionsForLine(selectedLine, cases, projectLabel).map((row) => (
-                  <option key={`panel-${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
-                    {caseOptionLabel(row)}
-                  </option>
-                ))}
-              </select>
+              {panelReadOnly ? (
+                <p className={`${selectClass} flex items-center bg-gray-50 dark:bg-gray-900/80`}>
+                  {panelTaskLabel || "—"}
+                </p>
+              ) : (
+                <select
+                  className={selectClass}
+                  value={panelTaskKey}
+                  disabled={panelReadOnly}
+                  onChange={(e) =>
+                    updateLine(selectedLine.key, { caseKey: e.target.value, label: undefined })
+                  }
+                >
+                  <option value="">Select task…</option>
+                  {caseOptionsForLine(
+                    panelTaskLine,
+                    cases,
+                    projectLabel,
+                    projectDisplayLabel,
+                  ).map((row) => (
+                    <option key={`panel-${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
+                      {caseOptionLabel(row)}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div>
@@ -1591,6 +1662,8 @@ export function TimesheetForm({
             </div>
           </div>
         </aside>
+          );
+        })()
       ) : null}
     </form>
   );
