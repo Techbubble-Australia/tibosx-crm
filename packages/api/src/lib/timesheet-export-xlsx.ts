@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { TIMESHEET_STATUS_LABELS } from "./project-types";
 import {
   entryHasHours,
+  entryLabel,
   sumDailyHours,
   WEEKDAY_KEYS,
   type DailyComments,
@@ -142,12 +143,13 @@ function writeTimesheetSheet(sheet: ExcelJS.Worksheet, row: TimesheetXlsxRow) {
   sheet.addRow(padRow(["Task name", ...dayHeaders]));
 
   const entries = exportEntries(row);
-  entries.forEach((entry, index) => {
+  entries.forEach((entry) => {
     const hoursCells = WEEKDAY_KEYS.map((key) => {
       const hours = Number((entry.dailyHours as DailyHours)?.[key]) || 0;
       return hours > 0 ? hours : "";
     });
-    sheet.addRow(padRow([`Task #${index + 1}`, ...hoursCells]));
+    const taskName = entryLabel({ ...entry, project: row.project ?? null }).replace(/\s*—\s*/g, " - ");
+    sheet.addRow(padRow([taskName, ...hoursCells]));
 
     const commentCells = WEEKDAY_KEYS.map((key) => dayComment(entry.dailyComments, key));
     sheet.addRow(padRow(["Task comments", ...commentCells]));
@@ -159,7 +161,7 @@ function writeTimesheetSheet(sheet: ExcelJS.Worksheet, row: TimesheetXlsxRow) {
   const endRow = sheet.rowCount;
   applySheetGridBorders(sheet, startRow, endRow);
 
-  sheet.getColumn(1).width = 18;
+  sheet.getColumn(1).width = 36;
   for (let c = 2; c <= SHEET_COLUMN_COUNT; c += 1) {
     sheet.getColumn(c).width = 14;
   }

@@ -1,7 +1,7 @@
 "use client";
 import { appAlert, appConfirm } from "@/lib/app-alert";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { AddProjectMemberModal } from "@/components/projects/AddProjectMemberModal";
@@ -51,6 +51,18 @@ export type ProjectActualRow = {
   currency: string;
   actualCost: number;
   costType: ProjectCostType;
+  source?: "manual" | "timesheet";
+};
+
+export const MEMBER_RATE_FREQUENCIES = ["HOURLY", "DAILY", "WEEKLY", "FORTNIGHTLY", "MONTHLY"] as const;
+export type MemberRateFrequency = (typeof MEMBER_RATE_FREQUENCIES)[number];
+
+const MEMBER_RATE_FREQUENCY_LABELS: Record<MemberRateFrequency, string> = {
+  HOURLY: "Hourly",
+  DAILY: "Daily",
+  WEEKLY: "Weekly",
+  FORTNIGHTLY: "Fortnightly",
+  MONTHLY: "Monthly",
 };
 
 export type ProjectMemberRow = {
@@ -63,6 +75,9 @@ export type ProjectMemberRow = {
   hasCredentials: boolean;
   adminUserId?: string | null;
   adminUserEmail: string | null;
+  rateCurrency?: string;
+  rate?: number | null;
+  rateFrequency?: MemberRateFrequency;
 };
 
 export type ProjectFormValues = {
@@ -77,6 +92,9 @@ export type ProjectFormValues = {
   timesheetApproverUserId?: string;
   contractId: string | null;
   contractNumber?: string | null;
+  contractVariationId?: string | null;
+  budget?: number | null;
+  budgetCurrency?: string | null;
   startDate: string;
   endDate: string;
   fileUrls: string[];
@@ -166,9 +184,16 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
   const [estimates, setEstimates] = useState<ProjectEstimateRow[]>(defaults.estimates ?? []);
   const [actuals, setActuals] = useState<ProjectActualRow[]>(defaults.actuals ?? []);
   const [members, setMembers] = useState<ProjectMemberRow[]>(defaults.members ?? []);
+  const [budget, setBudget] = useState(defaults.budget != null ? String(defaults.budget) : "");
+  const [budgetCurrency, setBudgetCurrency] = useState(defaults.budgetCurrency ?? "AUD");
+  const [runningEstimates, setRunningEstimates] = useState(false);
+  const [savingMemberId, setSavingMemberId] = useState<string | null>(null);
+
+  const savedRatesRef = useRef<Record<string, number | null>>({});
 
   useEffect(() => {
     setMembers(defaults.members ?? []);
+    savedRatesRef.current = Object.fromEntries((defaults.members ?? []).map((m) => [m.id, m.rate ?? null]));
   }, [defaults.id, defaults.members]);
   const [fileUrls, setFileUrls] = useState<string[]>(defaults.fileUrls ?? []);
   const [clients, setClients] = useState<ClientOption[]>([]);
@@ -254,6 +279,59 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
     setActuals((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
+  async function runEstimates() {
+    if (!defaults.id) return;
+    const ok = await appConfirm(
+      "Recalculate personnel estimates from the contract's monthly days × member rates? Existing personnel estimate rows will be replaced.",
+      { title: "Run estimates", confirmLabel: "Run estimates" },
+    );
+    if (!ok) return;
+    setRunningEstimates(true);
+    try {
+      const res = await adminFetch(`/api/admin/projects/${defaults.id}/run-estimates`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to run estimates");
+      const detail = data.data as ProjectFormValues | null;
+      setEstimates(detail?.estimates ?? []);
+    } catch (err) {
+      appAlert(err instanceof Error ? err.message : "Failed to run estimates");
+    } finally {
+      setRunningEstimates(false);
+    }
+  }
+
+  function updateMemberLocal(memberId: string, patch: Partial<ProjectMemberRow>) {
+    setMembers((prev) => prev.map((m) => (m.id === memberId ? { ...m, ...patch } : m)));
+  }
+
+  async function saveMemberRate(memberId: string, patch: Partial<ProjectMemberRow>) {
+    if (!defaults.id) return;
+    updateMemberLocal(memberId, patch);
+    setSavingMemberId(memberId);
+    try {
+      const res = await adminFetch(`/api/admin/projects/${defaults.id}/members/${memberId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...(patch.rateCurrency !== undefined ? { rateCurrency: patch.rateCurrency } : {}),
+          ...(patch.rate !== undefined ? { rate: patch.rate } : {}),
+          ...(patch.rateFrequency !== undefined ? { rateFrequency: patch.rateFrequency } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to update member rate");
+      const saved = data.data as ProjectMemberRow;
+      savedRatesRef.current[memberId] = saved.rate ?? null;
+      const refreshed = await adminFetch(`/api/admin/projects/${defaults.id}`).then((r) => r.json());
+      const detail = refreshed.data as ProjectFormValues | undefined;
+      if (detail?.actuals) setActuals(detail.actuals);
+    } catch (err) {
+      appAlert(err instanceof Error ? err.message : "Failed to update member rate");
+    } finally {
+      setSavingMemberId(null);
+    }
+  }
+
   async function removeMember(memberId: string) {
     if (!defaults.id) return;
     if (!(await appConfirm("Remove this member from the project?"))) return;
@@ -316,6 +394,8 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
       startDate,
       endDate,
       fileUrls,
+      budget: budget.trim() === "" ? (defaults.id ? null : undefined) : Number(budget),
+      budgetCurrency: budget.trim() === "" ? (defaults.id ? null : undefined) : budgetCurrency,
       estimates,
       actuals,
       forCustomerSupport,
@@ -418,23 +498,66 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
 
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
           <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Financials</h3>
+          <div className="mb-6 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Budget</label>
+              <div className="flex gap-2">
+                <select
+                  className={`${inputClass} w-28 shrink-0`}
+                  value={budgetCurrency}
+                  onChange={(e) => setBudgetCurrency(e.target.value)}
+                  disabled={!canEditEstimates}
+                >
+                  {SALES_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
+                </select>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className={inputClass}
+                  value={budget}
+                  onChange={(e) => setBudget(e.target.value)}
+                  readOnly={!canEditEstimates}
+                  placeholder={defaults.id ? "" : "Defaults to the contract value"}
+                />
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                {defaults.contractVariationId
+                  ? "Populated from the contract variation value."
+                  : defaults.contractId
+                    ? "Populated from the total contract value."
+                    : "Optional."}
+              </p>
+            </div>
+          </div>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Estimates</h4>
             {canEditEstimates && defaults.id ? (
-              <button
-                type="button"
-                onClick={addEstimateRow}
-                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium dark:border-gray-600"
-              >
-                <Plus className="h-3.5 w-3.5" /> Add row
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void runEstimates()}
+                  disabled={runningEstimates}
+                  className="inline-flex items-center gap-1 rounded-lg bg-black px-2.5 py-1 text-xs font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+                >
+                  {runningEstimates ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  Run Estimates
+                </button>
+                <button
+                  type="button"
+                  onClick={addEstimateRow}
+                  className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium dark:border-gray-600"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add row
+                </button>
+              </div>
             ) : null}
           </div>
           {estimates.length === 0 ? (
             <p className="mb-4 text-sm text-gray-400">
               {defaults.id
-                ? "No estimate rows yet. Add a row or save scheduling dates to generate monthly rows."
-                : "Save the project to generate monthly estimate rows."}
+                ? "No estimate rows yet. Set member rates and click Run Estimates, or add a row manually."
+                : "Save the project, add member rates, then run estimates."}
             </p>
           ) : (
             <div className="mb-6 overflow-x-auto">
@@ -529,27 +652,48 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                   </tr>
                 </thead>
                 <tbody>
-                  {actuals.map((row, index) => (
-                    <tr key={`${row.year}-${row.month}`} className="border-b border-gray-50 dark:border-gray-800">
-                      <td className="py-2 pr-3">{formatProjectMonth(row.year, row.month)}</td>
-                      <td className="py-2 pr-3">
-                        <input type="number" min={0} step="0.01" className={inputClass} value={row.qty} onChange={(e) => updateActual(index, { qty: Number(e.target.value) })} />
-                      </td>
-                      <td className="py-2 pr-3">
-                        <select className={inputClass} value={row.currency} onChange={(e) => updateActual(index, { currency: e.target.value })}>
-                          {SALES_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
-                        </select>
-                      </td>
-                      <td className="py-2 pr-3">
-                        <input type="number" min={0} step="0.01" className={inputClass} value={row.actualCost} onChange={(e) => updateActual(index, { actualCost: Number(e.target.value) })} />
-                      </td>
-                      <td className="py-2">
-                        <select className={inputClass} value={row.costType} onChange={(e) => updateActual(index, { costType: e.target.value as ProjectCostType })}>
-                          {PROJECT_COST_TYPES.map((t) => <option key={t} value={t}>{PROJECT_COST_TYPE_LABELS[t]}</option>)}
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
+                  {actuals.map((row, index) => {
+                    const fromTimesheets = row.source === "timesheet";
+                    return (
+                      <tr key={`${row.year}-${row.month}-${row.currency}-${row.source ?? "manual"}-${index}`} className="border-b border-gray-50 dark:border-gray-800">
+                        <td className="py-2 pr-3">
+                          {formatProjectMonth(row.year, row.month)}
+                          {fromTimesheets ? (
+                            <span className="ml-2 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                              Approved timesheets
+                            </span>
+                          ) : null}
+                        </td>
+                        {fromTimesheets ? (
+                          <>
+                            <td className="py-2 pr-3">{row.qty} day{row.qty === 1 ? "" : "s"}</td>
+                            <td className="py-2 pr-3">{row.currency}</td>
+                            <td className="py-2 pr-3">{row.actualCost.toFixed(2)}</td>
+                            <td className="py-2">{PROJECT_COST_TYPE_LABELS[row.costType] ?? row.costType}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="py-2 pr-3">
+                              <input type="number" min={0} step="0.01" className={inputClass} value={row.qty} onChange={(e) => updateActual(index, { qty: Number(e.target.value) })} />
+                            </td>
+                            <td className="py-2 pr-3">
+                              <select className={inputClass} value={row.currency} onChange={(e) => updateActual(index, { currency: e.target.value })}>
+                                {SALES_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+                              </select>
+                            </td>
+                            <td className="py-2 pr-3">
+                              <input type="number" min={0} step="0.01" className={inputClass} value={row.actualCost} onChange={(e) => updateActual(index, { actualCost: Number(e.target.value) })} />
+                            </td>
+                            <td className="py-2">
+                              <select className={inputClass} value={row.costType} onChange={(e) => updateActual(index, { costType: e.target.value as ProjectCostType })}>
+                                {PROJECT_COST_TYPES.map((t) => <option key={t} value={t}>{PROJECT_COST_TYPE_LABELS[t]}</option>)}
+                              </select>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -583,6 +727,9 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                     <th className="py-2">Email</th>
                     <th className="py-2">Phone</th>
                     <th className="py-2">User record</th>
+                    <th className="py-2 pr-2">Currency</th>
+                    <th className="py-2 pr-2">Rate</th>
+                    <th className="py-2 pr-2">Frequency</th>
                     <th className="py-2" />
                   </tr>
                 </thead>
@@ -600,6 +747,51 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                         ) : (
                           "—"
                         )}
+                      </td>
+                      <td className="py-2 pr-2">
+                        <select
+                          className={`${inputClass} w-24 px-2`}
+                          value={member.rateCurrency ?? "AUD"}
+                          disabled={!canEditEstimates || savingMemberId === member.id}
+                          onChange={(e) => void saveMemberRate(member.id, { rateCurrency: e.target.value })}
+                        >
+                          {SALES_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
+                        </select>
+                      </td>
+                      <td className="py-2 pr-2">
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          className={`${inputClass} w-28 px-2`}
+                          value={member.rate ?? ""}
+                          readOnly={!canEditEstimates}
+                          onChange={(e) =>
+                            updateMemberLocal(member.id, {
+                              rate: e.target.value === "" ? null : Number(e.target.value),
+                            })
+                          }
+                          onBlur={(e) => {
+                            const next = e.target.value === "" ? null : Number(e.target.value);
+                            if (canEditEstimates && next !== (savedRatesRef.current[member.id] ?? null)) {
+                              void saveMemberRate(member.id, { rate: next });
+                            }
+                          }}
+                        />
+                      </td>
+                      <td className="py-2 pr-2">
+                        <select
+                          className={`${inputClass} w-32 px-2`}
+                          value={member.rateFrequency ?? "DAILY"}
+                          disabled={!canEditEstimates || savingMemberId === member.id}
+                          onChange={(e) =>
+                            void saveMemberRate(member.id, { rateFrequency: e.target.value as MemberRateFrequency })
+                          }
+                        >
+                          {MEMBER_RATE_FREQUENCIES.map((f) => (
+                            <option key={f} value={f}>{MEMBER_RATE_FREQUENCY_LABELS[f]}</option>
+                          ))}
+                        </select>
                       </td>
                       <td className="py-2 text-right">
                         <div className="flex justify-end gap-2">

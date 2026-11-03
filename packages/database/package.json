@@ -16,7 +16,8 @@
     "db:seed-admin": "tsx src/seed-admin-only.ts",
     "db:seed:support-ticketing": "tsx src/seed-support-ticketing.ts",
     "db:seed:site-content": "tsx src/seed-site-content-only.ts",
-    "db:clone-prod-to-dev": "tsx scripts/clone-prod-to-dev.ts"
+    "db:clone-prod-to-dev": "tsx scripts/clone-prod-to-dev.ts",
+    "db:clear-project-estimates": "tsx scripts/clear-project-estimates.ts"
   },
   "prisma": {
     "seed": "tsx src/seed.ts"

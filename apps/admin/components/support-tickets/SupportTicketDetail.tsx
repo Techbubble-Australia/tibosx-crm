@@ -359,16 +359,11 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
           </>
         }
         description={
-          <>
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <h2 className="font-semibold">Description</h2>
-            </div>
-            <TicketEditableDescription
-              description={ticket.description}
-              disabled={closedOrCancelled || saving}
-              onSave={(description) => patch({ description })}
-            />
-          </>
+          <TicketEditableDescription
+            description={ticket.description}
+            disabled={closedOrCancelled || saving}
+            onSave={(description) => patch({ description })}
+          />
         }
         attachments={
           <>

@@ -9,6 +9,7 @@ import {
 import { formatZodError } from "../../lib/zod-error.js";
 import { notifyAsync } from "../../lib/notifications";
 import { submittedTimesheetsPendingPmApprovalWhere } from "../../lib/timesheet-approver.js";
+import { syncProjectActualsFromTimesheets } from "../../lib/project-financials.js";
 import { fetchTimesheet, mapDetail } from "../../routes/timesheets.js";
 
 const router: IRouter = Router();
@@ -269,6 +270,14 @@ router.post("/:id/approve", async (req: TicketingRequest, res) => {
       },
     });
   });
+
+  if (timesheet.projectId) {
+    try {
+      await syncProjectActualsFromTimesheets(timesheet.projectId);
+    } catch (syncError) {
+      console.error("Failed to sync project actuals after client approval:", syncError);
+    }
+  }
 
   notifyAsync("timesheet.approved", { timesheetId: timesheet.id });
 

@@ -59,6 +59,8 @@ function formatAction(log: ActivityLog): string {
       return "Member removed";
     case "CREDENTIALS_GENERATED":
       return `Credentials generated for ${log.newValue ?? "member"}`;
+    case "ESTIMATES_RUN":
+      return log.newValue ? `Estimates run (${log.newValue})` : "Estimates run";
     default: {
       const text = log.action.replaceAll("_", " ").toLowerCase();
       return text.charAt(0).toUpperCase() + text.slice(1);

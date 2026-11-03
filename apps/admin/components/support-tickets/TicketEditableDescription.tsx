@@ -45,53 +45,55 @@ export function TicketEditableDescription({ description, disabled, onSave }: Pro
     setEditing(false);
   }
 
-  if (editing) {
-    return (
-      <div className="space-y-2">
-        <textarea
-          value={draft}
-          maxLength={20000}
-          disabled={saving}
-          rows={8}
-          onChange={(e) => setDraft(e.target.value)}
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
-          autoFocus
-        />
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => void commit()}
-            className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-gray-900"
-          >
-            Save
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={cancel}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 dark:border-gray-600"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-2">
-      <p className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{description}</p>
-      {!disabled ? (
-        <button
-          type="button"
-          onClick={startEdit}
-          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:hover:bg-gray-800"
-        >
-          <Pencil className="h-4 w-4" />
-          Edit description
-        </button>
-      ) : null}
-    </div>
+    <>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h2 className="font-semibold">Description</h2>
+        {!disabled && !editing ? (
+          <button
+            type="button"
+            onClick={startEdit}
+            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:hover:bg-gray-800"
+            aria-label="Edit description"
+            title="Edit description"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
+      {editing ? (
+        <div className="space-y-2">
+          <textarea
+            value={draft}
+            maxLength={20000}
+            disabled={saving}
+            rows={8}
+            onChange={(e) => setDraft(e.target.value)}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
+            autoFocus
+          />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void commit()}
+              className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-gray-900"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={cancel}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 dark:border-gray-600"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{description}</p>
+      )}
+    </>
   );
 }

@@ -17,6 +17,7 @@ import { getMemberOnboardingStatus } from "../lib/member-onboarding";
 import { notifyAsync } from "../lib/notifications";
 import { mondayOfWeek, sundayOfWeek, TIMESHEET_STATUSES, TIMESHEET_STATUS_LABELS } from "../lib/project-types";
 import { buildTimesheetExportFilename, buildTimesheetXlsxBuffer } from "../lib/timesheet-export-xlsx.js";
+import { syncProjectActualsFromTimesheets } from "../lib/project-financials.js";
 import { formatZodError } from "../lib/zod-error";
 import {
   listActiveProjectMembershipsForUser,
@@ -1663,6 +1664,14 @@ router.post("/:id/approve", async (req: AuthRequest, res) => {
         data: { timesheetId, action: "APPROVED", performedById: actorId },
       });
     });
+
+    if (existing.projectId) {
+      try {
+        await syncProjectActualsFromTimesheets(existing.projectId);
+      } catch (syncError) {
+        console.error("Failed to sync project actuals after timesheet approval:", syncError);
+      }
+    }
 
     notifyAsync("timesheet.approved", { timesheetId });
 

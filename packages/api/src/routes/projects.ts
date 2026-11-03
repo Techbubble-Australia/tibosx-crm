@@ -33,11 +33,9 @@ import { isValidProjectManagerUserId, isValidTimesheetApproverUserId } from "../
 import { emailTbosUserInvite } from "../lib/user-invite.js";
 import { logProjectFieldChanges, type ProjectSnapshot } from "../lib/project-activity";
 import {
-  generateProjectMonths,
   PROJECT_COST_TYPES,
   PROJECT_STATUSES,
   PROJECT_STATUS_LABELS,
-  type ProjectCostType,
 } from "../lib/project-types";
 import {
   ensureSupportOrganizationForProject,
@@ -51,6 +49,11 @@ import {
   syncProjectClientContacts,
 } from "../lib/support-project";
 import { applyProjectCustomerSupportSettings } from "../lib/project-customer-support";
+import {
+  MEMBER_RATE_FREQUENCIES,
+  runProjectEstimates,
+  syncProjectActualsFromTimesheets,
+} from "../lib/project-financials";
 
 const router: IRouter = Router();
 
@@ -72,6 +75,13 @@ const actualSchema = z.object({
   currency: z.string().min(1).max(8),
   actualCost: z.coerce.number().nonnegative(),
   costType: z.enum(PROJECT_COST_TYPES),
+  source: z.enum(["manual", "timesheet"]).optional(),
+});
+
+const memberRateSchema = z.object({
+  rateCurrency: z.string().min(1).max(8).optional(),
+  rate: z.coerce.number().nonnegative().nullable().optional(),
+  rateFrequency: z.enum(MEMBER_RATE_FREQUENCIES).optional(),
 });
 
 const projectSchema = z.object({
@@ -104,6 +114,8 @@ const projectSchema = z.object({
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
   fileUrls: z.array(z.string().min(1)).optional().default([]),
+  budget: z.coerce.number().nonnegative().nullable().optional(),
+  budgetCurrency: z.string().min(1).max(8).nullable().optional(),
   estimates: z.array(estimateSchema).optional(),
   actuals: z.array(actualSchema).optional(),
 });
@@ -194,6 +206,7 @@ function serializeActual(row: {
   currency: string;
   actualCost: { toString(): string } | number;
   costType: string;
+  source: string;
 }) {
   return {
     id: row.id,
@@ -203,6 +216,7 @@ function serializeActual(row: {
     currency: row.currency,
     actualCost: toNumber(row.actualCost),
     costType: row.costType,
+    source: row.source,
   };
 }
 
@@ -214,6 +228,9 @@ function serializeMember(row: {
   credentialData: unknown;
   signatureDataUrl: string | null;
   agreementSignedAt: Date | null;
+  rateCurrency: string;
+  rate: { toString(): string } | null;
+  rateFrequency: string;
   createdAt: Date;
   profile: {
     id: string;
@@ -241,6 +258,9 @@ function serializeMember(row: {
     agreementSignedAt: row.agreementSignedAt?.toISOString() ?? null,
     hasCredentials: Boolean(row.adminUserId),
     agreementSigned: Boolean(row.agreementSignedAt),
+    rateCurrency: row.rateCurrency,
+    rate: row.rate != null ? toNumber(row.rate) : null,
+    rateFrequency: row.rateFrequency,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -278,6 +298,9 @@ function serializeProject(row: {
   projectManagerId: string;
   timesheetApproverUserId: string;
   contractId: string | null;
+  contractVariationId?: string | null;
+  budget?: { toString(): string } | null;
+  budgetCurrency?: string | null;
   startDate: Date;
   endDate: Date;
   ticketPrefix?: string;
@@ -320,6 +343,9 @@ function serializeProject(row: {
     contractId: row.contractId,
     contractNumber: row.contract?.contractNumber ?? null,
     contractTitle: row.contract?.title ?? null,
+    contractVariationId: row.contractVariationId ?? null,
+    budget: row.budget != null ? toNumber(row.budget) : null,
+    budgetCurrency: row.budgetCurrency ?? null,
     startDate: row.startDate.toISOString(),
     endDate: row.endDate.toISOString(),
     ticketPrefix: row.ticketPrefix ?? "TKT",
@@ -405,15 +431,17 @@ async function replaceEstimates(
   });
 }
 
+/** Timesheet-sourced actuals are rebuilt from approved timesheets, so saves only replace manual rows. */
 async function replaceActuals(
   tx: Prisma.TransactionClient,
   projectId: string,
   rows: z.infer<typeof actualSchema>[],
 ) {
-  await tx.projectActual.deleteMany({ where: { projectId } });
-  if (!rows.length) return;
+  await tx.projectActual.deleteMany({ where: { projectId, source: { not: "timesheet" } } });
+  const manualRows = rows.filter((row) => row.source !== "timesheet");
+  if (!manualRows.length) return;
   await tx.projectActual.createMany({
-    data: rows.map((row) => ({
+    data: manualRows.map((row) => ({
       projectId,
       year: row.year,
       month: row.month,
@@ -421,37 +449,9 @@ async function replaceActuals(
       currency: row.currency,
       actualCost: row.actualCost,
       costType: row.costType,
+      source: "manual",
     })),
   });
-}
-
-function buildDefaultFinancialRows(
-  startDate: Date,
-  endDate: Date,
-  contract: { type: string; unit: string | null; currency: string } | null,
-  costType: ProjectCostType = "personnel",
-) {
-  const months = generateProjectMonths(startDate, endDate, contract?.type, contract?.unit);
-  const currency = contract?.currency ?? "AUD";
-  return months.map((row) => ({
-    year: row.year,
-    month: row.month,
-    qty: row.qty,
-    currency,
-    costType,
-  }));
-}
-
-function buildDefaultEstimates(
-  startDate: Date,
-  endDate: Date,
-  contract: { type: string; unit: string | null; currency: string } | null,
-  costType: ProjectCostType = "personnel",
-) {
-  return buildDefaultFinancialRows(startDate, endDate, contract, costType).map((row) => ({
-    ...row,
-    estimatedCost: 0,
-  }));
 }
 
 function serializeProjectClientContact(row: {
@@ -844,14 +844,13 @@ router.post("/", async (req: AuthRequest, res) => {
     const contract = data.contractId
       ? await prisma.contract.findUnique({
           where: { id: data.contractId },
-          select: { type: true, unit: true, currency: true },
+          select: { contractValue: true, currency: true },
         })
       : null;
-    const estimates =
-      data.estimates?.length
-        ? data.estimates
-        : buildDefaultEstimates(data.startDate, data.endDate, contract);
+    const estimates = data.estimates ?? [];
     const actuals = data.actuals ?? [];
+    const budget = data.budget !== undefined ? data.budget : contract ? toNumber(contract.contractValue) : null;
+    const budgetCurrency = data.budgetCurrency ?? contract?.currency ?? (budget != null ? "AUD" : null);
 
     const row = await prisma.$transaction(async (tx) => {
       const created = await tx.project.create({
@@ -869,6 +868,8 @@ router.post("/", async (req: AuthRequest, res) => {
           endDate: data.endDate,
           ticketPrefix: normalizedTicketPrefix(data.ticketPrefix),
           ticketNumberDigits: normalizedTicketDigits(data.ticketNumberDigits),
+          budget,
+          budgetCurrency,
           fileUrls: data.fileUrls ?? [],
         },
       });
@@ -957,13 +958,6 @@ router.put("/:id", async (req: AuthRequest, res) => {
       throw error;
     }
 
-    const contract = data.contractId
-      ? await prisma.contract.findUnique({
-          where: { id: data.contractId },
-          select: { type: true, unit: true, currency: true },
-        })
-      : null;
-
     const beforeSnapshot: ProjectSnapshot = {
       title: existing.title,
       description: existing.description,
@@ -1010,16 +1004,13 @@ router.put("/:id", async (req: AuthRequest, res) => {
           endDate: afterSnapshot.endDate,
           ticketPrefix: nextTicketPrefix,
           ticketNumberDigits: nextTicketDigits,
+          ...(data.budget !== undefined ? { budget: data.budget } : {}),
+          ...(data.budgetCurrency !== undefined ? { budgetCurrency: data.budgetCurrency } : {}),
           fileUrls: data.fileUrls ?? existing.fileUrls ?? [],
         },
       });
-      const estimates =
-        data.estimates?.length
-          ? data.estimates
-          : buildDefaultEstimates(data.startDate, data.endDate, contract);
-      const actuals = data.actuals ?? [];
-      await replaceEstimates(tx, projectId, estimates);
-      await replaceActuals(tx, projectId, actuals);
+      if (data.estimates) await replaceEstimates(tx, projectId, data.estimates);
+      if (data.actuals) await replaceActuals(tx, projectId, data.actuals);
       await logProjectFieldChanges(tx, projectId, beforeSnapshot, afterSnapshot, getActorId(req) || null);
       if (afterSnapshot.title !== beforeSnapshot.title) {
         const orgName = `${existing.projectNumber} — ${afterSnapshot.title}`;
@@ -1277,6 +1268,77 @@ async function canRemoveProjectMember(req: AuthRequest, projectId: string): Prom
   });
   return project?.projectManagerId === actorId;
 }
+
+router.post("/:id/run-estimates", async (req: AuthRequest, res) => {
+  try {
+    const projectId = req.params.id;
+    if (!projectId) return res.status(400).json({ error: "Invalid id" });
+    const role = req.user?.role ?? "";
+    if (!canManageProjects(role) && !isProjectManagerRole(role)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const count = await runProjectEstimates(projectId);
+    await prisma.projectActivityLog.create({
+      data: {
+        projectId,
+        action: "ESTIMATES_RUN",
+        newValue: `${count} personnel estimate row(s)`,
+        performedById: getActorId(req) || null,
+      },
+    });
+    const detail = await fetchProject(projectId);
+    res.json({ data: detail ? mapDetail(detail) : null });
+  } catch (error) {
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return res.status(404).json({ error: "Project not found" });
+    }
+    if (error instanceof Error && error.message === "NO_MEMBER_RATES") {
+      return res.status(400).json({
+        error: "Add a rate to at least one project member before running estimates.",
+      });
+    }
+    console.error("Error running project estimates:", error);
+    res.status(500).json({ error: "Failed to run estimates" });
+  }
+});
+
+router.patch("/:id/members/:memberId", async (req: AuthRequest, res) => {
+  try {
+    const projectId = req.params.id;
+    const memberId = req.params.memberId;
+    if (!projectId || !memberId) return res.status(400).json({ error: "Invalid id" });
+    const role = req.user?.role ?? "";
+    if (!canManageProjects(role) && !isProjectManagerRole(role)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const body = memberRateSchema.parse(req.body);
+    const member = await prisma.projectMember.findFirst({ where: { id: memberId, projectId } });
+    if (!member) return res.status(404).json({ error: "Member not found" });
+
+    const updated = await prisma.projectMember.update({
+      where: { id: memberId },
+      data: {
+        ...(body.rateCurrency !== undefined ? { rateCurrency: body.rateCurrency.toUpperCase() } : {}),
+        ...(body.rate !== undefined ? { rate: body.rate } : {}),
+        ...(body.rateFrequency !== undefined ? { rateFrequency: body.rateFrequency } : {}),
+      },
+      include: {
+        profile: {
+          select: { id: true, firstName: true, lastName: true, email: true, phone: true, available: true },
+        },
+        adminUser: { select: { id: true, email: true, name: true } },
+      },
+    });
+    await syncProjectActualsFromTimesheets(projectId);
+    res.json({ data: serializeMember(updated) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("Error updating project member rate:", error);
+    res.status(500).json({ error: "Failed to update member" });
+  }
+});
 
 router.delete("/:id/members/:memberId", async (req: AuthRequest, res) => {
   try {

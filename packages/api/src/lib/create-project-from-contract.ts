@@ -1,54 +1,6 @@
-import { prisma, type Prisma } from "@techbubble/database";
+import { prisma } from "@techbubble/database";
 import { ensureSupportOrganizationForProject } from "./support-organization";
-import { toNumber } from "./decimal";
 import { addContractProfilesAsProjectMembers } from "./project-members-from-contract";
-
-type WorkUnitRow = { year: number; month: number; workUnits: number };
-type MilestoneRow = { milestoneDate: Date; amount: Prisma.Decimal | number };
-
-export function buildEstimatesFromContract(
-  contract: {
-    type: string;
-    currency: string;
-    rate: { toString(): string } | number;
-  },
-  workUnitMonths: WorkUnitRow[],
-  milestones: MilestoneRow[],
-  rateOverride?: number | null,
-) {
-  const currency = contract.currency;
-  const rate =
-    rateOverride != null
-      ? rateOverride
-      : typeof contract.rate === "number"
-        ? contract.rate
-        : Number(contract.rate.toString());
-
-  if (contract.type === "T_AND_M" && workUnitMonths.length) {
-    return workUnitMonths.map((row) => ({
-      year: row.year,
-      month: row.month,
-      qty: row.workUnits,
-      currency,
-      estimatedCost: row.workUnits * rate,
-      costType: "personnel" as const,
-    }));
-  }
-
-  if (milestones.length) {
-    return milestones.map((row) => ({
-      year: row.milestoneDate.getUTCFullYear(),
-      month: row.milestoneDate.getUTCMonth(),
-      qty: 1,
-      currency,
-      estimatedCost:
-        typeof row.amount === "number" ? row.amount : Number(row.amount.toString()),
-      costType: "one-time" as const,
-    }));
-  }
-
-  return [];
-}
 
 async function allocateProjectNumber(): Promise<string> {
   const rows = await prisma.project.findMany({ select: { projectNumber: true } });
@@ -60,26 +12,6 @@ async function allocateProjectNumber(): Promise<string> {
   return `PRJ${String(max + 1).padStart(3, "0")}`;
 }
 
-async function replaceEstimates(
-  tx: Prisma.TransactionClient,
-  projectId: string,
-  rows: ReturnType<typeof buildEstimatesFromContract>,
-) {
-  await tx.projectEstimate.deleteMany({ where: { projectId } });
-  if (!rows.length) return;
-  await tx.projectEstimate.createMany({
-    data: rows.map((row) => ({
-      projectId,
-      year: row.year,
-      month: row.month,
-      qty: row.qty,
-      currency: row.currency,
-      estimatedCost: row.estimatedCost,
-      costType: row.costType,
-    })),
-  });
-}
-
 export async function createProjectFromContract(
   contractId: string,
   projectManagerId: string,
@@ -87,11 +19,7 @@ export async function createProjectFromContract(
 ) {
   const contract = await prisma.contract.findUnique({
     where: { id: contractId },
-    include: {
-      milestones: { orderBy: { milestoneDate: "asc" } },
-      workUnitMonths: { orderBy: [{ year: "asc" }, { month: "asc" }] },
-      variations: true,
-    },
+    include: { variations: true },
   });
   if (!contract) throw new Error("NOT_FOUND");
   if (contract.status !== "ACTIVE") throw new Error("NOT_ACTIVE");
@@ -109,21 +37,7 @@ export async function createProjectFromContract(
   });
   if (existing) throw new Error("PROJECT_EXISTS");
 
-  const segmentKey = variationId ?? "base";
-  const workUnitMonths = contract.workUnitMonths
-    .filter((row) => row.segmentKey === segmentKey)
-    .map((row) => ({ year: row.year, month: row.month, workUnits: toNumber(row.workUnits) }));
-
-  const rateOverride = variation?.rate
-    ? Number(variation.rate.toString())
-    : null;
-
-  const estimates = buildEstimatesFromContract(
-    contract,
-    workUnitMonths,
-    variationId ? [] : contract.milestones,
-    rateOverride,
-  );
+  const budget = variation ? variation.variationValue : contract.contractValue;
 
   const startDate = variation?.variationDate ?? contract.startDate;
   const endDate =
@@ -147,13 +61,13 @@ export async function createProjectFromContract(
         contractVariationId: variationId ?? null,
         startDate,
         endDate,
+        budget,
+        budgetCurrency: contract.currency,
         fileUrls: Array.isArray(contract.fileUrls)
           ? (contract.fileUrls as string[]).filter((url) => typeof url === "string")
           : [],
       },
     });
-
-    await replaceEstimates(tx, created.id, estimates);
 
     await tx.projectActivityLog.create({
       data: {

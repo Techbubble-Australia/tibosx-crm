@@ -765,6 +765,9 @@ model Project {
   ticketPrefix         String              @default("TKT")
   /// Zero-padded sequence width for support ticket numbers.
   ticketNumberDigits   Int                 @default(5)
+  /// Contract value (or variation value) when created from a contract; editable afterwards.
+  budget               Decimal?            @db.Decimal(14, 2)
+  budgetCurrency       String?
   fileUrls         Json?
   members          ProjectMember[]
   estimates        ProjectEstimate[]
@@ -846,6 +849,10 @@ model ProjectMember {
   credentialData       Json?
   signatureDataUrl     String?             @db.Text
   agreementSignedAt    DateTime?
+  rateCurrency         String              @default("AUD")
+  rate                 Decimal?            @db.Decimal(14, 2)
+  /// HOURLY | DAILY | WEEKLY | FORTNIGHTLY | MONTHLY
+  rateFrequency        String              @default("DAILY")
   supportGroupMember   ProjectSupportGroupMember?
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
@@ -883,6 +890,8 @@ model ProjectActual {
   currency    String
   actualCost  Decimal  @db.Decimal(14, 2)
   costType    String
+  /// manual | timesheet — timesheet rows are rebuilt from approved timesheets × member rates
+  source      String   @default("manual")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
