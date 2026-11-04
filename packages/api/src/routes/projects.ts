@@ -49,6 +49,7 @@ import {
   syncProjectClientContacts,
 } from "../lib/support-project";
 import { applyProjectCustomerSupportSettings } from "../lib/project-customer-support";
+import { syncProjectBudgetsForContract } from "../lib/project-budget";
 import {
   MEMBER_RATE_FREQUENCIES,
   runProjectEstimates,
@@ -849,8 +850,8 @@ router.post("/", async (req: AuthRequest, res) => {
       : null;
     const estimates = data.estimates ?? [];
     const actuals = data.actuals ?? [];
-    const budget = data.budget !== undefined ? data.budget : contract ? toNumber(contract.contractValue) : null;
-    const budgetCurrency = data.budgetCurrency ?? contract?.currency ?? (budget != null ? "AUD" : null);
+    const budget = contract ? toNumber(contract.contractValue) : (data.budget ?? null);
+    const budgetCurrency = contract ? contract.currency : (data.budgetCurrency ?? (budget != null ? "AUD" : null));
 
     const row = await prisma.$transaction(async (tx) => {
       const created = await tx.project.create({
@@ -1004,8 +1005,10 @@ router.put("/:id", async (req: AuthRequest, res) => {
           endDate: afterSnapshot.endDate,
           ticketPrefix: nextTicketPrefix,
           ticketNumberDigits: nextTicketDigits,
-          ...(data.budget !== undefined ? { budget: data.budget } : {}),
-          ...(data.budgetCurrency !== undefined ? { budgetCurrency: data.budgetCurrency } : {}),
+          ...(!afterSnapshot.contractId && data.budget !== undefined ? { budget: data.budget } : {}),
+          ...(!afterSnapshot.contractId && data.budgetCurrency !== undefined
+            ? { budgetCurrency: data.budgetCurrency }
+            : {}),
           fileUrls: data.fileUrls ?? existing.fileUrls ?? [],
         },
       });
@@ -1018,6 +1021,9 @@ router.put("/:id", async (req: AuthRequest, res) => {
           where: { projectId },
           data: { name: orgName },
         });
+      }
+      if (afterSnapshot.contractId) {
+        await syncProjectBudgetsForContract(afterSnapshot.contractId, tx);
       }
     });
 

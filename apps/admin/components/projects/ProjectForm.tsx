@@ -240,6 +240,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
   const canAddMembers = canRemoveMembers;
 
   const canEditEstimates = sessionRole === "admin" || sessionRole === "project_manager";
+  const budgetLocked = Boolean(contractId);
 
   function updateEstimate(index: number, patch: Partial<ProjectEstimateRow>) {
     setEstimates((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -397,8 +398,12 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
       startDate,
       endDate,
       fileUrls,
-      budget: budget.trim() === "" ? (defaults.id ? null : undefined) : Number(budget),
-      budgetCurrency: budget.trim() === "" ? (defaults.id ? null : undefined) : budgetCurrency,
+      ...(budgetLocked
+        ? {}
+        : {
+            budget: budget.trim() === "" ? null : Number(budget),
+            budgetCurrency: budget.trim() === "" ? null : budgetCurrency,
+          }),
       estimates,
       actuals,
       forCustomerSupport,
@@ -507,10 +512,10 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
               <div className="flex gap-2">
                 <div className="w-28 shrink-0">
                   <select
-                    className={inputClass}
+                    className={`${inputClass} disabled:bg-gray-50 dark:disabled:bg-gray-900`}
                     value={budgetCurrency}
                     onChange={(e) => setBudgetCurrency(e.target.value)}
-                    disabled={!canEditEstimates}
+                    disabled={!canEditEstimates || budgetLocked}
                     aria-label="Budget currency"
                   >
                     {SALES_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
@@ -521,21 +526,21 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                     type="number"
                     min={0}
                     step="0.01"
-                    className={inputClass}
+                    className={`${inputClass} read-only:bg-gray-50 dark:read-only:bg-gray-900`}
                     value={budget}
                     onChange={(e) => setBudget(e.target.value)}
-                    readOnly={!canEditEstimates}
-                    placeholder={defaults.id ? "0.00" : "Defaults to the contract value"}
+                    readOnly={!canEditEstimates || budgetLocked}
+                    placeholder={budgetLocked && !defaults.id ? "Set from the contract value on save" : "0.00"}
                     aria-label="Budget amount"
                   />
                 </div>
               </div>
               <p className="mt-1 text-xs text-gray-500">
                 {defaults.contractVariationId
-                  ? "Populated from the contract variation value."
-                  : defaults.contractId
-                    ? "Populated from the total contract value."
-                    : "Optional."}
+                  ? "Set from the contract variation value and kept in sync with it."
+                  : budgetLocked
+                    ? "Set from the total contract value and kept in sync with it."
+                    : "Optional. Enter a budget for projects without a contract."}
               </p>
             </div>
           </div>
@@ -729,82 +734,94 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                 Settings → Users.
               </p>
             ) : (
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
-                    <th className="py-2">Name</th>
-                    <th className="py-2">Email</th>
-                    <th className="py-2">Phone</th>
-                    <th className="py-2">User record</th>
-                    <th className="py-2 pr-2">Currency</th>
-                    <th className="py-2 pr-2">Rate</th>
-                    <th className="py-2 pr-2">Frequency</th>
-                    <th className="py-2" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {members.map((member) => (
-                    <tr key={member.id} className="border-b border-gray-50 dark:border-gray-800">
-                      <td className="py-2">{member.firstName} {member.lastName}</td>
-                      <td className="py-2">{member.email}</td>
-                      <td className="py-2">{member.phone || "—"}</td>
-                      <td className="py-2">
-                        {member.hasCredentials && member.adminUserId ? (
-                          <Link href={`/users/${member.adminUserId}`} className="text-blue-600 hover:underline dark:text-blue-400">
-                            {member.adminUserEmail ?? member.email}
-                          </Link>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className="py-2 pr-2">
-                        <select
-                          className={`${compactInputClass} w-24`}
-                          value={member.rateCurrency ?? "AUD"}
-                          disabled={!canEditEstimates || savingMemberId === member.id}
-                          onChange={(e) => void saveMemberRate(member.id, { rateCurrency: e.target.value })}
-                        >
-                          {SALES_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-                        </select>
-                      </td>
-                      <td className="py-2 pr-2">
-                        <input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          className={`${compactInputClass} w-28 text-right tabular-nums`}
-                          value={member.rate ?? ""}
-                          readOnly={!canEditEstimates}
-                          onChange={(e) =>
-                            updateMemberLocal(member.id, {
-                              rate: e.target.value === "" ? null : Number(e.target.value),
-                            })
-                          }
-                          onBlur={(e) => {
-                            const next = e.target.value === "" ? null : Number(e.target.value);
-                            if (canEditEstimates && next !== (savedRatesRef.current[member.id] ?? null)) {
-                              void saveMemberRate(member.id, { rate: next });
-                            }
-                          }}
-                        />
-                      </td>
-                      <td className="py-2 pr-2">
-                        <select
-                          className={`${compactInputClass} w-32`}
-                          value={member.rateFrequency ?? "DAILY"}
-                          disabled={!canEditEstimates || savingMemberId === member.id}
-                          onChange={(e) =>
-                            void saveMemberRate(member.id, { rateFrequency: e.target.value as MemberRateFrequency })
-                          }
-                        >
-                          {MEMBER_RATE_FREQUENCIES.map((f) => (
-                            <option key={f} value={f}>{MEMBER_RATE_FREQUENCY_LABELS[f]}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="py-2 text-right">
-                        <div className="flex justify-end gap-2">
-                          {canRemoveMembers ? (
+              <div className="-mx-2 overflow-x-auto px-2">
+                <table className="w-full min-w-[720px] text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:border-gray-800">
+                      <th className="py-2 pr-4">Member</th>
+                      <th className="py-2 pr-4">User record</th>
+                      <th className="py-2 pr-4">Rate</th>
+                      {canRemoveMembers ? <th className="w-12 py-2" aria-label="Actions" /> : null}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {members.map((member) => (
+                      <tr key={member.id} className="border-b border-gray-50 align-middle last:border-b-0 dark:border-gray-800">
+                        <td className="py-3 pr-4">
+                          <p className="font-medium text-gray-900 dark:text-gray-100">
+                            {member.firstName} {member.lastName}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {member.email}
+                            {member.phone ? <span className="whitespace-nowrap"> · {member.phone}</span> : null}
+                          </p>
+                        </td>
+                        <td className="max-w-[16rem] py-3 pr-4">
+                          {member.hasCredentials && member.adminUserId ? (
+                            <Link
+                              href={`/users/${member.adminUserId}`}
+                              className="block truncate text-blue-600 hover:underline dark:text-blue-400"
+                              title={member.adminUserEmail ?? member.email}
+                            >
+                              {member.adminUserEmail ?? member.email}
+                            </Link>
+                          ) : (
+                            <span className="text-gray-400">No login yet</span>
+                          )}
+                        </td>
+                        <td className="py-3 pr-4">
+                          <div className="flex items-center gap-2">
+                            <select
+                              className={`${compactInputClass} w-20`}
+                              value={member.rateCurrency ?? "AUD"}
+                              disabled={!canEditEstimates || savingMemberId === member.id}
+                              onChange={(e) => void saveMemberRate(member.id, { rateCurrency: e.target.value })}
+                              aria-label="Rate currency"
+                            >
+                              {SALES_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
+                            </select>
+                            <input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              className={`${compactInputClass} w-28 text-right tabular-nums`}
+                              value={member.rate ?? ""}
+                              placeholder="0.00"
+                              readOnly={!canEditEstimates}
+                              aria-label="Rate"
+                              onChange={(e) =>
+                                updateMemberLocal(member.id, {
+                                  rate: e.target.value === "" ? null : Number(e.target.value),
+                                })
+                              }
+                              onBlur={(e) => {
+                                const next = e.target.value === "" ? null : Number(e.target.value);
+                                if (canEditEstimates && next !== (savedRatesRef.current[member.id] ?? null)) {
+                                  void saveMemberRate(member.id, { rate: next });
+                                }
+                              }}
+                            />
+                            <span className="text-gray-400">/</span>
+                            <select
+                              className={`${compactInputClass} w-32`}
+                              value={member.rateFrequency ?? "DAILY"}
+                              disabled={!canEditEstimates || savingMemberId === member.id}
+                              aria-label="Rate frequency"
+                              onChange={(e) =>
+                                void saveMemberRate(member.id, { rateFrequency: e.target.value as MemberRateFrequency })
+                              }
+                            >
+                              {MEMBER_RATE_FREQUENCIES.map((f) => (
+                                <option key={f} value={f}>{MEMBER_RATE_FREQUENCY_LABELS[f]}</option>
+                              ))}
+                            </select>
+                            {savingMemberId === member.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-gray-400" aria-label="Saving" />
+                            ) : null}
+                          </div>
+                        </td>
+                        {canRemoveMembers ? (
+                          <td className="py-3 text-right">
                             <button
                               type="button"
                               onClick={() => void removeMember(member.id)}
@@ -814,13 +831,13 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          </td>
+                        ) : null}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </section>
         ) : null}

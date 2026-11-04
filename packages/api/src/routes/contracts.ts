@@ -36,6 +36,7 @@ import {
   syncProfileAvailableFlag,
 } from "../lib/contract-profiles";
 import { createProjectFromContract } from "../lib/create-project-from-contract";
+import { syncProjectBudgetsForContract } from "../lib/project-budget";
 import { normalizeContractFileUrls } from "../lib/contract-file-urls";
 import { toNumber, toNumberOrNull } from "../lib/decimal";
 
@@ -1373,6 +1374,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
         orderBy: { createdAt: "desc" },
         include: activityInclude,
       });
+      await syncProjectBudgetsForContract(existing.id, tx);
       return { ...updated, variations: [], activityLogs: logs };
     });
 
@@ -1809,6 +1811,7 @@ router.patch("/:id/variations/:variationId", async (req: AuthRequest, res) => {
         req.user?.id,
       );
       await maybeReactivateContractAfterVariation(tx, contract.id, req.user?.id);
+      await syncProjectBudgetsForContract(contract.id, tx);
       return updated;
     });
 
@@ -1869,6 +1872,7 @@ router.delete("/:id/variations/:variationId", async (req: AuthRequest, res) => {
       );
       await tx.contractVariation.delete({ where: { id: existing.id } });
       await syncContractTotalVariation(tx, contractId);
+      await syncProjectBudgetsForContract(contractId, tx);
     });
 
     res.json({ message: "Deleted" });
@@ -1940,6 +1944,7 @@ router.patch("/:id/end-date", async (req: AuthRequest, res) => {
         orderBy: { createdAt: "desc" },
         include: activityInclude,
       });
+      await syncProjectBudgetsForContract(existing.id, tx);
       return { ...updated, variations: [], activityLogs: logs };
     });
 
