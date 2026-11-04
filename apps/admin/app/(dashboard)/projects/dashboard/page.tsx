@@ -9,7 +9,7 @@ import { TimesheetStatusBadge } from "@/lib/timesheet-status-styles";
 import { PROJECT_STATUS_LABELS, PROJECT_COST_TYPE_LABELS, formatProjectMonth, type ProjectStatus, type ProjectCostType } from "@/lib/project-types";
 
 const BASE_CURRENCIES = ["AUD", "USD", "INR"] as const;
-const DAY_MS = 24 * 60 * 60 * 1000;
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 type AttentionKind = "MISSING" | "AWAITING_APPROVAL" | "DRAFT_NOT_SUBMITTED" | "PAST_END_DATE";
 type WeekRowStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "NOT_YET_SUBMITTED" | "MISSING";
@@ -200,18 +200,22 @@ function ProjectTimeline({ projects, today }: { projects: DashboardData["project
     const max = new Date(Math.max(...ends));
     const from = Date.UTC(min.getUTCFullYear(), min.getUTCMonth(), 1);
     const to = Date.UTC(max.getUTCFullYear(), max.getUTCMonth() + 1, 1);
-    const ticks: Array<{ at: number; label: string }> = [];
+    const months: Array<{ at: number; end: number; label: string; year: number; showYear: boolean }> = [];
     const cursor = new Date(from);
-    const totalMonths = Math.round((to - from) / (30.44 * DAY_MS));
-    const step = totalMonths > 18 ? 3 : totalMonths > 8 ? 2 : 1;
     while (cursor.getTime() < to) {
-      ticks.push({
-        at: cursor.getTime(),
-        label: cursor.toLocaleDateString("en-AU", { month: "short", year: "2-digit", timeZone: "UTC" }).replace(" ", " '"),
+      const at = cursor.getTime();
+      const year = cursor.getUTCFullYear();
+      const month = cursor.getUTCMonth();
+      months.push({
+        at,
+        end: Date.UTC(year, month + 1, 1),
+        label: MONTH_SHORT[month]!,
+        year,
+        showYear: months.length === 0 || month === 0,
       });
-      cursor.setUTCMonth(cursor.getUTCMonth() + step);
+      cursor.setUTCMonth(month + 1);
     }
-    return { from, to, ticks };
+    return { from, to, months };
   }, [projects]);
 
   if (!range) return <p className="text-sm text-gray-400">No dated projects.</p>;
@@ -227,13 +231,14 @@ function ProjectTimeline({ projects, today }: { projects: DashboardData["project
   };
   const todayMs = new Date(today).getTime();
   const todayInRange = todayMs >= range.from && todayMs <= range.to;
+  const minChartWidth = `calc(11.75rem + ${range.months.length * 2.75}rem)`;
 
   return (
     <div className="overflow-x-auto">
-      <div className="min-w-[720px]">
+      <div style={{ minWidth: `max(720px, ${minChartWidth})` }}>
         <div className="grid grid-cols-[11rem_1fr] gap-3 border-b border-gray-100 pb-1 dark:border-gray-800">
           <div className="flex items-end text-xs font-semibold uppercase tracking-wide text-gray-500">Project</div>
-          <div className="relative h-10 text-[11px] text-gray-500">
+          <div className="relative h-14 text-[11px] text-gray-500">
             {todayInRange ? (
               <span
                 className={`absolute top-0 whitespace-nowrap rounded bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white shadow-sm ${edgeAlign(todayMs)}`}
@@ -242,24 +247,35 @@ function ProjectTimeline({ projects, today }: { projects: DashboardData["project
                 Today
               </span>
             ) : null}
-            {range.ticks.map((tick) => (
+            {range.months
+              .filter((m) => m.showYear)
+              .map((m) => (
+                <span
+                  key={`year-${m.at}`}
+                  className="absolute bottom-5 whitespace-nowrap pl-1 font-semibold text-gray-700 dark:text-gray-300"
+                  style={{ left: pct(m.at) }}
+                >
+                  {m.year}
+                </span>
+              ))}
+            {range.months.map((m) => (
               <span
-                key={tick.at}
-                className={`absolute bottom-0 whitespace-nowrap font-medium ${edgeAlign(tick.at)}`}
-                style={{ left: pct(tick.at) }}
+                key={m.at}
+                className="absolute bottom-0 text-center font-medium"
+                style={{ left: pct(m.at), width: `${(ratio(m.end) - ratio(m.at)) * 100}%` }}
               >
-                {tick.label}
+                {m.label}
               </span>
             ))}
           </div>
         </div>
         <div className="relative pt-1">
           <div className="pointer-events-none absolute inset-y-0 left-[11.75rem] right-0">
-            {range.ticks.map((tick) => (
+            {range.months.map((m) => (
               <div
-                key={tick.at}
-                className="absolute inset-y-0 w-px bg-gray-100 dark:bg-gray-800"
-                style={{ left: pct(tick.at) }}
+                key={m.at}
+                className={`absolute inset-y-0 w-px ${m.showYear ? "bg-gray-300 dark:bg-gray-600" : "bg-gray-100 dark:bg-gray-800"}`}
+                style={{ left: pct(m.at) }}
               />
             ))}
           </div>
