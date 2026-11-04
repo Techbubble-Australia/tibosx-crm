@@ -33,6 +33,9 @@ import { getEffectiveRoles } from "@/lib/admin-roles";
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
 
+const compactInputClass =
+  "rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black disabled:bg-gray-50 read-only:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
+
 export type ProjectEstimateRow = {
   id?: string;
   year: number;
@@ -502,24 +505,30 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Budget</label>
               <div className="flex gap-2">
-                <select
-                  className={`${inputClass} w-28 shrink-0`}
-                  value={budgetCurrency}
-                  onChange={(e) => setBudgetCurrency(e.target.value)}
-                  disabled={!canEditEstimates}
-                >
-                  {SALES_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-                </select>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  className={inputClass}
-                  value={budget}
-                  onChange={(e) => setBudget(e.target.value)}
-                  readOnly={!canEditEstimates}
-                  placeholder={defaults.id ? "" : "Defaults to the contract value"}
-                />
+                <div className="w-28 shrink-0">
+                  <select
+                    className={inputClass}
+                    value={budgetCurrency}
+                    onChange={(e) => setBudgetCurrency(e.target.value)}
+                    disabled={!canEditEstimates}
+                    aria-label="Budget currency"
+                  >
+                    {SALES_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
+                  </select>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    className={inputClass}
+                    value={budget}
+                    onChange={(e) => setBudget(e.target.value)}
+                    readOnly={!canEditEstimates}
+                    placeholder={defaults.id ? "0.00" : "Defaults to the contract value"}
+                    aria-label="Budget amount"
+                  />
+                </div>
               </div>
               <p className="mt-1 text-xs text-gray-500">
                 {defaults.contractVariationId
@@ -750,7 +759,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                       </td>
                       <td className="py-2 pr-2">
                         <select
-                          className={`${inputClass} w-24 px-2`}
+                          className={`${compactInputClass} w-24`}
                           value={member.rateCurrency ?? "AUD"}
                           disabled={!canEditEstimates || savingMemberId === member.id}
                           onChange={(e) => void saveMemberRate(member.id, { rateCurrency: e.target.value })}
@@ -763,7 +772,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                           type="number"
                           min={0}
                           step="0.01"
-                          className={`${inputClass} w-28 px-2`}
+                          className={`${compactInputClass} w-28 text-right tabular-nums`}
                           value={member.rate ?? ""}
                           readOnly={!canEditEstimates}
                           onChange={(e) =>
@@ -781,7 +790,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                       </td>
                       <td className="py-2 pr-2">
                         <select
-                          className={`${inputClass} w-32 px-2`}
+                          className={`${compactInputClass} w-32`}
                           value={member.rateFrequency ?? "DAILY"}
                           disabled={!canEditEstimates || savingMemberId === member.id}
                           onChange={(e) =>

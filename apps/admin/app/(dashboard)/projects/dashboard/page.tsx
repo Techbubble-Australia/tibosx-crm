@@ -216,29 +216,59 @@ function ProjectTimeline({ projects, today }: { projects: DashboardData["project
 
   if (!range) return <p className="text-sm text-gray-400">No dated projects.</p>;
   const span = range.to - range.from;
-  const pct = (time: number) => `${Math.min(100, Math.max(0, ((time - range.from) / span) * 100))}%`;
+  const ratio = (time: number) => Math.min(1, Math.max(0, (time - range.from) / span));
+  const pct = (time: number) => `${ratio(time) * 100}%`;
+  /** Keep labels near the chart edges inside the chart instead of centring them off the edge. */
+  const edgeAlign = (time: number) => {
+    const r = ratio(time);
+    if (r < 0.04) return "translate-x-0";
+    if (r > 0.96) return "-translate-x-full";
+    return "-translate-x-1/2";
+  };
   const todayMs = new Date(today).getTime();
+  const todayInRange = todayMs >= range.from && todayMs <= range.to;
 
   return (
     <div className="overflow-x-auto">
-      <div className="min-w-[640px]">
-        <div className="grid grid-cols-[11rem_1fr] gap-3">
-          <div />
-          <div className="relative h-5 text-[11px] text-gray-500">
+      <div className="min-w-[720px]">
+        <div className="grid grid-cols-[11rem_1fr] gap-3 border-b border-gray-100 pb-1 dark:border-gray-800">
+          <div className="flex items-end text-xs font-semibold uppercase tracking-wide text-gray-500">Project</div>
+          <div className="relative h-10 text-[11px] text-gray-500">
+            {todayInRange ? (
+              <span
+                className={`absolute top-0 whitespace-nowrap rounded bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white shadow-sm ${edgeAlign(todayMs)}`}
+                style={{ left: pct(todayMs) }}
+              >
+                Today
+              </span>
+            ) : null}
             {range.ticks.map((tick) => (
-              <span key={tick.at} className="absolute -translate-x-1/2 whitespace-nowrap" style={{ left: pct(tick.at) }}>
+              <span
+                key={tick.at}
+                className={`absolute bottom-0 whitespace-nowrap font-medium ${edgeAlign(tick.at)}`}
+                style={{ left: pct(tick.at) }}
+              >
                 {tick.label}
               </span>
             ))}
           </div>
         </div>
-        <div className="relative">
+        <div className="relative pt-1">
+          <div className="pointer-events-none absolute inset-y-0 left-[11.75rem] right-0">
+            {range.ticks.map((tick) => (
+              <div
+                key={tick.at}
+                className="absolute inset-y-0 w-px bg-gray-100 dark:bg-gray-800"
+                style={{ left: pct(tick.at) }}
+              />
+            ))}
+          </div>
           {projects.map((project) => {
             const start = new Date(project.startDate).getTime();
             const end = new Date(project.endDate).getTime();
             const width = Math.max(((end - start) / span) * 100, 0.8);
             return (
-              <div key={project.id} className="grid grid-cols-[11rem_1fr] items-center gap-3 py-1.5">
+              <div key={project.id} className="relative grid grid-cols-[11rem_1fr] items-center gap-3 py-1.5">
                 <Link
                   href={`/projects/${project.id}`}
                   className="truncate text-xs font-medium text-gray-700 hover:underline dark:text-gray-300"
@@ -246,23 +276,21 @@ function ProjectTimeline({ projects, today }: { projects: DashboardData["project
                 >
                   {project.projectNumber} · {project.consultants[0] ?? project.title}
                 </Link>
-                <div className="relative h-4 rounded bg-gray-50 dark:bg-gray-800/60">
+                <div className="relative h-4 rounded bg-gray-50/70 dark:bg-gray-800/40">
                   <div
                     className={`absolute top-0 h-4 rounded ${project.ended ? "bg-gray-300 dark:bg-gray-600" : "bg-black dark:bg-white"}`}
                     style={{ left: pct(start), width: `${width}%` }}
-                    title={formatRange(project.startDate, project.endDate)}
+                    title={`${project.projectNumber}: ${formatRange(project.startDate, project.endDate)}`}
                   />
                 </div>
               </div>
             );
           })}
-          <div className="pointer-events-none absolute inset-y-0 left-[11.75rem] right-0">
-            <div className="absolute inset-y-0 w-px bg-red-500" style={{ left: pct(todayMs) }}>
-              <span className="absolute -top-5 -translate-x-1/2 rounded bg-red-500 px-1 text-[10px] font-semibold text-white">
-                Today
-              </span>
+          {todayInRange ? (
+            <div className="pointer-events-none absolute inset-y-0 left-[11.75rem] right-0">
+              <div className="absolute inset-y-0 w-px bg-red-500" style={{ left: pct(todayMs) }} />
             </div>
-          </div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -423,7 +451,7 @@ export default function ProjectManagerDashboardPage() {
           </div>
         ) : data && kpis ? (
           <>
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <KpiCard
                 label="Awaiting approval"
                 value={kpis.awaitingApproval.count}
