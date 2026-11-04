@@ -90,6 +90,7 @@ const navGroups: NavGroup[] = [
     roles: ["admin", "sales", "project_manager", "project_member"],
     items: [
       { href: "/projects/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "project_manager"] },
+      { href: "/projects/my-dashboard", label: "My dashboard", icon: LayoutDashboard, roles: ["project_member"] },
       { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin", "project_manager", "project_member"] },
       { href: "/timesheets", label: "Timesheets", icon: ClipboardCheck, roles: ["admin", "project_manager", "project_member"] },
     ],
@@ -217,7 +218,11 @@ function navItemIsActive(item: NavItem, pathname: string): boolean {
     return pathUnder("/timesheets", pathname) && !pathUnder("/support-tickets", pathname);
   }
   if (item.href === "/projects") {
-    return pathUnder("/projects", pathname) && !pathUnder("/projects/dashboard", pathname);
+    return (
+      pathUnder("/projects", pathname) &&
+      !pathUnder("/projects/dashboard", pathname) &&
+      !pathUnder("/projects/my-dashboard", pathname)
+    );
   }
   if (item.href === "/support-tickets/dashboard") {
     return pathUnder("/support-tickets/dashboard", pathname);
