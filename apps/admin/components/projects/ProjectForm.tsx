@@ -734,43 +734,45 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                 Settings → Users.
               </p>
             ) : (
-              <div className="-mx-2 overflow-x-auto px-2">
-                <table className="w-full min-w-[720px] text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:border-gray-800">
-                      <th className="py-2 pr-4">Member</th>
-                      <th className="py-2 pr-4">User record</th>
-                      <th className="py-2 pr-4">Rate</th>
-                      {canRemoveMembers ? <th className="w-12 py-2" aria-label="Actions" /> : null}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {members.map((member) => (
-                      <tr key={member.id} className="border-b border-gray-50 align-middle last:border-b-0 dark:border-gray-800">
-                        <td className="py-3 pr-4">
-                          <p className="font-medium text-gray-900 dark:text-gray-100">
-                            {member.firstName} {member.lastName}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {member.email}
-                            {member.phone ? <span className="whitespace-nowrap"> · {member.phone}</span> : null}
-                          </p>
-                        </td>
-                        <td className="max-w-[16rem] py-3 pr-4">
-                          {member.hasCredentials && member.adminUserId ? (
-                            <Link
-                              href={`/users/${member.adminUserId}`}
-                              className="block truncate text-blue-600 hover:underline dark:text-blue-400"
-                              title={member.adminUserEmail ?? member.email}
-                            >
-                              {member.adminUserEmail ?? member.email}
-                            </Link>
-                          ) : (
-                            <span className="text-gray-400">No login yet</span>
-                          )}
-                        </td>
-                        <td className="py-3 pr-4">
+              <>
+              <ul className="divide-y divide-gray-100 rounded-lg border border-gray-100 dark:divide-gray-800 dark:border-gray-800">
+                    {members.map((member) => {
+                      const initials = `${member.firstName?.[0] ?? ""}${member.lastName?.[0] ?? ""}`.toUpperCase() || "?";
+                      return (
+                      <li
+                        key={member.id}
+                        className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:gap-6"
+                      >
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                            {initials}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                              {member.firstName} {member.lastName}
+                            </p>
+                            <p className="truncate text-xs text-gray-500 dark:text-gray-400" title={member.email}>
+                              {member.email}
+                              {member.phone ? <span className="whitespace-nowrap"> · {member.phone}</span> : null}
+                            </p>
+                            <p className="truncate text-xs">
+                              {member.hasCredentials && member.adminUserId ? (
+                                <Link
+                                  href={`/users/${member.adminUserId}`}
+                                  className="text-blue-600 hover:underline dark:text-blue-400"
+                                  title="Open user record"
+                                >
+                                  User record: {member.adminUserEmail ?? member.email}
+                                </Link>
+                              ) : (
+                                <span className="text-gray-400">No login yet</span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2 pl-12 lg:pl-0">
                           <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-gray-500">Rate</span>
                             <select
                               className={`${compactInputClass} w-20`}
                               value={member.rateCurrency ?? "AUD"}
@@ -815,29 +817,32 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                                 <option key={f} value={f}>{MEMBER_RATE_FREQUENCY_LABELS[f]}</option>
                               ))}
                             </select>
-                            {savingMemberId === member.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin text-gray-400" aria-label="Saving" />
-                            ) : null}
+                            <span className="flex w-4 justify-center">
+                              {savingMemberId === member.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-gray-400" aria-label="Saving" />
+                              ) : null}
+                            </span>
                           </div>
-                        </td>
-                        {canRemoveMembers ? (
-                          <td className="py-3 text-right">
+                          {canRemoveMembers ? (
                             <button
                               type="button"
                               onClick={() => void removeMember(member.id)}
-                              className="rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400"
+                              className="ml-auto rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50 lg:ml-2 dark:border-red-900 dark:text-red-400"
                               aria-label="Remove member"
                               title="Remove member"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
-                          </td>
-                        ) : null}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                          ) : null}
+                        </div>
+                      </li>
+                      );
+                    })}
+              </ul>
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                Rates are used by Run Estimates and to calculate actuals from approved timesheets. Changes save automatically.
+              </p>
+              </>
             )}
           </section>
         ) : null}
