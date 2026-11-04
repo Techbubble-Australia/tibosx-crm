@@ -34,13 +34,19 @@ import {
   ClipboardCheck,
   Ticket,
   Bug,
+  Home,
 } from "lucide-react";
 import { UserAccountMenu } from "@/components/UserAccountMenu";
 import { HelpSupportHeaderButton } from "@/components/HelpSupportHeaderButton";
 import { ImpersonationBanner } from "@/components/users/ImpersonationBanner";
 import { ImpersonateUserModal } from "@/components/users/ImpersonateUserModal";
 import { DebugModeGate } from "@/components/debug/DebugModeGate";
-import { anyEffectiveRole, defaultLandingPath, formatRolesLabel } from "@/lib/admin-roles";
+import {
+  anyEffectiveRole,
+  defaultLandingPath,
+  formatRolesLabel,
+  isRestrictedToWorkspaceOnly,
+} from "@/lib/admin-roles";
 import { AdminSessionProvider, useAdminSession } from "@/contexts/AdminSessionContext";
 import { MfaEnrollmentGuard } from "@/components/MfaEnrollmentGuard";
 import { MemberOnboardingGuard } from "@/components/MemberOnboardingGuard";
@@ -69,6 +75,14 @@ type NavGroup = {
   items: NavItem[];
 };
 
+/** Personal home for every non-client user; client/support-portal-only users land on their portal dashboard. */
+const workspaceNavItem: NavItem = {
+  href: "/my-workspace",
+  label: "Workspace",
+  icon: Home,
+  roles: [],
+};
+
 const navGroups: NavGroup[] = [
   {
     id: "sales",
@@ -90,7 +104,6 @@ const navGroups: NavGroup[] = [
     roles: ["admin", "sales", "project_manager", "project_member"],
     items: [
       { href: "/projects/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "project_manager"] },
-      { href: "/projects/my-dashboard", label: "My dashboard", icon: LayoutDashboard, roles: ["project_member"] },
       { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin", "project_manager", "project_member"] },
       { href: "/timesheets", label: "Timesheets", icon: ClipboardCheck, roles: ["admin", "project_manager", "project_member"] },
     ],
@@ -218,11 +231,7 @@ function navItemIsActive(item: NavItem, pathname: string): boolean {
     return pathUnder("/timesheets", pathname) && !pathUnder("/support-tickets", pathname);
   }
   if (item.href === "/projects") {
-    return (
-      pathUnder("/projects", pathname) &&
-      !pathUnder("/projects/dashboard", pathname) &&
-      !pathUnder("/projects/my-dashboard", pathname)
-    );
+    return pathUnder("/projects", pathname) && !pathUnder("/projects/dashboard", pathname);
   }
   if (item.href === "/support-tickets/dashboard") {
     return pathUnder("/support-tickets/dashboard", pathname);
@@ -320,6 +329,10 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
       });
       }, [role, additionalRoles, canAccessProjectManagementTimesheets, canAccessWorkspaceTimesheets, impersonation, isDevAppEnv]);
 
+  const showWorkspaceHome =
+    !loading && role !== "client" && !isRestrictedToWorkspaceOnly(role, additionalRoles);
+  const workspaceHomeActive = pathUnder("/my-workspace", pathname);
+
   function toggleGroup(id: string) {
     setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));
   }
@@ -392,6 +405,22 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 space-y-1 px-2">
+          {showWorkspaceHome ? (
+            <Link
+              href={workspaceNavItem.href}
+              title={sidebarCollapsed ? workspaceNavItem.label : undefined}
+              className={`mb-2 flex items-center rounded-lg text-sm font-semibold transition-colors ${
+                sidebarCollapsed ? "justify-center p-2.5" : "gap-2.5 px-3 py-2.5"
+              } ${
+                workspaceHomeActive
+                  ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100"
+                  : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+              }`}
+            >
+              <Home className="h-4 w-4 shrink-0" />
+              {sidebarCollapsed ? null : <span className="truncate">{workspaceNavItem.label}</span>}
+            </Link>
+          ) : null}
           {sidebarCollapsed ? (
             <div className="space-y-1">
               {visibleGroups.flatMap((group) =>

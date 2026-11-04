@@ -322,13 +322,8 @@ export function isRestrictedToWorkspaceOnly(primary: string, additional?: string
 /** Post-login landing route (relative TBOS path). */
 export function defaultLandingPath(role: string, additional?: string[] | null): string {
   if (isRestrictedToWorkspaceOnly(role, additional)) return "/workspace/dashboard";
-  if (role === "client" || role === "customer_support") return "/workspace/dashboard";
-  if (role === "admin" || role === "sales") return "/sales/dashboard";
-  if (role === "recruiter_admin" || role === "recruiter") return "/database/dashboard";
-  if (role === "website") return "/pages";
-  if (role === "project_manager") return "/projects/dashboard";
-  if (role === "project_member") return "/projects/my-dashboard";
-  return "/sales/dashboard";
+  if (role === "client") return "/workspace/dashboard";
+  return "/my-workspace";
 }
 
 export function isExternalLandingPath(path: string): boolean {

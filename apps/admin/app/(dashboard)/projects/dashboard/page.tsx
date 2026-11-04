@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, X } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
+import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { useDismissedToday } from "@/hooks/useDismissedToday";
 import { TimesheetStatusBadge } from "@/lib/timesheet-status-styles";
 import { PROJECT_STATUS_LABELS, PROJECT_COST_TYPE_LABELS, formatProjectMonth, type ProjectStatus, type ProjectCostType } from "@/lib/project-types";
 
@@ -183,6 +185,36 @@ function attentionDetail(item: DashboardData["attention"][number]): string {
   }
 }
 
+function attentionKey(item: DashboardData["attention"][number]): string {
+  return [item.kind, item.projectId, item.timesheetId ?? "", item.consultant ?? "", item.weekStart ?? ""].join("|");
+}
+
+type ProjectStatusFilter = "OPEN" | "ALL" | "PAST_END" | ProjectStatus;
+
+const PROJECT_STATUS_FILTERS: Array<{ value: ProjectStatusFilter; label: string }> = [
+  { value: "OPEN", label: "Open (active, on hold, draft)" },
+  { value: "ALL", label: "All statuses" },
+  { value: "ACTIVE", label: PROJECT_STATUS_LABELS.ACTIVE },
+  { value: "PAST_END", label: "Active, past end date" },
+  { value: "ON_HOLD", label: PROJECT_STATUS_LABELS.ON_HOLD },
+  { value: "DRAFT", label: PROJECT_STATUS_LABELS.DRAFT },
+  { value: "COMPLETED", label: PROJECT_STATUS_LABELS.COMPLETED },
+  { value: "CANCELLED", label: PROJECT_STATUS_LABELS.CANCELLED },
+];
+
+function matchesStatusFilter(project: DashboardData["projects"][number], filter: ProjectStatusFilter): boolean {
+  if (filter === "ALL") return true;
+  if (filter === "OPEN") return ["ACTIVE", "ON_HOLD", "DRAFT"].includes(project.status);
+  if (filter === "PAST_END") return project.status === "ACTIVE" && project.ended;
+  return project.status === filter;
+}
+
+function uniqueProjectOptions(rows: Array<{ projectId: string; projectLabel: string }>) {
+  const map = new Map<string, string>();
+  for (const row of rows) map.set(row.projectId, row.projectLabel);
+  return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+}
+
 function WeekStatus({ status }: { status: WeekRowStatus }) {
   if (status === "MISSING") return <Pill className="bg-red-100 text-red-800 ring-red-200">Missing</Pill>;
   if (status === "NOT_YET_SUBMITTED") {
@@ -322,7 +354,7 @@ function CostByMonth({ rows, currency }: { rows: DashboardData["costByMonth"]; c
   const dayRate = totals.days > 0 ? totals.estimated / totals.days : null;
 
   if (!rows.length) {
-    return <p className="text-sm text-gray-400">No estimates or actuals yet. Use Run Estimates on a project to populate this.</p>;
+    return <p className="text-sm text-gray-400">No estimates or actuals for this year. Use Run Estimates on a project to populate this.</p>;
   }
 
   return (
@@ -339,9 +371,7 @@ function CostByMonth({ rows, currency }: { rows: DashboardData["costByMonth"]; c
                 <div className="w-1/2 max-w-6 rounded-t bg-green-600" style={{ height: `${(row.actual / max) * 100}%` }} />
               ) : null}
             </div>
-            <span className="text-[11px] text-gray-500">
-              {new Date(Date.UTC(row.year, row.month, 1)).toLocaleDateString("en-AU", { month: "short", timeZone: "UTC" })}
-            </span>
+            <span className="text-[11px] text-gray-500">{MONTH_SHORT[row.month]}</span>
           </div>
         ))}
       </div>
@@ -417,15 +447,44 @@ export default function ProjectManagerDashboardPage() {
 
   const currency = data?.baseCurrency ?? baseCurrency;
   const kpis = data?.kpis;
-  const weekGroups = useMemo(() => {
-    const groups = new Map<string, DashboardData["timesheetsByWeek"]>();
-    for (const row of data?.timesheetsByWeek ?? []) {
-      const list = groups.get(row.weekStart) ?? [];
-      list.push(row);
-      groups.set(row.weekStart, list);
-    }
-    return [...groups.entries()];
+  const { userId } = useAdminSession();
+  const { dismissed, dismiss, restoreAll } = useDismissedToday("pm-dashboard-attention", userId);
+  const [attentionProject, setAttentionProject] = useState("");
+  const [weekProject, setWeekProject] = useState("");
+  const [projectStatusFilter, setProjectStatusFilter] = useState<ProjectStatusFilter>("OPEN");
+  const [costYear, setCostYear] = useState<number | null>(null);
+
+  const attentionAll = useMemo(
+    () => (data?.attention ?? []).filter((item) => !dismissed.has(attentionKey(item))),
+    [data, dismissed],
+  );
+  const hiddenAttention = (data?.attention.length ?? 0) - attentionAll.length;
+  const attentionRows = useMemo(
+    () => attentionAll.filter((item) => !attentionProject || item.projectId === attentionProject),
+    [attentionAll, attentionProject],
+  );
+  const weekRows = useMemo(
+    () => (data?.timesheetsByWeek ?? []).filter((row) => !weekProject || row.projectId === weekProject),
+    [data, weekProject],
+  );
+  const filteredProjects = useMemo(
+    () => (data?.projects ?? []).filter((project) => matchesStatusFilter(project, projectStatusFilter)),
+    [data, projectStatusFilter],
+  );
+  const timelineProjects = useMemo(
+    () => (data?.projects ?? []).filter((project) => matchesStatusFilter(project, "OPEN")),
+    [data],
+  );
+  const costYears = useMemo(() => {
+    const years = new Set((data?.costByMonth ?? []).map((row) => row.year));
+    if (data) years.add(new Date(data.today).getUTCFullYear());
+    return [...years].sort((a, b) => b - a);
   }, [data]);
+  const selectedCostYear = costYear ?? (data ? new Date(data.today).getUTCFullYear() : null);
+  const costRows = useMemo(
+    () => (data?.costByMonth ?? []).filter((row) => row.year === selectedCostYear),
+    [data, selectedCostYear],
+  );
 
   const selectClass =
     "rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800";
@@ -507,9 +566,34 @@ export default function ProjectManagerDashboardPage() {
               />
             </div>
 
-            <Section title="Needs attention" subtitle="Missing, unapproved and overdue items, most urgent first">
-              {data.attention.length === 0 ? (
-                <p className="text-sm text-gray-400">Nothing needs attention right now.</p>
+            <Section
+              title="Needs attention"
+              subtitle="Missing, unapproved and overdue items, most urgent first"
+              actions={
+                <div className="flex flex-wrap items-center gap-3">
+                  {hiddenAttention > 0 ? (
+                    <button type="button" onClick={restoreAll} className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400">
+                      Show {hiddenAttention} dismissed
+                    </button>
+                  ) : null}
+                  <select
+                    value={attentionProject}
+                    onChange={(e) => setAttentionProject(e.target.value)}
+                    className={selectClass}
+                    aria-label="Filter needs attention by project"
+                  >
+                    <option value="">All projects</option>
+                    {uniqueProjectOptions(attentionAll).map(([id, label]) => (
+                      <option key={id} value={id}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+              }
+            >
+              {attentionRows.length === 0 ? (
+                <p className="text-sm text-gray-400">
+                  {attentionProject ? "Nothing needs attention for this project." : "Nothing needs attention right now."}
+                </p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-sm">
@@ -517,23 +601,36 @@ export default function ProjectManagerDashboardPage() {
                       <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
                         <th className="py-2 pr-3">Issue</th>
                         <th className="py-2 pr-3">Project</th>
-                        <th className="py-2">Detail</th>
+                        <th className="py-2 pr-3">Detail</th>
+                        <th className="w-10 py-2" aria-label="Dismiss" />
                       </tr>
                     </thead>
                     <tbody>
-                      {data.attention.map((item, index) => {
+                      {attentionRows.map((item) => {
                         const meta = ATTENTION_META[item.kind];
                         const href = item.timesheetId ? `/timesheets/${item.timesheetId}` : `/projects/${item.projectId}`;
+                        const key = attentionKey(item);
                         return (
-                          <tr key={`${item.kind}-${item.projectId}-${item.timesheetId ?? index}`} className="border-b border-gray-50 dark:border-gray-800">
+                          <tr key={key} className="border-b border-gray-50 dark:border-gray-800">
                             <td className="py-2 pr-3"><Pill className={meta.className}>{meta.label}</Pill></td>
                             <td className="py-2 pr-3">
                               <Link href={`/projects/${item.projectId}`} className="text-blue-600 hover:underline dark:text-blue-400">
                                 {item.projectLabel}
                               </Link>
                             </td>
-                            <td className="py-2 text-gray-700 dark:text-gray-300">
+                            <td className="py-2 pr-3 text-gray-700 dark:text-gray-300">
                               <Link href={href} className="hover:underline">{attentionDetail(item)}</Link>
+                            </td>
+                            <td className="py-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => dismiss(key)}
+                                className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                                aria-label={`Dismiss for today: ${meta.label} on ${item.projectLabel}`}
+                                title="Dismiss for today"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
                             </td>
                           </tr>
                         );
@@ -547,9 +644,24 @@ export default function ProjectManagerDashboardPage() {
             <Section
               title="Timesheets by week"
               subtitle="Every project member expected to log time that week. “Not yet submitted” means the week is still running and no timesheet exists yet."
+              actions={
+                <select
+                  value={weekProject}
+                  onChange={(e) => setWeekProject(e.target.value)}
+                  className={selectClass}
+                  aria-label="Filter timesheets by project"
+                >
+                  <option value="">All projects</option>
+                  {uniqueProjectOptions(data.timesheetsByWeek).map(([id, label]) => (
+                    <option key={id} value={id}>{label}</option>
+                  ))}
+                </select>
+              }
             >
-              {weekGroups.length === 0 ? (
-                <p className="text-sm text-gray-400">No active projects with members in these weeks.</p>
+              {weekRows.length === 0 ? (
+                <p className="text-sm text-gray-400">
+                  {weekProject ? "No timesheets expected for this project in these weeks." : "No active projects with members in these weeks."}
+                </p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-sm">
@@ -563,8 +675,7 @@ export default function ProjectManagerDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {weekGroups.flatMap(([, rows]) =>
-                        rows.map((row) => (
+                      {weekRows.map((row) => (
                           <tr key={`${row.weekStart}-${row.projectId}-${row.consultant}`} className="border-b border-gray-50 dark:border-gray-800">
                             <td className="whitespace-nowrap py-2 pr-3 text-gray-600 dark:text-gray-400">{formatWeek(row.weekStart, row.weekEnd)}</td>
                             <td className="py-2 pr-3">
@@ -582,8 +693,7 @@ export default function ProjectManagerDashboardPage() {
                             </td>
                             <td className="py-2 text-right tabular-nums">{row.hours != null ? row.hours : "—"}</td>
                           </tr>
-                        )),
-                      )}
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -591,16 +701,46 @@ export default function ProjectManagerDashboardPage() {
             </Section>
 
             <Section title="Project timeline" subtitle="Start to end of each project, with today marked. Grey bars have ended.">
-              <ProjectTimeline projects={data.projects} today={data.today} />
+              <ProjectTimeline projects={timelineProjects} today={data.today} />
             </Section>
 
-            <Section title="Estimated cost by month" subtitle={`Project estimates and actuals combined, in ${currency}.`}>
-              <CostByMonth rows={data.costByMonth} currency={currency} />
+            <Section
+              title="Estimated vs Actual costs by month"
+              subtitle={`Project estimates and actuals combined, in ${currency}.`}
+              actions={
+                <select
+                  value={selectedCostYear ?? ""}
+                  onChange={(e) => setCostYear(Number(e.target.value))}
+                  className={selectClass}
+                  aria-label="Filter costs by year"
+                >
+                  {costYears.map((year) => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              }
+            >
+              <CostByMonth rows={costRows} currency={currency} />
             </Section>
 
-            <Section title="All projects" subtitle="Time elapsed to today for each project">
-              {data.projects.length === 0 ? (
-                <p className="text-sm text-gray-400">No projects.</p>
+            <Section
+              title="All projects"
+              subtitle="Time elapsed to today for each project"
+              actions={
+                <select
+                  value={projectStatusFilter}
+                  onChange={(e) => setProjectStatusFilter(e.target.value as ProjectStatusFilter)}
+                  className={selectClass}
+                  aria-label="Filter projects by status"
+                >
+                  {PROJECT_STATUS_FILTERS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              }
+            >
+              {filteredProjects.length === 0 ? (
+                <p className="text-sm text-gray-400">No projects match this status.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-sm">
@@ -616,7 +756,7 @@ export default function ProjectManagerDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.projects.map((project) => (
+                      {filteredProjects.map((project) => (
                         <tr key={project.id} className="border-b border-gray-50 dark:border-gray-800">
                           <td className="py-2 pr-3">
                             <Link href={`/projects/${project.id}`} className="text-blue-600 hover:underline dark:text-blue-400">

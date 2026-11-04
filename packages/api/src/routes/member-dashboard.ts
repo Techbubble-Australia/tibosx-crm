@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { prisma, type Prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth";
 import { getActorId } from "../lib/project-access";
+import { effectiveRolesForUser } from "../lib/admin-roles";
 import { getMemberOnboardingStatus } from "../lib/member-onboarding";
 import { mondayOfWeek, startOfUtcDay } from "../lib/project-types";
 import { WEEKDAY_KEYS, sumDailyHours, type DailyHours } from "../lib/timesheet-entries";
@@ -46,10 +47,17 @@ function projectLabel(project: { projectNumber: string; title: string } | null |
 
 type WeekStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "NOT_STARTED" | "MISSING";
 
+/** Client and support-portal-only users have their own portal dashboard. */
+const PORTAL_ONLY_ROLES = new Set(["client", "customer_support"]);
+
 router.get("/", async (req: AuthRequest, res) => {
   try {
     const actorId = getActorId(req);
     if (!actorId) return res.status(401).json({ error: "Unauthorized" });
+    const roles = await effectiveRolesForUser(actorId, req.user?.role ?? "");
+    if (req.user?.role === "client" || roles.every((role) => PORTAL_ONLY_ROLES.has(role))) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
 
     const today = startOfUtcDay(new Date());
     const currentMonday = mondayOfWeek(today);
@@ -57,6 +65,8 @@ router.get("/", async (req: AuthRequest, res) => {
     const chartStart = addDays(currentMonday, -7 * (CHART_WEEKS - 1));
     const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
     const nextMonthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1));
+    const lastMonthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
+    const sheetsFrom = addDays(chartStart < lastMonthStart ? chartStart : lastMonthStart, -6);
 
     const projectSelect = {
       id: true,
@@ -91,7 +101,7 @@ router.get("/", async (req: AuthRequest, res) => {
         select: { project: { select: projectSelect } },
       }),
       prisma.timesheet.findMany({
-        where: { memberUserId: actorId, startDate: { gte: addDays(chartStart, -6) } },
+        where: { memberUserId: actorId, startDate: { gte: sheetsFrom } },
         select: sheetSelect,
       }),
       prisma.timesheet.findMany({
@@ -156,22 +166,29 @@ router.get("/", async (req: AuthRequest, res) => {
     );
     const awaiting = openSheets.filter((row) => row.status === "SUBMITTED");
 
+    const isMember = memberships.length > 0;
+    const agreementPending = isMember && onboarding.hasAgreementAssignment && !onboarding.agreementSigned;
+    const profilePending = isMember && !onboarding.profileComplete;
+
     const actionItems: Array<{
+      id: string;
       kind: "AGREEMENT" | "PROFILE" | "RETURNED" | "OVERDUE_DRAFT" | "MISSING";
       title: string;
       detail: string;
       href: string;
     }> = [];
-    if (onboarding.hasAgreementAssignment && !onboarding.agreementSigned) {
+    if (agreementPending) {
       actionItems.push({
+        id: "agreement",
         kind: "AGREEMENT",
         title: "Sign your agreement",
         detail: "You can't submit timesheets until your agreement is signed.",
         href: "/agreement",
       });
     }
-    if (!onboarding.profileComplete) {
+    if (profilePending) {
       actionItems.push({
+        id: "profile",
         kind: "PROFILE",
         title: "Complete your profile",
         detail: "Add your address, bank details and an emergency contact.",
@@ -180,6 +197,7 @@ router.get("/", async (req: AuthRequest, res) => {
     }
     for (const row of returned) {
       actionItems.push({
+        id: `returned:${row.id}`,
         kind: "RETURNED",
         title: "Timesheet returned",
         detail: `${projectLabel(row.project)}, week of ${isoDay(row.startDate)}: ${row.rejectReason}`,
@@ -188,6 +206,7 @@ router.get("/", async (req: AuthRequest, res) => {
     }
     for (const row of overdueDrafts) {
       actionItems.push({
+        id: `draft:${row.id}`,
         kind: "OVERDUE_DRAFT",
         title: "Draft not submitted",
         detail: `${projectLabel(row.project)}, week of ${isoDay(row.startDate)} (${totalHours(row)} h)`,
@@ -196,6 +215,7 @@ router.get("/", async (req: AuthRequest, res) => {
     }
     for (const row of lastWeek.filter((r) => r.status === "MISSING")) {
       actionItems.push({
+        id: `missing:${row.projectId}:${isoDay(lastMonday)}`,
         kind: "MISSING",
         title: "Timesheet missing",
         detail: `${row.projectLabel}, week of ${isoDay(lastMonday)}`,
@@ -218,10 +238,15 @@ router.get("/", async (req: AuthRequest, res) => {
     });
 
     let approvedHoursThisMonth = 0;
+    let approvedHoursLastMonth = 0;
     const monthHoursByProject = new Map<string, number>();
     for (const sheet of recentSheets) {
       for (const day of hoursByDay(sheet)) {
-        if (day.date < monthStart || day.date >= nextMonthStart || day.hours <= 0) continue;
+        if (day.hours <= 0) continue;
+        if (sheet.status === "APPROVED" && day.date >= lastMonthStart && day.date < monthStart) {
+          approvedHoursLastMonth += day.hours;
+        }
+        if (day.date < monthStart || day.date >= nextMonthStart) continue;
         if (sheet.projectId) {
           monthHoursByProject.set(sheet.projectId, (monthHoursByProject.get(sheet.projectId) ?? 0) + day.hours);
         }
@@ -264,16 +289,17 @@ router.get("/", async (req: AuthRequest, res) => {
         weekEnd: isoDay(addDays(currentMonday, 6)),
         lastWeekStart: isoDay(lastMonday),
         lastWeekEnd: isoDay(addDays(lastMonday, 6)),
+        isProjectMember: isMember,
         onboarding: {
-          agreementSigned: onboarding.agreementSigned,
-          hasAgreementAssignment: onboarding.hasAgreementAssignment,
-          profileComplete: onboarding.profileComplete,
+          agreementPending,
+          profilePending,
         },
         kpis: {
           hoursThisWeek: thisWeek.reduce((sum, row) => sum + row.hours, 0),
           awaitingApproval: { count: awaiting.length, hours: awaiting.reduce((sum, row) => sum + totalHours(row), 0) },
-          toSubmit: returned.length + overdueDrafts.length + lastWeek.filter((r) => r.status === "MISSING").length,
           approvedHoursThisMonth,
+          approvedHoursLastMonth,
+          lastMonthLabel: lastMonthStart.toISOString(),
           activeProjects: activeProjects.length,
         },
         actionItems,

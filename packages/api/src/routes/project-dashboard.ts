@@ -16,7 +16,6 @@ import {
 const router: IRouter = Router();
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const DASHBOARD_PROJECT_STATUSES = ["ACTIVE", "ON_HOLD", "DRAFT"];
 
 function parseBaseCurrency(value: unknown): DashboardBaseCurrency {
   const normalized = typeof value === "string" ? value.trim().toUpperCase() : "";
@@ -66,12 +65,9 @@ router.get("/", async (req: AuthRequest, res) => {
     const currentSunday = addDays(currentMonday, 6);
     const lastSunday = addDays(lastMonday, 6);
 
-    const projectWhere: Prisma.ProjectWhereInput = {
-      status: { in: DASHBOARD_PROJECT_STATUSES },
-      ...(mine
-        ? { OR: [{ projectManagerId: actorId }, { timesheetApproverUserId: actorId }] }
-        : {}),
-    };
+    const projectWhere: Prisma.ProjectWhereInput = mine
+      ? { OR: [{ projectManagerId: actorId }, { timesheetApproverUserId: actorId }] }
+      : {};
 
     const projects = await prisma.project.findMany({
       where: projectWhere,
@@ -314,6 +310,7 @@ router.get("/", async (req: AuthRequest, res) => {
     let actualTotal = 0;
     const actualMonths = new Set<number>();
     for (const project of projects) {
+      if (project.status === "CANCELLED") continue;
       for (const row of project.estimates) {
         const amount = toBase(toNumber(row.estimatedCost), row.currency);
         estimatedTotal += amount;
