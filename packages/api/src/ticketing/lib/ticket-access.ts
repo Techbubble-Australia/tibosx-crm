@@ -44,7 +44,7 @@ export async function organizationIdsForClientPortal(
     select: {
       email: true,
       tbosAdminUserId: true,
-      projectClientLink: {
+      projectClientLinks: {
         select: {
           projectId: true,
           contactId: true,
@@ -120,12 +120,10 @@ export async function organizationIdsForClientPortal(
     for (const row of approverProjects) projectIds.add(row.id);
   }
 
-  if (
-    tu.projectClientLink &&
-    (tu.projectClientLink.portalAccess || tu.projectClientLink.canApproveTimesheets)
-  ) {
-    projectIds.add(tu.projectClientLink.projectId);
-    contactIds.add(tu.projectClientLink.contactId);
+  for (const link of tu.projectClientLinks) {
+    if (!link.portalAccess && !link.canApproveTimesheets) continue;
+    projectIds.add(link.projectId);
+    contactIds.add(link.contactId);
   }
 
   if (contactEmails.size) {

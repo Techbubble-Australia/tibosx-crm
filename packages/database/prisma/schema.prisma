@@ -797,7 +797,8 @@ model ProjectClientContact {
   contact              ClientContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
   portalAccess         Boolean       @default(true)
   canApproveTimesheets Boolean       @default(false)
-  ticketingUserId      String?       @unique
+  /// One portal login can be the client contact on several projects.
+  ticketingUserId      String?
   ticketingUser        TicketingUser? @relation("ProjectClientPortalUser", fields: [ticketingUserId], references: [id], onDelete: SetNull)
   timesheetApprovals   Timesheet[]   @relation("TimesheetClientApprover")
   createdAt            DateTime      @default(now())
@@ -806,6 +807,7 @@ model ProjectClientContact {
   @@unique([projectId, contactId])
   @@index([projectId])
   @@index([contactId])
+  @@index([ticketingUserId])
 }
 
 model ProjectSupportGroup {
@@ -1168,7 +1170,7 @@ model TicketingUser {
   messages                TicketMessage[]
   auditLogs               TicketAuditLog[]         @relation("AuditActor")
   consultantOrganizations ConsultantOrganization[]
-  projectClientLink       ProjectClientContact?    @relation("ProjectClientPortalUser")
+  projectClientLinks      ProjectClientContact[]   @relation("ProjectClientPortalUser")
   supportGroupMembers     ProjectSupportGroupMember[] @relation("SupportGroupConsultant")
 
   @@index([organizationId])
