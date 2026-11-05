@@ -68,7 +68,7 @@ export function TechBubbleLogo({
           <span className="text-base font-bold leading-tight tracking-tight text-gray-900 dark:text-gray-100">
             TIBOSX
           </span>
-          <span className="max-w-[12rem] text-[11px] font-medium leading-snug text-gray-500 dark:text-gray-400">
+          <span className="whitespace-nowrap text-[10.5px] font-medium leading-snug tracking-tight text-gray-500 dark:text-gray-400">
             AI-powered Business Operating System
           </span>
         </span>

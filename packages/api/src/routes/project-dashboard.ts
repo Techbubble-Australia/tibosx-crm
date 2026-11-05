@@ -45,13 +45,206 @@ function projectLabel(project: { projectNumber: string; title: string }): string
 
 type WeekRowStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "NOT_YET_SUBMITTED" | "MISSING";
 
+type WeekRow = {
+  weekStart: string;
+  weekEnd: string;
+  projectId: string;
+  projectLabel: string;
+  consultant: string;
+  status: WeekRowStatus;
+  hours: number | null;
+  timesheetId: string | null;
+};
+
+type WeekProject = {
+  id: string;
+  projectNumber: string;
+  title: string;
+  status: string;
+  startDate: Date;
+  endDate: Date;
+  members: Array<{
+    adminUserId: string | null;
+    profile: { firstName: string };
+    adminUser: { name: string | null; email: string } | null;
+  }>;
+};
+
+type WeekSheet = {
+  id: string;
+  projectId: string | null;
+  memberUserId: string;
+  startDate: Date;
+  status: string;
+  dailyHours: unknown;
+  entries: Array<{ dailyHours: unknown }>;
+  memberUser: { name: string | null; email: string };
+};
+
+const WEEK_STATUS_ORDER: Record<WeekRowStatus, number> = {
+  MISSING: 0,
+  DRAFT: 1,
+  SUBMITTED: 2,
+  NOT_YET_SUBMITTED: 3,
+  APPROVED: 4,
+};
+
+/** Every member with a login on an ACTIVE project overlapping the week is expected to log time that week. */
+function buildWeekRows(
+  projects: WeekProject[],
+  sheets: WeekSheet[],
+  weeks: Array<{ monday: Date; sunday: Date; ended: boolean }>,
+): WeekRow[] {
+  const projectById = new Map(projects.map((row) => [row.id, row]));
+  const rows: WeekRow[] = [];
+
+  for (const week of weeks) {
+    const weekKey = isoDay(week.monday);
+    const weekEnd = isoDay(week.sunday);
+    const sheetsThisWeek = sheets.filter((row) => isoDay(row.startDate) === weekKey);
+    const seen = new Set<string>();
+
+    for (const project of projects) {
+      if (project.status !== "ACTIVE") continue;
+      if (project.startDate > week.sunday || project.endDate < week.monday) continue;
+      for (const member of project.members) {
+        if (!member.adminUserId) continue;
+        const key = `${project.id}:${member.adminUserId}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const sheet = sheetsThisWeek.find(
+          (row) => row.projectId === project.id && row.memberUserId === member.adminUserId,
+        );
+        rows.push({
+          weekStart: weekKey,
+          weekEnd,
+          projectId: project.id,
+          projectLabel: projectLabel(project),
+          consultant: member.profile.firstName || member.adminUser?.name || member.adminUser?.email || "",
+          status: sheet ? (sheet.status as WeekRowStatus) : week.ended ? "MISSING" : "NOT_YET_SUBMITTED",
+          hours: sheet ? timesheetHours(sheet) : null,
+          timesheetId: sheet?.id ?? null,
+        });
+      }
+    }
+
+    for (const sheet of sheetsThisWeek) {
+      if (!sheet.projectId) continue;
+      const key = `${sheet.projectId}:${sheet.memberUserId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const project = projectById.get(sheet.projectId);
+      if (!project) continue;
+      rows.push({
+        weekStart: weekKey,
+        weekEnd,
+        projectId: project.id,
+        projectLabel: projectLabel(project),
+        consultant: sheet.memberUser.name?.trim() || sheet.memberUser.email,
+        status: sheet.status as WeekRowStatus,
+        hours: timesheetHours(sheet),
+        timesheetId: sheet.id,
+      });
+    }
+  }
+
+  return rows.sort(
+    (a, b) =>
+      b.weekStart.localeCompare(a.weekStart) ||
+      WEEK_STATUS_ORDER[a.status] - WEEK_STATUS_ORDER[b.status] ||
+      a.projectLabel.localeCompare(b.projectLabel),
+  );
+}
+
+const weekProjectMembersSelect = {
+  orderBy: { createdAt: "asc" },
+  select: {
+    adminUserId: true,
+    profile: { select: { firstName: true } },
+    adminUser: { select: { name: true, email: true } },
+  },
+} satisfies Prisma.Project$membersArgs;
+
+const weekSheetSelect = {
+  id: true,
+  projectId: true,
+  memberUserId: true,
+  startDate: true,
+  status: true,
+  dailyHours: true,
+  entries: { select: { dailyHours: true } },
+  memberUser: { select: { name: true, email: true } },
+} satisfies Prisma.TimesheetSelect;
+
+async function requireProjectManager(req: AuthRequest): Promise<string | null> {
+  const actorId = getActorId(req);
+  const roles = await effectiveRolesForUser(actorId, req.user?.role ?? "");
+  return roles.some((role) => canManageProjects(role)) ? actorId : null;
+}
+
+function scopeWhere(mine: boolean, actorId: string): Prisma.ProjectWhereInput {
+  return mine ? { OR: [{ projectManagerId: actorId }, { timesheetApproverUserId: actorId }] } : {};
+}
+
+/** Timesheets for every week that overlaps the requested month (YYYY-MM, default current month). */
+router.get("/timesheets-by-month", async (req: AuthRequest, res) => {
+  try {
+    const actorId = await requireProjectManager(req);
+    if (!actorId) return res.status(403).json({ error: "Forbidden" });
+
+    const today = startOfUtcDay(new Date());
+    const match = typeof req.query.month === "string" ? /^(\d{4})-(\d{2})$/.exec(req.query.month) : null;
+    const year = match ? Number(match[1]) : today.getUTCFullYear();
+    const month = match ? Number(match[2]) - 1 : today.getUTCMonth();
+    if (month < 0 || month > 11) return res.status(400).json({ error: "Invalid month" });
+
+    const monthStart = new Date(Date.UTC(year, month, 1));
+    const monthEnd = new Date(Date.UTC(year, month + 1, 0));
+    const weeks: Array<{ monday: Date; sunday: Date; ended: boolean }> = [];
+    for (let monday = mondayOfWeek(monthStart); monday <= monthEnd; monday = addDays(monday, 7)) {
+      const sunday = addDays(monday, 6);
+      weeks.push({ monday, sunday, ended: sunday < today });
+    }
+
+    const projects = await prisma.project.findMany({
+      where: scopeWhere(req.query.scope === "mine", actorId),
+      orderBy: { projectNumber: "asc" },
+      select: {
+        id: true,
+        projectNumber: true,
+        title: true,
+        status: true,
+        startDate: true,
+        endDate: true,
+        members: weekProjectMembersSelect,
+      },
+    });
+    const sheets = projects.length
+      ? await prisma.timesheet.findMany({
+          where: {
+            projectId: { in: projects.map((row) => row.id) },
+            startDate: { gte: weeks[0]!.monday, lt: addDays(weeks[weeks.length - 1]!.monday, 7) },
+          },
+          select: weekSheetSelect,
+        })
+      : [];
+
+    res.json({
+      data: {
+        month: `${year}-${String(month + 1).padStart(2, "0")}`,
+        rows: buildWeekRows(projects, sheets, weeks),
+      },
+    });
+  } catch (error) {
+    console.error("Error loading timesheets by month:", error);
+    res.status(500).json({ error: "Failed to load timesheets" });
+  }
+});
+
 router.get("/", async (req: AuthRequest, res) => {
   try {
-    const actorId = getActorId(req);
-    const roles = await effectiveRolesForUser(actorId, req.user?.role ?? "");
-    if (!roles.some((role) => canManageProjects(role))) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
+    const actorId = await requireProjectManager(req);
+    if (!actorId) return res.status(403).json({ error: "Forbidden" });
 
     const mine = req.query.scope === "mine";
     const baseCurrency = parseBaseCurrency(req.query.baseCurrency);
@@ -62,15 +255,10 @@ router.get("/", async (req: AuthRequest, res) => {
     const today = startOfUtcDay(new Date());
     const currentMonday = mondayOfWeek(today);
     const lastMonday = addDays(currentMonday, -7);
-    const currentSunday = addDays(currentMonday, 6);
     const lastSunday = addDays(lastMonday, 6);
 
-    const projectWhere: Prisma.ProjectWhereInput = mine
-      ? { OR: [{ projectManagerId: actorId }, { timesheetApproverUserId: actorId }] }
-      : {};
-
     const projects = await prisma.project.findMany({
-      where: projectWhere,
+      where: scopeWhere(mine, actorId),
       orderBy: { projectNumber: "asc" },
       select: {
         id: true,
@@ -82,14 +270,7 @@ router.get("/", async (req: AuthRequest, res) => {
         client: { select: { name: true } },
         projectManager: { select: { name: true, email: true } },
         timesheetApprover: { select: { name: true, email: true } },
-        members: {
-          orderBy: { createdAt: "asc" },
-          select: {
-            adminUserId: true,
-            profile: { select: { firstName: true, lastName: true } },
-            adminUser: { select: { name: true, email: true } },
-          },
-        },
+        members: weekProjectMembersSelect,
         estimates: { select: { year: true, month: true, qty: true, currency: true, estimatedCost: true, costType: true } },
         actuals: { select: { year: true, month: true, qty: true, currency: true, actualCost: true, costType: true } },
       },
@@ -111,7 +292,7 @@ router.get("/", async (req: AuthRequest, res) => {
       projectClientContact: { select: { contact: { select: { name: true } } } },
     } satisfies Prisma.TimesheetSelect;
 
-    const [pendingTimesheets, recentTimesheets] = projectIds.length
+    const [pendingTimesheets, lastWeekTimesheets] = projectIds.length
       ? await Promise.all([
           prisma.timesheet.findMany({
             where: {
@@ -122,11 +303,8 @@ router.get("/", async (req: AuthRequest, res) => {
             select: timesheetSelect,
           }),
           prisma.timesheet.findMany({
-            where: {
-              projectId: { in: projectIds },
-              startDate: { gte: lastMonday, lte: currentSunday },
-            },
-            select: timesheetSelect,
+            where: { projectId: { in: projectIds }, startDate: { gte: lastMonday, lt: currentMonday } },
+            select: weekSheetSelect,
           }),
         ])
       : [[], []];
@@ -149,92 +327,13 @@ router.get("/", async (req: AuthRequest, res) => {
       );
     };
 
-    // Timesheets by week: every consultant on an active project overlapping the week is expected to log time.
-    const weeks = [
-      { monday: currentMonday, sunday: currentSunday, ended: false },
+    const lastWeekRows = buildWeekRows(projects, lastWeekTimesheets, [
       { monday: lastMonday, sunday: lastSunday, ended: true },
-    ];
-    const weekRows: Array<{
-      weekStart: string;
-      weekEnd: string;
-      projectId: string;
-      projectLabel: string;
-      consultant: string;
-      status: WeekRowStatus;
-      hours: number | null;
-      timesheetId: string | null;
-    }> = [];
-
-    for (const week of weeks) {
-      const weekKey = isoDay(week.monday);
-      const sheetsThisWeek = recentTimesheets.filter((row) => isoDay(row.startDate) === weekKey);
-      const seen = new Set<string>();
-
-      for (const project of projects) {
-        if (project.status !== "ACTIVE") continue;
-        if (project.startDate > week.sunday || project.endDate < week.monday) continue;
-        for (const member of project.members) {
-          if (!member.adminUserId) continue;
-          const key = `${project.id}:${member.adminUserId}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          const sheet = sheetsThisWeek.find(
-            (row) => row.projectId === project.id && row.memberUserId === member.adminUserId,
-          );
-          weekRows.push({
-            weekStart: weekKey,
-            weekEnd: isoDay(week.sunday),
-            projectId: project.id,
-            projectLabel: projectLabel(project),
-            consultant: member.profile.firstName || member.adminUser?.name || member.adminUser?.email || "",
-            status: sheet
-              ? (sheet.status as WeekRowStatus)
-              : week.ended
-                ? "MISSING"
-                : "NOT_YET_SUBMITTED",
-            hours: sheet ? timesheetHours(sheet) : null,
-            timesheetId: sheet?.id ?? null,
-          });
-        }
-      }
-
-      for (const sheet of sheetsThisWeek) {
-        if (!sheet.projectId) continue;
-        const key = `${sheet.projectId}:${sheet.memberUserId}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        const project = projectById.get(sheet.projectId);
-        if (!project) continue;
-        weekRows.push({
-          weekStart: weekKey,
-          weekEnd: isoDay(week.sunday),
-          projectId: project.id,
-          projectLabel: projectLabel(project),
-          consultant: memberName(sheet),
-          status: sheet.status as WeekRowStatus,
-          hours: timesheetHours(sheet),
-          timesheetId: sheet.id,
-        });
-      }
-    }
-
-    const statusOrder: Record<WeekRowStatus, number> = {
-      MISSING: 0,
-      DRAFT: 1,
-      SUBMITTED: 2,
-      NOT_YET_SUBMITTED: 3,
-      APPROVED: 4,
-    };
-    weekRows.sort(
-      (a, b) =>
-        b.weekStart.localeCompare(a.weekStart) ||
-        statusOrder[a.status] - statusOrder[b.status] ||
-        a.projectLabel.localeCompare(b.projectLabel),
-    );
+    ]);
 
     const submitted = pendingTimesheets.filter((row) => row.status === "SUBMITTED");
     const overdueDrafts = pendingTimesheets.filter((row) => row.status === "DRAFT");
-    const missingLastWeek = weekRows.filter((row) => row.status === "MISSING");
+    const missingLastWeek = lastWeekRows.filter((row) => row.status === "MISSING");
     const activeProjects = projects.filter((row) => row.status === "ACTIVE");
     const pastEnd = activeProjects.filter((row) => row.endDate < today);
 
@@ -385,7 +484,6 @@ router.get("/", async (req: AuthRequest, res) => {
           actualCost: { total: Math.round(actualTotal), months: actualMonths.size },
         },
         attention,
-        timesheetsByWeek: weekRows,
         costByMonth,
         projects: projectRows,
       },

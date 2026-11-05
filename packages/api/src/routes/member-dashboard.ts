@@ -77,7 +77,6 @@ router.get("/", async (req: AuthRequest, res) => {
       endDate: true,
       client: { select: { name: true } },
       projectManager: { select: { name: true, email: true } },
-      timesheetApprover: { select: { name: true, email: true } },
     } satisfies Prisma.ProjectSelect;
 
     const sheetSelect = {
@@ -115,7 +114,7 @@ router.get("/", async (req: AuthRequest, res) => {
       prisma.timesheetActivityLog.findMany({
         where: { timesheet: { memberUserId: actorId }, action: { in: ["SUBMITTED", "APPROVED", "REJECTED"] } },
         orderBy: { createdAt: "desc" },
-        take: 10,
+        take: 3,
         select: {
           id: true,
           action: true,
@@ -240,11 +239,18 @@ router.get("/", async (req: AuthRequest, res) => {
     let approvedHoursThisMonth = 0;
     let approvedHoursLastMonth = 0;
     const monthHoursByProject = new Map<string, number>();
+    const lastMonthHoursByProject = new Map<string, number>();
     for (const sheet of recentSheets) {
       for (const day of hoursByDay(sheet)) {
         if (day.hours <= 0) continue;
-        if (sheet.status === "APPROVED" && day.date >= lastMonthStart && day.date < monthStart) {
-          approvedHoursLastMonth += day.hours;
+        if (day.date >= lastMonthStart && day.date < monthStart) {
+          if (sheet.status === "APPROVED") approvedHoursLastMonth += day.hours;
+          if (sheet.projectId) {
+            lastMonthHoursByProject.set(
+              sheet.projectId,
+              (lastMonthHoursByProject.get(sheet.projectId) ?? 0) + day.hours,
+            );
+          }
         }
         if (day.date < monthStart || day.date >= nextMonthStart) continue;
         if (sheet.projectId) {
@@ -272,12 +278,8 @@ router.get("/", async (req: AuthRequest, res) => {
         remainingDays: Math.ceil((startOfUtcDay(project.endDate).getTime() - today.getTime()) / DAY_MS),
         ended: project.endDate < today,
         projectManager: project.projectManager.name || project.projectManager.email,
-        approver:
-          project.timesheetApprover.name ||
-          project.timesheetApprover.email ||
-          project.projectManager.name ||
-          project.projectManager.email,
         hoursThisMonth: monthHoursByProject.get(project.id) ?? 0,
+        hoursLastMonth: lastMonthHoursByProject.get(project.id) ?? 0,
       };
     });
 

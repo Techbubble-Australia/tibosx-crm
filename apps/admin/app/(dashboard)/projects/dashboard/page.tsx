@@ -16,6 +16,28 @@ const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Se
 type AttentionKind = "MISSING" | "AWAITING_APPROVAL" | "DRAFT_NOT_SUBMITTED" | "PAST_END_DATE";
 type WeekRowStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "NOT_YET_SUBMITTED" | "MISSING";
 
+type MonthTimesheetRow = {
+  weekStart: string;
+  weekEnd: string;
+  projectId: string;
+  projectLabel: string;
+  consultant: string;
+  status: WeekRowStatus;
+  hours: number | null;
+  timesheetId: string | null;
+};
+
+function currentMonthInput(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatMonthInput(value: string): string {
+  const [y, m] = value.split("-").map(Number);
+  if (!y || !m) return value;
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-AU", { month: "long", year: "numeric", timeZone: "UTC" });
+}
+
 type DashboardData = {
   today: string;
   baseCurrency: string;
@@ -39,16 +61,6 @@ type DashboardData = {
     hours: number | null;
     approver: string | null;
     endDate: string | null;
-  }>;
-  timesheetsByWeek: Array<{
-    weekStart: string;
-    weekEnd: string;
-    projectId: string;
-    projectLabel: string;
-    consultant: string;
-    status: WeekRowStatus;
-    hours: number | null;
-    timesheetId: string | null;
   }>;
   costByMonth: Array<{
     year: number;
@@ -189,15 +201,15 @@ function attentionKey(item: DashboardData["attention"][number]): string {
   return [item.kind, item.projectId, item.timesheetId ?? "", item.consultant ?? "", item.weekStart ?? ""].join("|");
 }
 
-type ProjectStatusFilter = "OPEN" | "ALL" | "PAST_END" | ProjectStatus;
+/** OPEN is used internally by the timeline; it isn't offered in the All projects filter. */
+type ProjectStatusFilter = "ALL" | "OPEN" | "ACTIVE_ALL" | ProjectStatus;
 
 const PROJECT_STATUS_FILTERS: Array<{ value: ProjectStatusFilter; label: string }> = [
-  { value: "OPEN", label: "Open (active, on hold, draft)" },
   { value: "ALL", label: "All statuses" },
-  { value: "ACTIVE", label: PROJECT_STATUS_LABELS.ACTIVE },
-  { value: "PAST_END", label: "Active, past end date" },
-  { value: "ON_HOLD", label: PROJECT_STATUS_LABELS.ON_HOLD },
   { value: "DRAFT", label: PROJECT_STATUS_LABELS.DRAFT },
+  { value: "ACTIVE", label: PROJECT_STATUS_LABELS.ACTIVE },
+  { value: "ACTIVE_ALL", label: "Active (incl. past end date)" },
+  { value: "ON_HOLD", label: PROJECT_STATUS_LABELS.ON_HOLD },
   { value: "COMPLETED", label: PROJECT_STATUS_LABELS.COMPLETED },
   { value: "CANCELLED", label: PROJECT_STATUS_LABELS.CANCELLED },
 ];
@@ -205,7 +217,8 @@ const PROJECT_STATUS_FILTERS: Array<{ value: ProjectStatusFilter; label: string 
 function matchesStatusFilter(project: DashboardData["projects"][number], filter: ProjectStatusFilter): boolean {
   if (filter === "ALL") return true;
   if (filter === "OPEN") return ["ACTIVE", "ON_HOLD", "DRAFT"].includes(project.status);
-  if (filter === "PAST_END") return project.status === "ACTIVE" && project.ended;
+  if (filter === "ACTIVE_ALL") return project.status === "ACTIVE";
+  if (filter === "ACTIVE") return project.status === "ACTIVE" && !project.ended;
   return project.status === filter;
 }
 
@@ -263,12 +276,12 @@ function ProjectTimeline({ projects, today }: { projects: DashboardData["project
   };
   const todayMs = new Date(today).getTime();
   const todayInRange = todayMs >= range.from && todayMs <= range.to;
-  const minChartWidth = `calc(11.75rem + ${range.months.length * 2.75}rem)`;
+  const minChartWidth = `calc(16.75rem + ${range.months.length * 2.75}rem)`;
 
   return (
     <div className="overflow-x-auto">
       <div style={{ minWidth: `max(720px, ${minChartWidth})` }}>
-        <div className="grid grid-cols-[11rem_1fr] gap-3 border-b border-gray-100 pb-1 dark:border-gray-800">
+        <div className="grid grid-cols-[16rem_1fr] gap-3 border-b border-gray-100 pb-1 dark:border-gray-800">
           <div className="flex items-end text-xs font-semibold uppercase tracking-wide text-gray-500">Project</div>
           <div className="relative h-14 text-[11px] text-gray-500">
             {todayInRange ? (
@@ -302,7 +315,7 @@ function ProjectTimeline({ projects, today }: { projects: DashboardData["project
           </div>
         </div>
         <div className="relative pt-1">
-          <div className="pointer-events-none absolute inset-y-0 left-[11.75rem] right-0">
+          <div className="pointer-events-none absolute inset-y-0 left-[16.75rem] right-0">
             {range.months.map((m) => (
               <div
                 key={m.at}
@@ -316,13 +329,13 @@ function ProjectTimeline({ projects, today }: { projects: DashboardData["project
             const end = new Date(project.endDate).getTime();
             const width = Math.max(((end - start) / span) * 100, 0.8);
             return (
-              <div key={project.id} className="relative grid grid-cols-[11rem_1fr] items-center gap-3 py-1.5">
+              <div key={project.id} className="relative grid grid-cols-[16rem_1fr] items-center gap-3 py-1.5">
                 <Link
                   href={`/projects/${project.id}`}
                   className="truncate text-xs font-medium text-gray-700 hover:underline dark:text-gray-300"
                   title={`${project.projectNumber} · ${project.title}`}
                 >
-                  {project.projectNumber} · {project.consultants[0] ?? project.title}
+                  {project.projectNumber} · {project.title}
                 </Link>
                 <div className="relative h-4 rounded bg-gray-50/70 dark:bg-gray-800/40">
                   <div
@@ -335,7 +348,7 @@ function ProjectTimeline({ projects, today }: { projects: DashboardData["project
             );
           })}
           {todayInRange ? (
-            <div className="pointer-events-none absolute inset-y-0 left-[11.75rem] right-0">
+            <div className="pointer-events-none absolute inset-y-0 left-[16.75rem] right-0">
               <div className="absolute inset-y-0 w-px bg-red-500" style={{ left: pct(todayMs) }} />
             </div>
           ) : null}
@@ -426,6 +439,7 @@ export default function ProjectManagerDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -451,8 +465,33 @@ export default function ProjectManagerDashboardPage() {
   const { dismissed, dismiss, restoreAll } = useDismissedToday("pm-dashboard-attention", userId);
   const [attentionProject, setAttentionProject] = useState("");
   const [weekProject, setWeekProject] = useState("");
-  const [projectStatusFilter, setProjectStatusFilter] = useState<ProjectStatusFilter>("OPEN");
+  const [timesheetMonth, setTimesheetMonth] = useState(currentMonthInput);
+  const [monthRows, setMonthRows] = useState<MonthTimesheetRow[]>([]);
+  const [monthLoading, setMonthLoading] = useState(true);
+  const [projectStatusFilter, setProjectStatusFilter] = useState<ProjectStatusFilter>("ACTIVE_ALL");
   const [costYear, setCostYear] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!timesheetMonth) return;
+    let cancelled = false;
+    setMonthLoading(true);
+    const params = new URLSearchParams({ scope, month: timesheetMonth });
+    void adminFetch(`/api/admin/project-dashboard/timesheets-by-month?${params}`)
+      .then(async (res) => {
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.error || "Failed to load timesheets");
+        if (!cancelled) setMonthRows((body.data?.rows ?? []) as MonthTimesheetRow[]);
+      })
+      .catch(() => {
+        if (!cancelled) setMonthRows([]);
+      })
+      .finally(() => {
+        if (!cancelled) setMonthLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [scope, timesheetMonth, refreshKey]);
 
   const attentionAll = useMemo(
     () => (data?.attention ?? []).filter((item) => !dismissed.has(attentionKey(item))),
@@ -464,8 +503,8 @@ export default function ProjectManagerDashboardPage() {
     [attentionAll, attentionProject],
   );
   const weekRows = useMemo(
-    () => (data?.timesheetsByWeek ?? []).filter((row) => !weekProject || row.projectId === weekProject),
-    [data, weekProject],
+    () => monthRows.filter((row) => !weekProject || row.projectId === weekProject),
+    [monthRows, weekProject],
   );
   const filteredProjects = useMemo(
     () => (data?.projects ?? []).filter((project) => matchesStatusFilter(project, projectStatusFilter)),
@@ -509,7 +548,10 @@ export default function ProjectManagerDashboardPage() {
             </select>
             <button
               type="button"
-              onClick={load}
+              onClick={() => {
+                load();
+                setRefreshKey((key) => key + 1);
+              }}
               disabled={loading}
               className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
             >
@@ -532,14 +574,14 @@ export default function ProjectManagerDashboardPage() {
                 value={kpis.awaitingApproval.count}
                 hint={`${formatHours(kpis.awaitingApproval.hours)} to approve`}
                 tone={kpis.awaitingApproval.count ? "warn" : "default"}
-                href="/timesheets"
+                href="/timesheets?status=SUBMITTED"
               />
               <KpiCard
                 label="Overdue drafts"
                 value={kpis.overdueDrafts.count}
                 hint={`${formatHours(kpis.overdueDrafts.hours)} not yet submitted`}
                 tone={kpis.overdueDrafts.count ? "warn" : "default"}
-                href="/timesheets"
+                href="/timesheets?status=DRAFT"
               />
               <KpiCard
                 label="Missing timesheets"
@@ -642,25 +684,36 @@ export default function ProjectManagerDashboardPage() {
             </Section>
 
             <Section
-              title="Timesheets by week"
-              subtitle="Every project member expected to log time that week. “Not yet submitted” means the week is still running and no timesheet exists yet."
+              title="Timesheets by month"
+              subtitle={`Every week of ${formatMonthInput(timesheetMonth)}. Each project member is expected to log time each week; “Not yet submitted” means the week hasn't ended yet.`}
               actions={
-                <select
-                  value={weekProject}
-                  onChange={(e) => setWeekProject(e.target.value)}
-                  className={selectClass}
-                  aria-label="Filter timesheets by project"
-                >
-                  <option value="">All projects</option>
-                  {uniqueProjectOptions(data.timesheetsByWeek).map(([id, label]) => (
-                    <option key={id} value={id}>{label}</option>
-                  ))}
-                </select>
+                <div className="flex flex-wrap items-center gap-3">
+                  <input
+                    type="month"
+                    value={timesheetMonth}
+                    onChange={(e) => setTimesheetMonth(e.target.value || currentMonthInput())}
+                    className={selectClass}
+                    aria-label="Timesheet month"
+                  />
+                  <select
+                    value={weekProject}
+                    onChange={(e) => setWeekProject(e.target.value)}
+                    className={selectClass}
+                    aria-label="Filter timesheets by project"
+                  >
+                    <option value="">All projects</option>
+                    {uniqueProjectOptions(monthRows).map(([id, label]) => (
+                      <option key={id} value={id}>{label}</option>
+                    ))}
+                  </select>
+                </div>
               }
             >
-              {weekRows.length === 0 ? (
+              {monthLoading && monthRows.length === 0 ? (
+                <p className="text-sm text-gray-400">Loading timesheets…</p>
+              ) : weekRows.length === 0 ? (
                 <p className="text-sm text-gray-400">
-                  {weekProject ? "No timesheets expected for this project in these weeks." : "No active projects with members in these weeks."}
+                  {weekProject ? "No timesheets expected for this project in this month." : "No active projects with members in this month."}
                 </p>
               ) : (
                 <div className="overflow-x-auto">

@@ -70,8 +70,8 @@ type MemberDashboard = {
     remainingDays: number;
     ended: boolean;
     projectManager: string;
-    approver: string;
     hoursThisMonth: number;
+    hoursLastMonth: number;
   }>;
   recentActivity: Array<{
     id: string;
@@ -503,42 +503,11 @@ export default function WorkspacePage() {
                   <WeeklyHoursChart rows={data.weeklyHours} />
                 </Card>
               </div>
-              <Card title="Recent activity" subtitle="Updates on your timesheets">
-                {data.recentActivity.length === 0 ? (
-                  <p className="text-sm text-gray-400">No activity yet.</p>
-                ) : (
-                  <ol className="space-y-3">
-                    {data.recentActivity.map((item) => {
-                      const meta = ACTIVITY_LABELS[item.action] ?? { label: item.action, dot: "bg-gray-400" };
-                      return (
-                        <li key={item.id} className="flex gap-3">
-                          <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${meta.dot}`} />
-                          <Link href={`/timesheets/${item.timesheetId}`} className="min-w-0 hover:underline">
-                            <span className="block text-sm text-gray-900 dark:text-gray-100">
-                              <span className="font-medium">{meta.label}</span> · {formatWeek(item.weekStart, item.weekEnd)}
-                            </span>
-                            <span className="block truncate text-xs text-gray-500">{item.projectLabel}</span>
-                            {item.reason ? (
-                              <span className="block text-xs text-red-600 dark:text-red-400">“{item.reason}”</span>
-                            ) : null}
-                            <span className="block text-xs text-gray-400">
-                              {item.performedBy ? `${item.performedBy} · ` : ""}
-                              {relativeTime(item.createdAt)}
-                            </span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ol>
-                )}
-              </Card>
-            </div>
-
-            <Card title="My projects" subtitle="Projects you're a member of">
+              <Card title="My projects" subtitle="Projects you're a member of">
               {data.projects.length === 0 ? (
                 <p className="text-sm text-gray-400">You haven&apos;t been added to any projects yet.</p>
               ) : (
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div className="max-h-[26rem] space-y-3 overflow-y-auto pr-1">
                   {data.projects.map((project) => (
                     <div key={project.id} className="rounded-lg border border-gray-100 p-4 dark:border-gray-800">
                       <div className="flex items-start justify-between gap-2">
@@ -569,10 +538,10 @@ export default function WorkspacePage() {
                       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
                         <dt className="text-gray-500">Project manager</dt>
                         <dd className="truncate text-right text-gray-800 dark:text-gray-200">{project.projectManager}</dd>
-                        <dt className="text-gray-500">Approver</dt>
-                        <dd className="truncate text-right text-gray-800 dark:text-gray-200">{project.approver}</dd>
                         <dt className="text-gray-500">Hours this month</dt>
                         <dd className="text-right tabular-nums text-gray-800 dark:text-gray-200">{formatHours(project.hoursThisMonth)}</dd>
+                        <dt className="text-gray-500">Hours last month</dt>
+                        <dd className="text-right tabular-nums text-gray-800 dark:text-gray-200">{formatHours(project.hoursLastMonth)}</dd>
                       </dl>
                       {project.status === "ACTIVE" && !project.ended ? (
                         <Link
@@ -585,6 +554,43 @@ export default function WorkspacePage() {
                     </div>
                   ))}
                 </div>
+              )}
+              </Card>
+            </div>
+
+            <Card title="Recent activity" subtitle="Latest updates on your timesheets">
+              {data.recentActivity.length === 0 ? (
+                <p className="text-sm text-gray-400">No activity yet.</p>
+              ) : (
+                <ol className="grid gap-4 sm:grid-cols-3">
+                  {data.recentActivity.map((item) => {
+                    const meta = ACTIVITY_LABELS[item.action] ?? { label: item.action, dot: "bg-gray-400" };
+                    return (
+                      <li key={item.id} className="flex gap-3 rounded-lg border border-gray-100 p-3 dark:border-gray-800">
+                        <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${meta.dot}`} />
+                        <Link href={`/timesheets/${item.timesheetId}`} className="min-w-0 hover:underline">
+                          <span className="block text-sm text-gray-900 dark:text-gray-100">
+                            <span className="font-medium">{meta.label}</span> · {formatWeek(item.weekStart, item.weekEnd)}
+                          </span>
+                          <span className="block truncate text-xs text-gray-500">{item.projectLabel}</span>
+                          {item.reason ? (
+                            <span
+                              className={`block text-xs ${
+                                item.action === "REJECTED" ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"
+                              }`}
+                            >
+                              “{item.reason}”
+                            </span>
+                          ) : null}
+                          <span className="block text-xs text-gray-400">
+                            {item.performedBy ? `${item.performedBy} · ` : ""}
+                            {relativeTime(item.createdAt)}
+                          </span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ol>
               )}
             </Card>
           </>
