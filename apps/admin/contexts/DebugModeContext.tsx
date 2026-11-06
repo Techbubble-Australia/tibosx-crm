@@ -69,6 +69,7 @@ type DebugModeContextValue = {
   /** Extra screenshots: add files, capture the page behind the modal, or hide the modal to set up a shot. */
   addExtraScreenshotFiles: (files: File[]) => number;
   captureExtraScreen: () => Promise<boolean>;
+  captureExtraElement: (el: Element) => Promise<boolean>;
   extraCapturing: boolean;
   extraCaptureMode: boolean;
   startExtraCapture: () => void;
@@ -138,6 +139,24 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
       setExtraCapturing(false);
     }
   }, [addExtraScreenshotFiles]);
+
+  /** Captures one element (picked while the modal is hidden) and returns to the ticket. */
+  const captureExtraElement = useCallback(
+    async (el: Element) => {
+      setExtraCapturing(true);
+      try {
+        const dataUrl = await captureElementScreenshot(el as HTMLElement);
+        const file = dataUrl ? dataUrlToFile(dataUrl, `element-capture-${Date.now()}.png`) : null;
+        if (!file) return false;
+        addExtraScreenshotFiles([file]);
+        setExtraCaptureMode(false);
+        return true;
+      } finally {
+        setExtraCapturing(false);
+      }
+    },
+    [addExtraScreenshotFiles],
+  );
 
   const startExtraCapture = useCallback(() => setExtraCaptureMode(true), []);
   const cancelExtraCapture = useCallback(() => setExtraCaptureMode(false), []);
@@ -393,6 +412,7 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
       copyPayloadJson,
       addExtraScreenshotFiles,
       captureExtraScreen,
+      captureExtraElement,
       extraCapturing,
       extraCaptureMode,
       startExtraCapture,
@@ -402,6 +422,7 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
     [
       addExtraScreenshotFiles,
       captureExtraScreen,
+      captureExtraElement,
       extraCapturing,
       extraCaptureMode,
       startExtraCapture,

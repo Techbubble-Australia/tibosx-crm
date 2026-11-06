@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Camera, EyeOff, ImagePlus, Loader2, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Camera, EyeOff, ImagePlus, Loader2, Monitor, MousePointerClick, X } from "lucide-react";
 import { appAlert } from "@/lib/app-alert";
 import {
   MAX_DEBUG_SCREENSHOTS,
@@ -49,6 +49,148 @@ function Accordion({
   );
 }
 
+function isDebugUi(el: Element | null): boolean {
+  return Boolean(el?.closest("[data-debug-ui], [role='alertdialog']"));
+}
+
+type HoverBox = { top: number; left: number; width: number; height: number };
+
+/** Shown while the ticket modal is hidden: capture the whole screen or pick one element. */
+function ExtraCaptureBar({
+  capturing,
+  onCaptureScreen,
+  onCaptureElement,
+  onCancel,
+}: {
+  capturing: boolean;
+  onCaptureScreen: () => void;
+  onCaptureElement: (el: Element) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [picking, setPicking] = useState(false);
+  const [hoverBox, setHoverBox] = useState<HoverBox | null>(null);
+  const hoveredRef = useRef<Element | null>(null);
+
+  useEffect(() => {
+    if (!picking) {
+      setHoverBox(null);
+      hoveredRef.current = null;
+      return;
+    }
+
+    function onMouseMove(e: MouseEvent) {
+      const target = e.target instanceof Element ? e.target : null;
+      if (!target || isDebugUi(target)) {
+        setHoverBox(null);
+        hoveredRef.current = null;
+        return;
+      }
+      hoveredRef.current = target;
+      const rect = target.getBoundingClientRect();
+      setHoverBox({ top: rect.top, left: rect.left, width: rect.width, height: rect.height });
+    }
+
+    function onClick(e: MouseEvent) {
+      const target = e.target instanceof Element ? e.target : null;
+      if (!target || isDebugUi(target)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setPicking(false);
+      setHoverBox(null);
+      void onCaptureElement(target);
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setPicking(false);
+    }
+
+    document.addEventListener("mousemove", onMouseMove, true);
+    document.addEventListener("click", onClick, true);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      document.removeEventListener("mousemove", onMouseMove, true);
+      document.removeEventListener("click", onClick, true);
+      document.removeEventListener("keydown", onKeyDown, true);
+    };
+  }, [picking, onCaptureElement]);
+
+  const buttonBase = "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50";
+
+  return (
+    <>
+      {picking && hoverBox ? (
+        <div data-debug-ui className="pointer-events-none fixed inset-0 z-[165]">
+          <div
+            className="absolute rounded-sm border-2 border-dashed border-sky-500 bg-sky-500/5"
+            style={{ top: hoverBox.top, left: hoverBox.left, width: hoverBox.width, height: hoverBox.height }}
+          />
+        </div>
+      ) : null}
+      <div
+        data-debug-ui
+        className="fixed bottom-20 left-1/2 z-[170] flex w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 flex-col gap-3 rounded-xl border border-sky-200 bg-white px-4 py-3 shadow-2xl dark:border-sky-900 dark:bg-gray-900"
+        role="dialog"
+        aria-label="Capture another screenshot"
+      >
+        <div className="flex items-start gap-2">
+          {picking ? (
+            <MousePointerClick className="mt-0.5 h-5 w-5 shrink-0 text-sky-600" aria-hidden />
+          ) : (
+            <Camera className="mt-0.5 h-5 w-5 shrink-0 text-sky-600" aria-hidden />
+          )}
+          <p className="text-sm text-gray-700 dark:text-gray-200">
+            {capturing
+              ? "Capturing…"
+              : picking
+                ? "Click the part of the page you want to capture. Press Esc to stop picking."
+                : "Set up the screen you want (scroll, open menus, or go to another page), then capture the whole screen or pick one element."}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {picking ? (
+            <button
+              type="button"
+              onClick={() => setPicking(false)}
+              className={`${buttonBase} border border-gray-200 dark:border-gray-600`}
+            >
+              Stop picking
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                disabled={capturing}
+                onClick={onCaptureScreen}
+                className={`${buttonBase} bg-sky-600 text-white`}
+              >
+                {capturing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Monitor className="h-4 w-4" aria-hidden />}
+                Capture screen
+              </button>
+              <button
+                type="button"
+                disabled={capturing}
+                onClick={() => setPicking(true)}
+                className={`${buttonBase} border border-sky-600 text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-950/40`}
+              >
+                <MousePointerClick className="h-4 w-4" aria-hidden />
+                Pick element
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            disabled={capturing}
+            onClick={onCancel}
+            className={`${buttonBase} border border-gray-200 dark:border-gray-600`}
+          >
+            Back to ticket
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function DebugTicketModal() {
   const {
     modalOpen,
@@ -62,6 +204,7 @@ export function DebugTicketModal() {
     recaptureViewport,
     addExtraScreenshotFiles,
     captureExtraScreen,
+    captureExtraElement,
     extraCapturing,
     extraCaptureMode,
     startExtraCapture,
@@ -110,36 +253,15 @@ export function DebugTicketModal() {
 
   if (extraCaptureMode) {
     return (
-      <div
-        data-debug-ui
-        className="fixed bottom-20 left-1/2 z-[170] flex -translate-x-1/2 flex-wrap items-center gap-3 rounded-xl border border-sky-200 bg-white px-4 py-3 shadow-2xl dark:border-sky-900 dark:bg-gray-900"
-        role="dialog"
-        aria-label="Capture another screenshot"
-      >
-        <Camera className="h-5 w-5 text-sky-600" aria-hidden />
-        <p className="text-sm text-gray-700 dark:text-gray-200">
-          Set up the screen you want (scroll, open menus, or go to another page), then capture.
-        </p>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            disabled={extraCapturing}
-            onClick={() => void finishExtraCapture()}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {extraCapturing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" aria-hidden />}
-            Capture
-          </button>
-          <button
-            type="button"
-            disabled={extraCapturing}
-            onClick={cancelExtraCapture}
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm dark:border-gray-600"
-          >
-            Back to ticket
-          </button>
-        </div>
-      </div>
+      <ExtraCaptureBar
+        capturing={extraCapturing}
+        onCaptureScreen={() => void finishExtraCapture()}
+        onCaptureElement={async (el) => {
+          const ok = await captureExtraElement(el);
+          if (!ok) appAlert("Could not capture that element. Try capturing the whole screen instead.");
+        }}
+        onCancel={cancelExtraCapture}
+      />
     );
   }
 
@@ -313,10 +435,10 @@ export function DebugTicketModal() {
                       disabled={saving || extraCapturing}
                       onClick={startExtraCapture}
                       className="inline-flex items-center gap-1 rounded border border-gray-200 px-2 py-1 text-xs font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
-                      title="Hide this window, set up the screen (scroll, open a menu, go to another page), then capture"
+                      title="Hide this window, set up the screen (scroll, open a menu, go to another page), then capture the screen or an element"
                     >
                       <EyeOff className="h-3.5 w-3.5" aria-hidden />
-                      Hide &amp; capture…
+                      Hide &amp; capture screen or element…
                     </button>
                     <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-gray-200 px-2 py-1 text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800">
                       <ImagePlus className="h-3.5 w-3.5" aria-hidden />

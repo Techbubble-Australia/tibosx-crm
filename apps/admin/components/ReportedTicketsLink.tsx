@@ -27,9 +27,18 @@ export function ReportedTicketsLink({ variant = "banner" }: { variant?: Variant 
   const [loading, setLoading] = useState(false);
 
   async function openPortal() {
+    // Open the tab during the click; browsers block window.open after an await.
+    const tab = window.open("about:blank", "_blank");
+    if (tab) tab.opener = null;
+
+    const fail = (message: string) => {
+      tab?.close();
+      appAlert(message);
+    };
+
     const base = await resolveDebugPortalBase();
     if (!base) {
-      appAlert(
+      fail(
         "Debug portal URL is not configured. Set DEBUG_PORTAL_PUBLIC_URL (or NEXT_PUBLIC_DEBUG_PORTAL_URL at build) on the admin service.",
       );
       return;
@@ -40,25 +49,26 @@ export function ReportedTicketsLink({ variant = "banner" }: { variant?: Variant 
       const res = await adminFetch("/api/debug-portal/auth/sso-from-tbos", { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        appAlert(typeof data.error === "string" ? data.error : "Could not open debug portal");
+        fail(typeof data.error === "string" ? data.error : "Could not open debug portal");
         return;
       }
 
       const ssoToken = data?.data?.ssoToken;
-      const reporterUserId = data?.data?.reporterUserId;
       if (typeof ssoToken !== "string") {
-        appAlert("Invalid SSO response from server");
+        fail("Invalid SSO response from server");
         return;
       }
 
       const url = new URL("/api/auth/sso", base);
       url.searchParams.set("token", ssoToken);
-      if (typeof reporterUserId === "string" && reporterUserId) {
-        url.searchParams.set("reporterUserId", reporterUserId);
+      if (tab) {
+        tab.location.href = url.toString();
+      } else {
+        // Pop-ups blocked: fall back to opening the portal in this tab.
+        window.location.assign(url.toString());
       }
-      window.location.assign(url.toString());
     } catch {
-      appAlert("Could not open debug portal");
+      fail("Could not open debug portal");
     } finally {
       setLoading(false);
     }
