@@ -10,6 +10,12 @@ function captureScale(): number {
 
 /** Renders the visible viewport (debug UI excluded) — matches what the user sees on screen. */
 async function captureViewportCanvas(): Promise<HTMLCanvasElement | null> {
+  // html2canvas scrolls its cloned page to the current position; with the app's global
+  // `scroll-behavior: smooth` that scroll is still animating when it renders, so the capture
+  // (and every element crop) comes out shifted up the page whenever the user has scrolled.
+  const root = document.documentElement;
+  const previousScrollBehavior = root.style.scrollBehavior;
+  root.style.scrollBehavior = "auto";
   try {
     const html2canvas = (await import("html2canvas")).default;
     const scale = captureScale();
@@ -27,6 +33,8 @@ async function captureViewportCanvas(): Promise<HTMLCanvasElement | null> {
     });
   } catch {
     return null;
+  } finally {
+    root.style.scrollBehavior = previousScrollBehavior;
   }
 }
 

@@ -31,6 +31,7 @@ import { debugCaptureTicketRoutes } from "./routes/debug-capture-tickets.js";
 import { debugPortalAuthRoutes } from "./routes/debug-portal-auth.js";
 import { debugPortalTicketRoutes } from "./routes/debug-portal-tickets.js";
 import { debugPortalStatusRoutes } from "./routes/debug-portal-statuses.js";
+import { debugPortalSprintRoutes } from "./routes/debug-portal-sprints.js";
 import { debugPortalAgentRoutes } from "./routes/debug-portal-agent.js";
 import { authMiddleware } from "./middleware/auth";
 import { requireMfaEnrolled } from "./middleware/requireMfaEnrolled";
@@ -166,6 +167,7 @@ app.use("/api/debug-portal/auth", debugPortalAuthRoutes);
 // Any TBOS account (internal or customer) may use the debug portal; routes enforce per-ticket access.
 app.use("/api/debug-portal/tickets", authMiddleware, debugPortalTicketRoutes);
 app.use("/api/debug-portal/statuses", authMiddleware, debugPortalStatusRoutes);
+app.use("/api/debug-portal/sprints", authMiddleware, debugPortalSprintRoutes);
 app.use("/api/debug-portal/upload", authMiddleware, uploadRoutes);
 app.use("/api/debug-portal/agent", assertDevEnvMiddleware, debugPortalAgentRoutes);
 app.use(

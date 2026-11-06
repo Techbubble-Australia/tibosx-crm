@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Copy, Download, ExternalLink, Loader2, Pencil, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
+import { Copy, Download, ExternalLink, Loader2, Lock, Pencil, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
 import { ChevronSelect } from "@/components/ChevronSelect";
 import { StatusSelect } from "@/components/StatusSelect";
 import { TicketActivityLog, type TicketLogEntry } from "@/components/TicketActivityLog";
@@ -12,6 +12,8 @@ import { buildAgentIssuePrompt, resolveTicketScreenshotUrls } from "@/lib/agent-
 import { MAX_TICKET_SCREENSHOTS, SCREENSHOT_ACCEPT, uploadScreenshots } from "@/lib/upload-screenshot";
 import { usePortalUser } from "@/lib/use-portal-user";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
+import { SprintSelect } from "@/components/SprintSelect";
+import { BACKLOG, SPRINT_STATUS_LABELS, isSprintLocked, useSprints, type SprintStatus } from "@/lib/sprints";
 import { formatEnvironment, formatTicketType, memberStatusTarget, type TicketStatus } from "@/lib/tickets";
 
 type TicketDetail = {
@@ -33,6 +35,9 @@ type TicketDetail = {
   fullPayload: unknown;
   createdAt: string;
   logs?: TicketLogEntry[];
+  sprintId?: string | null;
+  sprintName?: string | null;
+  sprintStatus?: string | null;
 };
 
 type EditDraft = {
@@ -92,6 +97,29 @@ export default function TicketDetailPage() {
   });
   const { isAdmin } = usePortalUser();
   const { labelOf, badgeClassOf } = useTicketStatuses();
+  const { sprints, reload: reloadSprints } = useSprints();
+  const [savingSprint, setSavingSprint] = useState(false);
+
+  async function changeSprint(value: string) {
+    setSavingSprint(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/debug-portal/tickets/${id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sprintId: value === BACKLOG ? null : value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Could not change sprint");
+      applyUpdated(data.data as TicketDetail);
+      void reloadSprints();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not change sprint");
+    } finally {
+      setSavingSprint(false);
+    }
+  }
 
   function applyUpdated(updated: TicketDetail) {
     setRow(updated);
@@ -222,7 +250,8 @@ export default function TicketDetailPage() {
     }
   }
 
-  const memberTarget = row && !isAdmin ? memberStatusTarget(row.status) : null;
+  const locked = isSprintLocked(row?.sprintStatus, isAdmin);
+  const memberTarget = row && !isAdmin && !locked ? memberStatusTarget(row.status) : null;
   const el = (row?.elementDiagnostics ?? {}) as ElementDiagnosticsShape;
   const api = (row?.apiPrerequisite ?? null) as ApiPrerequisiteShape | null;
 
@@ -308,6 +337,40 @@ export default function TicketDetailPage() {
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,85fr)_minmax(0,15fr)]">
       <div className="min-w-0 space-y-6">
+      <div className="dp-card flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-slate-700">Sprint</span>
+          {!isAdmin ? (
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-800 ring-1 ring-slate-200">
+              {row.sprintName ?? "Backlog"}
+            </span>
+          ) : null}
+          {row.sprintStatus && row.sprintStatus !== "ACTIVE" ? (
+            <span className="text-xs text-slate-500">
+              {SPRINT_STATUS_LABELS[row.sprintStatus as SprintStatus] ?? row.sprintStatus}
+            </span>
+          ) : null}
+        </div>
+        {locked ? (
+          <p className="flex items-center gap-1.5 text-xs text-slate-600">
+            <Lock className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />
+            This sprint is completed and locked. You can view this ticket but not change it.
+          </p>
+        ) : null}
+        {isAdmin ? (
+          <div className="flex items-center gap-2">
+            {savingSprint ? <Loader2 className="h-4 w-4 animate-spin text-slate-400" aria-label="Saving sprint" /> : null}
+            <SprintSelect
+              value={row.sprintId ?? BACKLOG}
+              onChange={(value) => void changeSprint(value)}
+              sprints={sprints}
+              disabled={savingSprint}
+              className="min-w-[16rem]"
+              aria-label="Move ticket to sprint"
+            />
+          </div>
+        ) : null}
+      </div>
       <div className="dp-card flex flex-col gap-4 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:p-5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-slate-700">Workflow status</span>
@@ -349,6 +412,10 @@ export default function TicketDetailPage() {
                 : "Not fixed after all? Reopen it for the team."}
             </p>
           </div>
+        ) : locked ? (
+          <p className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+            <Lock className="h-3.5 w-3.5" aria-hidden /> Locked (completed sprint)
+          </p>
         ) : (
           <p className="text-xs text-slate-500">An admin will update the status as this is worked on.</p>
         )}
@@ -441,10 +508,12 @@ export default function TicketDetailPage() {
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
               {row.userDescription.trim() || "No description provided."}
             </p>
-            <button type="button" onClick={startEdit} className="dp-btn-secondary py-2">
-              <Pencil className="h-4 w-4" aria-hidden />
-              Edit ticket
-            </button>
+            {!locked ? (
+              <button type="button" onClick={startEdit} className="dp-btn-secondary py-2">
+                <Pencil className="h-4 w-4" aria-hidden />
+                Edit ticket
+              </button>
+            ) : null}
           </div>
         </SectionCard>
       )}
@@ -466,7 +535,7 @@ export default function TicketDetailPage() {
                     <Download className="h-4 w-4" aria-hidden />
                     Download
                   </button>
-                  {storedShots[index] ? (
+                  {storedShots[index] && !locked ? (
                     <button
                       type="button"
                       disabled={removingShot === storedShots[index]}
@@ -493,7 +562,7 @@ export default function TicketDetailPage() {
           ) : (
             <p className="text-sm leading-relaxed text-slate-600">No screenshots attached yet.</p>
           )}
-          {shots.length < MAX_TICKET_SCREENSHOTS ? (
+          {shots.length < MAX_TICKET_SCREENSHOTS && !locked ? (
             <div className="border-t border-slate-100 pt-4">
               <label className={`dp-btn-secondary inline-flex cursor-pointer ${uploadingShots ? "pointer-events-none opacity-60" : ""}`}>
                 {uploadingShots ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Upload className="h-4 w-4" aria-hidden />}

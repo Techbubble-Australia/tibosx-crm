@@ -8,6 +8,8 @@ import { ChevronSelect } from "@/components/ChevronSelect";
 import { FilterField } from "@/components/ui/FilterField";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
+import { SprintSelect } from "@/components/SprintSelect";
+import { ALL_SPRINTS, defaultSprintSelection, useSprints } from "@/lib/sprints";
 import {
   formatEnvironment,
   formatTicketType,
@@ -43,6 +45,14 @@ function TicketsListInner() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("");
+  /** null until sprints load and the default (active, else latest) sprint is chosen. */
+  const [sprintFilter, setSprintFilter] = useState<string | null>(null);
+  const { sprints, loading: sprintsLoading } = useSprints();
+
+  useEffect(() => {
+    if (sprintsLoading || sprintFilter !== null) return;
+    setSprintFilter(defaultSprintSelection(sprints));
+  }, [sprintsLoading, sprints, sprintFilter]);
   const [reporterFilter, setReporterFilter] = useState<string>("");
   const [reporters, setReporters] = useState<ReporterOption[]>([]);
   const [filtersReady, setFiltersReady] = useState(false);
@@ -70,7 +80,7 @@ function TicketsListInner() {
     setSelectedIds(new Set());
     setBulkError("");
     setPage(0);
-  }, [statusFilter, reporterFilter]);
+  }, [statusFilter, reporterFilter, sprintFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,12 +136,13 @@ function TicketsListInner() {
   );
 
   const load = useCallback(async () => {
-    if (!filtersReady) return;
+    if (!filtersReady || sprintFilter === null) return;
     setLoading(true);
     try {
       const qs = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(page * PAGE_SIZE) });
       if (statusFilter) qs.set("status", statusFilter);
       if (reporterFilter) qs.set("reporterUserId", reporterFilter);
+      if (sprintFilter) qs.set("sprintId", sprintFilter);
       const res = await fetch(`/api/debug-portal/tickets?${qs}`, { credentials: "include" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load");
@@ -143,7 +154,7 @@ function TicketsListInner() {
     } finally {
       setLoading(false);
     }
-  }, [filtersReady, reporterFilter, statusFilter, page]);
+  }, [filtersReady, reporterFilter, statusFilter, sprintFilter, page]);
 
   useEffect(() => {
     void load();
@@ -264,6 +275,18 @@ function TicketsListInner() {
                 </option>
               ))}
             </ChevronSelect>
+          </FilterField>
+          <FilterField label="Sprint" htmlFor="sprint-filter" className="sm:max-w-[20rem]">
+            <SprintSelect
+              id="sprint-filter"
+              value={sprintFilter ?? ALL_SPRINTS}
+              onChange={setSprintFilter}
+              sprints={sprints}
+              includeAll
+              showLocks={!isAdmin}
+              disabled={sprintFilter === null}
+              className="block w-full min-w-0"
+            />
           </FilterField>
         </div>
         {showBulkActions && rows.length > 0 && !loading ? (

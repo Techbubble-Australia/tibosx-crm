@@ -20,6 +20,7 @@ const FIELD_LABELS: Record<string, string> = {
   reportedEnvironment: "Environment",
   userDescription: "Description",
   currentUrl: "Related URL",
+  sprint: "Sprint",
 };
 
 function formatValue(field: string | null, value: string | null, labelOf: (key: string) => string): string {

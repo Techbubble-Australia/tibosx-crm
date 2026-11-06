@@ -1304,6 +1304,22 @@ enum DebugReportedEnvironment {
   production
 }
 
+/// A sprint groups debug tickets into its own board.
+model DebugSprint {
+  id        String               @id @default(cuid())
+  name      String
+  goal      String?              @db.Text
+  startDate DateTime?
+  endDate   DateTime?
+  /// PLANNED | ACTIVE | COMPLETED
+  status    String               @default("PLANNED")
+  tickets   DebugCaptureTicket[]
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@index([status])
+}
+
 /// Board columns for debug tickets. System statuses can be renamed/recoloured but not deleted.
 model DebugTicketStatus {
   id        String   @id @default(cuid())
@@ -1326,6 +1342,9 @@ model DebugCaptureTicket {
   type                 DebugCaptureTicketType
   /// Key of a DebugTicketStatus row.
   status               String                   @default("PENDING")
+  /// Null = backlog (not planned into a sprint).
+  sprintId             String?
+  sprint               DebugSprint?             @relation(fields: [sprintId], references: [id], onDelete: SetNull)
   reportedEnvironment  DebugReportedEnvironment @default(development)
   userDescription      String                   @db.Text
   reporterUserId       String
@@ -1345,6 +1364,7 @@ model DebugCaptureTicket {
   @@index([createdAt])
   @@index([reporterUserId])
   @@index([status])
+  @@index([sprintId])
 }
 
 /// Who changed what on a debug ticket (portal edits, status moves, AI agent updates).

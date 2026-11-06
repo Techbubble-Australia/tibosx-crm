@@ -64,6 +64,8 @@ const patchSchema = z
     reportedEnvironment: z.enum(["development", "staging", "production"]).optional(),
     userDescription: z.string().trim().min(1).max(20_000).optional(),
     currentUrl: z.string().trim().max(2000).optional(),
+    /** Admin-only: move the ticket into a sprint (null = backlog). */
+    sprintId: z.string().trim().min(1).nullable().optional(),
   })
   .refine((body) => Object.values(body).some((value) => value !== undefined), {
     message: "Nothing to update",
@@ -120,6 +122,17 @@ function manualElementDiagnostics(): Prisma.InputJsonValue {
   };
 }
 
+const SPRINT_SELECT = { id: true, name: true, status: true } as const;
+
+const LOCKED_SPRINT_ERROR = "This ticket's sprint is completed and locked. Only admins can change it.";
+
+/** Tickets in a completed sprint are read-only for non-admins. */
+async function lockedForUser(user: DebugPortalUser, sprintId: string | null): Promise<boolean> {
+  if (user.isAdmin || !sprintId) return false;
+  const sprint = await prisma.debugSprint.findUnique({ where: { id: sprintId }, select: { status: true } });
+  return sprint?.status === "COMPLETED";
+}
+
 function serializeRow(row: {
   id: string;
   ticketId: string;
@@ -138,9 +151,14 @@ function serializeRow(row: {
   screenshotUrls?: string[];
   fullPayload: unknown;
   createdAt: Date;
+  sprintId?: string | null;
+  sprint?: { id: string; name: string; status: string } | null;
 }) {
   const screenshotUrls = ticketScreenshotUrls(row);
   return {
+    sprintId: row.sprintId ?? null,
+    sprintName: row.sprint?.name ?? null,
+    sprintStatus: row.sprint?.status ?? null,
     id: row.id,
     ticketId: row.ticketId,
     type: row.type,
@@ -247,9 +265,12 @@ router.get("/", async (req: PortalRequest, res) => {
     const requestedReporter =
       typeof req.query.reporterUserId === "string" ? req.query.reporterUserId.trim() : "";
     const reporterUserId = req.portalUser!.isAdmin ? requestedReporter : req.portalUser!.id;
+    // sprintId: "" = every ticket, "none" = backlog (no sprint), otherwise one sprint.
+    const sprintParam = typeof req.query.sprintId === "string" ? req.query.sprintId.trim() : "";
     const where: Prisma.DebugCaptureTicketWhereInput = {
       ...(statusFilter?.success ? { status: statusFilter.data } : {}),
       ...(reporterUserId ? { reporterUserId } : {}),
+      ...(sprintParam === "none" ? { sprintId: null } : sprintParam ? { sprintId: sprintParam } : {}),
     };
 
     const [rows, total] = await Promise.all([
@@ -258,6 +279,7 @@ router.get("/", async (req: PortalRequest, res) => {
         orderBy: { createdAt: "desc" },
         take,
         skip,
+        include: { sprint: { select: SPRINT_SELECT } },
       }),
       prisma.debugCaptureTicket.count({ where }),
     ]);
@@ -350,7 +372,10 @@ router.patch("/bulk-status", async (req: PortalRequest, res) => {
 async function ticketDetail(id: string) {
   const row = await prisma.debugCaptureTicket.findUnique({
     where: { id },
-    include: { logs: { orderBy: { createdAt: "desc" } } },
+    include: {
+      logs: { orderBy: { createdAt: "desc" } },
+      sprint: { select: SPRINT_SELECT },
+    },
   });
   if (!row) return null;
   return { ...serializeRow(row), logs: row.logs.map(serializeDebugTicketLog) };
@@ -376,6 +401,7 @@ router.post("/:id/screenshots", async (req: PortalRequest, res) => {
     const { screenshotUrls: added } = addScreenshotsSchema.parse(req.body);
     const row = await prisma.debugCaptureTicket.findUnique({ where: { id: req.params.id } });
     if (!row || !canViewTicket(req.portalUser!, row)) return res.status(404).json({ error: "Not found" });
+    if (await lockedForUser(req.portalUser!, row.sprintId)) return res.status(403).json({ error: LOCKED_SPRINT_ERROR });
 
     const existing = ticketScreenshotUrls(row);
     const merged = [...new Set([...existing, ...added])];
@@ -413,6 +439,7 @@ router.delete("/:id/screenshots", async (req: PortalRequest, res) => {
     const { screenshotUrl } = removeScreenshotSchema.parse(req.body);
     const row = await prisma.debugCaptureTicket.findUnique({ where: { id: req.params.id } });
     if (!row || !canViewTicket(req.portalUser!, row)) return res.status(404).json({ error: "Not found" });
+    if (await lockedForUser(req.portalUser!, row.sprintId)) return res.status(403).json({ error: LOCKED_SPRINT_ERROR });
 
     const existing = ticketScreenshotUrls(row);
     if (!existing.includes(screenshotUrl)) return res.status(404).json({ error: "Screenshot not found" });
@@ -443,6 +470,7 @@ router.patch("/:id", async (req: PortalRequest, res) => {
     const body = patchSchema.parse(req.body);
     const row = await prisma.debugCaptureTicket.findUnique({ where: { id: req.params.id } });
     if (!row || !canViewTicket(user, row)) return res.status(404).json({ error: "Not found" });
+    if (await lockedForUser(user, row.sprintId)) return res.status(403).json({ error: LOCKED_SPRINT_ERROR });
     if (body.status !== undefined && body.status !== row.status && !(await isDebugTicketStatus(body.status))) {
       return res.status(400).json({ error: "Unknown status" });
     }
@@ -465,6 +493,22 @@ router.patch("/:id", async (req: PortalRequest, res) => {
       if (value === row[field]) continue;
       data[field] = value as never;
       entries.push({ action: "UPDATED", field, oldValue: String(row[field] ?? ""), newValue: String(value) });
+    }
+
+    if (body.sprintId !== undefined && body.sprintId !== row.sprintId) {
+      if (!user.isAdmin) return res.status(403).json({ error: "Only admins can change a ticket's sprint" });
+      const [fromSprint, toSprint] = await Promise.all([
+        row.sprintId ? prisma.debugSprint.findUnique({ where: { id: row.sprintId }, select: { name: true } }) : null,
+        body.sprintId ? prisma.debugSprint.findUnique({ where: { id: body.sprintId }, select: { name: true } }) : null,
+      ]);
+      if (body.sprintId && !toSprint) return res.status(400).json({ error: "Sprint not found" });
+      data.sprint = body.sprintId ? { connect: { id: body.sprintId } } : { disconnect: true };
+      entries.push({
+        action: "UPDATED",
+        field: "sprint",
+        oldValue: fromSprint?.name ?? "Backlog",
+        newValue: toSprint?.name ?? "Backlog",
+      });
     }
 
     if (entries.length) {

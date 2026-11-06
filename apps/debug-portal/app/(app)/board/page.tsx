@@ -2,11 +2,37 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, GripVertical, Images, Loader2, Plus, RefreshCw, Settings2, Trash2, X } from "lucide-react";
+import {
+  CalendarRange,
+  Check,
+  GripVertical,
+  Images,
+  Loader2,
+  Lock,
+  Pencil,
+  PlayCircle,
+  Plus,
+  RefreshCw,
+  Settings2,
+  Trash2,
+  X,
+} from "lucide-react";
 import { ChevronSelect } from "@/components/ChevronSelect";
 import { FilterField } from "@/components/ui/FilterField";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SprintSelect } from "@/components/SprintSelect";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
+import {
+  ALL_SPRINTS,
+  BACKLOG,
+  SPRINT_STATUS_LABELS,
+  defaultSprintSelection,
+  isSprintLocked,
+  sprintDateRange,
+  useSprints,
+  type Sprint,
+  type SprintStatus,
+} from "@/lib/sprints";
 import {
   STATUS_COLORS,
   canMoveStatus,
@@ -31,11 +57,26 @@ type BoardTicket = {
   reporterEmail: string;
   screenshotUrls?: string[];
   createdAt: string;
+  sprintStatus?: string | null;
 };
 
 const BOARD_LIMIT = 500;
 const TICKET_DRAG = "application/x-dp-ticket";
 const COLUMN_DRAG = "application/x-dp-status";
+
+type SprintDraft = { name: string; goal: string; startDate: string; endDate: string; status: SprintStatus };
+
+const EMPTY_SPRINT: SprintDraft = { name: "", goal: "", startDate: "", endDate: "", status: "PLANNED" };
+
+function sprintToDraft(sprint: Sprint): SprintDraft {
+  return {
+    name: sprint.name,
+    goal: sprint.goal ?? "",
+    startDate: sprint.startDate?.slice(0, 10) ?? "",
+    endDate: sprint.endDate?.slice(0, 10) ?? "",
+    status: sprint.status,
+  };
+}
 
 async function statusRequest(path: string, init: RequestInit): Promise<StatusOption[]> {
   const res = await fetch(`/api/debug-portal/statuses${path}`, {
@@ -89,13 +130,61 @@ export default function BoardPage() {
   const [adding, setAdding] = useState(false);
   const [newStatus, setNewStatus] = useState({ label: "", color: "slate" });
   const [statusSaving, setStatusSaving] = useState(false);
+  const { sprints, loading: sprintsLoading, reload: reloadSprints } = useSprints();
+  /** null until sprints load and the default (active, else latest) sprint is chosen. */
+  const [sprintFilter, setSprintFilter] = useState<string | null>(null);
+  const [sprintForm, setSprintForm] = useState<"create" | "edit" | null>(null);
+  const [sprintDraft, setSprintDraft] = useState<SprintDraft>(EMPTY_SPRINT);
+  const [sprintSaving, setSprintSaving] = useState(false);
+
+  useEffect(() => {
+    if (sprintsLoading || sprintFilter !== null) return;
+    setSprintFilter(defaultSprintSelection(sprints));
+  }, [sprintsLoading, sprints, sprintFilter]);
+
+  function selectSprint(value: string) {
+    setSprintFilter(value);
+    setSprintForm(null);
+  }
+
+  const selectedSprint = sprints.find((s) => s.id === sprintFilter) ?? null;
+  const activeSprint = sprints.find((s) => s.status === "ACTIVE") ?? null;
+  const selectedLocked = isSprintLocked(selectedSprint?.status, isAdmin);
+
+  async function activateSprint(sprint: Sprint) {
+    const message = activeSprint
+      ? `Make "${sprint.name}" the active sprint? "${activeSprint.name}" will be marked Completed.`
+      : `Make "${sprint.name}" the active sprint?`;
+    if (!window.confirm(message)) return;
+    setSprintSaving(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/debug-portal/sprints/${sprint.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "ACTIVE" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Could not activate sprint");
+      await reloadSprints();
+      setSprintForm(null);
+      void load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not activate sprint");
+    } finally {
+      setSprintSaving(false);
+    }
+  }
 
   const load = useCallback(async () => {
+    if (sprintFilter === null) return;
     setLoading(true);
     setError("");
     try {
       const qs = new URLSearchParams({ limit: String(BOARD_LIMIT) });
       if (reporterFilter) qs.set("reporterUserId", reporterFilter);
+      if (sprintFilter) qs.set("sprintId", sprintFilter);
       const res = await fetch(`/api/debug-portal/tickets?${qs}`, { credentials: "include" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load tickets");
@@ -107,7 +196,65 @@ export default function BoardPage() {
     } finally {
       setLoading(false);
     }
-  }, [reporterFilter]);
+  }, [reporterFilter, sprintFilter]);
+
+  async function saveSprint() {
+    if (!sprintDraft.name.trim()) return;
+    setSprintSaving(true);
+    setError("");
+    try {
+      const editing = sprintForm === "edit" && selectedSprint;
+      const res = await fetch(`/api/debug-portal/sprints${editing ? `/${selectedSprint.id}` : ""}`, {
+        method: editing ? "PATCH" : "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: sprintDraft.name.trim(),
+          goal: sprintDraft.goal.trim() || null,
+          startDate: sprintDraft.startDate || null,
+          endDate: sprintDraft.endDate || null,
+          status: sprintDraft.status,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Could not save sprint");
+      await reloadSprints();
+      const saved = data.data as Sprint;
+      selectSprint(saved.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save sprint");
+    } finally {
+      setSprintSaving(false);
+    }
+  }
+
+  async function deleteSprint() {
+    if (!selectedSprint) return;
+    if (
+      !window.confirm(
+        `Delete "${selectedSprint.name}"? Its ${selectedSprint.ticketCount} ticket(s) move back to the backlog.`,
+      )
+    ) {
+      return;
+    }
+    setSprintSaving(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/debug-portal/sprints/${selectedSprint.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Could not delete sprint");
+      const deletedId = selectedSprint.id;
+      await reloadSprints();
+      selectSprint(defaultSprintSelection(sprints.filter((s) => s.id !== deletedId)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete sprint");
+    } finally {
+      setSprintSaving(false);
+    }
+  }
 
   useEffect(() => {
     void load();
@@ -134,13 +281,14 @@ export default function BoardPage() {
   );
 
   const draggingTicket = draggingId ? tickets.find((t) => t.id === draggingId) ?? null : null;
-  const canDrag = (ticket: BoardTicket) => isAdmin || memberStatusTarget(ticket.status) !== null;
+  const canDrag = (ticket: BoardTicket) =>
+    !isSprintLocked(ticket.sprintStatus, isAdmin) && (isAdmin || memberStatusTarget(ticket.status) !== null);
   const canDropOn = (status: TicketStatus) =>
     Boolean(draggingTicket && canMoveStatus(isAdmin, draggingTicket.status, status));
 
   async function moveTicket(id: string, status: TicketStatus) {
     const ticket = tickets.find((t) => t.id === id);
-    if (!ticket || !canMoveStatus(isAdmin, ticket.status, status)) return;
+    if (!ticket || !canDrag(ticket) || !canMoveStatus(isAdmin, ticket.status, status)) return;
     const previous = ticket.status;
     setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)));
     setSavingId(id);
@@ -250,6 +398,198 @@ export default function BoardPage() {
         }
       />
 
+      <div className="dp-card space-y-4 p-4 sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <FilterField label="Sprint" htmlFor="board-sprint" className="sm:min-w-[20rem]">
+              <SprintSelect
+                id="board-sprint"
+                value={sprintFilter ?? ALL_SPRINTS}
+                onChange={selectSprint}
+                sprints={sprints}
+                includeAll
+                showLocks={!isAdmin}
+                disabled={sprintFilter === null}
+                className="block w-full min-w-0"
+              />
+            </FilterField>
+            {selectedSprint ? (
+              <div className="flex flex-wrap items-center gap-2 pb-1 text-xs text-slate-600">
+                <span
+                  className={`rounded-full px-2 py-0.5 font-semibold ring-1 ${
+                    selectedSprint.status === "ACTIVE"
+                      ? "bg-emerald-50 text-emerald-800 ring-emerald-200"
+                      : selectedSprint.status === "PLANNED"
+                        ? "bg-sky-50 text-sky-800 ring-sky-200"
+                        : "bg-slate-100 text-slate-700 ring-slate-200"
+                  }`}
+                >
+                  {SPRINT_STATUS_LABELS[selectedSprint.status]}
+                </span>
+                {sprintDateRange(selectedSprint) ? (
+                  <span className="inline-flex items-center gap-1">
+                    <CalendarRange className="h-3.5 w-3.5" aria-hidden />
+                    {sprintDateRange(selectedSprint)}
+                  </span>
+                ) : null}
+                <span>{selectedSprint.ticketCount} ticket(s)</span>
+              </div>
+            ) : sprintFilter === BACKLOG ? (
+              <p className="pb-1 text-xs text-slate-500">Tickets not planned into a sprint yet.</p>
+            ) : null}
+          </div>
+          {isAdmin ? (
+            <div className="flex flex-wrap gap-2">
+              {selectedSprint ? (
+                <>
+                  {selectedSprint.status !== "ACTIVE" ? (
+                    <button
+                      type="button"
+                      disabled={sprintSaving}
+                      onClick={() => void activateSprint(selectedSprint)}
+                      className="dp-btn-secondary py-2 text-emerald-800"
+                    >
+                      <PlayCircle className="h-4 w-4" aria-hidden /> Set as active sprint
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSprintDraft(sprintToDraft(selectedSprint));
+                      setSprintForm("edit");
+                    }}
+                    className="dp-btn-secondary py-2"
+                  >
+                    <Pencil className="h-4 w-4" aria-hidden /> Edit sprint
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sprintSaving}
+                    onClick={() => void deleteSprint()}
+                    className="dp-btn-ghost py-2 text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden /> Delete sprint
+                  </button>
+                </>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  setSprintDraft({ ...EMPTY_SPRINT, status: activeSprint ? "PLANNED" : "ACTIVE" });
+                  setSprintForm("create");
+                }}
+                className="dp-btn-primary py-2"
+              >
+                <Plus className="h-4 w-4" aria-hidden /> New sprint
+              </button>
+            </div>
+          ) : null}
+        </div>
+        {selectedSprint?.goal ? <p className="text-sm text-slate-600">Goal: {selectedSprint.goal}</p> : null}
+        {selectedLocked ? (
+          <p className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            <Lock className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+            This sprint is completed and locked. You can view its tickets but not change them.
+          </p>
+        ) : null}
+
+        {isAdmin && sprintForm ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4">
+            <h3 className="mb-3 text-sm font-semibold text-slate-900">
+              {sprintForm === "create" ? "New sprint" : `Edit ${selectedSprint?.name ?? "sprint"}`}
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="sm:col-span-2">
+                <label className="dp-label" htmlFor="sprint-name">
+                  Name <span className="text-red-600">*</span>
+                </label>
+                <input
+                  id="sprint-name"
+                  value={sprintDraft.name}
+                  maxLength={80}
+                  onChange={(e) => setSprintDraft((d) => ({ ...d, name: e.target.value }))}
+                  placeholder="e.g. Sprint 12"
+                  className="dp-input"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="dp-label" htmlFor="sprint-start">
+                  Start date
+                </label>
+                <input
+                  id="sprint-start"
+                  type="date"
+                  value={sprintDraft.startDate}
+                  onChange={(e) => setSprintDraft((d) => ({ ...d, startDate: e.target.value }))}
+                  className="dp-input"
+                />
+              </div>
+              <div>
+                <label className="dp-label" htmlFor="sprint-end">
+                  End date
+                </label>
+                <input
+                  id="sprint-end"
+                  type="date"
+                  value={sprintDraft.endDate}
+                  min={sprintDraft.startDate || undefined}
+                  onChange={(e) => setSprintDraft((d) => ({ ...d, endDate: e.target.value }))}
+                  className="dp-input"
+                />
+              </div>
+              <div className="sm:col-span-2 lg:col-span-3">
+                <label className="dp-label" htmlFor="sprint-goal">
+                  Goal <span className="font-normal text-slate-500">(optional)</span>
+                </label>
+                <input
+                  id="sprint-goal"
+                  value={sprintDraft.goal}
+                  maxLength={2000}
+                  onChange={(e) => setSprintDraft((d) => ({ ...d, goal: e.target.value }))}
+                  placeholder="What should this sprint deliver?"
+                  className="dp-input"
+                />
+              </div>
+              <div>
+                <label className="dp-label" htmlFor="sprint-status">
+                  Status
+                </label>
+                <ChevronSelect
+                  id="sprint-status"
+                  value={sprintDraft.status}
+                  onChange={(v) => setSprintDraft((d) => ({ ...d, status: v as SprintStatus }))}
+                  className="block w-full min-w-0"
+                >
+                  <option value="PLANNED">Planned</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="COMPLETED">Completed</option>
+                </ChevronSelect>
+                {sprintDraft.status === "ACTIVE" &&
+                activeSprint &&
+                !(sprintForm === "edit" && selectedSprint?.id === activeSprint.id) ? (
+                  <p className="mt-1 text-[11px] text-amber-700">{activeSprint.name} will be marked Completed.</p>
+                ) : null}
+              </div>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                disabled={sprintSaving || !sprintDraft.name.trim()}
+                onClick={() => void saveSprint()}
+                className="dp-btn-primary"
+              >
+                {sprintSaving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Check className="h-4 w-4" aria-hidden />}
+                {sprintForm === "create" ? "Create sprint" : "Save sprint"}
+              </button>
+              <button type="button" onClick={() => setSprintForm(null)} className="dp-btn-secondary">
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
       <div className="dp-card flex flex-col gap-4 p-4 sm:flex-row sm:flex-wrap sm:items-end sm:p-5">
         {isAdmin ? (
           <FilterField label="Reporter" htmlFor="board-reporter" className="sm:max-w-[18rem]">
@@ -285,7 +625,15 @@ export default function BoardPage() {
             className="dp-input"
           />
         </FilterField>
-        <button type="button" onClick={() => void load()} disabled={loading} className="dp-btn-secondary">
+        <button
+          type="button"
+          onClick={() => {
+            void load();
+            void reloadSprints();
+          }}
+          disabled={loading}
+          className="dp-btn-secondary"
+        >
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden />
           Refresh
         </button>
@@ -477,8 +825,13 @@ export default function BoardPage() {
                           {savingId === ticket.id ? (
                             <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-slate-400" aria-label="Saving" />
                           ) : (
-                            <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${typeBadgeClass(ticket.type)}`}>
-                              {formatTicketType(ticket.type)}
+                            <span className="flex shrink-0 items-center gap-1">
+                              {isSprintLocked(ticket.sprintStatus, isAdmin) ? (
+                                <Lock className="h-3.5 w-3.5 text-slate-400" aria-label="Locked (completed sprint)" />
+                              ) : null}
+                              <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ${typeBadgeClass(ticket.type)}`}>
+                                {formatTicketType(ticket.type)}
+                              </span>
                             </span>
                           )}
                         </div>
