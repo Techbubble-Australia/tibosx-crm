@@ -47,6 +47,21 @@ export function resolveScreenshotUrl(url: string | null | undefined): string | n
   return resolveMediaPreviewUrl(url);
 }
 
+/** Status moves allowed for non-admins (the API enforces the same rule). */
+const MEMBER_STATUS_MOVES: Partial<Record<TicketStatus, TicketStatus>> = {
+  FOR_REVIEW: "COMPLETED",
+  COMPLETED: "PENDING",
+};
+
+export function memberStatusTarget(from: TicketStatus): TicketStatus | null {
+  return MEMBER_STATUS_MOVES[from] ?? null;
+}
+
+export function canMoveStatus(isAdmin: boolean, from: TicketStatus, to: TicketStatus): boolean {
+  if (from === to) return false;
+  return isAdmin || memberStatusTarget(from) === to;
+}
+
 /** Next workflow status when advancing tickets in bulk (null = no bulk advance). */
 export function bulkAdvanceTargetStatus(from: TicketStatus): TicketStatus | null {
   switch (from) {

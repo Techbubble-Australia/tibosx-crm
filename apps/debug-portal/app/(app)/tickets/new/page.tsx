@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Loader2, Upload, X } from "lucide-react";
 import { ChevronSelect } from "@/components/ChevronSelect";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { readUploadImageUrlFromJson } from "@/lib/upload-response";
+import { MAX_TICKET_SCREENSHOTS, SCREENSHOT_ACCEPT, uploadScreenshots } from "@/lib/upload-screenshot";
 
 type TicketType = "BUG" | "ENHANCEMENT";
 type ReportedEnvironment = "development" | "production";
+type PendingShot = { file: File; previewUrl: string };
 
 export default function NewTicketPage() {
   const router = useRouter();
@@ -17,26 +18,55 @@ export default function NewTicketPage() {
   const [reportedEnvironment, setReportedEnvironment] = useState<ReportedEnvironment>("development");
   const [currentUrl, setCurrentUrl] = useState("");
   const [userDescription, setUserDescription] = useState("");
-  const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [shots, setShots] = useState<PendingShot[]>([]);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
-  function onPickScreenshot(file: File | null) {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setScreenshotFile(file);
-    setPreviewUrl(file ? URL.createObjectURL(file) : null);
+  const addFiles = useCallback((incoming: File[]) => {
+    const images = incoming.filter((file) => SCREENSHOT_ACCEPT.split(",").includes(file.type));
+    if (incoming.length && !images.length) {
+      setError("Only PNG, JPEG, GIF, or WebP images can be attached.");
+      return;
+    }
+    setShots((prev) => {
+      const room = MAX_TICKET_SCREENSHOTS - prev.length;
+      if (images.length > room) {
+        setError(`You can attach up to ${MAX_TICKET_SCREENSHOTS} screenshots per ticket.`);
+      }
+      const picked = images.slice(0, Math.max(room, 0));
+      return [...prev, ...picked.map((file) => ({ file, previewUrl: URL.createObjectURL(file) }))];
+    });
+  }, []);
+
+  function onPickScreenshots(files: FileList | null) {
+    if (files?.length) addFiles(Array.from(files));
   }
 
-  async function uploadScreenshot(file: File): Promise<string | null> {
-    const form = new FormData();
-    form.append("image", file);
-    const res = await fetch("/api/upload/image", { method: "POST", credentials: "include", body: form });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(typeof json.error === "string" ? json.error : "Screenshot upload failed");
+  /** Paste screenshots straight from the clipboard (e.g. after Print Screen / Cmd+Shift+Ctrl+4). */
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      const files = Array.from(e.clipboardData?.files ?? []);
+      if (!files.length) return;
+      e.preventDefault();
+      addFiles(
+        files.map((file, i) =>
+          file.name && file.name !== "image.png"
+            ? file
+            : new File([file], `pasted-${Date.now()}-${i + 1}.png`, { type: file.type || "image/png" }),
+        ),
+      );
     }
-    return readUploadImageUrlFromJson(json) || null;
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [addFiles]);
+
+  function removeShot(index: number) {
+    setShots((prev) => {
+      const target = prev[index];
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((_, i) => i !== index);
+    });
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -49,13 +79,7 @@ export default function NewTicketPage() {
 
     setSubmitting(true);
     try {
-      let screenshotUrl: string | null = null;
-      if (screenshotFile) {
-        screenshotUrl = await uploadScreenshot(screenshotFile);
-        if (!screenshotUrl) {
-          throw new Error("Screenshot upload failed");
-        }
-      }
+      const screenshotUrls = await uploadScreenshots(shots.map((shot) => shot.file));
 
       const res = await fetch("/api/debug-portal/tickets", {
         method: "POST",
@@ -66,7 +90,7 @@ export default function NewTicketPage() {
           reportedEnvironment,
           userDescription: userDescription.trim(),
           currentUrl: currentUrl.trim() || undefined,
-          screenshotUrl,
+          screenshotUrls,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -167,39 +191,73 @@ export default function NewTicketPage() {
           />
         </div>
 
-        <div>
+        <div
+          onDragOver={(e) => {
+            if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            addFiles(Array.from(e.dataTransfer.files));
+          }}
+          className={`rounded-lg border-2 border-dashed p-4 transition-colors ${
+            dragOver ? "border-sky-400 bg-sky-50/60" : "border-slate-200"
+          }`}
+        >
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <span className="dp-label mb-0">Screenshot (optional)</span>
-            {previewUrl ? (
-              <button
-                type="button"
-                onClick={() => onPickScreenshot(null)}
-                className="dp-btn-ghost py-1 text-xs text-slate-600"
-              >
-                <X className="h-3.5 w-3.5" />
-                Remove
-              </button>
+            <span className="dp-label mb-0">
+              Screenshots <span className="font-normal text-slate-500">(optional)</span>
+            </span>
+            {shots.length ? (
+              <span className="text-xs text-slate-500">
+                {shots.length} / {MAX_TICKET_SCREENSHOTS}
+              </span>
             ) : null}
           </div>
-          {previewUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={previewUrl}
-              alt="Screenshot preview"
-              className="mb-3 max-h-56 rounded-lg border border-slate-200 bg-slate-50 object-contain p-1"
-            />
+          {shots.length ? (
+            <ul className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {shots.map((shot, index) => (
+                <li key={shot.previewUrl} className="relative rounded-lg border border-slate-200 bg-slate-50 p-1">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={shot.previewUrl} alt={`Screenshot ${index + 1}`} className="h-28 w-full rounded object-contain" />
+                  <p className="mt-1 truncate px-1 text-[11px] text-slate-500" title={shot.file.name}>
+                    {shot.file.name}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => removeShot(index)}
+                    className="absolute right-1.5 top-1.5 rounded-full bg-white/90 p-1 text-slate-600 shadow hover:text-red-600"
+                    aria-label={`Remove ${shot.file.name}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
           ) : null}
-          <label className="dp-btn-secondary inline-flex cursor-pointer">
-            <Upload className="h-4 w-4" aria-hidden />
-            Choose image
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
-              className="sr-only"
-              onChange={(e) => onPickScreenshot(e.target.files?.[0] ?? null)}
-            />
-          </label>
-          <p className="mt-2 text-xs text-slate-500">PNG, JPEG, GIF, or WebP · max 10 MB</p>
+          {shots.length < MAX_TICKET_SCREENSHOTS ? (
+            <label className="dp-btn-secondary inline-flex cursor-pointer">
+              <Upload className="h-4 w-4" aria-hidden />
+              {shots.length ? "Add more images" : "Choose images"}
+              <input
+                type="file"
+                multiple
+                accept={SCREENSHOT_ACCEPT}
+                className="sr-only"
+                onChange={(e) => {
+                  onPickScreenshots(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          ) : null}
+          <p className="mt-2 text-xs text-slate-500">
+            Choose several at once, drag images here, or paste with Ctrl/Cmd+V. PNG, JPEG, GIF, or WebP · max 10 MB
+            each · up to {MAX_TICKET_SCREENSHOTS} images
+          </p>
         </div>
 
         <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-4">

@@ -42,7 +42,7 @@ export default function LoginPage() {
             <Bug className="h-7 w-7" aria-hidden />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Debug portal</h1>
-          <p className="mt-2 text-sm text-slate-600">Sign in with your TBOS admin account. MFA is not required here.</p>
+          <p className="mt-2 text-sm text-slate-600">Sign in with your TBOS account. MFA is not required here.</p>
         </div>
         <form onSubmit={onSubmit} className="space-y-5">
           {error ? (

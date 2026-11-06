@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bug, LogOut, Plus, Ticket } from "lucide-react";
+import { Bug, KanbanSquare, LogOut, Plus, Ticket } from "lucide-react";
 
 function navClass(active: boolean): string {
   return active ? "dp-nav-link dp-nav-link-active" : "dp-nav-link";
@@ -15,6 +15,7 @@ export default function AppShellLayout({ children }: { children: React.ReactNode
   const onTickets =
     pathname === "/tickets" || (pathname.startsWith("/tickets/") && pathname !== "/tickets/new");
   const onNew = pathname === "/tickets/new";
+  const onBoard = pathname === "/board";
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
@@ -37,6 +38,10 @@ export default function AppShellLayout({ children }: { children: React.ReactNode
               <Link href="/tickets" className={navClass(onTickets)}>
                 <Ticket className="mr-1.5 inline h-4 w-4 opacity-70" aria-hidden />
                 Tickets
+              </Link>
+              <Link href="/board" className={navClass(onBoard)}>
+                <KanbanSquare className="mr-1.5 inline h-4 w-4 opacity-70" aria-hidden />
+                Board
               </Link>
               <Link href="/tickets/new" className={navClass(onNew)}>
                 <Plus className="mr-1.5 inline h-4 w-4 opacity-70" aria-hidden />

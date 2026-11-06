@@ -11,6 +11,9 @@
  *   SKIP_DUMP=1 DEV_DATABASE_URL="postgresql://..." PROD_DATABASE_URL=x \
  *     pnpm --filter @techbubble/database db:clone-prod-to-dev
  * Whitelisted emails are left unchanged (see ANONYMIZE_EMAIL_ALLOWLIST).
+ *
+ * MFA: production authenticator secrets are never kept on development. Existing dev enrollments are
+ * restored after the copy; every other account must set up MFA again on dev (DEV.TIBOSX.AI entry).
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -87,6 +90,55 @@ function anonymizedPhone(original: string, table: string, id: string): string {
 function keepEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   return ANONYMIZE_EMAIL_ALLOWLIST.has(email.trim().toLowerCase());
+}
+
+type DevMfaEnrollment = { totpSecretEnc: string; mfaEnrolledAt: Date | null; mfaEnabled: boolean };
+type DevMfaSnapshot = { admin: Map<string, DevMfaEnrollment>; customer: Map<string, DevMfaEnrollment> };
+
+const MFA_RESET = { mfaEnabled: true, totpSecretEnc: null, mfaEnrolledAt: null } as const;
+
+/** Dev authenticator enrollments (by user id) to put back after the production copy. */
+async function snapshotDevMfa(devUrl: string): Promise<DevMfaSnapshot> {
+  const prisma = new PrismaClient({ datasources: { db: { url: devUrl } } });
+  const toMap = (rows: Array<{ id: string; totpSecretEnc: string | null; mfaEnrolledAt: Date | null; mfaEnabled: boolean }>) =>
+    new Map(
+      rows
+        .filter((row) => row.totpSecretEnc)
+        .map((row) => [row.id, { totpSecretEnc: row.totpSecretEnc!, mfaEnrolledAt: row.mfaEnrolledAt, mfaEnabled: row.mfaEnabled }]),
+    );
+  try {
+    const select = { id: true, totpSecretEnc: true, mfaEnrolledAt: true, mfaEnabled: true } as const;
+    const [admins, customers] = await Promise.all([
+      prisma.adminUser.findMany({ select }),
+      prisma.customerUser.findMany({ select }),
+    ]);
+    return { admin: toMap(admins), customer: toMap(customers) };
+  } catch (error) {
+    console.warn("Could not read dev MFA enrollments (empty or new dev DB?) — all users will re-enroll.", error);
+    return { admin: new Map(), customer: new Map() };
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+/** Replace copied production MFA secrets with dev enrollments, or clear them so users re-enroll on dev. */
+async function applyDevMfa(devUrl: string, snapshot: DevMfaSnapshot) {
+  const prisma = new PrismaClient({ datasources: { db: { url: devUrl } } });
+  try {
+    await prisma.adminUser.updateMany({ data: MFA_RESET });
+    await prisma.customerUser.updateMany({ data: MFA_RESET });
+    for (const [id, enrollment] of snapshot.admin) {
+      await prisma.adminUser.updateMany({ where: { id }, data: enrollment });
+    }
+    for (const [id, enrollment] of snapshot.customer) {
+      await prisma.customerUser.updateMany({ where: { id }, data: enrollment });
+    }
+    console.log(
+      `MFA: kept ${snapshot.admin.size + snapshot.customer.size} dev enrollment(s); everyone else will set up MFA on next dev login.`,
+    );
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 async function anonymizeDevDatabase(devUrl: string) {
@@ -184,6 +236,8 @@ async function main() {
   if (skipDump) {
     console.log("SKIP_DUMP set — anonymizing development only (no dump/restore).");
     await anonymizeDevDatabase(devUrl);
+    // Dev was already overwritten, so its own enrollments are gone; clear the copied prod secrets.
+    await applyDevMfa(devUrl, { admin: new Map(), customer: new Map() });
     console.log("Done.");
     return;
   }
@@ -194,6 +248,9 @@ async function main() {
   const workDir = mkdtempSync(join(tmpdir(), "tbos-prod-clone-"));
   const dumpPath = join(workDir, "prod.dump");
 
+  console.log("Saving development MFA enrollments…");
+  const devMfa = await snapshotDevMfa(devUrl);
+
   console.log("Dumping production database…");
   run("pg_dump", ["--format=custom", "--no-owner", "--no-acl", `--file=${dumpPath}`, prodUrl]);
 
@@ -202,6 +259,9 @@ async function main() {
 
   console.log("Masking personal email and phone fields on development…");
   await anonymizeDevDatabase(devUrl);
+
+  console.log("Replacing production MFA secrets with development enrollments…");
+  await applyDevMfa(devUrl, devMfa);
 
   rmSync(workDir, { recursive: true, force: true });
   console.log("Done. Development database now mirrors production with anonymized contact details.");

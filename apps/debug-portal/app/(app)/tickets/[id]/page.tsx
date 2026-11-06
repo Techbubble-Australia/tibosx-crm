@@ -2,15 +2,20 @@
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Copy, Download, ExternalLink, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { Copy, Download, ExternalLink, Loader2, Pencil, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
+import { ChevronSelect } from "@/components/ChevronSelect";
 import { StatusSelect } from "@/components/StatusSelect";
+import { TicketActivityLog, type TicketLogEntry } from "@/components/TicketActivityLog";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
-import { buildAgentIssuePrompt, resolveTicketScreenshotUrl } from "@/lib/agent-prompt";
+import { buildAgentIssuePrompt, resolveTicketScreenshotUrls } from "@/lib/agent-prompt";
+import { MAX_TICKET_SCREENSHOTS, SCREENSHOT_ACCEPT, uploadScreenshots } from "@/lib/upload-screenshot";
+import { usePortalUser } from "@/lib/use-portal-user";
 import {
   TICKET_STATUS_LABELS,
   formatEnvironment,
   formatTicketType,
+  memberStatusTarget,
   statusBadgeClass,
   type TicketStatus,
 } from "@/lib/tickets";
@@ -28,10 +33,19 @@ type TicketDetail = {
   currentUrl: string;
   userAgent: string;
   screenshotUrl: string | null;
+  screenshotUrls?: string[];
   elementDiagnostics: unknown;
   apiPrerequisite: unknown;
   fullPayload: unknown;
   createdAt: string;
+  logs?: TicketLogEntry[];
+};
+
+type EditDraft = {
+  type: "BUG" | "ENHANCEMENT";
+  reportedEnvironment: string;
+  userDescription: string;
+  currentUrl: string;
 };
 
 type ElementDiagnosticsShape = {
@@ -72,6 +86,87 @@ export default function TicketDetailPage() {
   const [status, setStatus] = useState<TicketStatus>("PENDING");
   const [copyHint, setCopyHint] = useState("");
   const [agentPrompt, setAgentPrompt] = useState("");
+  const [uploadingShots, setUploadingShots] = useState(false);
+  const [removingShot, setRemovingShot] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editDraft, setEditDraft] = useState<EditDraft>({
+    type: "BUG",
+    reportedEnvironment: "development",
+    userDescription: "",
+    currentUrl: "",
+  });
+  const { isAdmin } = usePortalUser();
+
+  function applyUpdated(updated: TicketDetail) {
+    setRow(updated);
+    setStatus(updated.status);
+    setAgentPrompt(buildAgentIssuePrompt(updated));
+  }
+
+  function startEdit() {
+    if (!row) return;
+    setEditDraft({
+      type: row.type === "ENHANCEMENT" ? "ENHANCEMENT" : "BUG",
+      reportedEnvironment: row.reportedEnvironment,
+      userDescription: row.userDescription,
+      currentUrl: row.currentUrl.startsWith("manual://") ? "" : row.currentUrl,
+    });
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    if (!editDraft.userDescription.trim()) {
+      setError("Description is required.");
+      return;
+    }
+    setSavingEdit(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/debug-portal/tickets/${id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: editDraft.type,
+          reportedEnvironment: editDraft.reportedEnvironment,
+          userDescription: editDraft.userDescription.trim(),
+          currentUrl: editDraft.currentUrl.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Failed to save changes");
+      applyUpdated(data.data as TicketDetail);
+      setEditing(false);
+      setCopyHint("Ticket updated.");
+      window.setTimeout(() => setCopyHint(""), 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save changes");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function removeScreenshot(storedUrl: string) {
+    if (!window.confirm("Remove this screenshot from the ticket?")) return;
+    setRemovingShot(storedUrl);
+    setError("");
+    try {
+      const res = await fetch(`/api/debug-portal/tickets/${id}/screenshots`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ screenshotUrl: storedUrl }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Failed to remove screenshot");
+      applyUpdated(data.data as TicketDetail);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove screenshot");
+    } finally {
+      setRemovingShot(null);
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -96,12 +191,47 @@ export default function TicketDetailPage() {
     void load();
   }, [load]);
 
-  const shot = useMemo(() => (row ? resolveTicketScreenshotUrl(row) : null), [row]);
+  const shots = useMemo(() => (row ? resolveTicketScreenshotUrls(row) : []), [row]);
+  /** Stored URLs (what the API expects for removal), aligned with `shots`. */
+  const storedShots = useMemo(
+    () => (row?.screenshotUrls?.length ? row.screenshotUrls : row?.screenshotUrl ? [row.screenshotUrl] : []),
+    [row],
+  );
 
+  async function addScreenshots(files: FileList | null) {
+    if (!row || !files?.length) return;
+    const room = MAX_TICKET_SCREENSHOTS - shots.length;
+    if (room <= 0) {
+      setError(`A ticket can have at most ${MAX_TICKET_SCREENSHOTS} screenshots.`);
+      return;
+    }
+    setUploadingShots(true);
+    setError("");
+    try {
+      const urls = await uploadScreenshots(Array.from(files).slice(0, room));
+      const res = await fetch(`/api/debug-portal/tickets/${id}/screenshots`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ screenshotUrls: urls }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Failed to add screenshots");
+      applyUpdated(data.data as TicketDetail);
+      setCopyHint(`${urls.length} screenshot${urls.length === 1 ? "" : "s"} added.`);
+      window.setTimeout(() => setCopyHint(""), 2500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add screenshots");
+    } finally {
+      setUploadingShots(false);
+    }
+  }
+
+  const memberTarget = row && !isAdmin ? memberStatusTarget(row.status) : null;
   const el = (row?.elementDiagnostics ?? {}) as ElementDiagnosticsShape;
   const api = (row?.apiPrerequisite ?? null) as ApiPrerequisiteShape | null;
 
-  async function saveStatus() {
+  async function saveStatus(nextStatus: TicketStatus = status) {
     if (!row) return;
     setSaving(true);
     setError("");
@@ -110,13 +240,11 @@ export default function TicketDetailPage() {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status: nextStatus }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Update failed");
-      const updated = data.data as TicketDetail;
-      setRow(updated);
-      setAgentPrompt(buildAgentIssuePrompt(updated));
+      applyUpdated(data.data as TicketDetail);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Update failed");
     } finally {
@@ -134,8 +262,8 @@ export default function TicketDetailPage() {
     }
   }
 
-  async function downloadScreenshot() {
-    if (!shot || !row) return;
+  async function downloadScreenshot(shot: string, index: number) {
+    if (!row) return;
     setCopyHint("");
     try {
       const res = await fetch(shot, { credentials: "include" });
@@ -144,7 +272,8 @@ export default function TicketDetailPage() {
       const objectUrl = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = objectUrl;
-      anchor.download = `${row.ticketId.replace(/[^\w.-]+/g, "_")}-screenshot.png`;
+      const suffix = shots.length > 1 ? `-${index + 1}` : "";
+      anchor.download = `${row.ticketId.replace(/[^\w.-]+/g, "_")}-screenshot${suffix}.png`;
       anchor.click();
       URL.revokeObjectURL(objectUrl);
       setCopyHint("Screenshot downloaded.");
@@ -182,6 +311,8 @@ export default function TicketDetailPage() {
     <div className="space-y-6">
       <PageHeader title={row.ticketId} description={metaLine} backHref="/tickets" backLabel="All tickets" />
 
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,85fr)_minmax(0,15fr)]">
+      <div className="min-w-0 space-y-6">
       <div className="dp-card flex flex-col gap-4 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:p-5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-slate-700">Workflow status</span>
@@ -191,18 +322,39 @@ export default function TicketDetailPage() {
             {TICKET_STATUS_LABELS[row.status]}
           </span>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <StatusSelect value={status} onChange={setStatus} aria-label="Change ticket status" />
-          <button
-            type="button"
-            disabled={saving || status === row.status}
-            onClick={() => void saveStatus()}
-            className="dp-btn-primary"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-            Save status
-          </button>
-        </div>
+        {isAdmin ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <StatusSelect value={status} onChange={setStatus} aria-label="Change ticket status" />
+            <button
+              type="button"
+              disabled={saving || status === row.status}
+              onClick={() => void saveStatus()}
+              className="dp-btn-primary"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+              Save status
+            </button>
+          </div>
+        ) : memberTarget ? (
+          <div className="flex flex-col items-start gap-1 sm:items-end">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void saveStatus(memberTarget)}
+              className={memberTarget === "COMPLETED" ? "dp-btn-primary" : "dp-btn-secondary"}
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+              {memberTarget === "COMPLETED" ? "Mark completed" : "Reopen (move to Pending)"}
+            </button>
+            <p className="text-xs text-slate-500">
+              {memberTarget === "COMPLETED"
+                ? "Confirm the fix works, then mark it completed."
+                : "Not fixed after all? Reopen it for the team."}
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500">An admin will update the status as this is worked on.</p>
+        )}
       </div>
 
       {error ? (
@@ -216,38 +368,157 @@ export default function TicketDetailPage() {
         </p>
       ) : null}
 
-      <SectionCard title="Description">
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
-          {row.userDescription.trim() || "No description provided."}
-        </p>
-      </SectionCard>
-
-      <SectionCard title="Screenshot">
-        {shot ? (
+      {editing ? (
+        <SectionCard title="Edit ticket">
           <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <a href={shot} target="_blank" rel="noreferrer" className="dp-btn-secondary py-2">
-                Open full size
-                <ExternalLink className="h-4 w-4" aria-hidden />
-              </a>
-              <button type="button" onClick={() => void downloadScreenshot()} className="dp-btn-secondary py-2">
-                <Download className="h-4 w-4" aria-hidden />
-                Download
+            <div className="flex flex-wrap gap-4">
+              <div>
+                <label htmlFor="edit-type" className="dp-label">
+                  Type
+                </label>
+                <ChevronSelect
+                  id="edit-type"
+                  value={editDraft.type}
+                  onChange={(v) => setEditDraft((d) => ({ ...d, type: v as EditDraft["type"] }))}
+                  className="block w-44"
+                >
+                  <option value="BUG">Bug</option>
+                  <option value="ENHANCEMENT">Enhancement</option>
+                </ChevronSelect>
+              </div>
+              <div>
+                <label htmlFor="edit-env" className="dp-label">
+                  Environment
+                </label>
+                <ChevronSelect
+                  id="edit-env"
+                  value={editDraft.reportedEnvironment}
+                  onChange={(v) => setEditDraft((d) => ({ ...d, reportedEnvironment: v }))}
+                  className="block w-44"
+                >
+                  <option value="development">Development</option>
+                  <option value="production">Production</option>
+                  {editDraft.reportedEnvironment === "staging" ? <option value="staging">Staging</option> : null}
+                </ChevronSelect>
+              </div>
+            </div>
+            <div>
+              <label htmlFor="edit-url" className="dp-label">
+                Related URL <span className="font-normal text-slate-500">(optional)</span>
+              </label>
+              <input
+                id="edit-url"
+                type="url"
+                value={editDraft.currentUrl}
+                onChange={(e) => setEditDraft((d) => ({ ...d, currentUrl: e.target.value }))}
+                placeholder="https://…"
+                className="dp-input"
+              />
+            </div>
+            <div>
+              <label htmlFor="edit-description" className="dp-label">
+                Description <span className="text-red-600">*</span>
+              </label>
+              <textarea
+                id="edit-description"
+                rows={8}
+                value={editDraft.userDescription}
+                onChange={(e) => setEditDraft((d) => ({ ...d, userDescription: e.target.value }))}
+                className="dp-input min-h-[10rem] resize-y"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+              <button type="button" disabled={savingEdit} onClick={() => void saveEdit()} className="dp-btn-primary">
+                {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+                Save changes
+              </button>
+              <button type="button" disabled={savingEdit} onClick={() => setEditing(false)} className="dp-btn-secondary">
+                Cancel
               </button>
             </div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={shot}
-              alt="Debug capture screenshot"
-              className="max-h-[min(520px,70vh)] w-full rounded-lg border border-slate-200 bg-slate-50 object-contain"
-            />
           </div>
-        ) : (
-          <p className="text-sm leading-relaxed text-slate-600">
-            No screenshot attached. Captures from TBOS debug mode include an image when you submit; manual tickets
-            can add one when creating the ticket.
-          </p>
-        )}
+        </SectionCard>
+      ) : (
+        <SectionCard title="Description">
+          <div className="space-y-3">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+              {row.userDescription.trim() || "No description provided."}
+            </p>
+            <button type="button" onClick={startEdit} className="dp-btn-secondary py-2">
+              <Pencil className="h-4 w-4" aria-hidden />
+              Edit ticket
+            </button>
+          </div>
+        </SectionCard>
+      )}
+
+      <SectionCard title={shots.length > 1 ? `Screenshots (${shots.length})` : "Screenshot"}>
+        <div className="space-y-6">
+          {shots.length ? (
+            shots.map((shot, index) => (
+              <div key={shot} className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  {shots.length > 1 ? (
+                    <span className="mr-1 text-sm font-medium text-slate-700">Image {index + 1}</span>
+                  ) : null}
+                  <a href={shot} target="_blank" rel="noreferrer" className="dp-btn-secondary py-2">
+                    Open full size
+                    <ExternalLink className="h-4 w-4" aria-hidden />
+                  </a>
+                  <button type="button" onClick={() => void downloadScreenshot(shot, index)} className="dp-btn-secondary py-2">
+                    <Download className="h-4 w-4" aria-hidden />
+                    Download
+                  </button>
+                  {storedShots[index] ? (
+                    <button
+                      type="button"
+                      disabled={removingShot === storedShots[index]}
+                      onClick={() => void removeScreenshot(storedShots[index]!)}
+                      className="dp-btn-ghost py-2 text-red-700 hover:bg-red-50"
+                    >
+                      {removingShot === storedShots[index] ? (
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                      ) : (
+                        <Trash2 className="h-4 w-4" aria-hidden />
+                      )}
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={shot}
+                  alt={`Debug capture screenshot ${index + 1}`}
+                  className="max-h-[min(520px,70vh)] w-full rounded-lg border border-slate-200 bg-slate-50 object-contain"
+                />
+              </div>
+            ))
+          ) : (
+            <p className="text-sm leading-relaxed text-slate-600">No screenshots attached yet.</p>
+          )}
+          {shots.length < MAX_TICKET_SCREENSHOTS ? (
+            <div className="border-t border-slate-100 pt-4">
+              <label className={`dp-btn-secondary inline-flex cursor-pointer ${uploadingShots ? "pointer-events-none opacity-60" : ""}`}>
+                {uploadingShots ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Upload className="h-4 w-4" aria-hidden />}
+                {uploadingShots ? "Uploading…" : "Add screenshots"}
+                <input
+                  type="file"
+                  multiple
+                  accept={SCREENSHOT_ACCEPT}
+                  className="sr-only"
+                  disabled={uploadingShots}
+                  onChange={(e) => {
+                    void addScreenshots(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              <p className="mt-2 text-xs text-slate-500">
+                PNG, JPEG, GIF, or WebP · max 10 MB each · up to {MAX_TICKET_SCREENSHOTS} per ticket
+              </p>
+            </div>
+          ) : null}
+        </div>
       </SectionCard>
 
       <SectionCard title="Capture overview">
@@ -381,6 +652,12 @@ export default function TicketDetailPage() {
           {JSON.stringify(row.fullPayload, null, 2)}
         </pre>
       </SectionCard>
+      </div>
+
+      <aside className="min-w-0 lg:sticky lg:top-20">
+        <TicketActivityLog logs={row.logs ?? []} />
+      </aside>
+      </div>
     </div>
   );
 }

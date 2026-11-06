@@ -16,10 +16,10 @@ function redirectTo(request: NextRequest, pathname: string) {
   return NextResponse.redirect(debugPortalAbsoluteUrl(request, pathname));
 }
 
-function hasAdminRole(role: string, additionalRoles: unknown): boolean {
-  if (role === "admin") return true;
-  if (!Array.isArray(additionalRoles)) return false;
-  return additionalRoles.includes("admin");
+/** Any signed-in TBOS account may use the portal; the API decides which tickets each user can see. */
+async function hasPortalSession(token: string): Promise<boolean> {
+  const { payload } = await jwtVerify(token, jwtSecretKey());
+  return typeof payload.id === "string" && !payload.purpose;
 }
 
 export async function middleware(request: NextRequest) {
@@ -29,10 +29,7 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith("/login")) {
     if (!token) return NextResponse.next();
     try {
-      const { payload } = await jwtVerify(token, jwtSecretKey());
-      const role = typeof payload.role === "string" ? payload.role : "";
-      const additionalRoles = payload.additionalRoles;
-      if (hasAdminRole(role, additionalRoles)) {
+      if (await hasPortalSession(token)) {
         return redirectTo(request, "/tickets");
       }
     } catch {
@@ -52,25 +49,13 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    const { payload } = await jwtVerify(token, jwtSecretKey());
-    const purpose = typeof payload.purpose === "string" ? payload.purpose : undefined;
-    if (purpose) {
-      const res = redirectTo(request, LOGIN);
-      res.cookies.delete(DEBUG_PORTAL_SESSION_COOKIE);
-      return res;
-    }
-    const role = typeof payload.role === "string" ? payload.role : "";
-    if (!hasAdminRole(role, payload.additionalRoles)) {
-      const res = redirectTo(request, LOGIN);
-      res.cookies.delete(DEBUG_PORTAL_SESSION_COOKIE);
-      return res;
-    }
-    return NextResponse.next();
+    if (await hasPortalSession(token)) return NextResponse.next();
   } catch {
-    const res = redirectTo(request, LOGIN);
-    res.cookies.delete(DEBUG_PORTAL_SESSION_COOKIE);
-    return res;
+    /* invalid or expired token */
   }
+  const res = redirectTo(request, LOGIN);
+  res.cookies.delete(DEBUG_PORTAL_SESSION_COOKIE);
+  return res;
 }
 
 export const config = {

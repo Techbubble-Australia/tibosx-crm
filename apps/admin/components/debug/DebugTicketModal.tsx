@@ -1,9 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { ImagePlus, Loader2, X } from "lucide-react";
 import { appAlert } from "@/lib/app-alert";
-import { useDebugMode, type DebugCaptureType, type ReportedEnvironment } from "@/contexts/DebugModeContext";
+import {
+  MAX_DEBUG_SCREENSHOTS,
+  useDebugMode,
+  type DebugCaptureType,
+  type ReportedEnvironment,
+} from "@/contexts/DebugModeContext";
 import { JsonTreePreview } from "@/components/debug/JsonTreePreview";
 
 function trafficLogHint(reason: string | undefined): string {
@@ -59,6 +64,31 @@ export function DebugTicketModal() {
   const [saving, setSaving] = useState(false);
 
   if (!modalOpen) return null;
+
+  const usedSlots = (draft?.screenshotDataUrl ? 1 : 0) + (draft?.extraScreenshots.length ?? 0);
+  const extraRoom = MAX_DEBUG_SCREENSHOTS - usedSlots;
+
+  function addExtraScreenshots(files: FileList | null) {
+    if (!draft || !files?.length) return;
+    const picked = Array.from(files).slice(0, Math.max(extraRoom, 0));
+    if (files.length > extraRoom) {
+      appAlert(`You can attach up to ${MAX_DEBUG_SCREENSHOTS} screenshots per ticket.`);
+    }
+    setDraftField("extraScreenshots", [
+      ...draft.extraScreenshots,
+      ...picked.map((file) => ({ file, previewUrl: URL.createObjectURL(file) })),
+    ]);
+  }
+
+  function removeExtraScreenshot(index: number) {
+    if (!draft) return;
+    const target = draft.extraScreenshots[index];
+    if (target) URL.revokeObjectURL(target.previewUrl);
+    setDraftField(
+      "extraScreenshots",
+      draft.extraScreenshots.filter((_, i) => i !== index),
+    );
+  }
 
   async function onSave() {
     setSaving(true);
@@ -178,6 +208,53 @@ export function DebugTicketModal() {
                   </button>
                 </div>
               )}
+
+              <div>
+                <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-medium">
+                    Additional screenshots <span className="font-normal text-gray-500">(optional)</span>
+                  </p>
+                  {extraRoom > 0 ? (
+                    <label className="cursor-pointer rounded border border-gray-200 px-2 py-1 text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800">
+                      <ImagePlus className="mr-1 inline h-3.5 w-3.5" aria-hidden />
+                      Attach images
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/png,image/jpeg,image/gif,image/webp"
+                        className="sr-only"
+                        disabled={saving}
+                        onChange={(e) => {
+                          addExtraScreenshots(e.target.files);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  ) : null}
+                </div>
+                {draft.extraScreenshots.length ? (
+                  <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {draft.extraScreenshots.map((shot, index) => (
+                      <li key={shot.previewUrl} className="relative rounded border border-gray-200 p-1 dark:border-gray-700">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={shot.previewUrl} alt={shot.file.name} className="h-20 w-full rounded object-contain" />
+                        <button
+                          type="button"
+                          onClick={() => removeExtraScreenshot(index)}
+                          className="absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-gray-600 shadow hover:text-red-600"
+                          aria-label={`Remove ${shot.file.name}`}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-gray-500">
+                    Add other images that help explain the issue (other screens, error dialogs, expected design).
+                  </p>
+                )}
+              </div>
 
               <Accordion title={draft.elementDiagnostics.captureScope === "viewport" ? "Screen metadata" : "DOM metadata"} defaultOpen>
                 <dl className="space-y-1 text-xs text-gray-700 dark:text-gray-300">

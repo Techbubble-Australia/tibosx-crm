@@ -36,6 +36,7 @@ type ReporterOption = {
 
 /** URL marker so "All reporters" isn't mistaken for "no choice yet" (which defaults to the signed-in user). */
 const ALL_REPORTERS = "all";
+const PAGE_SIZE = 50;
 
 function TicketsListInner() {
   const router = useRouter();
@@ -50,6 +51,8 @@ function TicketsListInner() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkError, setBulkError] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [page, setPage] = useState(0);
 
   const filteredStatus = useMemo((): TicketStatus | null => {
     if (!statusFilter) return null;
@@ -61,11 +64,12 @@ function TicketsListInner() {
     [filteredStatus],
   );
 
-  const showBulkActions = Boolean(bulkTargetStatus && filteredStatus);
+  const showBulkActions = isAdmin && Boolean(bulkTargetStatus && filteredStatus);
 
   useEffect(() => {
     setSelectedIds(new Set());
     setBulkError("");
+    setPage(0);
   }, [statusFilter, reporterFilter]);
 
   useEffect(() => {
@@ -82,12 +86,17 @@ function TicketsListInner() {
 
         const sessionId =
           typeof meJson?.data?.user?.id === "string" ? (meJson.data.user.id as string) : "";
+        const admin = Boolean(meJson?.data?.user?.isAdmin);
+        setIsAdmin(admin);
         if (Array.isArray(repJson?.data)) {
           setReporters(repJson.data as ReporterOption[]);
         }
 
         const fromUrl = searchParams.get("reporterUserId")?.trim() ?? "";
-        if (fromUrl === ALL_REPORTERS) {
+        if (!admin) {
+          // The API limits non-admins to their own tickets; no reporter filter to apply.
+          setReporterFilter("");
+        } else if (fromUrl === ALL_REPORTERS) {
           setReporterFilter("");
         } else if (fromUrl) {
           setReporterFilter(fromUrl);
@@ -120,7 +129,7 @@ function TicketsListInner() {
     if (!filtersReady) return;
     setLoading(true);
     try {
-      const qs = new URLSearchParams({ limit: "50" });
+      const qs = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(page * PAGE_SIZE) });
       if (statusFilter) qs.set("status", statusFilter);
       if (reporterFilter) qs.set("reporterUserId", reporterFilter);
       const res = await fetch(`/api/debug-portal/tickets?${qs}`, { credentials: "include" });
@@ -134,11 +143,15 @@ function TicketsListInner() {
     } finally {
       setLoading(false);
     }
-  }, [filtersReady, reporterFilter, statusFilter]);
+  }, [filtersReady, reporterFilter, statusFilter, page]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const rangeStart = total === 0 ? 0 : page * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(total, (page + 1) * PAGE_SIZE);
 
   const reporterOptions = reporters.length
     ? reporters
@@ -207,28 +220,34 @@ function TicketsListInner() {
     <div className="space-y-6">
       <PageHeader
         title="Tickets"
-        description="Review debug captures from TBOS and tickets you filed here."
+        description={
+          isAdmin
+            ? "Review debug captures from TBOS and tickets filed here."
+            : "Tickets you reported from TBOS or filed here."
+        }
       />
 
       <div className="dp-card p-4 sm:p-5">
         <p className="mb-4 text-sm font-medium text-slate-800">{countLabel}</p>
         <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
-          <FilterField label="Reporter" htmlFor="reporter-filter" className="sm:max-w-[18rem]">
-            <ChevronSelect
-              id="reporter-filter"
-              value={reporterFilter}
-              onChange={onReporterChange}
-              className="block w-full min-w-0"
-              aria-label="Filter by reporter"
-            >
-              <option value="">All reporters</option>
-              {reporterOptions.map((r) => (
-                <option key={r.reporterUserId} value={r.reporterUserId}>
-                  {r.reporterEmail}
-                </option>
-              ))}
-            </ChevronSelect>
-          </FilterField>
+          {isAdmin ? (
+            <FilterField label="Reporter" htmlFor="reporter-filter" className="sm:max-w-[18rem]">
+              <ChevronSelect
+                id="reporter-filter"
+                value={reporterFilter}
+                onChange={onReporterChange}
+                className="block w-full min-w-0"
+                aria-label="Filter by reporter"
+              >
+                <option value="">All reporters</option>
+                {reporterOptions.map((r) => (
+                  <option key={r.reporterUserId} value={r.reporterUserId}>
+                    {r.reporterEmail}
+                  </option>
+                ))}
+              </ChevronSelect>
+            </FilterField>
+          ) : null}
           <FilterField label="Status" htmlFor="status-filter">
             <ChevronSelect
               id="status-filter"
@@ -373,6 +392,34 @@ function TicketsListInner() {
               </tbody>
             </table>
           </div>
+          {total > PAGE_SIZE ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-sm text-slate-600">
+              <span>
+                Showing {rangeStart}–{rangeEnd} of {total}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  className="dp-btn-secondary py-1.5 disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <span className="tabular-nums">
+                  Page {page + 1} of {pageCount}
+                </span>
+                <button
+                  type="button"
+                  disabled={page + 1 >= pageCount}
+                  onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+                  className="dp-btn-secondary py-1.5 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
     </div>

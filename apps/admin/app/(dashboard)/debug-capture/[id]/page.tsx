@@ -17,6 +17,7 @@ type Detail = {
   reportedEnvironment: string;
   userDescription: string;
   screenshotUrl: string | null;
+  screenshotUrls?: string[];
   fullPayload: unknown;
   createdAt: string;
 };
@@ -52,7 +53,9 @@ export default function DebugCaptureDetailPage() {
 
   if (!row) return <p className="text-gray-500">Not found.</p>;
 
-  const shot = row.screenshotUrl ? resolveAdminMediaPreviewUrl(row.screenshotUrl) : null;
+  const shots = (row.screenshotUrls?.length ? row.screenshotUrls : row.screenshotUrl ? [row.screenshotUrl] : [])
+    .map((url) => resolveAdminMediaPreviewUrl(url))
+    .filter((url): url is string => Boolean(url));
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
@@ -69,10 +72,15 @@ export default function DebugCaptureDetailPage() {
       <p className="rounded-lg border border-gray-200 bg-white p-4 text-sm dark:border-gray-700 dark:bg-gray-900">
         {row.userDescription}
       </p>
-      {shot ? (
+      {shots.map((shot, index) => (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={shot} alt="Screenshot" className="max-w-full rounded border border-gray-200 dark:border-gray-700" />
-      ) : null}
+        <img
+          key={shot}
+          src={shot}
+          alt={`Screenshot ${index + 1}`}
+          className="max-w-full rounded border border-gray-200 dark:border-gray-700"
+        />
+      ))}
       <JsonTreePreview value={row.fullPayload} />
       <button
         type="button"

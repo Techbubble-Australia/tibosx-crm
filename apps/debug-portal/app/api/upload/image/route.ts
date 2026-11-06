@@ -5,7 +5,7 @@ import { getUpstreamApiBase } from "@/lib/proxy-api-request";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Proxy image upload to API (debug-portal upload path — admin role, no TBOS module gate). */
+/** Proxy image upload to API (debug-portal upload path — any signed-in portal user, no TBOS module gate). */
 export async function POST(req: NextRequest) {
   const target = `${getUpstreamApiBase()}/api/debug-portal/upload/image`;
 

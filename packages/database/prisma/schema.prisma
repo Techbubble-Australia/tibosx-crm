@@ -1325,11 +1325,31 @@ model DebugCaptureTicket {
   userAgent            String                   @db.Text
   elementDiagnostics   Json
   apiPrerequisite      Json?
+  /// First screenshot (kept for older readers); `screenshotUrls` holds every attachment.
   screenshotUrl        String?
+  screenshotUrls       String[]                 @default([])
   fullPayload          Json
+  logs                 DebugCaptureTicketLog[]
   createdAt            DateTime                 @default(now())
 
   @@index([createdAt])
   @@index([reporterUserId])
   @@index([status])
+}
+
+/// Who changed what on a debug ticket (portal edits, status moves, AI agent updates).
+model DebugCaptureTicketLog {
+  id          String             @id @default(cuid())
+  ticketId    String
+  ticket      DebugCaptureTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  /// CREATED | STATUS_CHANGED | UPDATED | SCREENSHOTS_ADDED | SCREENSHOT_REMOVED
+  action      String
+  field       String?
+  oldValue    String?            @db.Text
+  newValue    String?            @db.Text
+  actorUserId String?
+  actorEmail  String
+  createdAt   DateTime           @default(now())
+
+  @@index([ticketId, createdAt])
 }

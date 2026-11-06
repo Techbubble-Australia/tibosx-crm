@@ -45,8 +45,12 @@ export type DebugCaptureDraft = {
   elementDiagnostics: ElementDiagnostics;
   apiPrerequisite: ApiPrerequisiteCapture | null;
   screenshotDataUrl: string | null;
+  /** Images the user attached in addition to the automatic capture. */
+  extraScreenshots: Array<{ file: File; previewUrl: string }>;
   userMetadata: UserMetadataSnapshot;
 };
+
+export const MAX_DEBUG_SCREENSHOTS = 20;
 
 type DebugModeContextValue = {
   isDebugActive: boolean;
@@ -111,7 +115,10 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
 
   const closeModal = useCallback(() => {
     setModalOpen(false);
-    setDraft(null);
+    setDraft((prev) => {
+      prev?.extraScreenshots.forEach((shot) => URL.revokeObjectURL(shot.previewUrl));
+      return null;
+    });
   }, []);
 
   const setDraftField = useCallback(
@@ -163,6 +170,7 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
           elementDiagnostics: captureElementDiagnostics(el),
           apiPrerequisite,
           screenshotDataUrl,
+          extraScreenshots: [],
           userMetadata,
         });
         setModalOpen(true);
@@ -188,6 +196,7 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
         elementDiagnostics: captureViewportDiagnostics(),
         apiPrerequisite: null,
         screenshotDataUrl,
+        extraScreenshots: [],
         userMetadata,
       });
       setModalOpen(true);
@@ -228,6 +237,7 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
       apiPrerequisite: draft.apiPrerequisite,
       screenshotUrl: null as string | null,
       screenshotDataUrl: draft.screenshotDataUrl,
+      additionalScreenshotFiles: draft.extraScreenshots.map((shot) => shot.file.name),
     };
   }, [draft]);
 
@@ -252,30 +262,34 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
       return { ok: false, error: "Description is required" };
     }
 
-    let screenshotUrl: string | null = null;
+    const filesToUpload: File[] = [];
     if (draft.screenshotDataUrl) {
       const file = dataUrlToFile(draft.screenshotDataUrl, `${draft.ticketId}.png`);
-      if (file) {
-        const form = new FormData();
-        form.append("image", file);
-        const up = await adminFetch("/api/upload/image", { method: "POST", body: form });
-        const upJson = await up.json().catch(() => ({}));
-        if (!up.ok) {
-          return {
-            ok: false,
-            error: messageFromApiError(upJson, "Screenshot upload failed. The ticket was not saved."),
-          };
-        }
-        screenshotUrl = readUploadImageUrlFromJson(upJson) || null;
-        if (!screenshotUrl) {
-          return { ok: false, error: "Screenshot upload failed. The ticket was not saved." };
-        }
-      }
+      if (file) filesToUpload.push(file);
     }
+    filesToUpload.push(...draft.extraScreenshots.map((shot) => shot.file));
+
+    const screenshotUrls: string[] = [];
+    for (const file of filesToUpload) {
+      const form = new FormData();
+      form.append("image", file);
+      const up = await adminFetch("/api/upload/image", { method: "POST", body: form });
+      const upJson = await up.json().catch(() => ({}));
+      const url = up.ok ? readUploadImageUrlFromJson(upJson) : null;
+      if (!url) {
+        return {
+          ok: false,
+          error: messageFromApiError(upJson, `Upload failed for ${file.name}. The ticket was not saved.`),
+        };
+      }
+      screenshotUrls.push(url);
+    }
+    const screenshotUrl = screenshotUrls[0] ?? null;
 
     const fullPayload = {
       ...JSON.parse(buildPayloadJson()),
       screenshotUrl,
+      screenshotUrls,
     };
     delete (fullPayload as { screenshotDataUrl?: string }).screenshotDataUrl;
 
@@ -296,6 +310,7 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
         elementDiagnostics: draft.elementDiagnostics,
         apiPrerequisite: draft.apiPrerequisite,
         screenshotUrl,
+        screenshotUrls,
         fullPayload,
       }),
     });

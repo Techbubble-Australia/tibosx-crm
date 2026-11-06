@@ -7,9 +7,12 @@ import {
   type AgentExportTicket,
 } from "../lib/debug-agent-brief.js";
 import {
+  resolveAgentScreenshotUrls,
   screenshotPathsFromTicket,
   screenshotUrlFromTicket,
 } from "../lib/debug-media-url.js";
+import { ticketScreenshotUrls } from "../lib/debug-portal-user.js";
+import { AI_AGENT_ACTOR, logDebugTicket } from "../lib/debug-ticket-log.js";
 
 const router: IRouter = Router();
 
@@ -51,6 +54,7 @@ type DbRow = {
   elementDiagnostics: unknown;
   apiPrerequisite: unknown;
   screenshotUrl: string | null;
+  screenshotUrls?: string[];
   fullPayload: unknown;
   createdAt: Date;
 };
@@ -156,6 +160,7 @@ function serializeForAgent(row: DbRow, includeFullPayload: boolean) {
       apiUrl: shotUrls.apiUrl,
       note: screenshotNote,
     },
+    screenshots: ticketScreenshotUrls(row).map((url) => resolveAgentScreenshotUrls(url)),
     agentBriefMarkdown: buildAgentIssueBriefMarkdown(exportTicket),
     links: portalBase ? { debugPortalDetail: `${portalBase}/tickets/${row.id}` } : undefined,
     ...(includeFullPayload ? { fullPayload: row.fullPayload } : {}),
@@ -244,9 +249,15 @@ router.patch("/tickets/:idOrTicketId/status", async (req, res) => {
       });
     }
 
-    const row = await prisma.debugCaptureTicket.update({
-      where: { id: existing.id },
-      data: { status },
+    const row = await prisma.$transaction(async (tx) => {
+      const updated = await tx.debugCaptureTicket.update({
+        where: { id: existing.id },
+        data: { status },
+      });
+      await logDebugTicket(tx, existing.id, AI_AGENT_ACTOR, [
+        { action: "STATUS_CHANGED", field: "status", oldValue: previousStatus, newValue: status },
+      ]);
+      return updated;
     });
 
     res.json({

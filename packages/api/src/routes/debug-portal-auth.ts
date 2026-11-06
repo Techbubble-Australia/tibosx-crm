@@ -9,8 +9,7 @@ import {
   verifyDebugPortalSsoToken,
   type AuthRequest,
 } from "../middleware/auth.js";
-import { effectiveRoleList } from "../lib/admin-roles.js";
-import { requireRole } from "../middleware/requireRole.js";
+import { resolveDebugPortalUser, type DebugPortalUser } from "../lib/debug-portal-user.js";
 
 const router: IRouter = Router();
 
@@ -19,70 +18,66 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-function publicUser(user: { id: string; email: string; name: string | null; role: string }) {
+function publicUser(user: DebugPortalUser) {
   return {
     id: user.id,
     email: user.email,
-    name: user.name ?? "",
+    name: user.name,
     role: user.role,
+    isAdmin: user.isAdmin,
   };
 }
 
-function hasAdminAccess(role: string, additionalRoles: unknown): boolean {
-  return effectiveRoleList(role, additionalRoles).includes("admin");
-}
+const PASSWORD_RESET_REQUIRED = {
+  error: "Password reset required. Use the main TBOS app to update your password first.",
+  code: "PASSWORD_RESET_REQUIRED",
+};
 
+/** Any active TBOS account (internal or customer user) may sign in; MFA is not required here. */
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
     const normalized = email.trim().toLowerCase();
 
-    const user = await prisma.adminUser.findFirst({
-      where: { email: { equals: normalized, mode: "insensitive" } },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        active: true,
-        passwordHash: true,
-        passwordNeedsReset: true,
-        additionalRoles: true,
-      },
-    });
+    const [adminUser, customerUser] = await Promise.all([
+      prisma.adminUser.findFirst({
+        where: { email: { equals: normalized, mode: "insensitive" } },
+        select: { id: true, role: true, active: true, passwordHash: true, passwordNeedsReset: true },
+      }),
+      prisma.customerUser.findFirst({
+        where: { email: { equals: normalized, mode: "insensitive" } },
+        select: { id: true, active: true, passwordHash: true, passwordNeedsReset: true },
+      }),
+    ]);
 
-    if (!user?.passwordHash || user.active === false) {
+    const adminOk =
+      Boolean(adminUser?.passwordHash) &&
+      adminUser!.active !== false &&
+      (await bcrypt.compare(password, adminUser!.passwordHash!));
+    const customerOk =
+      Boolean(customerUser?.passwordHash) &&
+      customerUser!.active !== false &&
+      (await bcrypt.compare(password, customerUser!.passwordHash!));
+
+    // Same preference as the main TBOS login: internal accounts win unless they are client-only.
+    const account =
+      adminOk && adminUser && (adminUser.role !== "client" || !customerOk)
+        ? adminUser
+        : customerOk && customerUser
+          ? customerUser
+          : null;
+    if (!account) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
-
-    if (!hasAdminAccess(user.role, user.additionalRoles)) {
-      return res.status(403).json({ error: "Only admin accounts can access the debug ticket portal" });
+    if (account.passwordNeedsReset) {
+      return res.status(403).json(PASSWORD_RESET_REQUIRED);
     }
 
-    const passwordOk = await bcrypt.compare(password, user.passwordHash);
-    if (!passwordOk) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
+    const user = await resolveDebugPortalUser(account.id);
+    if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
-    if (user.passwordNeedsReset) {
-      return res.status(403).json({
-        error: "Password reset required. Use the main TBOS admin app to update your password first.",
-        code: "PASSWORD_RESET_REQUIRED",
-      });
-    }
-
-    const token = generateToken({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-    });
-
-    return res.json({
-      data: {
-        token,
-        user: publicUser(user),
-      },
-    });
+    const token = generateToken({ id: user.id, email: user.email, role: user.role });
+    return res.json({ data: { token, user: publicUser(user) } });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
@@ -92,19 +87,11 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.get("/me", authMiddleware, requireRole("admin"), async (req: AuthRequest, res) => {
+router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
   const u = req.user;
   if (!u) return res.status(401).json({ error: "Unauthorized" });
-
-  const user = await prisma.adminUser.findUnique({
-    where: { id: u.id },
-    select: { id: true, email: true, name: true, role: true, active: true, additionalRoles: true },
-  });
-
-  if (!user || user.active === false || !hasAdminAccess(user.role, user.additionalRoles)) {
-    return res.status(403).json({ error: "Forbidden" });
-  }
-
+  const user = await resolveDebugPortalUser(u.id);
+  if (!user) return res.status(403).json({ error: "Forbidden" });
   res.json({ data: { user: publicUser(user) } });
 });
 
@@ -112,32 +99,16 @@ const exchangeSsoSchema = z.object({
   ssoToken: z.string().min(1),
 });
 
-/** Mint a short-lived token from an active TBOS admin session (for debug portal SSO). */
-router.post("/sso-from-tbos", authMiddleware, requireRole("admin"), async (req: AuthRequest, res) => {
+/** Mint a short-lived token from an active TBOS session (for debug portal SSO). */
+router.post("/sso-from-tbos", authMiddleware, async (req: AuthRequest, res) => {
   const u = req.user;
   if (!u?.id) return res.status(401).json({ error: "Unauthorized" });
 
-  const user = await prisma.adminUser.findUnique({
-    where: { id: u.id },
-    select: { id: true, email: true, role: true, active: true, additionalRoles: true },
-  });
+  const user = await resolveDebugPortalUser(u.id);
+  if (!user) return res.status(403).json({ error: "Forbidden" });
 
-  if (!user || user.active === false || !hasAdminAccess(user.role, user.additionalRoles)) {
-    return res.status(403).json({ error: "Only admin accounts can access the debug ticket portal" });
-  }
-
-  const ssoToken = generateDebugPortalSsoToken({
-    id: user.id,
-    email: user.email,
-    role: user.role,
-  });
-
-  res.json({
-    data: {
-      ssoToken,
-      reporterUserId: user.id,
-    },
-  });
+  const ssoToken = generateDebugPortalSsoToken({ id: user.id, email: user.email, role: user.role });
+  res.json({ data: { ssoToken, reporterUserId: user.id } });
 });
 
 /** Exchange SSO token for a debug portal session JWT. */
@@ -146,37 +117,14 @@ router.post("/exchange-sso", async (req, res) => {
     const { ssoToken } = exchangeSsoSchema.parse(req.body);
     const pending = verifyDebugPortalSsoToken(ssoToken);
     if (!pending) {
-      return res.status(401).json({ error: "SSO link expired or invalid. Open reported tickets from TBOS admin again." });
+      return res.status(401).json({ error: "SSO link expired or invalid. Open reported tickets from TBOS again." });
     }
 
-    const user = await prisma.adminUser.findUnique({
-      where: { id: pending.id },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        active: true,
-        additionalRoles: true,
-      },
-    });
+    const user = await resolveDebugPortalUser(pending.id);
+    if (!user) return res.status(403).json({ error: "Forbidden" });
 
-    if (!user || user.active === false || !hasAdminAccess(user.role, user.additionalRoles)) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
-
-    const token = generateToken({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-    });
-
-    res.json({
-      data: {
-        token,
-        user: publicUser(user),
-      },
-    });
+    const token = generateToken({ id: user.id, email: user.email, role: user.role });
+    res.json({ data: { token, user: publicUser(user) } });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });

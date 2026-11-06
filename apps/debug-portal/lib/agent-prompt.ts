@@ -13,6 +13,7 @@ export type AgentPromptTicket = {
   currentUrl: string;
   userAgent: string;
   screenshotUrl: string | null;
+  screenshotUrls?: string[];
   elementDiagnostics: unknown;
   apiPrerequisite: unknown;
   fullPayload: unknown;
@@ -44,14 +45,20 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function screenshotUrlForTicket(ticket: AgentPromptTicket): string | null {
-  const direct = resolveMediaPreviewUrl(ticket.screenshotUrl);
-  if (direct) return direct;
+function screenshotUrlsForTicket(ticket: AgentPromptTicket): string[] {
+  const stored = ticket.screenshotUrls?.length
+    ? ticket.screenshotUrls
+    : ticket.screenshotUrl
+      ? [ticket.screenshotUrl]
+      : [];
+  const resolved = stored.map((url) => resolveMediaPreviewUrl(url)).filter((url): url is string => Boolean(url));
+  if (resolved.length) return resolved;
   const payload = asRecord(ticket.fullPayload);
   if (payload && typeof payload.screenshotUrl === "string") {
-    return resolveMediaPreviewUrl(payload.screenshotUrl);
+    const legacy = resolveMediaPreviewUrl(payload.screenshotUrl);
+    return legacy ? [legacy] : [];
   }
-  return null;
+  return [];
 }
 
 function formatJsonBlock(value: unknown, maxLen = 6000): string {
@@ -68,7 +75,7 @@ function formatJsonBlock(value: unknown, maxLen = 6000): string {
 export function buildAgentIssuePrompt(ticket: AgentPromptTicket): string {
   const el = (ticket.elementDiagnostics ?? {}) as ElementDiagnosticsShape;
   const api = ticket.apiPrerequisite as ApiPrerequisiteShape | null;
-  const shot = screenshotUrlForTicket(ticket);
+  const shots = screenshotUrlsForTicket(ticket);
   const lines: string[] = [];
 
   lines.push(`# Debug capture: ${ticket.ticketId}`);
@@ -119,9 +126,12 @@ export function buildAgentIssuePrompt(ticket: AgentPromptTicket): string {
     lines.push("");
   }
 
-  lines.push("## Screenshot");
-  if (shot) {
-    lines.push(`Open the capture image for visual context: ${shot}`);
+  lines.push(shots.length > 1 ? "## Screenshots" : "## Screenshot");
+  if (shots.length === 1) {
+    lines.push(`Open the capture image for visual context: ${shots[0]}`);
+  } else if (shots.length > 1) {
+    lines.push("Open these images for visual context:");
+    shots.forEach((url, index) => lines.push(`${index + 1}. ${url}`));
   } else {
     lines.push("No screenshot was stored for this ticket.");
   }
@@ -146,6 +156,6 @@ export function buildAgentIssuePrompt(ticket: AgentPromptTicket): string {
   return lines.join("\n");
 }
 
-export function resolveTicketScreenshotUrl(ticket: AgentPromptTicket): string | null {
-  return screenshotUrlForTicket(ticket);
+export function resolveTicketScreenshotUrls(ticket: AgentPromptTicket): string[] {
+  return screenshotUrlsForTicket(ticket);
 }

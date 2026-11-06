@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { Bug, Monitor } from "lucide-react";
 import { useDebugMode } from "@/contexts/DebugModeContext";
+import { ReportedTicketsLink } from "@/components/ReportedTicketsLink";
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -28,6 +29,7 @@ export function DebugToolbar() {
 
   return (
     <div data-debug-ui className="fixed bottom-4 right-4 z-[150] flex items-center gap-2">
+      <ReportedTicketsLink variant="toolbar" />
       {isDebugActive ? (
         <button
           type="button"

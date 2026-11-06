@@ -3,6 +3,13 @@ import { z } from "zod";
 import { prisma } from "@techbubble/database";
 import type { Prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth.js";
+import {
+  MAX_TICKET_SCREENSHOTS,
+  resolveDebugPortalUser,
+  screenshotFieldsFromInput,
+  ticketScreenshotUrls,
+} from "../lib/debug-portal-user.js";
+import { logDebugTicket } from "../lib/debug-ticket-log.js";
 
 const router: IRouter = Router();
 
@@ -49,8 +56,17 @@ const createSchema = z.object({
   elementDiagnostics: elementDiagnosticsSchema,
   apiPrerequisite: apiPrerequisiteSchema,
   screenshotUrl: z.string().max(2000).nullable().optional(),
+  screenshotUrls: z.array(z.string().trim().min(1).max(2000)).max(MAX_TICKET_SCREENSHOTS).optional(),
   fullPayload: z.record(z.string(), z.unknown()).optional(),
 });
+
+/** Saving a capture is open to every TBOS user; browsing all captures stays admin-only. */
+async function requireCaptureAdmin(req: AuthRequest, res: import("express").Response): Promise<boolean> {
+  const user = req.user?.id ? await resolveDebugPortalUser(req.user.id) : null;
+  if (user?.isAdmin) return true;
+  res.status(403).json({ error: "Forbidden: insufficient permissions" });
+  return false;
+}
 
 function asInputJson(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
@@ -88,9 +104,11 @@ function serializeRow(row: {
   elementDiagnostics: unknown;
   apiPrerequisite: unknown;
   screenshotUrl: string | null;
+  screenshotUrls?: string[];
   fullPayload: unknown;
   createdAt: Date;
 }) {
+  const screenshotUrls = ticketScreenshotUrls(row);
   return {
     id: row.id,
     ticketId: row.ticketId,
@@ -105,7 +123,8 @@ function serializeRow(row: {
     userAgent: row.userAgent,
     elementDiagnostics: row.elementDiagnostics,
     apiPrerequisite: row.apiPrerequisite,
-    screenshotUrl: row.screenshotUrl,
+    screenshotUrl: screenshotUrls[0] ?? null,
+    screenshotUrls,
     fullPayload: row.fullPayload,
     createdAt: row.createdAt.toISOString(),
   };
@@ -117,6 +136,7 @@ router.post("/", async (req: AuthRequest, res) => {
     if (!u) return res.status(401).json({ error: "Unauthorized" });
 
     const input = createSchema.parse(req.body);
+    const screenshots = screenshotFieldsFromInput(input);
     const clientIp = clientIpFromRequest(req);
 
     const apiPrerequisite = input.apiPrerequisite
@@ -139,7 +159,8 @@ router.post("/", async (req: AuthRequest, res) => {
       },
       elementDiagnostics: input.elementDiagnostics,
       apiPrerequisite,
-      screenshotUrl: input.screenshotUrl ?? null,
+      screenshotUrl: screenshots.screenshotUrl,
+      screenshotUrls: screenshots.screenshotUrls,
     };
 
     let ticketId = input.ticketId;
@@ -151,17 +172,19 @@ router.post("/", async (req: AuthRequest, res) => {
             type: input.type,
             reportedEnvironment: input.reportedEnvironment,
             userDescription: input.userDescription,
-            reporterUserId: input.userMetadata.userId,
+            reporterUserId: u.id,
             reporterEmail: u.email,
             reporterRole: input.userMetadata.role,
             currentUrl: input.userMetadata.currentUrl,
             userAgent: input.userMetadata.userAgent,
             elementDiagnostics: asInputJson(input.elementDiagnostics),
             apiPrerequisite: apiPrerequisite ? asInputJson(apiPrerequisite) : undefined,
-            screenshotUrl: input.screenshotUrl ?? null,
+            screenshotUrl: screenshots.screenshotUrl,
+            screenshotUrls: screenshots.screenshotUrls,
             fullPayload: asInputJson(fullPayload),
           },
         });
+        await logDebugTicket(prisma, row.id, { userId: u.id, email: u.email }, [{ action: "CREATED" }]);
         return res.status(201).json({
           data: serializeRow(row),
           clientIp,
@@ -185,8 +208,9 @@ router.post("/", async (req: AuthRequest, res) => {
   }
 });
 
-router.get("/", async (req, res) => {
+router.get("/", async (req: AuthRequest, res) => {
   try {
+    if (!(await requireCaptureAdmin(req, res))) return;
     const take = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
     const skip = Math.max(0, Number(req.query.offset) || 0);
     const [rows, total] = await Promise.all([
@@ -209,6 +233,7 @@ router.get("/", async (req, res) => {
           elementDiagnostics: true,
           apiPrerequisite: true,
           screenshotUrl: true,
+          screenshotUrls: true,
           fullPayload: true,
           createdAt: true,
         },
@@ -225,8 +250,9 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", async (req: AuthRequest, res) => {
   try {
+    if (!(await requireCaptureAdmin(req, res))) return;
     const row = await prisma.debugCaptureTicket.findUnique({
       where: { id: req.params.id },
     });

@@ -158,23 +158,13 @@ app.use(
   "/api/admin/debug-capture-tickets",
   authMiddleware,
   requireMfaEnrolled,
-  requireRole("admin"),
   assertDevEnvMiddleware,
   debugCaptureTicketRoutes,
 );
 app.use("/api/debug-portal/auth", debugPortalAuthRoutes);
-app.use(
-  "/api/debug-portal/tickets",
-  authMiddleware,
-  requireRole("admin"),
-  debugPortalTicketRoutes,
-);
-app.use(
-  "/api/debug-portal/upload",
-  authMiddleware,
-  requireRole("admin"),
-  uploadRoutes,
-);
+// Any TBOS account (internal or customer) may use the debug portal; routes enforce per-ticket access.
+app.use("/api/debug-portal/tickets", authMiddleware, debugPortalTicketRoutes);
+app.use("/api/debug-portal/upload", authMiddleware, uploadRoutes);
 app.use("/api/debug-portal/agent", assertDevEnvMiddleware, debugPortalAgentRoutes);
 app.use(
   "/api/admin/workspace-groups",
