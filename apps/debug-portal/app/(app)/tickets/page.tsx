@@ -7,13 +7,11 @@ import { ArrowRight, Loader2, Plus } from "lucide-react";
 import { ChevronSelect } from "@/components/ChevronSelect";
 import { FilterField } from "@/components/ui/FilterField";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { useTicketStatuses } from "@/components/TicketStatusesProvider";
 import {
-  TICKET_STATUSES,
-  TICKET_STATUS_LABELS,
-  bulkAdvanceTargetStatus,
   formatEnvironment,
   formatTicketType,
-  statusBadgeClass,
+  nextStatusInOrder,
   typeBadgeClass,
   type TicketStatus,
 } from "@/lib/tickets";
@@ -54,14 +52,16 @@ function TicketsListInner() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [page, setPage] = useState(0);
 
+  const { statuses, labelOf, badgeClassOf } = useTicketStatuses();
+
   const filteredStatus = useMemo((): TicketStatus | null => {
     if (!statusFilter) return null;
-    return TICKET_STATUSES.includes(statusFilter as TicketStatus) ? (statusFilter as TicketStatus) : null;
-  }, [statusFilter]);
+    return statuses.some((s) => s.key === statusFilter) ? statusFilter : null;
+  }, [statusFilter, statuses]);
 
   const bulkTargetStatus = useMemo(
-    () => (filteredStatus ? bulkAdvanceTargetStatus(filteredStatus) : null),
-    [filteredStatus],
+    () => (filteredStatus ? nextStatusInOrder(statuses, filteredStatus) : null),
+    [filteredStatus, statuses],
   );
 
   const showBulkActions = isAdmin && Boolean(bulkTargetStatus && filteredStatus);
@@ -197,6 +197,7 @@ function TicketsListInner() {
         body: JSON.stringify({
           ids: [...selectedIds],
           status: bulkTargetStatus,
+          fromStatus: filteredStatus,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -213,7 +214,7 @@ function TicketsListInner() {
   }
 
   const bulkButtonLabel = bulkTargetStatus
-    ? `Move to ${TICKET_STATUS_LABELS[bulkTargetStatus]}`
+    ? `Move to ${labelOf(bulkTargetStatus)}`
     : "";
 
   return (
@@ -257,9 +258,9 @@ function TicketsListInner() {
               aria-label="Filter by status"
             >
               <option value="">All statuses</option>
-              {TICKET_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {TICKET_STATUS_LABELS[s]}
+              {statuses.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
                 </option>
               ))}
             </ChevronSelect>
@@ -268,7 +269,7 @@ function TicketsListInner() {
         {showBulkActions && rows.length > 0 && !loading ? (
           <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <p className="text-sm text-slate-600">
-              Bulk update visible {TICKET_STATUS_LABELS[filteredStatus!].toLowerCase()} tickets
+              Bulk update visible {labelOf(filteredStatus!).toLowerCase()} tickets
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" onClick={toggleSelectAll} className="dp-btn-ghost py-2 text-sm">
@@ -363,9 +364,9 @@ function TicketsListInner() {
                     </td>
                     <td className="dp-table-cell">
                       <span
-                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(row.status)}`}
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${badgeClassOf(row.status)}`}
                       >
-                        {TICKET_STATUS_LABELS[row.status] ?? row.status}
+                        {labelOf(row.status)}
                       </span>
                     </td>
                     <td className="dp-table-cell">

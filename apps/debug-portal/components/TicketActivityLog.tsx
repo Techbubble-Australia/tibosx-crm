@@ -1,7 +1,8 @@
 "use client";
 
 import { History } from "lucide-react";
-import { TICKET_STATUS_LABELS, formatEnvironment, formatTicketType, type TicketStatus } from "@/lib/tickets";
+import { useTicketStatuses } from "@/components/TicketStatusesProvider";
+import { formatEnvironment, formatTicketType } from "@/lib/tickets";
 
 export type TicketLogEntry = {
   id: string;
@@ -21,22 +22,23 @@ const FIELD_LABELS: Record<string, string> = {
   currentUrl: "Related URL",
 };
 
-function formatValue(field: string | null, value: string | null): string {
+function formatValue(field: string | null, value: string | null, labelOf: (key: string) => string): string {
   if (!value) return "—";
-  if (field === "status") return TICKET_STATUS_LABELS[value as TicketStatus] ?? value;
+  if (field === "status") return labelOf(value);
   if (field === "type") return formatTicketType(value);
   if (field === "reportedEnvironment") return formatEnvironment(value);
   return value;
 }
 
-function describe(entry: TicketLogEntry): { title: string; detail?: string } {
+function describe(entry: TicketLogEntry, labelOf: (key: string) => string): { title: string; detail?: string } {
+  const fmt = (field: string | null, value: string | null) => formatValue(field, value, labelOf);
   switch (entry.action) {
     case "CREATED":
       return { title: "Created the ticket" };
     case "STATUS_CHANGED":
       return {
         title: "Changed status",
-        detail: `${formatValue("status", entry.oldValue)} → ${formatValue("status", entry.newValue)}`,
+        detail: `${fmt("status", entry.oldValue)} → ${fmt("status", entry.newValue)}`,
       };
     case "SCREENSHOTS_ADDED": {
       const added = Number(entry.newValue ?? 0) - Number(entry.oldValue ?? 0);
@@ -49,7 +51,7 @@ function describe(entry: TicketLogEntry): { title: string; detail?: string } {
       if (entry.field === "userDescription") return { title: `Edited ${label.toLowerCase()}` };
       return {
         title: `Changed ${label.toLowerCase()}`,
-        detail: `${formatValue(entry.field, entry.oldValue)} → ${formatValue(entry.field, entry.newValue)}`,
+        detail: `${fmt(entry.field, entry.oldValue)} → ${fmt(entry.field, entry.newValue)}`,
       };
     }
     default:
@@ -62,6 +64,7 @@ function formatWhen(iso: string): string {
 }
 
 export function TicketActivityLog({ logs }: { logs: TicketLogEntry[] }) {
+  const { labelOf } = useTicketStatuses();
   return (
     <section className="dp-card p-3" aria-label="Activity log">
       <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-slate-900">
@@ -73,7 +76,7 @@ export function TicketActivityLog({ logs }: { logs: TicketLogEntry[] }) {
       ) : (
         <ol className="relative space-y-3 border-l border-slate-200 pl-3">
           {logs.map((entry) => {
-            const { title, detail } = describe(entry);
+            const { title, detail } = describe(entry, labelOf);
             return (
               <li key={entry.id} className="relative">
                 <span className="absolute -left-[17px] top-1.5 h-2 w-2 rounded-full bg-sky-500 ring-2 ring-white" aria-hidden />

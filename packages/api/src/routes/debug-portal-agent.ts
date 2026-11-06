@@ -13,6 +13,7 @@ import {
 } from "../lib/debug-media-url.js";
 import { ticketScreenshotUrls } from "../lib/debug-portal-user.js";
 import { AI_AGENT_ACTOR, logDebugTicket } from "../lib/debug-ticket-log.js";
+import { isDebugTicketStatus } from "../lib/debug-ticket-statuses.js";
 
 const router: IRouter = Router();
 
@@ -25,7 +26,8 @@ const listQuerySchema = z.object({
   format: z.enum(["json", "markdown"]).optional(),
 });
 
-const ticketStatusSchema = z.enum(["PENDING", "IN_PROGRESS", "FOR_REVIEW", "COMPLETED"]);
+/** Any configured board status key (PENDING, IN_PROGRESS, FOR_REVIEW, COMPLETED, or a custom one). */
+const ticketStatusSchema = z.string().trim().min(1).max(60);
 
 const patchStatusBodySchema = z.object({
   status: ticketStatusSchema,
@@ -223,12 +225,15 @@ router.get("/tickets/in-progress", async (req, res) => {
 
 /**
  * PATCH /api/debug-portal/agent/tickets/:idOrTicketId/status
- * Body: { "status": "PENDING" | "IN_PROGRESS" | "FOR_REVIEW" | "COMPLETED" }
+ * Body: { "status": "PENDING" | "IN_PROGRESS" | "FOR_REVIEW" | "COMPLETED" | <custom status key> }
  * :idOrTicketId may be the internal id (cuid) or public ticketId (e.g. TICK-1793584247027).
  */
 router.patch("/tickets/:idOrTicketId/status", async (req, res) => {
   try {
     const { status } = patchStatusBodySchema.parse(req.body);
+    if (!(await isDebugTicketStatus(status))) {
+      return res.status(400).json({ error: "Unknown status", code: "UNKNOWN_STATUS" });
+    }
     const existing = await findTicketByIdOrTicketId(req.params.idOrTicketId);
     if (!existing) {
       return res.status(404).json({ error: "Ticket not found", code: "TICKET_NOT_FOUND" });

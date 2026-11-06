@@ -11,14 +11,8 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { buildAgentIssuePrompt, resolveTicketScreenshotUrls } from "@/lib/agent-prompt";
 import { MAX_TICKET_SCREENSHOTS, SCREENSHOT_ACCEPT, uploadScreenshots } from "@/lib/upload-screenshot";
 import { usePortalUser } from "@/lib/use-portal-user";
-import {
-  TICKET_STATUS_LABELS,
-  formatEnvironment,
-  formatTicketType,
-  memberStatusTarget,
-  statusBadgeClass,
-  type TicketStatus,
-} from "@/lib/tickets";
+import { useTicketStatuses } from "@/components/TicketStatusesProvider";
+import { formatEnvironment, formatTicketType, memberStatusTarget, type TicketStatus } from "@/lib/tickets";
 
 type TicketDetail = {
   id: string;
@@ -97,6 +91,7 @@ export default function TicketDetailPage() {
     currentUrl: "",
   });
   const { isAdmin } = usePortalUser();
+  const { labelOf, badgeClassOf } = useTicketStatuses();
 
   function applyUpdated(updated: TicketDetail) {
     setRow(updated);
@@ -317,9 +312,9 @@ export default function TicketDetailPage() {
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-slate-700">Workflow status</span>
           <span
-            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(row.status)}`}
+            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${badgeClassOf(row.status)}`}
           >
-            {TICKET_STATUS_LABELS[row.status]}
+            {labelOf(row.status)}
           </span>
         </div>
         {isAdmin ? (
@@ -344,7 +339,9 @@ export default function TicketDetailPage() {
               className={memberTarget === "COMPLETED" ? "dp-btn-primary" : "dp-btn-secondary"}
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-              {memberTarget === "COMPLETED" ? "Mark completed" : "Reopen (move to Pending)"}
+              {memberTarget === "COMPLETED"
+                ? `Mark ${labelOf("COMPLETED").toLowerCase()}`
+                : `Reopen (move to ${labelOf("PENDING")})`}
             </button>
             <p className="text-xs text-slate-500">
               {memberTarget === "COMPLETED"

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ImagePlus, Loader2, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Camera, EyeOff, ImagePlus, Loader2, X } from "lucide-react";
 import { appAlert } from "@/lib/app-alert";
 import {
   MAX_DEBUG_SCREENSHOTS,
@@ -60,24 +60,87 @@ export function DebugTicketModal() {
     submitTicket,
     copyPayloadJson,
     recaptureViewport,
+    addExtraScreenshotFiles,
+    captureExtraScreen,
+    extraCapturing,
+    extraCaptureMode,
+    startExtraCapture,
+    finishExtraCapture,
+    cancelExtraCapture,
   } = useDebugMode();
   const [saving, setSaving] = useState(false);
-
-  if (!modalOpen) return null;
+  const [dropActive, setDropActive] = useState(false);
 
   const usedSlots = (draft?.screenshotDataUrl ? 1 : 0) + (draft?.extraScreenshots.length ?? 0);
   const extraRoom = MAX_DEBUG_SCREENSHOTS - usedSlots;
 
-  function addExtraScreenshots(files: FileList | null) {
-    if (!draft || !files?.length) return;
-    const picked = Array.from(files).slice(0, Math.max(extraRoom, 0));
-    if (files.length > extraRoom) {
-      appAlert(`You can attach up to ${MAX_DEBUG_SCREENSHOTS} screenshots per ticket.`);
+  const addExtraScreenshots = useCallback(
+    (files: FileList | File[] | null) => {
+      const images = Array.from(files ?? []).filter((file) => file.type.startsWith("image/"));
+      if (!images.length) return;
+      const added = addExtraScreenshotFiles(images);
+      if (added < images.length) {
+        appAlert(`You can attach up to ${MAX_DEBUG_SCREENSHOTS} screenshots per ticket.`);
+      }
+    },
+    [addExtraScreenshotFiles],
+  );
+
+  /** Paste screenshots from the clipboard while the modal is open (text pastes are left alone). */
+  useEffect(() => {
+    if (!modalOpen || extraCaptureMode) return;
+    function onPaste(e: ClipboardEvent) {
+      const files = Array.from(e.clipboardData?.files ?? []).filter((file) => file.type.startsWith("image/"));
+      if (!files.length) return;
+      e.preventDefault();
+      addExtraScreenshots(
+        files.map((file, i) => new File([file], `pasted-${Date.now()}-${i + 1}.png`, { type: file.type || "image/png" })),
+      );
     }
-    setDraftField("extraScreenshots", [
-      ...draft.extraScreenshots,
-      ...picked.map((file) => ({ file, previewUrl: URL.createObjectURL(file) })),
-    ]);
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [modalOpen, extraCaptureMode, addExtraScreenshots]);
+
+  if (!modalOpen) return null;
+
+  async function onCaptureNow() {
+    const ok = await captureExtraScreen();
+    if (!ok) appAlert("Could not capture the screen. Try uploading an image instead.");
+  }
+
+  if (extraCaptureMode) {
+    return (
+      <div
+        data-debug-ui
+        className="fixed bottom-20 left-1/2 z-[170] flex -translate-x-1/2 flex-wrap items-center gap-3 rounded-xl border border-sky-200 bg-white px-4 py-3 shadow-2xl dark:border-sky-900 dark:bg-gray-900"
+        role="dialog"
+        aria-label="Capture another screenshot"
+      >
+        <Camera className="h-5 w-5 text-sky-600" aria-hidden />
+        <p className="text-sm text-gray-700 dark:text-gray-200">
+          Set up the screen you want (scroll, open menus, or go to another page), then capture.
+        </p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={extraCapturing}
+            onClick={() => void finishExtraCapture()}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {extraCapturing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" aria-hidden />}
+            Capture
+          </button>
+          <button
+            type="button"
+            disabled={extraCapturing}
+            onClick={cancelExtraCapture}
+            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm dark:border-gray-600"
+          >
+            Back to ticket
+          </button>
+        </div>
+      </div>
+    );
   }
 
   function removeExtraScreenshot(index: number) {
@@ -209,15 +272,55 @@ export function DebugTicketModal() {
                 </div>
               )}
 
-              <div>
-                <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+              <div
+                onDragOver={(e) => {
+                  if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+                  e.preventDefault();
+                  setDropActive(true);
+                }}
+                onDragLeave={() => setDropActive(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDropActive(false);
+                  addExtraScreenshots(e.dataTransfer.files);
+                }}
+                className={`rounded-lg border-2 border-dashed p-3 transition-colors ${
+                  dropActive ? "border-sky-400 bg-sky-50/60 dark:bg-sky-950/30" : "border-gray-200 dark:border-gray-700"
+                }`}
+              >
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm font-medium">
-                    Additional screenshots <span className="font-normal text-gray-500">(optional)</span>
+                    More screenshots <span className="font-normal text-gray-500">(optional)</span>
                   </p>
-                  {extraRoom > 0 ? (
-                    <label className="cursor-pointer rounded border border-gray-200 px-2 py-1 text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800">
-                      <ImagePlus className="mr-1 inline h-3.5 w-3.5" aria-hidden />
-                      Attach images
+                  <span className="text-xs text-gray-500">
+                    {usedSlots} / {MAX_DEBUG_SCREENSHOTS}
+                  </span>
+                </div>
+                {extraRoom > 0 ? (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={saving || extraCapturing}
+                      onClick={() => void onCaptureNow()}
+                      className="inline-flex items-center gap-1 rounded border border-gray-200 px-2 py-1 text-xs font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                      title="Capture the page behind this window"
+                    >
+                      {extraCapturing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" aria-hidden />}
+                      Capture screen
+                    </button>
+                    <button
+                      type="button"
+                      disabled={saving || extraCapturing}
+                      onClick={startExtraCapture}
+                      className="inline-flex items-center gap-1 rounded border border-gray-200 px-2 py-1 text-xs font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                      title="Hide this window, set up the screen (scroll, open a menu, go to another page), then capture"
+                    >
+                      <EyeOff className="h-3.5 w-3.5" aria-hidden />
+                      Hide &amp; capture…
+                    </button>
+                    <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-gray-200 px-2 py-1 text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800">
+                      <ImagePlus className="h-3.5 w-3.5" aria-hidden />
+                      Upload images
                       <input
                         type="file"
                         multiple
@@ -230,8 +333,10 @@ export function DebugTicketModal() {
                         }}
                       />
                     </label>
-                  ) : null}
-                </div>
+                  </div>
+                ) : (
+                  <p className="mb-2 text-xs text-amber-700">Screenshot limit reached.</p>
+                )}
                 {draft.extraScreenshots.length ? (
                   <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                     {draft.extraScreenshots.map((shot, index) => (
@@ -251,7 +356,7 @@ export function DebugTicketModal() {
                   </ul>
                 ) : (
                   <p className="text-xs text-gray-500">
-                    Add other images that help explain the issue (other screens, error dialogs, expected design).
+                    Capture other screens, upload images, drag files here, or paste with Ctrl/Cmd+V.
                   </p>
                 )}
               </div>

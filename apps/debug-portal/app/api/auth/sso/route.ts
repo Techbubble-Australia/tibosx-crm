@@ -7,8 +7,6 @@ import { getUpstreamApiBase } from "@/lib/proxy-api-request";
 
 export async function GET(req: NextRequest) {
   const ssoToken = req.nextUrl.searchParams.get("token")?.trim();
-  const reporterUserId = req.nextUrl.searchParams.get("reporterUserId")?.trim() ?? "";
-
   if (!ssoToken) {
     return NextResponse.redirect(debugPortalAbsoluteUrl(req, "/login?error=sso"));
   }
@@ -32,12 +30,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(debugPortalAbsoluteUrl(req, "/login?error=sso"));
   }
 
-  const ticketsUrl = debugPortalAbsoluteUrl(req, "/tickets");
-  if (reporterUserId) {
-    ticketsUrl.searchParams.set("reporterUserId", reporterUserId);
-  }
-
-  const response = NextResponse.redirect(ticketsUrl);
+  const response = NextResponse.redirect(debugPortalAbsoluteUrl(req, "/board"));
   response.cookies.set(DEBUG_PORTAL_SESSION_COOKIE, token, sessionCookieOptions());
   return response;
 }

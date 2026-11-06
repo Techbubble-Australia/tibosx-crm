@@ -1,7 +1,8 @@
 "use client";
 
 import { ChevronSelect } from "@/components/ChevronSelect";
-import { TICKET_STATUSES, TICKET_STATUS_LABELS, type TicketStatus } from "@/lib/tickets";
+import { useTicketStatuses } from "@/components/TicketStatusesProvider";
+import type { TicketStatus } from "@/lib/tickets";
 
 type Props = {
   value: TicketStatus;
@@ -13,6 +14,8 @@ type Props = {
 };
 
 export function StatusSelect({ value, onChange, id, disabled, className, "aria-label": ariaLabel }: Props) {
+  const { statuses, labelOf } = useTicketStatuses();
+  const known = statuses.some((s) => s.key === value);
   return (
     <ChevronSelect
       id={id}
@@ -20,11 +23,12 @@ export function StatusSelect({ value, onChange, id, disabled, className, "aria-l
       disabled={disabled}
       className={className}
       aria-label={ariaLabel}
-      onChange={(v) => onChange(v as TicketStatus)}
+      onChange={(v) => onChange(v)}
     >
-      {TICKET_STATUSES.map((s) => (
-        <option key={s} value={s}>
-          {TICKET_STATUS_LABELS[s]}
+      {known ? null : <option value={value}>{labelOf(value)}</option>}
+      {statuses.map((s) => (
+        <option key={s.key} value={s.key}>
+          {s.label}
         </option>
       ))}
     </ChevronSelect>

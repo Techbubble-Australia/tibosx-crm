@@ -11,6 +11,7 @@ import {
   type DebugPortalUser,
 } from "../lib/debug-portal-user.js";
 import { logDebugTicket, serializeDebugTicketLog, type DebugTicketActor } from "../lib/debug-ticket-log.js";
+import { isDebugTicketStatus, previousDebugTicketStatus } from "../lib/debug-ticket-statuses.js";
 
 const router: IRouter = Router();
 
@@ -52,7 +53,8 @@ function canViewTicket(user: DebugPortalUser, row: { reporterUserId: string }): 
 
 const screenshotUrlSchema = z.string().trim().min(1).max(2000);
 
-const statusSchema = z.enum(["PENDING", "IN_PROGRESS", "FOR_REVIEW", "COMPLETED"]);
+/** Any key from DebugTicketStatus (validated against the table before saving). */
+const statusSchema = z.string().trim().min(1).max(60);
 
 /** Status changes are admin-only; content fields can be edited by the reporter or an admin. */
 const patchSchema = z
@@ -74,20 +76,9 @@ const removeScreenshotSchema = z.object({ screenshotUrl: screenshotUrlSchema });
 const bulkStatusSchema = z.object({
   ids: z.array(z.string().min(1)).min(1).max(100),
   status: statusSchema,
+  /** Status every selected ticket must currently have; defaults to the column before `status`. */
+  fromStatus: statusSchema.optional(),
 });
-
-function bulkAdvanceFromStatus(to: z.infer<typeof statusSchema>): z.infer<typeof statusSchema> | null {
-  switch (to) {
-    case "IN_PROGRESS":
-      return "PENDING";
-    case "FOR_REVIEW":
-      return "IN_PROGRESS";
-    case "COMPLETED":
-      return "FOR_REVIEW";
-    default:
-      return null;
-  }
-}
 
 const portalCreateSchema = z.object({
   type: z.enum(["BUG", "ENHANCEMENT"]),
@@ -299,9 +290,12 @@ router.get("/reporters", async (req: PortalRequest, res) => {
 router.patch("/bulk-status", async (req: PortalRequest, res) => {
   try {
     if (!requirePortalAdmin(req, res)) return;
-    const { ids, status } = bulkStatusSchema.parse(req.body);
-    const requiredFrom = bulkAdvanceFromStatus(status);
-    if (!requiredFrom) {
+    const { ids, status, fromStatus } = bulkStatusSchema.parse(req.body);
+    if (!(await isDebugTicketStatus(status))) {
+      return res.status(400).json({ error: "Unknown status" });
+    }
+    const requiredFrom = fromStatus ?? (await previousDebugTicketStatus(status));
+    if (!requiredFrom || requiredFrom === status) {
       return res.status(400).json({ error: "Invalid bulk target status" });
     }
 
@@ -449,6 +443,9 @@ router.patch("/:id", async (req: PortalRequest, res) => {
     const body = patchSchema.parse(req.body);
     const row = await prisma.debugCaptureTicket.findUnique({ where: { id: req.params.id } });
     if (!row || !canViewTicket(user, row)) return res.status(404).json({ error: "Not found" });
+    if (body.status !== undefined && body.status !== row.status && !(await isDebugTicketStatus(body.status))) {
+      return res.status(400).json({ error: "Unknown status" });
+    }
     if (body.status !== undefined && body.status !== row.status && !canChangeStatus(user, row.status, body.status)) {
       return res.status(403).json({
         error: "You can only move a ticket from For review to Completed, or from Completed back to Pending.",

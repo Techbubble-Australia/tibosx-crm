@@ -66,6 +66,14 @@ type DebugModeContextValue = {
   buildPayloadJson: () => string;
   submitTicket: () => Promise<{ ok: boolean; error?: string }>;
   copyPayloadJson: () => Promise<boolean>;
+  /** Extra screenshots: add files, capture the page behind the modal, or hide the modal to set up a shot. */
+  addExtraScreenshotFiles: (files: File[]) => number;
+  captureExtraScreen: () => Promise<boolean>;
+  extraCapturing: boolean;
+  extraCaptureMode: boolean;
+  startExtraCapture: () => void;
+  finishExtraCapture: () => Promise<void>;
+  cancelExtraCapture: () => void;
 };
 
 const DebugModeContext = createContext<DebugModeContextValue | null>(null);
@@ -97,10 +105,46 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [captureLoading, setCaptureLoading] = useState(false);
   const [draft, setDraft] = useState<DebugCaptureDraft | null>(null);
+  const [extraCapturing, setExtraCapturing] = useState(false);
+  const [extraCaptureMode, setExtraCaptureMode] = useState(false);
 
   useEffect(() => {
     setIsDebugActive(readStoredDebugActive());
   }, []);
+
+  /** Appends images to the draft (respecting the per-ticket limit); returns how many were added. */
+  const addExtraScreenshotFiles = useCallback(
+    (files: File[]) => {
+      if (!draft) return 0;
+      const used = (draft.screenshotDataUrl ? 1 : 0) + draft.extraScreenshots.length;
+      const picked = files.slice(0, Math.max(MAX_DEBUG_SCREENSHOTS - used, 0));
+      if (!picked.length) return 0;
+      const additions = picked.map((file) => ({ file, previewUrl: URL.createObjectURL(file) }));
+      setDraft((prev) => (prev ? { ...prev, extraScreenshots: [...prev.extraScreenshots, ...additions] } : prev));
+      return picked.length;
+    },
+    [draft],
+  );
+
+  const captureExtraScreen = useCallback(async () => {
+    setExtraCapturing(true);
+    try {
+      const dataUrl = await captureViewportScreenshot();
+      const file = dataUrl ? dataUrlToFile(dataUrl, `screen-capture-${Date.now()}.png`) : null;
+      if (!file) return false;
+      addExtraScreenshotFiles([file]);
+      return true;
+    } finally {
+      setExtraCapturing(false);
+    }
+  }, [addExtraScreenshotFiles]);
+
+  const startExtraCapture = useCallback(() => setExtraCaptureMode(true), []);
+  const cancelExtraCapture = useCallback(() => setExtraCaptureMode(false), []);
+  const finishExtraCapture = useCallback(async () => {
+    await captureExtraScreen();
+    setExtraCaptureMode(false);
+  }, [captureExtraScreen]);
 
   const persistActive = useCallback((next: boolean) => {
     setIsDebugActive(next);
@@ -115,6 +159,7 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
 
   const closeModal = useCallback(() => {
     setModalOpen(false);
+    setExtraCaptureMode(false);
     setDraft((prev) => {
       prev?.extraScreenshots.forEach((shot) => URL.revokeObjectURL(shot.previewUrl));
       return null;
@@ -346,8 +391,22 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
       buildPayloadJson,
       submitTicket,
       copyPayloadJson,
+      addExtraScreenshotFiles,
+      captureExtraScreen,
+      extraCapturing,
+      extraCaptureMode,
+      startExtraCapture,
+      finishExtraCapture,
+      cancelExtraCapture,
     }),
     [
+      addExtraScreenshotFiles,
+      captureExtraScreen,
+      extraCapturing,
+      extraCaptureMode,
+      startExtraCapture,
+      finishExtraCapture,
+      cancelExtraCapture,
       isDebugActive,
       toggleDebug,
       modalOpen,

@@ -26,7 +26,7 @@ export default function LoginPage() {
       if (!res.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "Login failed");
       }
-      window.location.assign("/tickets");
+      window.location.assign("/board");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {

@@ -2,18 +2,20 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Images, Loader2, RefreshCw } from "lucide-react";
+import { Check, GripVertical, Images, Loader2, Plus, RefreshCw, Settings2, Trash2, X } from "lucide-react";
 import { ChevronSelect } from "@/components/ChevronSelect";
 import { FilterField } from "@/components/ui/FilterField";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { useTicketStatuses } from "@/components/TicketStatusesProvider";
 import {
-  TICKET_STATUSES,
-  TICKET_STATUS_LABELS,
+  STATUS_COLORS,
   canMoveStatus,
-  memberStatusTarget,
   formatEnvironment,
   formatTicketType,
+  memberStatusTarget,
+  statusColorClasses,
   typeBadgeClass,
+  type StatusOption,
   type TicketStatus,
 } from "@/lib/tickets";
 import { usePortalUser } from "@/lib/use-portal-user";
@@ -32,16 +34,44 @@ type BoardTicket = {
 };
 
 const BOARD_LIMIT = 500;
+const TICKET_DRAG = "application/x-dp-ticket";
+const COLUMN_DRAG = "application/x-dp-status";
 
-const COLUMN_ACCENT: Record<TicketStatus, string> = {
-  PENDING: "border-t-amber-400",
-  IN_PROGRESS: "border-t-sky-500",
-  FOR_REVIEW: "border-t-violet-500",
-  COMPLETED: "border-t-emerald-500",
-};
+async function statusRequest(path: string, init: RequestInit): Promise<StatusOption[]> {
+  const res = await fetch(`/api/debug-portal/statuses${path}`, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    ...init,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Could not update statuses");
+  return (data.data ?? []) as StatusOption[];
+}
+
+function ColorSwatches({ value, onChange }: { value: string; onChange: (color: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Column colour">
+      {STATUS_COLORS.map((color) => (
+        <button
+          key={color}
+          type="button"
+          role="radio"
+          aria-checked={value === color}
+          aria-label={color}
+          title={color}
+          onClick={() => onChange(color)}
+          className={`h-5 w-5 rounded-full ${statusColorClasses(color).swatch} ${
+            value === color ? "ring-2 ring-slate-900 ring-offset-2" : "ring-1 ring-black/10"
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function BoardPage() {
   const { isAdmin } = usePortalUser();
+  const { statuses, setStatuses } = useTicketStatuses();
   const [tickets, setTickets] = useState<BoardTicket[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -52,6 +82,13 @@ export default function BoardPage() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<TicketStatus | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [draggingColumn, setDraggingColumn] = useState<string | null>(null);
+  const [columnDropTarget, setColumnDropTarget] = useState<string | null>(null);
+  const [editingColumn, setEditingColumn] = useState<string | null>(null);
+  const [columnDraft, setColumnDraft] = useState({ label: "", color: "slate" });
+  const [adding, setAdding] = useState(false);
+  const [newStatus, setNewStatus] = useState({ label: "", color: "slate" });
+  const [statusSaving, setStatusSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -92,8 +129,8 @@ export default function BoardPage() {
   }, [tickets, typeFilter, search]);
 
   const columns = useMemo(
-    () => TICKET_STATUSES.map((status) => ({ status, items: visible.filter((t) => t.status === status) })),
-    [visible],
+    () => statuses.map((status) => ({ status, items: visible.filter((t) => t.status === status.key) })),
+    [statuses, visible],
   );
 
   const draggingTicket = draggingId ? tickets.find((t) => t.id === draggingId) ?? null : null;
@@ -125,13 +162,90 @@ export default function BoardPage() {
     }
   }
 
+  async function reorderColumns(draggedKey: string, targetKey: string) {
+    if (draggedKey === targetKey) return;
+    const keys = statuses.map((s) => s.key);
+    const from = keys.indexOf(draggedKey);
+    const to = keys.indexOf(targetKey);
+    if (from < 0 || to < 0) return;
+    keys.splice(from, 1);
+    keys.splice(to, 0, draggedKey);
+    const previous = statuses;
+    setStatuses(keys.map((key, position) => ({ ...statuses.find((s) => s.key === key)!, position })));
+    setError("");
+    try {
+      setStatuses(await statusRequest("/order", { method: "PUT", body: JSON.stringify({ keys }) }));
+    } catch (err) {
+      setStatuses(previous);
+      setError(err instanceof Error ? err.message : "Could not save column order");
+    }
+  }
+
+  function startEditColumn(status: StatusOption) {
+    setEditingColumn(status.key);
+    setColumnDraft({ label: status.label, color: status.color });
+  }
+
+  async function saveColumn(key: string) {
+    if (!columnDraft.label.trim()) return;
+    setStatusSaving(true);
+    setError("");
+    try {
+      setStatuses(
+        await statusRequest(`/${encodeURIComponent(key)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ label: columnDraft.label.trim(), color: columnDraft.color }),
+        }),
+      );
+      setEditingColumn(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update status");
+    } finally {
+      setStatusSaving(false);
+    }
+  }
+
+  async function deleteColumn(status: StatusOption) {
+    if (!window.confirm(`Delete the "${status.label}" column?`)) return;
+    setStatusSaving(true);
+    setError("");
+    try {
+      setStatuses(await statusRequest(`/${encodeURIComponent(status.key)}`, { method: "DELETE" }));
+      setEditingColumn(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete status");
+    } finally {
+      setStatusSaving(false);
+    }
+  }
+
+  async function addColumn() {
+    if (!newStatus.label.trim()) return;
+    setStatusSaving(true);
+    setError("");
+    try {
+      setStatuses(
+        await statusRequest("", {
+          method: "POST",
+          body: JSON.stringify({ label: newStatus.label.trim(), color: newStatus.color }),
+        }),
+      );
+      setNewStatus({ label: "", color: "slate" });
+      setAdding(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not add status");
+    } finally {
+      setStatusSaving(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Board"
         description={
           isAdmin
-            ? "Drag tickets between columns to change their status."
+            ? "Drag tickets between columns to change their status. Drag a column by its handle to reorder, or use its settings to rename, recolour, or delete it."
             : "Your tickets by status. Drag a For review ticket to Completed once it's fixed, or a Completed ticket back to Pending to reopen it."
         }
       />
@@ -193,100 +307,261 @@ export default function BoardPage() {
           <Loader2 className="h-8 w-8 animate-spin text-sky-500" aria-label="Loading board" />
         </div>
       ) : (
-        <div className="grid gap-4 overflow-x-auto pb-2 md:grid-cols-2 xl:grid-cols-4">
-          {columns.map(({ status, items }) => (
-            <section
-              key={status}
-              aria-label={TICKET_STATUS_LABELS[status]}
-              onDragOver={(e) => {
-                if (!canDropOn(status)) return;
-                e.preventDefault();
-                setDropTarget(status);
-              }}
-              onDragLeave={() => setDropTarget((current) => (current === status ? null : current))}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDropTarget(null);
-                const id = e.dataTransfer.getData("text/plain") || draggingId;
-                setDraggingId(null);
-                if (id) void moveTicket(id, status);
-              }}
-              className={`flex min-h-[16rem] min-w-[16rem] flex-col rounded-xl border border-t-4 border-slate-200 bg-slate-50/70 transition-opacity ${COLUMN_ACCENT[status]} ${
-                dropTarget === status ? "ring-2 ring-sky-400 ring-offset-1" : ""
-              } ${draggingTicket && !canDropOn(status) && draggingTicket.status !== status ? "opacity-50" : ""}`}
-            >
-              <header className="flex items-center justify-between px-3 py-2.5">
-                <h2 className="text-sm font-semibold text-slate-800">{TICKET_STATUS_LABELS[status]}</h2>
-                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
-                  {items.length}
-                </span>
-              </header>
-              <ul className="flex flex-1 flex-col gap-2 px-2 pb-3">
-                {items.length === 0 ? (
-                  <li className="rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-xs text-slate-400">
-                    {canDropOn(status) ? "Drop here" : "No tickets"}
-                  </li>
-                ) : (
-                  items.map((ticket) => (
-                    <li
-                      key={ticket.id}
-                      draggable={canDrag(ticket)}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("text/plain", ticket.id);
-                        e.dataTransfer.effectAllowed = "move";
-                        setDraggingId(ticket.id);
+        <div className="flex items-start gap-4 overflow-x-auto pb-3">
+          {columns.map(({ status, items }) => {
+            const accent = statusColorClasses(status.color).accent;
+            const isEditing = editingColumn === status.key;
+            return (
+              <section
+                key={status.key}
+                aria-label={status.label}
+                onDragOver={(e) => {
+                  const types = Array.from(e.dataTransfer.types);
+                  if (types.includes(COLUMN_DRAG)) {
+                    if (!isAdmin || !draggingColumn) return;
+                    e.preventDefault();
+                    setColumnDropTarget(status.key);
+                    return;
+                  }
+                  if (!canDropOn(status.key)) return;
+                  e.preventDefault();
+                  setDropTarget(status.key);
+                }}
+                onDragLeave={() => {
+                  setDropTarget((current) => (current === status.key ? null : current));
+                  setColumnDropTarget((current) => (current === status.key ? null : current));
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const columnKey = e.dataTransfer.getData(COLUMN_DRAG);
+                  setDropTarget(null);
+                  setColumnDropTarget(null);
+                  if (columnKey) {
+                    setDraggingColumn(null);
+                    if (isAdmin) void reorderColumns(columnKey, status.key);
+                    return;
+                  }
+                  const id = e.dataTransfer.getData(TICKET_DRAG) || draggingId;
+                  setDraggingId(null);
+                  if (id) void moveTicket(id, status.key);
+                }}
+                className={`flex min-h-[16rem] w-72 shrink-0 flex-col rounded-xl border border-t-4 border-slate-200 bg-slate-50/70 transition-opacity ${accent} ${
+                  dropTarget === status.key ? "ring-2 ring-sky-400 ring-offset-1" : ""
+                } ${
+                  columnDropTarget === status.key && draggingColumn !== status.key
+                    ? "ring-2 ring-violet-400 ring-offset-1"
+                    : ""
+                } ${draggingColumn === status.key ? "opacity-40" : ""} ${
+                  draggingTicket && !canDropOn(status.key) && draggingTicket.status !== status.key ? "opacity-50" : ""
+                }`}
+              >
+                <header className="flex items-center justify-between gap-2 px-3 py-2.5">
+                  <div className="flex min-w-0 items-center gap-1">
+                    {isAdmin ? (
+                      <span
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData(COLUMN_DRAG, status.key);
+                          e.dataTransfer.effectAllowed = "move";
+                          setDraggingColumn(status.key);
+                        }}
+                        onDragEnd={() => {
+                          setDraggingColumn(null);
+                          setColumnDropTarget(null);
+                        }}
+                        className="-ml-1 cursor-grab rounded p-0.5 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600 active:cursor-grabbing"
+                        title="Drag to reorder column"
+                        aria-label={`Drag to reorder ${status.label}`}
+                      >
+                        <GripVertical className="h-4 w-4" aria-hidden />
+                      </span>
+                    ) : null}
+                    <h2 className="truncate text-sm font-semibold text-slate-800" title={status.label}>
+                      {status.label}
+                    </h2>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
+                      {items.length}
+                    </span>
+                    {isAdmin ? (
+                      <button
+                        type="button"
+                        onClick={() => (isEditing ? setEditingColumn(null) : startEditColumn(status))}
+                        className="rounded p-1 text-slate-400 hover:bg-slate-200/70 hover:text-slate-700"
+                        aria-label={`Edit ${status.label} column`}
+                        title="Column settings"
+                      >
+                        <Settings2 className="h-4 w-4" aria-hidden />
+                      </button>
+                    ) : null}
+                  </div>
+                </header>
+
+                {isEditing ? (
+                  <div className="mx-2 mb-2 space-y-2 rounded-lg border border-slate-200 bg-white p-3">
+                    <label className="dp-label" htmlFor={`col-${status.key}`}>
+                      Name
+                    </label>
+                    <input
+                      id={`col-${status.key}`}
+                      value={columnDraft.label}
+                      maxLength={40}
+                      onChange={(e) => setColumnDraft((d) => ({ ...d, label: e.target.value }))}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void saveColumn(status.key);
+                        if (e.key === "Escape") setEditingColumn(null);
                       }}
-                      onDragEnd={() => {
-                        setDraggingId(null);
-                        setDropTarget(null);
-                      }}
-                      className={`rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition ${
-                        canDrag(ticket) ? "cursor-grab active:cursor-grabbing" : ""
-                      } ${draggingId === ticket.id ? "opacity-50" : ""}`}
-                    >
-                      <div className="mb-1.5 flex items-center justify-between gap-2">
-                        <Link
-                          href={`/tickets/${ticket.id}`}
-                          className="truncate text-sm font-semibold text-sky-700 hover:text-sky-800 hover:underline"
+                      className="dp-input"
+                      autoFocus
+                    />
+                    <ColorSwatches value={columnDraft.color} onChange={(color) => setColumnDraft((d) => ({ ...d, color }))} />
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        disabled={statusSaving || !columnDraft.label.trim()}
+                        onClick={() => void saveColumn(status.key)}
+                        className="dp-btn-primary py-1.5 text-xs"
+                      >
+                        <Check className="h-3.5 w-3.5" aria-hidden /> Save
+                      </button>
+                      <button type="button" onClick={() => setEditingColumn(null)} className="dp-btn-ghost py-1.5 text-xs">
+                        Cancel
+                      </button>
+                      {status.isSystem ? (
+                        <span className="text-[11px] text-slate-400">Built-in status</span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={statusSaving}
+                          onClick={() => void deleteColumn(status)}
+                          className="dp-btn-ghost ml-auto py-1.5 text-xs text-red-700 hover:bg-red-50"
                         >
-                          {ticket.ticketId}
-                        </Link>
-                        {savingId === ticket.id ? (
-                          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-slate-400" aria-label="Saving" />
-                        ) : (
-                          <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${typeBadgeClass(ticket.type)}`}>
-                            {formatTicketType(ticket.type)}
-                          </span>
-                        )}
-                      </div>
-                      <p className="line-clamp-3 text-xs leading-relaxed text-slate-600">
-                        {ticket.userDescription || "No description"}
-                      </p>
-                      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
-                        <span>{formatEnvironment(ticket.reportedEnvironment)}</span>
-                        <span aria-hidden>·</span>
-                        <span>{new Date(ticket.createdAt).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}</span>
-                        {ticket.screenshotUrls?.length ? (
-                          <>
-                            <span aria-hidden>·</span>
-                            <span className="inline-flex items-center gap-0.5">
-                              <Images className="h-3 w-3" aria-hidden />
-                              {ticket.screenshotUrls.length}
-                            </span>
-                          </>
-                        ) : null}
-                      </div>
-                      {isAdmin ? (
-                        <p className="mt-1 truncate text-[11px] text-slate-400" title={ticket.reporterEmail}>
-                          {ticket.reporterEmail}
-                        </p>
-                      ) : null}
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden /> Delete
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                <ul className="flex flex-1 flex-col gap-2 px-2 pb-3">
+                  {items.length === 0 ? (
+                    <li className="rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-xs text-slate-400">
+                      {canDropOn(status.key) ? "Drop here" : "No tickets"}
                     </li>
-                  ))
-                )}
-              </ul>
+                  ) : (
+                    items.map((ticket) => (
+                      <li
+                        key={ticket.id}
+                        draggable={canDrag(ticket)}
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData(TICKET_DRAG, ticket.id);
+                          e.dataTransfer.effectAllowed = "move";
+                          setDraggingId(ticket.id);
+                        }}
+                        onDragEnd={() => {
+                          setDraggingId(null);
+                          setDropTarget(null);
+                        }}
+                        className={`rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition ${
+                          canDrag(ticket) ? "cursor-grab active:cursor-grabbing" : ""
+                        } ${draggingId === ticket.id ? "opacity-50" : ""}`}
+                      >
+                        <div className="mb-1.5 flex items-center justify-between gap-2">
+                          <Link
+                            href={`/tickets/${ticket.id}`}
+                            className="truncate text-sm font-semibold text-sky-700 hover:text-sky-800 hover:underline"
+                          >
+                            {ticket.ticketId}
+                          </Link>
+                          {savingId === ticket.id ? (
+                            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-slate-400" aria-label="Saving" />
+                          ) : (
+                            <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${typeBadgeClass(ticket.type)}`}>
+                              {formatTicketType(ticket.type)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="line-clamp-3 text-xs leading-relaxed text-slate-600">
+                          {ticket.userDescription || "No description"}
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+                          <span>{formatEnvironment(ticket.reportedEnvironment)}</span>
+                          <span aria-hidden>·</span>
+                          <span>
+                            {new Date(ticket.createdAt).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
+                          </span>
+                          {ticket.screenshotUrls?.length ? (
+                            <>
+                              <span aria-hidden>·</span>
+                              <span className="inline-flex items-center gap-0.5">
+                                <Images className="h-3 w-3" aria-hidden />
+                                {ticket.screenshotUrls.length}
+                              </span>
+                            </>
+                          ) : null}
+                        </div>
+                        {isAdmin ? (
+                          <p className="mt-1 truncate text-[11px] text-slate-400" title={ticket.reporterEmail}>
+                            {ticket.reporterEmail}
+                          </p>
+                        ) : null}
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </section>
+            );
+          })}
+
+          {isAdmin ? (
+            <section className="w-72 shrink-0 rounded-xl border-2 border-dashed border-slate-200 bg-white/60 p-3">
+              {adding ? (
+                <div className="space-y-2">
+                  <label className="dp-label" htmlFor="new-status-label">
+                    New status
+                  </label>
+                  <input
+                    id="new-status-label"
+                    value={newStatus.label}
+                    maxLength={40}
+                    onChange={(e) => setNewStatus((s) => ({ ...s, label: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void addColumn();
+                      if (e.key === "Escape") setAdding(false);
+                    }}
+                    placeholder="e.g. Blocked, Waiting on client"
+                    className="dp-input"
+                    autoFocus
+                  />
+                  <ColorSwatches value={newStatus.color} onChange={(color) => setNewStatus((s) => ({ ...s, color }))} />
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      disabled={statusSaving || !newStatus.label.trim()}
+                      onClick={() => void addColumn()}
+                      className="dp-btn-primary py-1.5 text-xs"
+                    >
+                      {statusSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Plus className="h-3.5 w-3.5" aria-hidden />}
+                      Add status
+                    </button>
+                    <button type="button" onClick={() => setAdding(false)} className="dp-btn-ghost py-1.5 text-xs">
+                      <X className="h-3.5 w-3.5" aria-hidden /> Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAdding(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg py-6 text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                >
+                  <Plus className="h-4 w-4" aria-hidden />
+                  Add status
+                </button>
+              )}
             </section>
-          ))}
+          ) : null}
         </div>
       )}
     </div>

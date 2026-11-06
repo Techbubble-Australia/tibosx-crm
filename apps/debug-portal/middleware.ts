@@ -30,7 +30,7 @@ export async function middleware(request: NextRequest) {
     if (!token) return NextResponse.next();
     try {
       if (await hasPortalSession(token)) {
-        return redirectTo(request, "/tickets");
+        return redirectTo(request, "/board");
       }
     } catch {
       const res = NextResponse.next();

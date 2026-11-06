@@ -1304,18 +1304,28 @@ enum DebugReportedEnvironment {
   production
 }
 
-enum DebugCaptureTicketStatus {
-  PENDING
-  IN_PROGRESS
-  FOR_REVIEW
-  COMPLETED
+/// Board columns for debug tickets. System statuses can be renamed/recoloured but not deleted.
+model DebugTicketStatus {
+  id        String   @id @default(cuid())
+  /// Stable value stored on tickets (e.g. PENDING, BLOCKED).
+  key       String   @unique
+  label     String
+  /// Palette name used by the debug portal (amber, sky, violet, emerald, rose, …).
+  color     String   @default("slate")
+  position  Int
+  isSystem  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([position])
 }
 
 model DebugCaptureTicket {
   id                   String                   @id @default(cuid())
   ticketId             String                   @unique
   type                 DebugCaptureTicketType
-  status               DebugCaptureTicketStatus @default(PENDING)
+  /// Key of a DebugTicketStatus row.
+  status               String                   @default("PENDING")
   reportedEnvironment  DebugReportedEnvironment @default(development)
   userDescription      String                   @db.Text
   reporterUserId       String
