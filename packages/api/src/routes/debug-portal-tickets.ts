@@ -12,6 +12,7 @@ import {
 } from "../lib/debug-portal-user.js";
 import { logDebugTicket, serializeDebugTicketLog, type DebugTicketActor } from "../lib/debug-ticket-log.js";
 import { isDebugTicketStatus, previousDebugTicketStatus } from "../lib/debug-ticket-statuses.js";
+import { activeDebugSprintId } from "../lib/debug-sprints.js";
 
 const router: IRouter = Router();
 
@@ -213,6 +214,7 @@ router.post("/", async (req: PortalRequest, res) => {
       screenshotUrls: screenshots.screenshotUrls,
     };
 
+    const sprintId = await activeDebugSprintId();
     let attemptId = ticketId;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -232,7 +234,9 @@ router.post("/", async (req: PortalRequest, res) => {
             screenshotUrl: screenshots.screenshotUrl,
             screenshotUrls: screenshots.screenshotUrls,
             fullPayload: asInputJson(fullPayload),
+            sprintId,
           },
+          include: { sprint: { select: SPRINT_SELECT } },
         });
         await logDebugTicket(prisma, row.id, actorOf(adminUser), [{ action: "CREATED" }]);
         return res.status(201).json({ data: serializeRow(row) });

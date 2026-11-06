@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Loader2, Plus } from "lucide-react";
 import { ChevronSelect } from "@/components/ChevronSelect";
 import { FilterField } from "@/components/ui/FilterField";
@@ -135,24 +135,28 @@ function TicketsListInner() {
     [router, searchParams],
   );
 
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
     if (!filtersReady || sprintFilter === null) return;
+    const seq = ++loadSeq.current;
     setLoading(true);
     try {
       const qs = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(page * PAGE_SIZE) });
       if (statusFilter) qs.set("status", statusFilter);
       if (reporterFilter) qs.set("reporterUserId", reporterFilter);
       if (sprintFilter) qs.set("sprintId", sprintFilter);
-      const res = await fetch(`/api/debug-portal/tickets?${qs}`, { credentials: "include" });
+      const res = await fetch(`/api/debug-portal/tickets?${qs}`, { credentials: "include", cache: "no-store" });
       const data = await res.json();
+      if (seq !== loadSeq.current) return;
       if (!res.ok) throw new Error(data.error || "Failed to load");
       setRows(data.data ?? []);
       setTotal(typeof data.total === "number" ? data.total : 0);
     } catch {
+      if (seq !== loadSeq.current) return;
       setRows([]);
       setTotal(0);
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, [filtersReady, reporterFilter, statusFilter, sprintFilter, page]);
 

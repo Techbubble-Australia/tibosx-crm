@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarRange,
   Check,
@@ -20,6 +20,7 @@ import {
 import { ChevronSelect } from "@/components/ChevronSelect";
 import { FilterField } from "@/components/ui/FilterField";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SprintForm } from "@/components/SprintForm";
 import { SprintSelect } from "@/components/SprintSelect";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
 import {
@@ -31,7 +32,6 @@ import {
   sprintDateRange,
   useSprints,
   type Sprint,
-  type SprintStatus,
 } from "@/lib/sprints";
 import {
   STATUS_COLORS,
@@ -63,20 +63,6 @@ type BoardTicket = {
 const BOARD_LIMIT = 500;
 const TICKET_DRAG = "application/x-dp-ticket";
 const COLUMN_DRAG = "application/x-dp-status";
-
-type SprintDraft = { name: string; goal: string; startDate: string; endDate: string; status: SprintStatus };
-
-const EMPTY_SPRINT: SprintDraft = { name: "", goal: "", startDate: "", endDate: "", status: "PLANNED" };
-
-function sprintToDraft(sprint: Sprint): SprintDraft {
-  return {
-    name: sprint.name,
-    goal: sprint.goal ?? "",
-    startDate: sprint.startDate?.slice(0, 10) ?? "",
-    endDate: sprint.endDate?.slice(0, 10) ?? "",
-    status: sprint.status,
-  };
-}
 
 async function statusRequest(path: string, init: RequestInit): Promise<StatusOption[]> {
   const res = await fetch(`/api/debug-portal/statuses${path}`, {
@@ -134,12 +120,14 @@ export default function BoardPage() {
   /** null until sprints load and the default (active, else latest) sprint is chosen. */
   const [sprintFilter, setSprintFilter] = useState<string | null>(null);
   const [sprintForm, setSprintForm] = useState<"create" | "edit" | null>(null);
-  const [sprintDraft, setSprintDraft] = useState<SprintDraft>(EMPTY_SPRINT);
   const [sprintSaving, setSprintSaving] = useState(false);
 
   useEffect(() => {
     if (sprintsLoading || sprintFilter !== null) return;
-    setSprintFilter(defaultSprintSelection(sprints));
+    const requested = new URLSearchParams(window.location.search).get("sprint");
+    const requestedValid =
+      requested !== null && (requested === BACKLOG || sprints.some((s) => s.id === requested));
+    setSprintFilter(requestedValid ? requested : defaultSprintSelection(sprints));
   }, [sprintsLoading, sprints, sprintFilter]);
 
   function selectSprint(value: string) {
@@ -177,56 +165,31 @@ export default function BoardPage() {
     }
   }
 
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
     if (sprintFilter === null) return;
+    // Switching sprints quickly must not let a slower, older response overwrite the newer board.
+    const seq = ++loadSeq.current;
     setLoading(true);
     setError("");
     try {
       const qs = new URLSearchParams({ limit: String(BOARD_LIMIT) });
       if (reporterFilter) qs.set("reporterUserId", reporterFilter);
       if (sprintFilter) qs.set("sprintId", sprintFilter);
-      const res = await fetch(`/api/debug-portal/tickets?${qs}`, { credentials: "include" });
+      const res = await fetch(`/api/debug-portal/tickets?${qs}`, { credentials: "include", cache: "no-store" });
       const data = await res.json();
+      if (seq !== loadSeq.current) return;
       if (!res.ok) throw new Error(data.error || "Failed to load tickets");
       setTickets((data.data ?? []) as BoardTicket[]);
       setTotal(typeof data.total === "number" ? data.total : 0);
     } catch (err) {
+      if (seq !== loadSeq.current) return;
       setError(err instanceof Error ? err.message : "Failed to load tickets");
       setTickets([]);
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, [reporterFilter, sprintFilter]);
-
-  async function saveSprint() {
-    if (!sprintDraft.name.trim()) return;
-    setSprintSaving(true);
-    setError("");
-    try {
-      const editing = sprintForm === "edit" && selectedSprint;
-      const res = await fetch(`/api/debug-portal/sprints${editing ? `/${selectedSprint.id}` : ""}`, {
-        method: editing ? "PATCH" : "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: sprintDraft.name.trim(),
-          goal: sprintDraft.goal.trim() || null,
-          startDate: sprintDraft.startDate || null,
-          endDate: sprintDraft.endDate || null,
-          status: sprintDraft.status,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Could not save sprint");
-      await reloadSprints();
-      const saved = data.data as Sprint;
-      selectSprint(saved.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save sprint");
-    } finally {
-      setSprintSaving(false);
-    }
-  }
 
   async function deleteSprint() {
     if (!selectedSprint) return;
@@ -437,6 +400,11 @@ export default function BoardPage() {
             ) : sprintFilter === BACKLOG ? (
               <p className="pb-1 text-xs text-slate-500">Tickets not planned into a sprint yet.</p>
             ) : null}
+            {loading && sprintFilter !== null ? (
+              <span className="inline-flex items-center gap-1.5 pb-1 text-xs text-slate-500">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> Loading tickets…
+              </span>
+            ) : null}
           </div>
           {isAdmin ? (
             <div className="flex flex-wrap gap-2">
@@ -454,10 +422,7 @@ export default function BoardPage() {
                   ) : null}
                   <button
                     type="button"
-                    onClick={() => {
-                      setSprintDraft(sprintToDraft(selectedSprint));
-                      setSprintForm("edit");
-                    }}
+                    onClick={() => setSprintForm("edit")}
                     className="dp-btn-secondary py-2"
                   >
                     <Pencil className="h-4 w-4" aria-hidden /> Edit sprint
@@ -474,10 +439,7 @@ export default function BoardPage() {
               ) : null}
               <button
                 type="button"
-                onClick={() => {
-                  setSprintDraft({ ...EMPTY_SPRINT, status: activeSprint ? "PLANNED" : "ACTIVE" });
-                  setSprintForm("create");
-                }}
+                onClick={() => setSprintForm("create")}
                 className="dp-btn-primary py-2"
               >
                 <Plus className="h-4 w-4" aria-hidden /> New sprint
@@ -493,100 +455,30 @@ export default function BoardPage() {
           </p>
         ) : null}
 
-        {isAdmin && sprintForm ? (
-          <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4">
-            <h3 className="mb-3 text-sm font-semibold text-slate-900">
-              {sprintForm === "create" ? "New sprint" : `Edit ${selectedSprint?.name ?? "sprint"}`}
-            </h3>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="sm:col-span-2">
-                <label className="dp-label" htmlFor="sprint-name">
-                  Name <span className="text-red-600">*</span>
-                </label>
-                <input
-                  id="sprint-name"
-                  value={sprintDraft.name}
-                  maxLength={80}
-                  onChange={(e) => setSprintDraft((d) => ({ ...d, name: e.target.value }))}
-                  placeholder="e.g. Sprint 12"
-                  className="dp-input"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="dp-label" htmlFor="sprint-start">
-                  Start date
-                </label>
-                <input
-                  id="sprint-start"
-                  type="date"
-                  value={sprintDraft.startDate}
-                  onChange={(e) => setSprintDraft((d) => ({ ...d, startDate: e.target.value }))}
-                  className="dp-input"
-                />
-              </div>
-              <div>
-                <label className="dp-label" htmlFor="sprint-end">
-                  End date
-                </label>
-                <input
-                  id="sprint-end"
-                  type="date"
-                  value={sprintDraft.endDate}
-                  min={sprintDraft.startDate || undefined}
-                  onChange={(e) => setSprintDraft((d) => ({ ...d, endDate: e.target.value }))}
-                  className="dp-input"
-                />
-              </div>
-              <div className="sm:col-span-2 lg:col-span-3">
-                <label className="dp-label" htmlFor="sprint-goal">
-                  Goal <span className="font-normal text-slate-500">(optional)</span>
-                </label>
-                <input
-                  id="sprint-goal"
-                  value={sprintDraft.goal}
-                  maxLength={2000}
-                  onChange={(e) => setSprintDraft((d) => ({ ...d, goal: e.target.value }))}
-                  placeholder="What should this sprint deliver?"
-                  className="dp-input"
-                />
-              </div>
-              <div>
-                <label className="dp-label" htmlFor="sprint-status">
-                  Status
-                </label>
-                <ChevronSelect
-                  id="sprint-status"
-                  value={sprintDraft.status}
-                  onChange={(v) => setSprintDraft((d) => ({ ...d, status: v as SprintStatus }))}
-                  className="block w-full min-w-0"
-                >
-                  <option value="PLANNED">Planned</option>
-                  <option value="ACTIVE">Active</option>
-                  <option value="COMPLETED">Completed</option>
-                </ChevronSelect>
-                {sprintDraft.status === "ACTIVE" &&
-                activeSprint &&
-                !(sprintForm === "edit" && selectedSprint?.id === activeSprint.id) ? (
-                  <p className="mt-1 text-[11px] text-amber-700">{activeSprint.name} will be marked Completed.</p>
-                ) : null}
-              </div>
-            </div>
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                disabled={sprintSaving || !sprintDraft.name.trim()}
-                onClick={() => void saveSprint()}
-                className="dp-btn-primary"
-              >
-                {sprintSaving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Check className="h-4 w-4" aria-hidden />}
-                {sprintForm === "create" ? "Create sprint" : "Save sprint"}
+        {!sprintsLoading && sprints.length === 0 && !sprintForm ? (
+          <div className="flex flex-col gap-2 rounded-lg border border-dashed border-sky-200 bg-sky-50/60 px-4 py-3 text-sm text-sky-900 sm:flex-row sm:items-center sm:justify-between">
+            <p>
+              No sprints yet. New tickets are saved to the Backlog until there is an active sprint.
+            </p>
+            {isAdmin ? (
+              <button type="button" onClick={() => setSprintForm("create")} className="dp-btn-primary shrink-0 py-2">
+                <Plus className="h-4 w-4" aria-hidden /> Create first sprint
               </button>
-              <button type="button" onClick={() => setSprintForm(null)} className="dp-btn-secondary">
-                Cancel
-              </button>
-            </div>
+            ) : null}
           </div>
+        ) : null}
+
+        {isAdmin && sprintForm ? (
+          <SprintForm
+            key={sprintForm === "edit" ? selectedSprint?.id : "new"}
+            sprint={sprintForm === "edit" ? selectedSprint : null}
+            activeSprint={activeSprint}
+            onSaved={async (saved) => {
+              await reloadSprints();
+              selectSprint(saved.id);
+            }}
+            onCancel={() => setSprintForm(null)}
+          />
         ) : null}
       </div>
 
@@ -655,7 +547,10 @@ export default function BoardPage() {
           <Loader2 className="h-8 w-8 animate-spin text-sky-500" aria-label="Loading board" />
         </div>
       ) : (
-        <div className="flex items-start gap-4 overflow-x-auto pb-3">
+        <div
+          className={`flex items-start gap-4 overflow-x-auto pb-3 transition-opacity ${loading ? "pointer-events-none opacity-50" : ""}`}
+          aria-busy={loading}
+        >
           {columns.map(({ status, items }) => {
             const accent = statusColorClasses(status.color).accent;
             const isEditing = editingColumn === status.key;

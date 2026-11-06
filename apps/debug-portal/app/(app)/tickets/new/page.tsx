@@ -7,6 +7,7 @@ import { Loader2, Upload, X } from "lucide-react";
 import { ChevronSelect } from "@/components/ChevronSelect";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MAX_TICKET_SCREENSHOTS, SCREENSHOT_ACCEPT, uploadScreenshots } from "@/lib/upload-screenshot";
+import { useSprints } from "@/lib/sprints";
 
 type TicketType = "BUG" | "ENHANCEMENT";
 type ReportedEnvironment = "development" | "production";
@@ -22,6 +23,8 @@ export default function NewTicketPage() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const { sprints, loading: sprintsLoading } = useSprints();
+  const activeSprint = sprints.find((s) => s.status === "ACTIVE") ?? null;
 
   const addFiles = useCallback((incoming: File[]) => {
     const images = incoming.filter((file) => SCREENSHOT_ACCEPT.split(",").includes(file.type));
@@ -259,6 +262,14 @@ export default function NewTicketPage() {
             each · up to {MAX_TICKET_SCREENSHOTS} images
           </p>
         </div>
+
+        {!sprintsLoading ? (
+          <p className="text-xs text-slate-500">
+            {activeSprint
+              ? `This ticket will be added to the active sprint, ${activeSprint.name}.`
+              : "There is no active sprint, so this ticket will be saved to the Backlog."}
+          </p>
+        ) : null}
 
         <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-4">
           <button type="submit" disabled={submitting} className="dp-btn-primary">

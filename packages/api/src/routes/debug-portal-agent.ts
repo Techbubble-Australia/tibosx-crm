@@ -13,7 +13,8 @@ import {
 } from "../lib/debug-media-url.js";
 import { ticketScreenshotUrls } from "../lib/debug-portal-user.js";
 import { AI_AGENT_ACTOR, logDebugTicket } from "../lib/debug-ticket-log.js";
-import { isDebugTicketStatus } from "../lib/debug-ticket-statuses.js";
+import { isDebugTicketStatus, listDebugTicketStatuses } from "../lib/debug-ticket-statuses.js";
+import type { Prisma } from "@techbubble/database";
 
 const router: IRouter = Router();
 
@@ -24,7 +25,52 @@ const listQuerySchema = z.object({
     .optional()
     .transform((v) => v === "true" || v === "1"),
   format: z.enum(["json", "markdown"]).optional(),
+  /** Omitted or "active" = the active sprint; "all" = every open sprint + backlog; "none" = backlog; else a sprint id. */
+  sprintId: z.string().trim().min(1).optional(),
 });
+
+const SPRINT_SELECT = { id: true, name: true, status: true, startDate: true, endDate: true } as const;
+
+type SprintRef = { id: string; name: string; status: string; startDate: Date | null; endDate: Date | null };
+
+function serializeSprint(sprint: SprintRef | null | undefined) {
+  if (!sprint) return null;
+  return {
+    id: sprint.id,
+    name: sprint.name,
+    status: sprint.status,
+    startDate: sprint.startDate?.toISOString() ?? null,
+    endDate: sprint.endDate?.toISOString() ?? null,
+  };
+}
+
+type SprintScope =
+  | { kind: "sprint"; sprint: SprintRef }
+  | { kind: "backlog" }
+  | { kind: "all" };
+
+/** Resolve ?sprintId: default is the active sprint (falls back to every open ticket when none is active). */
+async function resolveSprintScope(sprintId: string | undefined): Promise<SprintScope | null> {
+  if (sprintId === "all") return { kind: "all" };
+  if (sprintId === "none" || sprintId === "backlog") return { kind: "backlog" };
+  if (!sprintId || sprintId === "active") {
+    const active = await prisma.debugSprint.findFirst({
+      where: { status: "ACTIVE" },
+      orderBy: [{ startDate: "desc" }, { createdAt: "desc" }],
+      select: SPRINT_SELECT,
+    });
+    return active ? { kind: "sprint", sprint: active } : { kind: "all" };
+  }
+  const sprint = await prisma.debugSprint.findUnique({ where: { id: sprintId }, select: SPRINT_SELECT });
+  return sprint ? { kind: "sprint", sprint } : null;
+}
+
+/** Tickets in a completed sprint are locked; "all" leaves them out so agents only see workable tickets. */
+function sprintWhere(scope: SprintScope): Prisma.DebugCaptureTicketWhereInput {
+  if (scope.kind === "sprint") return { sprintId: scope.sprint.id };
+  if (scope.kind === "backlog") return { sprintId: null };
+  return { OR: [{ sprintId: null }, { sprint: { status: { not: "COMPLETED" } } }] };
+}
 
 /** Any configured board status key (PENDING, IN_PROGRESS, FOR_REVIEW, COMPLETED, or a custom one). */
 const ticketStatusSchema = z.string().trim().min(1).max(60);
@@ -36,9 +82,10 @@ const patchStatusBodySchema = z.object({
 async function findTicketByIdOrTicketId(idOrTicketId: string) {
   const trimmed = idOrTicketId.trim();
   if (!trimmed) return null;
-  const byId = await prisma.debugCaptureTicket.findUnique({ where: { id: trimmed } });
+  const include = { sprint: { select: SPRINT_SELECT } } as const;
+  const byId = await prisma.debugCaptureTicket.findUnique({ where: { id: trimmed }, include });
   if (byId) return byId;
-  return prisma.debugCaptureTicket.findUnique({ where: { ticketId: trimmed } });
+  return prisma.debugCaptureTicket.findUnique({ where: { ticketId: trimmed }, include });
 }
 
 type DbRow = {
@@ -59,10 +106,12 @@ type DbRow = {
   screenshotUrls?: string[];
   fullPayload: unknown;
   createdAt: Date;
+  sprint?: SprintRef | null;
 };
 
 function toAgentExportTicket(row: DbRow): AgentExportTicket {
   return {
+    sprintName: row.sprint?.name ?? null,
     ticketId: row.ticketId,
     type: row.type,
     status: row.status,
@@ -142,6 +191,8 @@ function serializeForAgent(row: DbRow, includeFullPayload: boolean) {
     type: row.type,
     reportedEnvironment: row.reportedEnvironment,
     createdAt: row.createdAt.toISOString(),
+    sprint: serializeSprint(row.sprint),
+    locked: row.sprint?.status === "COMPLETED",
     origin: ticketOrigin(row.fullPayload),
     summary: row.userDescription.trim().slice(0, 280),
     userDescription: row.userDescription,
@@ -170,11 +221,18 @@ function serializeForAgent(row: DbRow, includeFullPayload: boolean) {
 }
 
 const AGENT_INSTRUCTIONS =
-  "Each ticket includes structured fields plus agentBriefMarkdown. Use pageUrl, element.cssSelector, apiContext, and screenshot.publicUrl together. Work in the techbubble-website monorepo with minimal, pattern-matching fixes.";
+  "Each ticket includes structured fields plus agentBriefMarkdown. Use pageUrl, element.cssSelector, apiContext, and screenshot.publicUrl together. Work in the techbubble-website monorepo with minimal, pattern-matching fixes. When a fix is done, PATCH /api/debug-portal/agent/tickets/:ticketId/status with { \"status\": \"FOR_REVIEW\" }. Tickets in a completed sprint are locked.";
+
+function scopeLabel(scope: SprintScope): string {
+  if (scope.kind === "sprint") return scope.sprint.name;
+  if (scope.kind === "backlog") return "Backlog";
+  return "All open sprints and backlog";
+}
 
 /**
- * GET /api/debug-portal/agent/tickets/in-progress
- * Lists IN_PROGRESS debug capture tickets for coding agents (JSON or markdown).
+ * GET /api/debug-portal/agent/tickets/in-progress?limit=20&sprintId=active
+ * Lists IN_PROGRESS tickets for coding agents (JSON or markdown), scoped to the active sprint by default.
+ * sprintId: omitted/"active" (active sprint, else all open), "all", "none" (backlog), or a sprint id.
  */
 router.get("/tickets/in-progress", async (req, res) => {
   try {
@@ -183,34 +241,52 @@ router.get("/tickets/in-progress", async (req, res) => {
     const includeFullPayload = query.includeFullPayload ?? false;
     const format = query.format ?? "json";
 
-    const rows = await prisma.debugCaptureTicket.findMany({
-      where: { status: "IN_PROGRESS" },
-      orderBy: { createdAt: "asc" },
-      take: limit,
-    });
+    const scope = await resolveSprintScope(query.sprintId);
+    if (!scope) {
+      return res.status(404).json({ error: "Sprint not found", code: "SPRINT_NOT_FOUND" });
+    }
+
+    const where: Prisma.DebugCaptureTicketWhereInput = { status: "IN_PROGRESS", ...sprintWhere(scope) };
+    const [rows, total] = await Promise.all([
+      prisma.debugCaptureTicket.findMany({
+        where,
+        orderBy: { createdAt: "asc" },
+        take: limit,
+        include: { sprint: { select: SPRINT_SELECT } },
+      }),
+      prisma.debugCaptureTicket.count({ where }),
+    ]);
 
     const tickets = rows.map((row) => serializeForAgent(row as DbRow, includeFullPayload));
     const combinedAgentBriefMarkdown = tickets
       .map((t) => t.agentBriefMarkdown)
       .join("\n\n---\n\n");
+    const label = scopeLabel(scope);
 
     if (format === "markdown") {
       res.type("text/markdown; charset=utf-8");
       if (tickets.length === 0) {
-        return res.send("# In-progress debug tickets\n\nNo tickets with status IN_PROGRESS.\n");
+        return res.send(`# In-progress debug tickets: ${label}\n\nNo tickets with status IN_PROGRESS.\n`);
       }
       return res.send(
-        `# In-progress debug tickets (${tickets.length})\n\n${AGENT_INSTRUCTIONS}\n\n${combinedAgentBriefMarkdown}\n`,
+        `# In-progress debug tickets: ${label} (${tickets.length} of ${total})\n\n${AGENT_INSTRUCTIONS}\n\n${combinedAgentBriefMarkdown}\n`,
       );
     }
 
     res.json({
-      schemaVersion: "1.0",
+      schemaVersion: "1.1",
       generatedAt: new Date().toISOString(),
       repository: "techbubble-website",
       statusFilter: "IN_PROGRESS",
+      sprintFilter: {
+        scope: scope.kind,
+        label,
+        sprint: scope.kind === "sprint" ? serializeSprint(scope.sprint) : null,
+      },
       instructions: AGENT_INSTRUCTIONS,
       count: tickets.length,
+      total,
+      limit,
       combinedAgentBriefMarkdown,
       tickets,
     });
@@ -232,17 +308,26 @@ router.patch("/tickets/:idOrTicketId/status", async (req, res) => {
   try {
     const { status } = patchStatusBodySchema.parse(req.body);
     if (!(await isDebugTicketStatus(status))) {
-      return res.status(400).json({ error: "Unknown status", code: "UNKNOWN_STATUS" });
+      const allowed = (await listDebugTicketStatuses()).map((s) => s.key);
+      return res.status(400).json({ error: "Unknown status", code: "UNKNOWN_STATUS", allowedStatuses: allowed });
     }
-    const existing = await findTicketByIdOrTicketId(req.params.idOrTicketId);
+    const existing = await findTicketByIdOrTicketId(req.params.idOrTicketId!);
     if (!existing) {
       return res.status(404).json({ error: "Ticket not found", code: "TICKET_NOT_FOUND" });
+    }
+    const sprint = serializeSprint(existing.sprint);
+    if (existing.sprint?.status === "COMPLETED") {
+      return res.status(409).json({
+        error: `Ticket ${existing.ticketId} is in completed sprint "${existing.sprint.name}" and is locked.`,
+        code: "SPRINT_LOCKED",
+        ticket: { id: existing.id, ticketId: existing.ticketId, status: existing.status, sprint },
+      });
     }
 
     const previousStatus = existing.status;
     if (previousStatus === status) {
       return res.json({
-        schemaVersion: "1.0",
+        schemaVersion: "1.1",
         updated: false,
         message: "Status unchanged",
         ticket: {
@@ -250,6 +335,7 @@ router.patch("/tickets/:idOrTicketId/status", async (req, res) => {
           ticketId: existing.ticketId,
           status: existing.status,
           previousStatus,
+          sprint,
         },
       });
     }
@@ -266,13 +352,14 @@ router.patch("/tickets/:idOrTicketId/status", async (req, res) => {
     });
 
     res.json({
-      schemaVersion: "1.0",
+      schemaVersion: "1.1",
       updated: true,
       ticket: {
         id: row.id,
         ticketId: row.ticketId,
         status: row.status,
         previousStatus,
+        sprint,
       },
     });
   } catch (error) {

@@ -15,6 +15,7 @@ export type AgentExportTicket = {
   apiPrerequisite: unknown;
   fullPayload: unknown;
   createdAt: string;
+  sprintName?: string | null;
 };
 
 type ElementDiagnosticsShape = {
@@ -69,6 +70,7 @@ export function buildAgentIssueBriefMarkdown(ticket: AgentExportTicket): string 
   lines.push("");
   lines.push("## Summary");
   lines.push(`- **Status:** ${ticket.status}`);
+  if (ticket.sprintName !== undefined) lines.push(`- **Sprint:** ${ticket.sprintName ?? "Backlog"}`);
   lines.push(`- **Type:** ${ticket.type}`);
   lines.push(`- **Reported environment:** ${ticket.reportedEnvironment}`);
   lines.push(`- **Created:** ${ticket.createdAt}`);

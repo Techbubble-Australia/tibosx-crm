@@ -10,6 +10,7 @@ import {
   ticketScreenshotUrls,
 } from "../lib/debug-portal-user.js";
 import { logDebugTicket } from "../lib/debug-ticket-log.js";
+import { activeDebugSprintId } from "../lib/debug-sprints.js";
 
 const router: IRouter = Router();
 
@@ -163,6 +164,7 @@ router.post("/", async (req: AuthRequest, res) => {
       screenshotUrls: screenshots.screenshotUrls,
     };
 
+    const sprintId = await activeDebugSprintId();
     let ticketId = input.ticketId;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -182,6 +184,7 @@ router.post("/", async (req: AuthRequest, res) => {
             screenshotUrl: screenshots.screenshotUrl,
             screenshotUrls: screenshots.screenshotUrls,
             fullPayload: asInputJson(fullPayload),
+            sprintId,
           },
         });
         await logDebugTicket(prisma, row.id, { userId: u.id, email: u.email }, [{ action: "CREATED" }]);
