@@ -5,7 +5,7 @@ import { getActorId } from "../lib/project-access";
 import { effectiveRolesForUser } from "../lib/admin-roles";
 import { getMemberOnboardingStatus } from "../lib/member-onboarding";
 import { mondayOfWeek, startOfUtcDay } from "../lib/project-types";
-import { WEEKDAY_KEYS, sumDailyHours, type DailyHours } from "../lib/timesheet-entries";
+import { sumDailyHours, totalHoursByIsoDay, type DailyHours } from "../lib/timesheet-entries";
 
 const router: IRouter = Router();
 
@@ -32,13 +32,20 @@ function totalHours(sheet: SheetHours): number {
   return hourSources(sheet).reduce((sum, row) => sum + sumDailyHours(row), 0);
 }
 
-/** Hours on each calendar day of the timesheet week. */
+/** Hours on each calendar day of the timesheet (weekly or monthly). */
 function hoursByDay(sheet: SheetHours): Array<{ date: Date; hours: number }> {
-  const sources = hourSources(sheet);
-  return WEEKDAY_KEYS.map((key, index) => ({
-    date: addDays(startOfUtcDay(sheet.startDate), index),
-    hours: sources.reduce((sum, row) => sum + (Number(row[key]) || 0), 0),
+  return [...totalHoursByIsoDay(startOfUtcDay(sheet.startDate), hourSources(sheet))].map(([iso, hours]) => ({
+    date: new Date(`${iso}T00:00:00.000Z`),
+    hours,
   }));
+}
+
+function monthLabel(date: Date): string {
+  return date.toLocaleDateString("en-AU", { month: "long", year: "numeric", timeZone: "UTC" });
+}
+
+function periodText(sheet: { startDate: Date; period: string }): string {
+  return sheet.period === "MONTHLY" ? monthLabel(sheet.startDate) : `week of ${isoDay(sheet.startDate)}`;
 }
 
 function projectLabel(project: { projectNumber: string; title: string } | null | undefined): string {
@@ -75,6 +82,7 @@ router.get("/", async (req: AuthRequest, res) => {
       status: true,
       startDate: true,
       endDate: true,
+      timesheetPeriod: true,
       client: { select: { name: true } },
       projectManager: { select: { name: true, email: true } },
     } satisfies Prisma.ProjectSelect;
@@ -84,6 +92,7 @@ router.get("/", async (req: AuthRequest, res) => {
       projectId: true,
       startDate: true,
       endDate: true,
+      period: true,
       status: true,
       rejectReason: true,
       dailyHours: true,
@@ -138,6 +147,7 @@ router.get("/", async (req: AuthRequest, res) => {
       const sunday = addDays(monday, 6);
       const key = isoDay(monday);
       return activeProjects
+        .filter((project) => project.timesheetPeriod !== "MONTHLY")
         .filter((project) => project.startDate <= sunday && project.endDate >= monday)
         .map((project) => {
           const sheet = recentSheets.find((row) => row.projectId === project.id && isoDay(row.startDate) === key);
@@ -199,7 +209,7 @@ router.get("/", async (req: AuthRequest, res) => {
         id: `returned:${row.id}`,
         kind: "RETURNED",
         title: "Timesheet returned",
-        detail: `${projectLabel(row.project)}, week of ${isoDay(row.startDate)}: ${row.rejectReason}`,
+        detail: `${projectLabel(row.project)}, ${periodText(row)}: ${row.rejectReason}`,
         href: `/timesheets/${row.id}`,
       });
     }
@@ -208,8 +218,25 @@ router.get("/", async (req: AuthRequest, res) => {
         id: `draft:${row.id}`,
         kind: "OVERDUE_DRAFT",
         title: "Draft not submitted",
-        detail: `${projectLabel(row.project)}, week of ${isoDay(row.startDate)} (${totalHours(row)} h)`,
+        detail: `${projectLabel(row.project)}, ${periodText(row)} (${totalHours(row)} h)`,
         href: `/timesheets/${row.id}`,
+      });
+    }
+    const lastMonthKey = isoDay(lastMonthStart).slice(0, 7);
+    const lastMonthEnd = addDays(monthStart, -1);
+    for (const project of activeProjects) {
+      if (project.timesheetPeriod !== "MONTHLY") continue;
+      if (project.startDate > lastMonthEnd || project.endDate < lastMonthStart) continue;
+      const hasSheet = recentSheets.some(
+        (row) => row.projectId === project.id && row.period === "MONTHLY" && isoDay(row.startDate) === isoDay(lastMonthStart),
+      );
+      if (hasSheet) continue;
+      actionItems.push({
+        id: `missing:${project.id}:${lastMonthKey}`,
+        kind: "MISSING",
+        title: "Timesheet missing",
+        detail: `${projectLabel(project)}, ${monthLabel(lastMonthStart)}`,
+        href: `/timesheets/new?projectId=${encodeURIComponent(project.id)}&month=${lastMonthKey}`,
       });
     }
     for (const row of lastWeek.filter((r) => r.status === "MISSING")) {
@@ -222,19 +249,30 @@ router.get("/", async (req: AuthRequest, res) => {
       });
     }
 
+    // Bucket by calendar day so monthly timesheets spread across the weeks they cover.
     const weeklyHours = Array.from({ length: CHART_WEEKS }, (_, index) => {
       const monday = addDays(chartStart, index * 7);
-      const key = isoDay(monday);
-      const bucket = { weekStart: key, approved: 0, submitted: 0, draft: 0 };
+      const nextMonday = addDays(monday, 7);
+      const bucket = { weekStart: isoDay(monday), approved: 0, submitted: 0, draft: 0 };
       for (const sheet of recentSheets) {
-        if (isoDay(sheet.startDate) !== key) continue;
-        const hours = totalHours(sheet);
-        if (sheet.status === "APPROVED") bucket.approved += hours;
-        else if (sheet.status === "SUBMITTED") bucket.submitted += hours;
-        else bucket.draft += hours;
+        for (const day of hoursByDay(sheet)) {
+          if (day.date < monday || day.date >= nextMonday) continue;
+          if (sheet.status === "APPROVED") bucket.approved += day.hours;
+          else if (sheet.status === "SUBMITTED") bucket.submitted += day.hours;
+          else bucket.draft += day.hours;
+        }
       }
       return bucket;
     });
+    const nextMonday = addDays(currentMonday, 7);
+    const hoursThisWeek = recentSheets.reduce(
+      (sum, sheet) =>
+        sum +
+        hoursByDay(sheet)
+          .filter((day) => day.date >= currentMonday && day.date < nextMonday)
+          .reduce((s, day) => s + day.hours, 0),
+      0,
+    );
 
     let approvedHoursThisMonth = 0;
     let approvedHoursLastMonth = 0;
@@ -297,7 +335,7 @@ router.get("/", async (req: AuthRequest, res) => {
           profilePending,
         },
         kpis: {
-          hoursThisWeek: thisWeek.reduce((sum, row) => sum + row.hours, 0),
+          hoursThisWeek,
           awaitingApproval: { count: awaiting.length, hours: awaiting.reduce((sum, row) => sum + totalHours(row), 0) },
           approvedHoursThisMonth,
           approvedHoursLastMonth,

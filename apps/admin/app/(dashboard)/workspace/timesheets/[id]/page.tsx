@@ -7,10 +7,11 @@ import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { workspaceFetch } from "@/lib/workspace-fetch";
 import { messageFromApiError } from "@/lib/api-error";
-import { TimesheetForm, type TimesheetFormValues } from "@/components/timesheets/TimesheetForm";
+import { TimesheetForm } from "@/components/timesheets/TimesheetForm";
+import { MonthlyTimesheetForm, type MonthlyTimesheetValues } from "@/components/timesheets/MonthlyTimesheetForm";
 import { TimesheetRejectDialog } from "@/components/timesheets/TimesheetRejectDialog";
 
-type TimesheetDetail = TimesheetFormValues & { canApprove?: boolean };
+type TimesheetDetail = MonthlyTimesheetValues & { canApprove?: boolean; period?: string };
 
 export default function WorkspaceTimesheetDetailPage() {
   const router = useRouter();
@@ -109,13 +110,8 @@ export default function WorkspaceTimesheetDetailPage() {
           </Link>
         </div>
       ) : timesheet ? (
-        <TimesheetForm
-          defaults={timesheet}
-          readOnly
-          isSaving={false}
-          onSubmit={async () => {}}
-          footerActions={
-            canApprove ? (
+        (() => {
+          const footer = canApprove ? (
               <>
                 <button
                   type="button"
@@ -134,9 +130,21 @@ export default function WorkspaceTimesheetDetailPage() {
                   Reject
                 </button>
               </>
-            ) : null
-          }
-        />
+          ) : null;
+          return timesheet.period === "MONTHLY" ? (
+            <MonthlyTimesheetForm
+              defaults={timesheet}
+              monthKey={timesheet.monthKey || timesheet.startDate.slice(0, 7)}
+              readOnly
+              allowMonthNavigation={false}
+              isSaving={false}
+              onSubmit={async () => {}}
+              footerActions={footer}
+            />
+          ) : (
+            <TimesheetForm defaults={timesheet} readOnly isSaving={false} onSubmit={async () => {}} footerActions={footer} />
+          );
+        })()
       ) : null}
 
       {showReject ? (

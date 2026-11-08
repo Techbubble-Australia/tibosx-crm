@@ -1040,7 +1040,21 @@ export function TimesheetForm({
     void adminFetch(`/api/admin/timesheets/entry-point?projectId=${encodeURIComponent(projectId)}`)
       .then((r) => r.json())
       .then((data) => {
-        const row = data.data as { weekStart?: string; existingTimesheetId?: string | null };
+        const row = data.data as {
+          weekStart?: string;
+          existingTimesheetId?: string | null;
+          period?: string;
+          month?: string;
+        };
+        if (row.period === "MONTHLY") {
+          router.replace(
+            row.existingTimesheetId
+              ? `/timesheets/${row.existingTimesheetId}`
+              : `/timesheets/new?projectId=${encodeURIComponent(projectId)}&month=${row.month ?? ""}`,
+            { scroll: false },
+          );
+          return;
+        }
         if (row.existingTimesheetId) {
           router.replace(`/timesheets/${row.existingTimesheetId}`, { scroll: false });
           return;

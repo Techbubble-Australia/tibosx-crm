@@ -3,11 +3,10 @@ import { TIMESHEET_STATUS_LABELS } from "./project-types";
 import {
   entryHasHours,
   entryLabel,
+  isIsoDayKey,
   sumDailyHours,
   WEEKDAY_KEYS,
-  type DailyComments,
   type DailyHours,
-  type WeekdayKey,
 } from "./timesheet-entries";
 
 type ExportEntry = {
@@ -20,6 +19,8 @@ type ExportEntry = {
 export type TimesheetXlsxRow = {
   startDate: Date;
   endDate: Date;
+  period?: string;
+  daysOff?: unknown;
   status: string;
   comments: string | null;
   dailyHours: unknown;
@@ -83,6 +84,11 @@ function sanitizeSheetName(raw: string): string {
 }
 
 function sheetTitleForRow(row: TimesheetXlsxRow, index: number): string {
+  if (row.period === "MONTHLY") {
+    return sanitizeSheetName(
+      row.startDate.toLocaleDateString("en-AU", { month: "long", year: "numeric", timeZone: "UTC" }),
+    );
+  }
   const start = formatTabDate(row.startDate);
   const end = formatTabDate(row.endDate);
   return sanitizeSheetName(`${start} - ${end}` || `Sheet ${index + 1}`);
@@ -99,22 +105,40 @@ export function buildTimesheetExportFilename(rows: TimesheetXlsxRow[]): string {
   return "timesheets_export.xlsx";
 }
 
-const DAY_COLUMN_COUNT = WEEKDAY_KEYS.length;
-const SHEET_COLUMN_COUNT = 1 + DAY_COLUMN_COUNT;
-
-function padRow(cells: (string | number)[]): (string | number)[] {
+function padRow(cells: (string | number)[], columnCount: number): (string | number)[] {
   const row = [...cells];
-  while (row.length < SHEET_COLUMN_COUNT) row.push("");
-  return row.slice(0, SHEET_COLUMN_COUNT);
+  while (row.length < columnCount) row.push("");
+  return row.slice(0, columnCount);
 }
 
-function dayComment(comments: unknown, key: WeekdayKey): string {
-  return (((comments as DailyComments)?.[key] ?? "") as string).trim();
+/** Calendar days shown as columns: 7 for weekly sheets, every day of the month for monthly sheets. */
+function sheetDayIsos(row: TimesheetXlsxRow): string[] {
+  const startIso = row.startDate.toISOString().slice(0, 10);
+  const count =
+    row.period === "MONTHLY"
+      ? Math.round((row.endDate.getTime() - row.startDate.getTime()) / 86_400_000) + 1
+      : WEEKDAY_KEYS.length;
+  return Array.from({ length: Math.max(1, count) }, (_, i) => addUtcDays(startIso, i).toISOString().slice(0, 10));
 }
 
-function applySheetGridBorders(sheet: ExcelJS.Worksheet, fromRow: number, toRow: number) {
+/** Map weekday-keyed or ISO-keyed values onto ISO days. */
+function valuesByIsoDay<T>(startIso: string, values: unknown): Map<string, T> {
+  const out = new Map<string, T>();
+  if (!values || typeof values !== "object") return out;
+  for (const [key, value] of Object.entries(values as Record<string, T>)) {
+    if (isIsoDayKey(key)) {
+      out.set(key, value);
+      continue;
+    }
+    const index = (WEEKDAY_KEYS as readonly string[]).indexOf(key);
+    if (index >= 0) out.set(addUtcDays(startIso, index).toISOString().slice(0, 10), value);
+  }
+  return out;
+}
+
+function applySheetGridBorders(sheet: ExcelJS.Worksheet, fromRow: number, toRow: number, columnCount: number) {
   for (let r = fromRow; r <= toRow; r += 1) {
-    for (let c = 1; c <= SHEET_COLUMN_COUNT; c += 1) {
+    for (let c = 1; c <= columnCount; c += 1) {
       sheet.getCell(r, c).border = {
         top: { style: "thin" },
         left: { style: "thin" },
@@ -126,44 +150,53 @@ function applySheetGridBorders(sheet: ExcelJS.Worksheet, fromRow: number, toRow:
 }
 
 function writeTimesheetSheet(sheet: ExcelJS.Worksheet, row: TimesheetXlsxRow) {
-  const weekStartIso = row.startDate.toISOString().slice(0, 10);
+  const startIso = row.startDate.toISOString().slice(0, 10);
+  const dayIsos = sheetDayIsos(row);
+  const columnCount = 1 + dayIsos.length;
+  const pad = (cells: (string | number)[]) => padRow(cells, columnCount);
   const member = row.memberUser?.name?.trim() || row.memberUser?.email?.trim() || "";
   const total = totalHours(row);
   const projectName = projectListName(row.project ?? null);
 
   const startRow = sheet.rowCount + 1;
 
-  sheet.addRow(padRow(["Project Name", projectName]));
-  sheet.addRow(padRow(["Member", member]));
-  sheet.addRow(padRow(["Status", timesheetStatusLabel(row.status)]));
-  sheet.addRow(padRow(["Total hours", total]));
-  sheet.addRow(padRow([]));
+  sheet.addRow(pad(["Project Name", projectName]));
+  sheet.addRow(pad(["Member", member]));
+  sheet.addRow(pad(["Status", timesheetStatusLabel(row.status)]));
+  sheet.addRow(pad(["Total hours", total]));
+  const daysOff = Array.isArray(row.daysOff) ? (row.daysOff as string[]) : [];
+  if (row.period === "MONTHLY" && daysOff.length) {
+    sheet.addRow(pad(["Days off", daysOff.map((iso) => formatTabDate(new Date(`${iso}T00:00:00.000Z`))).join(", ")]));
+  }
+  sheet.addRow(pad([]));
 
-  const dayHeaders = WEEKDAY_KEYS.map((_, i) => formatDayLabel(addUtcDays(weekStartIso, i)));
-  sheet.addRow(padRow(["Task name", ...dayHeaders]));
+  const dayHeaders = dayIsos.map((iso) => formatDayLabel(new Date(`${iso}T00:00:00.000Z`)));
+  sheet.addRow(pad(["Task name", ...dayHeaders]));
 
   const entries = exportEntries(row);
   entries.forEach((entry) => {
-    const hoursCells = WEEKDAY_KEYS.map((key) => {
-      const hours = Number((entry.dailyHours as DailyHours)?.[key]) || 0;
+    const hoursByDay = valuesByIsoDay<number>(startIso, entry.dailyHours);
+    const commentsByDay = valuesByIsoDay<string>(startIso, entry.dailyComments);
+    const hoursCells = dayIsos.map((iso) => {
+      const hours = Number(hoursByDay.get(iso)) || 0;
       return hours > 0 ? hours : "";
     });
     const taskName = entryLabel({ ...entry, project: row.project ?? null }).replace(/\s*—\s*/g, " - ");
-    sheet.addRow(padRow([taskName, ...hoursCells]));
+    sheet.addRow(pad([taskName, ...hoursCells]));
 
-    const commentCells = WEEKDAY_KEYS.map((key) => dayComment(entry.dailyComments, key));
-    sheet.addRow(padRow(["Task comments", ...commentCells]));
+    const commentCells = dayIsos.map((iso) => String(commentsByDay.get(iso) ?? "").trim());
+    sheet.addRow(pad(["Task comments", ...commentCells]));
   });
 
-  sheet.addRow(padRow(["Timesheet comments", row.comments?.trim() ?? ""]));
-  sheet.addRow(padRow(["Approver", row.approverLabel]));
+  sheet.addRow(pad(["Timesheet comments", row.comments?.trim() ?? ""]));
+  sheet.addRow(pad(["Approver", row.approverLabel]));
 
   const endRow = sheet.rowCount;
-  applySheetGridBorders(sheet, startRow, endRow);
+  applySheetGridBorders(sheet, startRow, endRow, columnCount);
 
   sheet.getColumn(1).width = 36;
-  for (let c = 2; c <= SHEET_COLUMN_COUNT; c += 1) {
-    sheet.getColumn(c).width = 14;
+  for (let c = 2; c <= columnCount; c += 1) {
+    sheet.getColumn(c).width = row.period === "MONTHLY" ? 12 : 14;
   }
 }
 

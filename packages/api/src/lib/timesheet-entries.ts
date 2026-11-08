@@ -3,28 +3,33 @@ import { prisma, type Prisma } from "@techbubble/database";
 
 export const WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 export type WeekdayKey = (typeof WEEKDAY_KEYS)[number];
-export type DailyHours = Partial<Record<WeekdayKey, number>>;
-export type DailyComments = Partial<Record<WeekdayKey, string>>;
 
-export const dailyHoursSchema = z.object({
-  mon: z.coerce.number().min(0).optional(),
-  tue: z.coerce.number().min(0).optional(),
-  wed: z.coerce.number().min(0).optional(),
-  thu: z.coerce.number().min(0).optional(),
-  fri: z.coerce.number().min(0).optional(),
-  sat: z.coerce.number().min(0).optional(),
-  sun: z.coerce.number().min(0).optional(),
-});
+export const TIMESHEET_PERIODS = ["WEEKLY", "MONTHLY"] as const;
+export type TimesheetPeriod = (typeof TIMESHEET_PERIODS)[number];
 
-export const dailyCommentsSchema = z.object({
-  mon: z.string().max(2000).optional(),
-  tue: z.string().max(2000).optional(),
-  wed: z.string().max(2000).optional(),
-  thu: z.string().max(2000).optional(),
-  fri: z.string().max(2000).optional(),
-  sat: z.string().max(2000).optional(),
-  sun: z.string().max(2000).optional(),
-});
+const ISO_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Weekly timesheets key hours by weekday (mon–sun); monthly timesheets key them by ISO date. */
+export type DayKey = WeekdayKey | string;
+export type DailyHours = Partial<Record<DayKey, number>>;
+export type DailyComments = Partial<Record<DayKey, string>>;
+
+export function isIsoDayKey(key: string): boolean {
+  return ISO_DAY_RE.test(key);
+}
+
+function isDayKey(key: string): boolean {
+  return (WEEKDAY_KEYS as readonly string[]).includes(key) || isIsoDayKey(key);
+}
+
+const dayKeySchema = z.string().refine(isDayKey, { message: "Invalid day key" });
+
+export const dailyHoursSchema = z.record(
+  dayKeySchema,
+  z.preprocess((v) => (v === null || v === "" ? undefined : v), z.coerce.number().min(0).max(24).optional()),
+);
+
+export const dailyCommentsSchema = z.record(dayKeySchema, z.string().max(2000).optional());
 
 export const timesheetEntryInputSchema = z
   .object({
@@ -41,17 +46,65 @@ export const timesheetEntryInputSchema = z
 
 export type TimesheetEntryInput = z.infer<typeof timesheetEntryInputSchema>;
 
-export function sumDailyHours(hours: DailyHours): number {
-  return WEEKDAY_KEYS.reduce((sum, key) => sum + (Number(hours[key]) || 0), 0);
+export function sumDailyHours(hours: DailyHours | null | undefined): number {
+  if (!hours || typeof hours !== "object") return 0;
+  return Object.entries(hours).reduce(
+    (sum, [key, value]) => (isDayKey(key) ? sum + (Number(value) || 0) : sum),
+    0,
+  );
 }
 
 export function mergeDailyHours(entries: DailyHours[]): DailyHours {
   const merged: DailyHours = {};
-  for (const key of WEEKDAY_KEYS) {
-    const total = entries.reduce((sum, row) => sum + (Number(row[key]) || 0), 0);
-    if (total > 0) merged[key] = total;
+  for (const row of entries) {
+    for (const [key, value] of Object.entries(row ?? {})) {
+      const hours = Number(value) || 0;
+      if (!isDayKey(key) || hours <= 0) continue;
+      merged[key] = (merged[key] ?? 0) + hours;
+    }
   }
   return merged;
+}
+
+function addUtcDaysIso(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Hours per calendar day for either layout (weekday keys are offset from the timesheet's Monday). */
+export function hoursByIsoDay(
+  startDate: Date | string,
+  hours: DailyHours | null | undefined,
+): Array<{ iso: string; hours: number }> {
+  if (!hours || typeof hours !== "object") return [];
+  const startIso = (typeof startDate === "string" ? new Date(startDate) : startDate).toISOString().slice(0, 10);
+  const out: Array<{ iso: string; hours: number }> = [];
+  for (const [key, value] of Object.entries(hours)) {
+    const n = Number(value) || 0;
+    if (n <= 0) continue;
+    if (isIsoDayKey(key)) {
+      out.push({ iso: key, hours: n });
+      continue;
+    }
+    const index = (WEEKDAY_KEYS as readonly string[]).indexOf(key);
+    if (index >= 0) out.push({ iso: addUtcDaysIso(startIso, index), hours: n });
+  }
+  return out;
+}
+
+/** Sum hours per ISO day across several entry rows. */
+export function totalHoursByIsoDay(
+  startDate: Date | string,
+  rows: Array<DailyHours | null | undefined>,
+): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    for (const { iso, hours } of hoursByIsoDay(startDate, row)) {
+      totals.set(iso, (totals.get(iso) ?? 0) + hours);
+    }
+  }
+  return totals;
 }
 
 export function entryHasHours(hours: DailyHours): boolean {

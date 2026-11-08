@@ -9,6 +9,7 @@ import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
 import { TimesheetForm, type TimesheetFormValues } from "@/components/timesheets/TimesheetForm";
+import { MonthlyTimesheetForm, type MonthlyTimesheetValues } from "@/components/timesheets/MonthlyTimesheetForm";
 import { TimesheetRejectDialog } from "@/components/timesheets/TimesheetRejectDialog";
 import { messageFromApiError } from "@/lib/api-error";
 import { timesheetsListHref } from "@/lib/timesheet-list-query";
@@ -20,7 +21,13 @@ export default function TimesheetDetailPage() {
   const backHref = timesheetsListHref(listBack);
   const { isEffectiveProjectMember, userId, role } = useAdminSession();
   const [timesheet, setTimesheet] = useState<
-    (TimesheetFormValues & { canApprove?: boolean; canSubmit?: boolean }) | null
+    | (MonthlyTimesheetValues & {
+        canApprove?: boolean;
+        canSubmit?: boolean;
+        period?: string;
+        updatedAt?: string;
+      })
+    | null
   >(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -192,6 +199,26 @@ export default function TimesheetDetailPage() {
     timesheet?.memberUserId && userId && timesheet.memberUserId !== userId,
   );
   const formReadOnly = status !== "DRAFT" || viewingOthersSheet;
+  const approvalActions = pmCanAct ? (
+    <>
+      <button
+        type="button"
+        onClick={() => void approve()}
+        disabled={actionLoading}
+        className="inline-flex min-w-[10rem] items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
+      >
+        Approve
+      </button>
+      <button
+        type="button"
+        onClick={() => setShowReject(true)}
+        disabled={actionLoading}
+        className="inline-flex min-w-[10rem] items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
+      >
+        Reject
+      </button>
+    </>
+  ) : null;
 
   return (
     <ProjectManagementGuard>
@@ -234,6 +261,20 @@ export default function TimesheetDetailPage() {
           <p className="text-sm text-gray-400">Loading…</p>
         ) : !timesheet ? (
           <p className="text-sm text-gray-400">Timesheet not found.</p>
+        ) : timesheet.period === "MONTHLY" ? (
+          <MonthlyTimesheetForm
+            key={`${timesheet.id}-${timesheet.startDate}-${timesheet.status}-${timesheet.updatedAt ?? ""}`}
+            defaults={timesheet}
+            monthKey={timesheet.monthKey || timesheet.startDate.slice(0, 7)}
+            onSubmit={handleSubmit}
+            isSaving={isSaving}
+            readOnly={formReadOnly}
+            canStartTimesheetForEmptyMonth={!viewingOthersSheet && isEffectiveProjectMember}
+            showSubmitForApproval={Boolean(timesheet.memberUserId === userId && status === "DRAFT" && isEffectiveProjectMember)}
+            submitForApprovalLoading={actionLoading}
+            onSubmitForApproval={() => void submitForApproval()}
+            footerActions={approvalActions}
+          />
         ) : (
           <TimesheetForm
             key={`${timesheet.id}-${timesheet.startDate}-${timesheet.status}`}
@@ -248,28 +289,7 @@ export default function TimesheetDetailPage() {
             showSubmitForApproval={canSubmitTimesheet}
             submitForApprovalLoading={actionLoading}
             onSubmitForApproval={() => void submitForApproval()}
-            footerActions={
-              pmCanAct ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => void approve()}
-                    disabled={actionLoading}
-                    className="inline-flex min-w-[10rem] items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowReject(true)}
-                    disabled={actionLoading}
-                    className="inline-flex min-w-[10rem] items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
-                  >
-                    Reject
-                  </button>
-                </>
-              ) : null
-            }
+            footerActions={approvalActions}
           />
         )}
 

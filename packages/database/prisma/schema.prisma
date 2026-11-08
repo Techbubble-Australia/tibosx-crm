@@ -761,6 +761,8 @@ model Project {
   contractVariation    ContractVariation?  @relation(fields: [contractVariationId], references: [id], onDelete: SetNull)
   startDate            DateTime
   endDate          DateTime
+  /// WEEKLY | MONTHLY — how members log timesheets for this project.
+  timesheetPeriod      String              @default("WEEKLY")
   /// Support ticket number prefix (e.g. TKT). Used when kind is SUPPORT.
   ticketPrefix         String              @default("TKT")
   /// Zero-padded sequence width for support ticket numbers.
@@ -929,6 +931,10 @@ model Timesheet {
   memberUser             AdminUser             @relation("TimesheetMember", fields: [memberUserId], references: [id], onDelete: Restrict)
   startDate              DateTime
   endDate                DateTime
+  /// WEEKLY (hours keyed mon–sun) | MONTHLY (hours keyed by ISO date, startDate = 1st of month)
+  period                 String                @default("WEEKLY")
+  /// MONTHLY only: ISO dates marked as a day off (leave / public holiday).
+  daysOff                Json?
   /// DRAFT | SUBMITTED | APPROVED
   status                 String                @default("DRAFT")
   /// PM | CLIENT_CONTACT

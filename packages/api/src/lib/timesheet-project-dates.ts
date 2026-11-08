@@ -1,5 +1,5 @@
 import { mondayOfWeek, sundayOfWeek } from "./project-types";
-import { WEEKDAY_KEYS, type DailyHours, type WeekdayKey } from "./timesheet-entries";
+import { WEEKDAY_KEYS, hoursByIsoDay, type DailyHours, type WeekdayKey } from "./timesheet-entries";
 
 function toDateInputUtc(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -56,28 +56,35 @@ export function projectWeekMondayBounds(projectStartIso: string, projectEndIso: 
   return { min, max };
 }
 
+/**
+ * Every logged day must fall inside both the timesheet period and the project dates
+ * (e.g. a project starting 22 Oct locks 1–21 Oct on the October monthly sheet).
+ */
 export function assertTimesheetWithinProjectDates(
   project: { startDate: Date; endDate: Date },
-  weekMondayIso: string,
+  periodStartIso: string,
+  periodEndIso: string,
   entryRows: { dailyHours: DailyHours }[],
   legacyHours?: DailyHours | null,
 ) {
   const { startDate, endDate } = projectDateBoundsIso(project);
-  const mon = new Date(`${weekMondayIso}T00:00:00.000Z`);
-  const weekEndIso = toDateInputUtc(sundayOfWeek(mon));
-  if (weekEndIso < startDate || weekMondayIso > endDate) {
+  if (periodEndIso < startDate || periodStartIso > endDate) {
     throw new Error("TIMESHEET_WEEK_OUTSIDE_PROJECT");
   }
 
   const rows = entryRows.length > 0 ? entryRows : legacyHours ? [{ dailyHours: legacyHours }] : [];
   for (const row of rows) {
-    for (const key of WEEKDAY_KEYS) {
-      const hours = Number(row.dailyHours[key]) || 0;
-      if (hours <= 0) continue;
-      const dayIso = weekDayIso(weekMondayIso, key);
-      if (dayIso < startDate || dayIso > endDate) {
+    for (const { iso } of hoursByIsoDay(periodStartIso, row.dailyHours)) {
+      if (iso < periodStartIso || iso > periodEndIso) {
+        throw new Error("TIMESHEET_HOURS_OUTSIDE_PERIOD");
+      }
+      if (iso < startDate || iso > endDate) {
         throw new Error("TIMESHEET_HOURS_OUTSIDE_PROJECT");
       }
     }
   }
+}
+
+export function weekEndIsoFromMonday(weekMondayIso: string): string {
+  return toDateInputUtc(sundayOfWeek(new Date(`${weekMondayIso}T00:00:00.000Z`)));
 }

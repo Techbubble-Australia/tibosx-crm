@@ -12,6 +12,8 @@ import { messageFromApiError } from "@/lib/api-error";
 import { TIMESHEET_STATUSES, TIMESHEET_STATUS_LABELS, type TimesheetStatus } from "@/lib/project-types";
 import { TimesheetStatusBadge } from "@/lib/timesheet-status-styles";
 import { TablePagination } from "@/components/ui/TablePagination";
+import { MonthlyTimesheetPeriods } from "@/components/timesheets/MonthlyTimesheetPeriods";
+import { formatMonthLabel } from "@/lib/timesheet-month";
 import { SortableTh, toggleSortKey, type SortDir } from "@/components/ui/SortableTh";
 import {
   timesheetDetailHref,
@@ -31,6 +33,8 @@ type TimesheetRow = {
   memberName: string;
   startDate: string;
   endDate: string;
+  period?: "WEEKLY" | "MONTHLY";
+  monthKey?: string | null;
   status: TimesheetStatus;
   totalHours?: number;
   approverKind?: string | null;
@@ -358,6 +362,8 @@ export default function TimesheetsPage() {
           </div>
         </div>
 
+        {isEffectiveProjectMember ? <MonthlyTimesheetPeriods refreshKey={rows.length} /> : null}
+
         {isLoading ? (
           <p className="text-sm text-gray-400">Loading…</p>
         ) : rows.length === 0 ? (
@@ -513,6 +519,10 @@ export default function TimesheetsPage() {
                           ? `${row.projectNumber} — ${row.projectTitle}`
                           : row.targetLabel || "—";
                     const detailHref = timesheetDetailHref(row.id, listQueryParams);
+                    const periodText =
+                      row.period === "MONTHLY" && row.monthKey
+                        ? formatMonthLabel(row.monthKey)
+                        : `${formatDate(row.startDate)} – ${formatDate(row.endDate)}`;
                     return (
                       <tr key={row.id} className="border-b border-gray-50 dark:border-gray-800">
                         <td className="px-4 py-2">
@@ -520,16 +530,16 @@ export default function TimesheetsPage() {
                             type="checkbox"
                             checked={selected.has(row.id)}
                             onChange={() => toggleExportSelect(row.id)}
-                            aria-label={`Select timesheet ${formatDate(row.startDate)} – ${formatDate(row.endDate)}`}
+                            aria-label={`Select timesheet ${row.period === "MONTHLY" && row.monthKey ? formatMonthLabel(row.monthKey) : `${formatDate(row.startDate)} – ${formatDate(row.endDate)}`}`}
                           />
                         </td>
                         <td className="max-w-[11rem] px-4 py-2 text-gray-500">
                           <Link
                             href={detailHref}
                             className="block truncate text-sky-600 hover:underline dark:text-sky-400"
-                            title={`${formatDate(row.startDate)} – ${formatDate(row.endDate)}`}
+                            title={periodText}
                           >
-                            {formatDate(row.startDate)} – {formatDate(row.endDate)}
+                            {periodText}
                           </Link>
                         </td>
                         <td className="max-w-xs px-4 py-2">

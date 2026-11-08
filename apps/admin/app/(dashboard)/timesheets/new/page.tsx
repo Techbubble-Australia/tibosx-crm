@@ -9,7 +9,11 @@ import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
 import { TimesheetForm, type TimesheetFormValues } from "@/components/timesheets/TimesheetForm";
+import { MonthlyTimesheetForm } from "@/components/timesheets/MonthlyTimesheetForm";
 import { messageFromApiError } from "@/lib/api-error";
+import { isMonthKey } from "@/lib/timesheet-month";
+
+type MonthlyTarget = { status: "loading" } | { status: "weekly" } | { status: "monthly"; month: string };
 
 function NewTimesheetPageInner() {
   const router = useRouter();
@@ -19,7 +23,9 @@ function NewTimesheetPageInner() {
 
   const queryProjectId = searchParams.get("projectId")?.trim() || undefined;
   const queryWeekStart = searchParams.get("weekStart")?.trim() || undefined;
+  const queryMonth = searchParams.get("month")?.trim() || undefined;
   const queryMemberUserId = searchParams.get("memberUserId")?.trim() || undefined;
+  const [target, setTarget] = useState<MonthlyTarget>(queryProjectId ? { status: "loading" } : { status: "weekly" });
 
   const initialDefaults = useMemo((): Partial<TimesheetFormValues> => {
     const next: Partial<TimesheetFormValues> = {};
@@ -34,6 +40,52 @@ function NewTimesheetPageInner() {
       router.replace("/timesheets");
     }
   }, [sessionLoading, canCreateTimesheets, router]);
+
+  /** Monthly projects use the month calendar; pick the requested month or the next open one. */
+  useEffect(() => {
+    if (!queryProjectId) {
+      setTarget({ status: "weekly" });
+      return;
+    }
+    let cancelled = false;
+    // Keep the weekly form mounted while re-checking (it rewrites the URL as the member navigates).
+    setTarget((prev) => (prev.status === "weekly" ? prev : { status: "loading" }));
+    void (async () => {
+      try {
+        const meta = await adminFetch(
+          `/api/admin/timesheets/target-meta?projectId=${encodeURIComponent(queryProjectId)}`,
+        ).then((r) => r.json());
+        if (cancelled) return;
+        if (meta?.data?.timesheetPeriod !== "MONTHLY") {
+          setTarget({ status: "weekly" });
+          return;
+        }
+        if (isMonthKey(queryMonth)) {
+          setTarget({ status: "monthly", month: queryMonth });
+          return;
+        }
+        const entry = await adminFetch(
+          `/api/admin/timesheets/entry-point?projectId=${encodeURIComponent(queryProjectId)}`,
+        ).then((r) => r.json());
+        if (cancelled) return;
+        const row = entry?.data as { month?: string; existingTimesheetId?: string | null } | undefined;
+        if (row?.existingTimesheetId) {
+          router.replace(`/timesheets/${row.existingTimesheetId}`);
+          return;
+        }
+        if (row?.month) {
+          router.replace(`/timesheets/new?projectId=${encodeURIComponent(queryProjectId)}&month=${row.month}`);
+          return;
+        }
+        setTarget({ status: "weekly" });
+      } catch {
+        if (!cancelled) setTarget({ status: "weekly" });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [queryProjectId, queryMonth, router]);
 
   async function handleSubmit(payload: Record<string, unknown>) {
     setIsSaving(true);
@@ -50,7 +102,7 @@ function NewTimesheetPageInner() {
           router.push(`/timesheets/${existingId}`);
           return;
         }
-        appAlert("A timesheet already exists for this project and week.");
+        appAlert(messageFromApiError(data, "A timesheet already exists for this period."));
         return;
       }
       if (!res.ok) throw new Error(messageFromApiError(data, "Failed to create timesheet"));
@@ -63,7 +115,7 @@ function NewTimesheetPageInner() {
     }
   }
 
-  if (sessionLoading || !canCreateTimesheets) {
+  if (sessionLoading || !canCreateTimesheets || target.status === "loading") {
     return (
       <ProjectManagementGuard>
         <p className="text-sm text-gray-400">Loading…</p>
@@ -80,14 +132,26 @@ function NewTimesheetPageInner() {
         >
           <ArrowLeft className="h-4 w-4" /> Back to timesheets
         </Link>
-        <TimesheetForm
-          title="New Timesheet"
-          defaults={initialDefaults}
-          requireProjectFirst
-          syncNewTimesheetQuery
-          onSubmit={handleSubmit}
-          isSaving={isSaving}
-        />
+        {target.status === "monthly" ? (
+          <MonthlyTimesheetForm
+            key={`${queryProjectId}-${target.month}`}
+            title="New monthly timesheet"
+            defaults={{ projectId: queryProjectId, memberUserId: queryMemberUserId, status: "DRAFT", fileUrls: [], startDate: "", endDate: "" }}
+            monthKey={target.month}
+            onSubmit={handleSubmit}
+            isSaving={isSaving}
+            canStartTimesheetForEmptyMonth
+          />
+        ) : (
+          <TimesheetForm
+            title="New Timesheet"
+            defaults={initialDefaults}
+            requireProjectFirst
+            syncNewTimesheetQuery
+            onSubmit={handleSubmit}
+            isSaving={isSaving}
+          />
+        )}
       </div>
     </ProjectManagementGuard>
   );

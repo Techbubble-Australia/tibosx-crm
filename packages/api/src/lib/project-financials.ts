@@ -1,7 +1,7 @@
 import { prisma } from "@techbubble/database";
 import { toNumber, toNumberOrNull } from "./decimal";
 import { generateProjectMonths } from "./project-types";
-import { WEEKDAY_KEYS, type DailyHours } from "./timesheet-entries";
+import { totalHoursByIsoDay, type DailyHours } from "./timesheet-entries";
 
 export const MEMBER_RATE_FREQUENCIES = ["HOURLY", "DAILY", "WEEKLY", "FORTNIGHTLY", "MONTHLY"] as const;
 export type MemberRateFrequency = (typeof MEMBER_RATE_FREQUENCIES)[number];
@@ -144,7 +144,7 @@ export async function runProjectEstimates(projectId: string) {
   return rows.length;
 }
 
-function addUtcDays(date: Date, days: number): Date {
+export function addUtcDays(date: Date, days: number): Date {
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   d.setUTCDate(d.getUTCDate() + days);
   return d;
@@ -180,10 +180,9 @@ export async function syncProjectActualsFromTimesheets(projectId: string) {
       ? sheet.entries.map((row) => (row.dailyHours ?? {}) as DailyHours)
       : [(sheet.dailyHours ?? {}) as DailyHours];
 
-    WEEKDAY_KEYS.forEach((key, index) => {
-      const hours = hourSources.reduce((sum, row) => sum + (Number(row[key]) || 0), 0);
+    totalHoursByIsoDay(sheet.startDate, hourSources).forEach((hours, iso) => {
       if (hours <= 0) return;
-      const date = addUtcDays(sheet.startDate, index);
+      const date = new Date(`${iso}T00:00:00.000Z`);
       const year = date.getUTCFullYear();
       const month = date.getUTCMonth();
       const currency = member.rateCurrency || "AUD";

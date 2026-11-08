@@ -49,6 +49,7 @@ import {
   syncProjectClientContacts,
 } from "../lib/support-project";
 import { applyProjectCustomerSupportSettings } from "../lib/project-customer-support";
+import { TIMESHEET_PERIODS } from "../lib/timesheet-entries";
 import { syncProjectBudgetsForContract } from "../lib/project-budget";
 import {
   MEMBER_RATE_FREQUENCIES,
@@ -114,6 +115,7 @@ const projectSchema = z.object({
   contractId: z.string().optional().nullable(),
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
+  timesheetPeriod: z.enum(TIMESHEET_PERIODS).optional(),
   fileUrls: z.array(z.string().min(1)).optional().default([]),
   budget: z.coerce.number().nonnegative().nullable().optional(),
   budgetCurrency: z.string().min(1).max(8).nullable().optional(),
@@ -304,6 +306,7 @@ function serializeProject(row: {
   budgetCurrency?: string | null;
   startDate: Date;
   endDate: Date;
+  timesheetPeriod?: string;
   ticketPrefix?: string;
   ticketNumberDigits?: number;
   fileUrls: unknown;
@@ -349,6 +352,7 @@ function serializeProject(row: {
     budgetCurrency: row.budgetCurrency ?? null,
     startDate: row.startDate.toISOString(),
     endDate: row.endDate.toISOString(),
+    timesheetPeriod: row.timesheetPeriod === "MONTHLY" ? "MONTHLY" : "WEEKLY",
     ticketPrefix: row.ticketPrefix ?? "TKT",
     ticketNumberDigits: row.ticketNumberDigits ?? 5,
     fileUrls,
@@ -867,6 +871,7 @@ router.post("/", async (req: AuthRequest, res) => {
           contractId: data.contractId ?? null,
           startDate: data.startDate,
           endDate: data.endDate,
+          timesheetPeriod: data.timesheetPeriod ?? "WEEKLY",
           ticketPrefix: normalizedTicketPrefix(data.ticketPrefix),
           ticketNumberDigits: normalizedTicketDigits(data.ticketNumberDigits),
           budget,
@@ -970,6 +975,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
       contractId: existing.contractId,
       startDate: existing.startDate,
       endDate: existing.endDate,
+      timesheetPeriod: existing.timesheetPeriod,
     };
     const afterSnapshot: ProjectSnapshot = {
       title: data.title.trim(),
@@ -987,6 +993,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
       contractId: data.contractId ?? null,
       startDate: data.startDate,
       endDate: data.endDate,
+      timesheetPeriod: data.timesheetPeriod ?? existing.timesheetPeriod,
     };
 
     await prisma.$transaction(async (tx) => {
@@ -1003,6 +1010,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
           contractId: afterSnapshot.contractId,
           startDate: afterSnapshot.startDate,
           endDate: afterSnapshot.endDate,
+          timesheetPeriod: afterSnapshot.timesheetPeriod,
           ticketPrefix: nextTicketPrefix,
           ticketNumberDigits: nextTicketDigits,
           ...(!afterSnapshot.contractId && data.budget !== undefined ? { budget: data.budget } : {}),

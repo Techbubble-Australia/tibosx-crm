@@ -12,6 +12,7 @@ export const PROJECT_FIELD_LABELS: Record<string, string> = {
   contractId: "Contract",
   startDate: "Start date",
   endDate: "End date",
+  timesheetPeriod: "Timesheet type",
 };
 
 const TRACKED_FIELDS = [
@@ -25,6 +26,7 @@ const TRACKED_FIELDS = [
   "contractId",
   "startDate",
   "endDate",
+  "timesheetPeriod",
 ] as const;
 
 type TrackedField = (typeof TRACKED_FIELDS)[number];
@@ -40,6 +42,7 @@ export type ProjectSnapshot = {
   contractId: string | null;
   startDate: Date;
   endDate: Date;
+  timesheetPeriod: string;
 };
 
 type ActivityContext = {
@@ -70,6 +73,8 @@ function formatFieldValue(field: TrackedField, value: unknown, context: Activity
     case "startDate":
     case "endDate":
       return formatDate(value as Date);
+    case "timesheetPeriod":
+      return value === "MONTHLY" ? "Monthly" : "Weekly";
     default:
       return String(value);
   }
