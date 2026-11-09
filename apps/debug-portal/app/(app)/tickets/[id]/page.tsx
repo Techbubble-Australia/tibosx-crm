@@ -684,7 +684,7 @@ export default function TicketDetailPage() {
         }}
       />
 
-      <SectionCard title="Capture overview">
+      <SectionCard title="Capture overview" collapsible>
         <dl className="space-y-3">
           <DetailRow label="Reporter">
             {row.reporterEmail}
@@ -713,7 +713,7 @@ export default function TicketDetailPage() {
         </dl>
       </SectionCard>
 
-      <SectionCard title="Element / screen context">
+      <SectionCard title="Element / screen context" collapsible>
         {el.captureScope === "manual" ? (
           <p className="text-sm text-slate-600">
             Created manually in the debug portal (not from an in-app element capture).
@@ -751,7 +751,7 @@ export default function TicketDetailPage() {
       </SectionCard>
 
       {api?.endpoint ? (
-        <SectionCard title="API prerequisite">
+        <SectionCard title="API prerequisite" collapsible>
           <dl className="space-y-3">
             <DetailRow label="Request">
               <code className="text-xs">
@@ -768,7 +768,7 @@ export default function TicketDetailPage() {
         </SectionCard>
       ) : null}
 
-      <SectionCard title="AI agent brief">
+      <SectionCard title="AI agent brief" collapsible>
         <p className="text-sm text-slate-600">
           Copy this into Cursor or another coding agent for context, reproduction steps, and fix guidance.
         </p>
@@ -802,7 +802,7 @@ export default function TicketDetailPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Full payload">
+      <SectionCard title="Full payload" collapsible>
         <button
           type="button"
           onClick={() => void copyText(JSON.stringify(row.fullPayload, null, 2), "Full JSON copied.")}
