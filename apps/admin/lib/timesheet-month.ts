@@ -2,6 +2,14 @@
 export type DateHours = Partial<Record<string, number>>;
 export type DateComments = Partial<Record<string, string>>;
 
+export type DayOffKind = "LEAVE" | "HOLIDAY";
+export type DayOff = { date: string; kind: DayOffKind };
+
+export const DAY_OFF_LABELS: Record<DayOffKind, string> = {
+  LEAVE: "Leave",
+  HOLIDAY: "Public holiday",
+};
+
 export type MonthCompletion = {
   requiredDays: number;
   filledDays: number;

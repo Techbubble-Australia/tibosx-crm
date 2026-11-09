@@ -1,6 +1,6 @@
 import { prisma, type Prisma } from "@techbubble/database";
 import { isIsoDayKey, WEEKDAY_KEYS } from "./timesheet-entries";
-import { monthBounds } from "./timesheet-monthly";
+import { monthBounds, normalizeDaysOff } from "./timesheet-monthly";
 import { syncProjectActualsFromTimesheets } from "./project-financials";
 
 /** Least-advanced status wins when weeks with different statuses merge into one month. */
@@ -185,11 +185,9 @@ async function writeGroup(tx: Prisma.TransactionClient, g: MonthGroup) {
     .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0];
   const comments = [...new Set(g.sources.map((s) => s.comments?.trim()).filter((c): c is string => Boolean(c)))];
   const fileUrls = [...new Set(g.sources.flatMap((s) => stringList(s.fileUrls)))];
-  const daysOff = [
-    ...new Set(
-      g.sources.flatMap((s) => stringList(s.daysOff)).filter((iso) => iso.startsWith(g.monthKey)),
-    ),
-  ].sort();
+  const daysOff = normalizeDaysOff(g.sources.flatMap((s) => normalizeDaysOff(s.daysOff))).filter((d) =>
+    d.date.startsWith(g.monthKey),
+  );
 
   const created = await tx.timesheet.create({
     data: {

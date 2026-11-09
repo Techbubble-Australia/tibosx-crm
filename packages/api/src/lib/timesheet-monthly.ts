@@ -78,9 +78,31 @@ export function requiredDaysInMonth(monthKey: string, project: { startDate: Date
   return openDaysInMonth(monthKey, project).filter((iso) => !isWeekendIso(iso));
 }
 
-export function normalizeDaysOff(raw: unknown): string[] {
+export const DAY_OFF_KINDS = ["LEAVE", "HOLIDAY"] as const;
+export type DayOffKind = (typeof DAY_OFF_KINDS)[number];
+export type DayOff = { date: string; kind: DayOffKind };
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Stored as `{ date, kind }`; plain ISO strings (older rows) are read as leave. One entry per date. */
+export function normalizeDaysOff(raw: unknown): DayOff[] {
   if (!Array.isArray(raw)) return [];
-  return [...new Set(raw.filter((v): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)))].sort();
+  const byDate = new Map<string, DayOffKind>();
+  for (const item of raw) {
+    if (typeof item === "string" && ISO_DATE_RE.test(item)) {
+      byDate.set(item, "LEAVE");
+    } else if (item && typeof item === "object") {
+      const { date, kind } = item as { date?: unknown; kind?: unknown };
+      if (typeof date === "string" && ISO_DATE_RE.test(date)) {
+        byDate.set(date, kind === "HOLIDAY" ? "HOLIDAY" : "LEAVE");
+      }
+    }
+  }
+  return [...byDate].sort(([a], [b]) => a.localeCompare(b)).map(([date, kind]) => ({ date, kind }));
+}
+
+export function dayOffDates(daysOff: DayOff[]): string[] {
+  return daysOff.map((d) => d.date);
 }
 
 /** Days off must be open weekdays of the month with no hours logged. */

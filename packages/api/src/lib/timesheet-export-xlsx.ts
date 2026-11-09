@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { TIMESHEET_STATUS_LABELS } from "./project-types";
+import { normalizeDaysOff } from "./timesheet-monthly";
 import {
   entryHasHours,
   entryLabel,
@@ -155,10 +156,14 @@ function writeTimesheetSheet(sheet: ExcelJS.Worksheet, row: TimesheetXlsxRow) {
   sheet.addRow(pad(["Member", member]));
   sheet.addRow(pad(["Status", timesheetStatusLabel(row.status)]));
   sheet.addRow(pad(["Total hours", total]));
-  const daysOff = Array.isArray(row.daysOff) ? (row.daysOff as string[]) : [];
-  if (daysOff.length) {
-    sheet.addRow(pad(["Days off", daysOff.map((iso) => formatTabDate(new Date(`${iso}T00:00:00.000Z`))).join(", ")]));
-  }
+  const daysOff = normalizeDaysOff(row.daysOff);
+  const listDays = (kind: string) =>
+    daysOff
+      .filter((d) => d.kind === kind)
+      .map((d) => formatTabDate(new Date(`${d.date}T00:00:00.000Z`)))
+      .join(", ");
+  if (daysOff.some((d) => d.kind === "LEAVE")) sheet.addRow(pad(["Leave", listDays("LEAVE")]));
+  if (daysOff.some((d) => d.kind === "HOLIDAY")) sheet.addRow(pad(["Public holidays", listDays("HOLIDAY")]));
   sheet.addRow(pad([]));
 
   const dayHeaders = dayIsos.map((iso) => formatDayLabel(new Date(`${iso}T00:00:00.000Z`)));

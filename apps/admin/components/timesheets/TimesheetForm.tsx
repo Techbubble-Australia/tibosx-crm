@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
-  CalendarOff,
   ChevronLeft,
   ChevronRight,
+  PartyPopper,
+  Plane,
   Loader2,
   Lock,
   MessageSquare,
@@ -37,8 +38,11 @@ import {
   sanitizeHoursInput,
   shiftMonth,
   sumDateHours,
+  DAY_OFF_LABELS,
   type DateComments,
   type DateHours,
+  type DayOff,
+  type DayOffKind,
 } from "@/lib/timesheet-month";
 
 export type TimesheetEntryValues = {
@@ -71,7 +75,7 @@ export type TimesheetFormValues = {
   projectTitle?: string;
   memberUserId?: string;
   monthKey?: string | null;
-  daysOff?: string[];
+  daysOff?: Array<DayOff | string>;
   projectStartDate?: string | null;
   projectEndDate?: string | null;
   activityLogs?: Array<{
@@ -157,8 +161,56 @@ function linePayload(line: LineEntry) {
 }
 
 function formatHours(value: number) {
-  return value % 1 === 0 ? String(value) : value.toFixed(2);
+  return value % 1 === 0 ? String(value) : value.toFixed(2).replace(/0$/, "");
 }
+
+/** Older sheets stored bare dates (leave). */
+function dayOffMap(raw: Array<DayOff | string> | undefined): Map<string, DayOffKind> {
+  const map = new Map<string, DayOffKind>();
+  for (const item of raw ?? []) {
+    if (typeof item === "string") map.set(item, "LEAVE");
+    else if (item?.date) map.set(item.date, item.kind === "HOLIDAY" ? "HOLIDAY" : "LEAVE");
+  }
+  return map;
+}
+
+function dayOffSignature(map: Map<string, DayOffKind>): string {
+  return [...map].sort(([a], [b]) => a.localeCompare(b)).map(([d, k]) => `${d}:${k}`).join(",");
+}
+
+type DayTone = "locked" | "logged" | "leave" | "holiday" | "missing" | "weekend" | "open";
+
+/** Colour per day state; hours logged on a weekend still read as logged. */
+const DAY_TONES: Record<DayTone, { cell: string; label: string }> = {
+  locked: {
+    cell: "cursor-not-allowed border-gray-100 bg-gray-100/80 text-gray-400 dark:border-gray-800 dark:bg-gray-900/70",
+    label: "text-gray-400",
+  },
+  logged: {
+    cell: "border-emerald-300 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-100/70 dark:border-emerald-800 dark:bg-emerald-950/40",
+    label: "text-emerald-800 dark:text-emerald-200",
+  },
+  leave: {
+    cell: "border-violet-300 bg-violet-50 hover:border-violet-400 dark:border-violet-800 dark:bg-violet-950/40",
+    label: "text-violet-800 dark:text-violet-200",
+  },
+  holiday: {
+    cell: "border-amber-300 bg-amber-50 hover:border-amber-400 dark:border-amber-800 dark:bg-amber-950/40",
+    label: "text-amber-800 dark:text-amber-200",
+  },
+  missing: {
+    cell: "border-dashed border-rose-300 bg-white hover:bg-rose-50/60 dark:border-rose-800 dark:bg-gray-950",
+    label: "text-rose-600 dark:text-rose-300",
+  },
+  weekend: {
+    cell: "border-slate-200 bg-slate-100 hover:bg-slate-200/70 dark:border-slate-700 dark:bg-slate-800/60",
+    label: "text-slate-500 dark:text-slate-400",
+  },
+  open: {
+    cell: "border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-950",
+    label: "text-gray-500",
+  },
+};
 
 function linesSignature(lines: LineEntry[]): string {
   return JSON.stringify(
@@ -200,7 +252,7 @@ export function TimesheetForm({
       : null,
   );
   const [lines, setLines] = useState<LineEntry[]>(() => linesFromDefaults(defaults));
-  const [daysOff, setDaysOff] = useState<Set<string>>(() => new Set(defaults.daysOff ?? []));
+  const [daysOff, setDaysOff] = useState<Map<string, DayOffKind>>(() => dayOffMap(defaults.daysOff));
   const [comments, setComments] = useState(defaults.comments ?? "");
   const [fileUrls, setFileUrls] = useState<string[]>(defaults.fileUrls ?? []);
   const [uploading, setUploading] = useState(false);
@@ -220,14 +272,19 @@ export function TimesheetForm({
     }
     return totals;
   }, [lines]);
-  const completion = useMemo(() => monthCompletion(days, totalsByDay, daysOff), [days, totalsByDay, daysOff]);
+  const completion = useMemo(
+    () => monthCompletion(days, totalsByDay, new Set(daysOff.keys())),
+    [days, totalsByDay, daysOff],
+  );
+  const leaveCount = [...daysOff.values()].filter((k) => k === "LEAVE").length;
+  const holidayCount = daysOff.size - leaveCount;
   const monthTotal = useMemo(() => [...totalsByDay.values()].reduce((s, v) => s + v, 0), [totalsByDay]);
   const missing = useMemo(() => new Set(completion.missingDays), [completion]);
 
   const dirty = useMemo(() => {
     if (!editable) return false;
     if (linesSignature(lines) !== linesSignature(linesFromDefaults(defaults))) return true;
-    if ([...daysOff].sort().join() !== [...(defaults.daysOff ?? [])].sort().join()) return true;
+    if (dayOffSignature(daysOff) !== dayOffSignature(dayOffMap(defaults.daysOff))) return true;
     if ((comments ?? "").trim() !== (defaults.comments ?? "").trim()) return true;
     const initialFiles = defaults.fileUrls ?? [];
     return fileUrls.length !== initialFiles.length || fileUrls.some((u, i) => u !== initialFiles[i]);
@@ -317,7 +374,7 @@ export function TimesheetForm({
     updateLine(line.key, { dailyHours: { ...line.dailyHours, [iso]: n && n > 0 ? n : undefined } });
     if (n && n > 0 && daysOff.has(iso)) {
       setDaysOff((prev) => {
-        const next = new Set(prev);
+        const next = new Map(prev);
         next.delete(iso);
         return next;
       });
@@ -345,12 +402,13 @@ export function TimesheetForm({
     setLines((prev) => prev.filter((l) => l.key !== line.key));
   }
 
-  function toggleDayOff(iso: string) {
-    if ((totalsByDay.get(iso) ?? 0) > 0) return;
+  /** null = working day; leave and public holidays count as filled. */
+  function setDayOff(iso: string, kind: DayOffKind | null) {
+    if (kind && (totalsByDay.get(iso) ?? 0) > 0) return;
     setDaysOff((prev) => {
-      const next = new Set(prev);
-      if (next.has(iso)) next.delete(iso);
-      else next.add(iso);
+      const next = new Map(prev);
+      if (kind) next.set(iso, kind);
+      else next.delete(iso);
       return next;
     });
   }
@@ -422,7 +480,9 @@ export function TimesheetForm({
       endDate: endIso,
       fileUrls,
       entries: lines.filter((l) => sumDateHours(l.dailyHours) > 0).map(linePayload),
-      daysOff: [...daysOff].sort(),
+      daysOff: [...daysOff]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, kind]) => ({ date, kind })),
       comments: comments.trim() || null,
     };
     if (approvers.length && selectedApprover) {
@@ -534,6 +594,16 @@ export function TimesheetForm({
                     style={{ width: `${progressPct}%` }}
                   />
                 </div>
+                {leaveCount || holidayCount ? (
+                  <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                    {[
+                      leaveCount ? `${leaveCount} leave day${leaveCount === 1 ? "" : "s"}` : "",
+                      holidayCount ? `${holidayCount} public holiday${holidayCount === 1 ? "" : "s"}` : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                ) : null}
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-500 dark:text-gray-400">Monthly total</p>
@@ -554,11 +624,25 @@ export function TimesheetForm({
               ))}
               {days.map((day) => {
                 const hours = totalsByDay.get(day.iso) ?? 0;
-                const off = daysOff.has(day.iso);
+                const offKind = daysOff.get(day.iso) ?? null;
                 const isMissing = editable && missing.has(day.iso);
                 const isSelected = selectedDay === day.iso;
                 const hasComment = lines.some((l) => Boolean(l.dailyComments[day.iso]?.trim()));
-                const clickable = !day.locked && (editable || hours > 0 || off);
+                const clickable = !day.locked && (editable || hours > 0 || Boolean(offKind));
+                const tone: DayTone = day.locked
+                  ? "locked"
+                  : hours > 0
+                    ? "logged"
+                    : offKind === "HOLIDAY"
+                      ? "holiday"
+                      : offKind === "LEAVE"
+                        ? "leave"
+                        : isMissing
+                          ? "missing"
+                          : day.weekend
+                            ? "weekend"
+                            : "open";
+                const style = DAY_TONES[tone];
                 return (
                   <button
                     key={day.iso}
@@ -566,36 +650,40 @@ export function TimesheetForm({
                     disabled={!clickable}
                     onClick={() => openDay(day.iso)}
                     title={day.locked ? "Outside the project dates" : formatDayLong(day.iso)}
-                    className={`relative flex h-20 flex-col rounded-lg border p-1.5 text-left transition-colors ${
-                      day.locked
-                        ? "cursor-not-allowed border-gray-100 bg-gray-100/70 text-gray-400 dark:border-gray-800 dark:bg-gray-900/60"
-                        : isSelected
-                          ? "border-blue-500 bg-blue-50/60 ring-1 ring-blue-200 dark:bg-blue-950/30"
-                          : off
-                            ? "border-sky-200 bg-sky-50/70 hover:border-sky-300 dark:border-sky-900 dark:bg-sky-950/30"
-                            : isMissing
-                              ? "border-amber-300 bg-white hover:bg-amber-50/50 dark:bg-gray-950"
-                              : day.weekend
-                                ? "border-gray-100 bg-gray-50/70 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900/40"
-                                : "border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-950"
+                    className={`relative flex h-24 min-w-0 flex-col rounded-lg border p-2 text-left transition-colors ${style.cell} ${
+                      isSelected ? "ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-gray-950" : ""
                     } ${!clickable && !day.locked ? "cursor-default" : ""}`}
                   >
-                    <span className="flex items-center justify-between text-xs font-medium">
-                      <span className={day.locked ? "" : "text-gray-700 dark:text-gray-300"}>{day.day}</span>
-                      {day.locked ? <Lock className="h-3 w-3" aria-label="Locked" /> : null}
-                      {hasComment && !day.locked ? <MessageSquare className="h-3 w-3 text-blue-500" aria-label="Has comment" /> : null}
+                    <span className="flex items-center justify-between gap-1">
+                      <span className={`text-sm font-semibold ${tone === "locked" ? "" : "text-gray-800 dark:text-gray-200"}`}>
+                        {day.day}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        {hasComment && !day.locked ? (
+                          <MessageSquare className="h-3.5 w-3.5 text-blue-500" aria-label="Has comment" />
+                        ) : null}
+                        {day.locked ? <Lock className="h-3.5 w-3.5" aria-label="Locked" /> : null}
+                      </span>
                     </span>
-                    <span className="mt-auto">
-                      {off ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-800 dark:text-sky-200">
-                          <CalendarOff className="h-3 w-3" aria-hidden /> Day off
+                    <span className="mt-auto min-w-0">
+                      {hours > 0 ? (
+                        <span className={`flex items-baseline gap-0.5 tabular-nums ${style.label}`}>
+                          <span className="text-2xl font-bold leading-none">{formatHours(hours)}</span>
+                          <span className="text-xs font-semibold">hrs</span>
                         </span>
-                      ) : hours > 0 ? (
-                        <span className="text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
-                          {formatHours(hours)}h
+                      ) : offKind ? (
+                        <span className={`flex items-center gap-1 text-xs font-semibold leading-tight ${style.label}`}>
+                          {offKind === "HOLIDAY" ? (
+                            <PartyPopper className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          ) : (
+                            <Plane className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          )}
+                          <span className="truncate">{DAY_OFF_LABELS[offKind]}</span>
                         </span>
                       ) : isMissing ? (
-                        <span className="text-[11px] text-amber-700">Not filled</span>
+                        <span className={`text-xs font-medium ${style.label}`}>To fill</span>
+                      ) : day.weekend && !day.locked ? (
+                        <span className={`text-xs ${style.label}`}>Weekend</span>
                       ) : null}
                     </span>
                   </button>
@@ -603,11 +691,22 @@ export function TimesheetForm({
               })}
             </div>
 
-            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-              <span className="inline-flex items-center gap-1"><Lock className="h-3 w-3" /> Outside project dates (locked)</span>
-              <span className="inline-flex items-center gap-1"><CalendarOff className="h-3 w-3 text-sky-700" /> Day off (leave / public holiday)</span>
-              {editable ? <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm border border-amber-300" /> Weekday still to fill</span> : null}
-              <span>Weekends are optional.</span>
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-gray-600 dark:text-gray-400">
+              {(
+                [
+                  ["logged", "Hours logged"],
+                  ["leave", "Leave"],
+                  ["holiday", "Public holiday"],
+                  ["weekend", "Weekend (optional)"],
+                  ...(editable ? ([["missing", "Weekday still to fill"]] as const) : []),
+                  ["locked", "Outside project dates"],
+                ] as const
+              ).map(([tone, label]) => (
+                <span key={tone} className="inline-flex items-center gap-1.5">
+                  <span className={`h-3 w-3 rounded border ${DAY_TONES[tone].cell}`} aria-hidden />
+                  {label}
+                </span>
+              ))}
             </div>
 
             {lines.length > 0 ? (
@@ -786,25 +885,44 @@ export function TimesheetForm({
           </div>
           <div className="space-y-4 px-5 py-4">
             {!selectedDayInfo.weekend ? (
-              <label
-                className={`flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm ${
-                  daysOff.has(selectedDay) ? "border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/30" : "border-gray-200 dark:border-gray-700"
-                } ${!editable || selectedDayTotal > 0 ? "opacity-70" : "cursor-pointer"}`}
-              >
-                <input
-                  type="checkbox"
-                  className="mt-0.5"
-                  checked={daysOff.has(selectedDay)}
-                  disabled={!editable || selectedDayTotal > 0}
-                  onChange={() => toggleDayOff(selectedDay)}
-                />
-                <span>
-                  <span className="font-medium text-gray-900 dark:text-gray-100">Day off</span>
-                  <span className="block text-xs text-gray-500">
-                    {selectedDayTotal > 0 ? "Clear the hours on this day to mark it as a day off." : "Leave or public holiday — counts as filled."}
-                  </span>
-                </span>
-              </label>
+              <div className="space-y-1.5">
+                <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Day type">
+                  {(
+                    [
+                      [null, "Working day", "logged"],
+                      ["LEAVE", "Leave", "leave"],
+                      ["HOLIDAY", "Public holiday", "holiday"],
+                    ] as const
+                  ).map(([kind, label, tone]) => {
+                    const active = (daysOff.get(selectedDay) ?? null) === kind;
+                    const blocked = !editable || (kind !== null && selectedDayTotal > 0);
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        disabled={blocked && !active}
+                        onClick={() => setDayOff(selectedDay, kind)}
+                        className={`flex items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                          active
+                            ? `${DAY_TONES[tone].cell} ${DAY_TONES[tone].label} ring-1 ring-current`
+                            : "border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300"
+                        }`}
+                      >
+                        {kind === "LEAVE" ? <Plane className="h-3.5 w-3.5" aria-hidden /> : null}
+                        {kind === "HOLIDAY" ? <PartyPopper className="h-3.5 w-3.5" aria-hidden /> : null}
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-gray-500">
+                  {selectedDayTotal > 0
+                    ? "Clear the hours on this day to mark it as leave or a public holiday."
+                    : "Leave and public holidays count as filled."}
+                </p>
+              </div>
             ) : null}
 
             {lines.length === 0 && !editable ? <p className="text-sm text-gray-500">No hours logged.</p> : null}

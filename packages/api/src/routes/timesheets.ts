@@ -38,7 +38,10 @@ import {
 import { assertTimesheetWithinProjectDates, projectDateBoundsIso } from "../lib/timesheet-project-dates";
 import {
   assertValidDaysOff,
+  DAY_OFF_KINDS,
+  dayOffDates,
   formatIsoDayShort,
+  type DayOff,
   isFirstOfMonthIso,
   isMonthKey,
   monthBounds,
@@ -62,8 +65,16 @@ const timesheetSchema = z
     endDate: z.coerce.date().optional(),
     fileUrls: z.array(z.string().min(1)).optional(),
     comments: z.string().max(10000).optional().nullable(),
-    /** Weekdays marked as a day off (leave / public holiday). */
-    daysOff: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).max(31).optional(),
+    /** Weekdays marked as a day off: leave or public holiday (a bare date counts as leave). */
+    daysOff: z
+      .array(
+        z.union([
+          z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), kind: z.enum(DAY_OFF_KINDS) }),
+        ]),
+      )
+      .max(31)
+      .optional(),
   })
   .refine(
     (data) =>
@@ -213,7 +224,7 @@ function serializeTimesheet(row: {
           serializedEntries.length
             ? serializedEntries.map((entry) => (entry.dailyHours ?? {}) as DailyHours)
             : [(row.dailyHours ?? {}) as DailyHours],
-          daysOff,
+          dayOffDates(daysOff),
         )
       : null;
   return {
@@ -965,7 +976,7 @@ router.get("/monthly-periods", async (req: AuthRequest, res) => {
             ? sheet.entries.map((e) => (e.dailyHours ?? {}) as DailyHours)
             : [(sheet.dailyHours ?? {}) as DailyHours]
           : [];
-        const completion = monthCompletion(month, project, hourRows, normalizeDaysOff(sheet?.daysOff));
+        const completion = monthCompletion(month, project, hourRows, dayOffDates(normalizeDaysOff(sheet?.daysOff)));
         const { startIso, endIso } = monthBounds(month);
         return {
           month,
@@ -1084,9 +1095,9 @@ function csvEscape(value: string | number | null | undefined) {
  */
 async function assertTimesheetProjectDateRules(
   projectId: string,
-  data: { startDate: Date; daysOff?: string[] },
+  data: { startDate: Date; daysOff?: unknown[] },
   entryRows: TimesheetEntryInput[],
-): Promise<{ startDate: Date; endDate: Date; daysOff: string[] }> {
+): Promise<{ startDate: Date; endDate: Date; daysOff: DayOff[] }> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: { startDate: true, endDate: true, status: true },
@@ -1098,7 +1109,7 @@ async function assertTimesheetProjectDateRules(
   const { endIso } = monthBounds(monthKey);
   assertTimesheetWithinProjectDates(project, startIso, endIso, entryRows);
   const daysOff = normalizeDaysOff(data.daysOff);
-  assertValidDaysOff(monthKey, project, daysOff, entryRows);
+  assertValidDaysOff(monthKey, project, dayOffDates(daysOff), entryRows);
   return {
     startDate: new Date(`${startIso}T00:00:00.000Z`),
     endDate: new Date(`${endIso}T00:00:00.000Z`),
@@ -1555,7 +1566,7 @@ router.post("/submit", async (req: AuthRequest, res) => {
         row.entries.length
           ? row.entries.map((e) => (e.dailyHours ?? {}) as DailyHours)
           : [(row.dailyHours ?? {}) as DailyHours],
-        normalizeDaysOff(row.daysOff),
+        dayOffDates(normalizeDaysOff(row.daysOff)),
       );
       if (!completion.complete) {
         const month = row.startDate.toLocaleDateString("en-AU", { month: "long", year: "numeric", timeZone: "UTC" });
