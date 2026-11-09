@@ -355,6 +355,38 @@ export default function TicketDetailPage() {
     <div className="space-y-6">
       <PageHeader title={row.ticketId} description={metaLine} backHref="/tickets" backLabel="All tickets" />
 
+      {!locked ? (
+        <section
+          aria-label="Ticket actions"
+          className="dp-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"
+        >
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Ticket actions</h2>
+            <p className="text-xs text-slate-500">Update the ticket details, or delete it permanently.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={startEdit}
+              disabled={editing || deleting}
+              className="dp-btn-secondary py-2"
+            >
+              <Pencil className="h-4 w-4" aria-hidden />
+              {editing ? "Editing…" : "Edit ticket"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void deleteTicket()}
+              disabled={deleting}
+              className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Trash2 className="h-4 w-4" aria-hidden />}
+              Delete ticket
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,85fr)_minmax(0,15fr)]">
       <div className="min-w-0 space-y-6">
       <div className="dp-card flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:p-5">
@@ -524,28 +556,9 @@ export default function TicketDetailPage() {
         </SectionCard>
       ) : (
         <SectionCard title="Description">
-          <div className="space-y-3">
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
-              {row.userDescription.trim() || "No description provided."}
-            </p>
-            {!locked ? (
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={startEdit} className="dp-btn-secondary py-2">
-                  <Pencil className="h-4 w-4" aria-hidden />
-                  Edit ticket
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void deleteTicket()}
-                  disabled={deleting}
-                  className="dp-btn-ghost py-2 text-red-700 hover:bg-red-50"
-                >
-                  {deleting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Trash2 className="h-4 w-4" aria-hidden />}
-                  Delete ticket
-                </button>
-              </div>
-            ) : null}
-          </div>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+            {row.userDescription.trim() || "No description provided."}
+          </p>
         </SectionCard>
       )}
 
