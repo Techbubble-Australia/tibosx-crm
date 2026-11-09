@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
 import { SprintSelect } from "@/components/SprintSelect";
 import { StatusBadge, TypeBadge } from "@/components/TicketBadges";
+import { TicketModal } from "@/components/TicketModal";
 import { ALL_SPRINTS, defaultSprintSelection, useSprints } from "@/lib/sprints";
 import { formatEnvironment, nextStatusInOrder, type TicketStatus } from "@/lib/tickets";
 
@@ -22,6 +23,8 @@ type TicketRow = {
   userDescription: string;
   reporterEmail: string;
   createdAt: string;
+  sprintId?: string | null;
+  sprintName?: string | null;
 };
 
 type ReporterOption = {
@@ -37,6 +40,7 @@ function TicketsListInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [rows, setRows] = useState<TicketRow[]>([]);
+  const [openTicket, setOpenTicket] = useState<TicketRow | null>(null);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -374,12 +378,13 @@ function TicketsListInner() {
                       </td>
                     ) : null}
                     <td className="dp-table-cell max-w-xs">
-                      <Link
-                        href={`/tickets/${row.id}?from=list`}
-                        className="font-semibold text-sky-700 hover:text-sky-800 hover:underline"
+                      <button
+                        type="button"
+                        onClick={() => setOpenTicket(row)}
+                        className="text-left font-semibold text-sky-700 hover:text-sky-800 hover:underline"
                       >
                         {row.ticketId}
-                      </Link>
+                      </button>
                       <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">
                         {row.userDescription}
                       </p>
@@ -437,6 +442,20 @@ function TicketsListInner() {
           ) : null}
         </div>
       )}
+
+      {openTicket ? (
+        <TicketModal
+          id={openTicket.id}
+          ticketNumber={openTicket.ticketId}
+          sprintId={openTicket.sprintId}
+          sprintName={openTicket.sprintName}
+          fullPageQuery="from=list"
+          onClose={(changed) => {
+            setOpenTicket(null);
+            if (changed) void load();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

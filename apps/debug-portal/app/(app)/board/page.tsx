@@ -23,6 +23,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SprintForm } from "@/components/SprintForm";
 import { SprintSelect } from "@/components/SprintSelect";
 import { TypeBadge } from "@/components/TicketBadges";
+import { TicketModal } from "@/components/TicketModal";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
 import {
@@ -59,6 +60,8 @@ type BoardTicket = {
   reporterEmail: string;
   screenshotUrls?: string[];
   createdAt: string;
+  sprintId?: string | null;
+  sprintName?: string | null;
   sprintStatus?: string | null;
 };
 
@@ -110,6 +113,7 @@ export default function BoardPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [search, setSearch] = useState("");
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [openTicket, setOpenTicket] = useState<BoardTicket | null>(null);
   const [dropTarget, setDropTarget] = useState<TicketStatus | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [draggingColumn, setDraggingColumn] = useState<string | null>(null);
@@ -745,19 +749,20 @@ export default function BoardPage() {
                           setDraggingId(null);
                           setDropTarget(null);
                         }}
-                        className={`rounded-lg border border-l-4 border-slate-200 bg-white p-3 shadow-sm transition ${
+                        className={`relative rounded-lg border border-l-4 border-slate-200 bg-white p-3 shadow-sm transition hover:border-slate-300 hover:shadow ${
                           ticket.type === "ENHANCEMENT" ? "border-l-indigo-400" : "border-l-red-400"
                         } ${canDrag(ticket) ? "cursor-grab active:cursor-grabbing" : ""} ${
                           draggingId === ticket.id ? "opacity-50" : ""
                         }`}
                       >
                         <div className="mb-1.5 flex items-center justify-between gap-2">
-                          <Link
-                            href={`/tickets/${ticket.id}`}
-                            className="truncate text-sm font-semibold text-sky-700 hover:text-sky-800 hover:underline"
+                          <button
+                            type="button"
+                            onClick={() => setOpenTicket(ticket)}
+                            className="truncate text-left text-sm font-semibold text-sky-700 after:absolute after:inset-0 after:content-[''] hover:text-sky-800 hover:underline"
                           >
                             {ticket.ticketId}
-                          </Link>
+                          </button>
                           {savingId === ticket.id ? (
                             <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-slate-400" aria-label="Saving" />
                           ) : (
@@ -851,6 +856,19 @@ export default function BoardPage() {
           ) : null}
         </div>
       )}
+
+      {openTicket ? (
+        <TicketModal
+          id={openTicket.id}
+          ticketNumber={openTicket.ticketId}
+          sprintId={openTicket.sprintId}
+          sprintName={openTicket.sprintName}
+          onClose={(changed) => {
+            setOpenTicket(null);
+            if (changed) void load();
+          }}
+        />
+      ) : null}
     </div>
   );
 }
