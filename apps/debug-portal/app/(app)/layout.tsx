@@ -19,6 +19,8 @@ export default function AppShellLayout({ children }: { children: React.ReactNode
   const onNew = pathname === "/tickets/new";
   const onBoard = pathname === "/board";
   const onSprints = pathname === "/sprints";
+  /** Ticket detail uses the wide layout so the activity column has room. */
+  const onTicketDetail = pathname.startsWith("/tickets/") && pathname !== "/tickets/new";
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
@@ -62,7 +64,11 @@ export default function AppShellLayout({ children }: { children: React.ReactNode
           </button>
         </div>
       </header>
-      <main className={`mx-auto px-4 py-8 sm:px-6 ${onBoard ? "max-w-[100rem]" : "max-w-6xl"}`}>
+      <main
+        className={`mx-auto ${
+          onBoard || onTicketDetail ? "max-w-[100rem] px-3 py-5 sm:px-4" : "max-w-6xl px-4 py-8 sm:px-6"
+        }`}
+      >
         <ConfirmDialogProvider>
           <TicketStatusesProvider>{children}</TicketStatusesProvider>
         </ConfirmDialogProvider>

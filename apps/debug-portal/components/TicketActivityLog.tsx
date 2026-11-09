@@ -43,7 +43,7 @@ function ChangeBadges({ field, from, to }: { field: "status" | "type"; from: str
       <TypeBadge type={value} size="sm" />
     );
   return (
-    <p className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-slate-500">
+    <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
       <Badge value={from} />
       <span aria-hidden>→</span>
       <Badge value={to} />
@@ -88,25 +88,31 @@ function formatWhen(iso: string): string {
 export function TicketActivityLog({ logs }: { logs: TicketLogEntry[] }) {
   const { labelOf } = useTicketStatuses();
   return (
-    <section className="dp-card p-3" aria-label="Activity log">
-      <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+    <section className="dp-card p-4" aria-label="Activity log">
+      <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-900">
         <History className="h-4 w-4 text-slate-500" aria-hidden />
         Activity
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{logs.length}</span>
       </h2>
       {logs.length === 0 ? (
-        <p className="text-xs text-slate-500">No activity yet.</p>
+        <p className="text-sm text-slate-500">No activity yet.</p>
       ) : (
-        <ol className="relative space-y-3 border-l border-slate-200 pl-3">
+        <ol className="relative space-y-4 border-l-2 border-slate-100 pl-4">
           {logs.map((entry) => {
             const { title, detail, badges } = describe(entry, labelOf);
             return (
               <li key={entry.id} className="relative">
-                <span className="absolute -left-[17px] top-1.5 h-2 w-2 rounded-full bg-sky-500 ring-2 ring-white" aria-hidden />
-                <p className="text-xs font-medium text-slate-800">{title}</p>
+                <span className="absolute -left-[23px] top-1 h-3 w-3 rounded-full bg-sky-500 ring-4 ring-white" aria-hidden />
+                <p className="text-sm font-medium text-slate-900">{title}</p>
                 {badges ? <ChangeBadges field={badges} from={entry.oldValue} to={entry.newValue} /> : null}
-                {detail ? <p className="break-words text-[11px] text-slate-600">{detail}</p> : null}
-                <p className="break-all text-[11px] text-slate-500">{entry.actorEmail}</p>
-                <p className="text-[11px] text-slate-400">{formatWhen(entry.createdAt)}</p>
+                {detail ? <p className="mt-0.5 break-words text-sm text-slate-700">{detail}</p> : null}
+                <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-slate-500">
+                  <span className="break-all">{entry.actorEmail}</span>
+                  <span aria-hidden>·</span>
+                  <time dateTime={entry.createdAt} className="whitespace-nowrap">
+                    {formatWhen(entry.createdAt)}
+                  </time>
+                </p>
               </li>
             );
           })}

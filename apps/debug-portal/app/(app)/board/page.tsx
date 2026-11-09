@@ -226,11 +226,24 @@ export default function BoardPage() {
     void load();
   }, [load]);
 
+  // Every reporter comes from the API, not the loaded tickets — otherwise picking one reporter hides the rest.
+  const [allReporters, setAllReporters] = useState<Array<{ reporterUserId: string; reporterEmail: string }>>([]);
+  useEffect(() => {
+    if (!isAdmin) return;
+    void fetch("/api/debug-portal/tickets/reporters", { credentials: "include", cache: "no-store" })
+      .then((r) => r.json())
+      .then((json) => {
+        if (Array.isArray(json?.data)) setAllReporters(json.data);
+      })
+      .catch(() => undefined);
+  }, [isAdmin, total]);
+
   const reporters = useMemo(() => {
     const map = new Map<string, string>();
-    for (const t of tickets) map.set(t.reporterUserId, t.reporterEmail);
+    for (const r of allReporters) map.set(r.reporterUserId, r.reporterEmail);
+    for (const t of tickets) if (!map.has(t.reporterUserId)) map.set(t.reporterUserId, t.reporterEmail);
     return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [tickets]);
+  }, [allReporters, tickets]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();

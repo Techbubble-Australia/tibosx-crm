@@ -369,7 +369,7 @@ export default function TicketDetailPage() {
   })}`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title={row.ticketId}
         description={metaLine}
@@ -415,8 +415,8 @@ export default function TicketDetailPage() {
         </section>
       ) : null}
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,85fr)_minmax(0,15fr)]">
-      <div className="min-w-0 space-y-6">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_26rem]">
+      <div className="min-w-0 space-y-4">
       <div className="dp-card flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:p-5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-slate-700">Sprint</span>
@@ -796,7 +796,7 @@ export default function TicketDetailPage() {
       </SectionCard>
       </div>
 
-      <aside className="min-w-0 lg:sticky lg:top-20">
+      <aside className="min-w-0 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
         <TicketActivityLog logs={row.logs ?? []} />
       </aside>
       </div>
