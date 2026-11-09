@@ -12,6 +12,13 @@ export type NotificationPayloads = {
     actorEmail?: string;
   };
   "contact.submitted": { submissionId: string };
+  "debug_ticket.created": { ticketId: string };
+  "debug_ticket.status.changed": {
+    ticketId: string;
+    oldStatus: string;
+    newStatus: string;
+    actorEmail?: string;
+  };
 };
 
 export type NotificationEvent = keyof NotificationPayloads;

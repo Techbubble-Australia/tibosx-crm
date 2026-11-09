@@ -18,6 +18,7 @@ import {
   resolveTicketProjectIdForNotifications,
 } from "./ticket-email-recipients";
 import { sendEmailIfEnabled } from "./send-if-enabled";
+import { effectiveRoleList } from "../admin-roles";
 
 const TICKET_STATUS_LABELS: Record<string, string> = {
   DRAFT: "Draft",
@@ -31,6 +32,31 @@ const TICKET_STATUS_LABELS: Record<string, string> = {
 
 function formatTicketStatusLabel(status: string): string {
   return TICKET_STATUS_LABELS[status] ?? status.replace(/_/g, " ").toLowerCase();
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function debugTicketUrl(id: string): string | null {
+  const base = process.env.DEBUG_PORTAL_PUBLIC_URL?.trim().replace(/\/$/, "");
+  return base ? `${base}/tickets/${id}` : null;
+}
+
+async function debugStatusLabel(key: string): Promise<string> {
+  const row = await prisma.debugTicketStatus.findUnique({ where: { key }, select: { label: true } });
+  return row?.label ?? key.replace(/_/g, " ").toLowerCase();
+}
+
+/** Active TBOS users with the admin role (primary or additional) — they manage the debug portal. */
+async function debugPortalAdminEmails(): Promise<string[]> {
+  const users = await prisma.adminUser.findMany({
+    where: { active: true },
+    select: { email: true, role: true, additionalRoles: true },
+  });
+  return users
+    .filter((u) => effectiveRoleList(u.role, u.additionalRoles).includes("admin"))
+    .map((u) => u.email.toLowerCase());
 }
 
 function contactNotificationEmail(): string {
@@ -233,6 +259,58 @@ export const notificationHandlers: {
         }),
       );
     }
+  },
+
+  async "debug_ticket.created"({ ticketId }) {
+    const ticket = await prisma.debugCaptureTicket.findUnique({ where: { id: ticketId } });
+    if (!ticket) return;
+    const statusLabel = await debugStatusLabel(ticket.status);
+    const link = debugTicketUrl(ticket.id);
+    const summary = ticket.userDescription.length > 400 ? `${ticket.userDescription.slice(0, 400)}…` : ticket.userDescription;
+    const kind = ticket.type === "ENHANCEMENT" ? "enhancement" : "bug";
+    const body = [
+      `${ticket.reporterEmail} reported a new ${kind}: ${ticket.ticketId} (${statusLabel}).`,
+      "",
+      summary,
+      link ? `\nView ticket: ${link}` : "",
+    ].join("\n");
+    const bodyHtml = `<p><strong>${escapeHtml(ticket.reporterEmail)}</strong> reported a new ${kind}: <strong>${ticket.ticketId}</strong> (${escapeHtml(statusLabel)}).</p><p style="white-space:pre-wrap;">${escapeHtml(summary)}</p>${link ? `<p><a href="${escapeHtml(link)}">View ticket in the debug portal</a></p>` : ""}`;
+
+    const recipients = new Set([...(await debugPortalAdminEmails()), ticket.reporterEmail.toLowerCase()]);
+    for (const to of recipients) {
+      await sendEmailIfEnabled("debug_ticket.created", to, () =>
+        sendSupportTicketNotificationEmail({
+          to,
+          headerTitle: "New debug ticket!",
+          subjectLine: `New debug ticket ${ticket.ticketId}`,
+          body,
+          bodyHtml,
+          greeting: "Hi Team,",
+        }),
+      );
+    }
+  },
+
+  async "debug_ticket.status.changed"({ ticketId, oldStatus, newStatus, actorEmail }) {
+    const ticket = await prisma.debugCaptureTicket.findUnique({ where: { id: ticketId } });
+    if (!ticket) return;
+    const to = ticket.reporterEmail.toLowerCase();
+    if (actorEmail && actorEmail.toLowerCase() === to) return;
+    const [from, next] = await Promise.all([debugStatusLabel(oldStatus), debugStatusLabel(newStatus)]);
+    const link = debugTicketUrl(ticket.id);
+    const by = actorEmail ? ` by ${actorEmail}` : "";
+    const body = `Your ticket ${ticket.ticketId} moved from ${from} to ${next}${by}.${link ? `\n\nView ticket: ${link}` : ""}`;
+    const bodyHtml = `<p>Your ticket <strong>${ticket.ticketId}</strong> moved from <strong>${escapeHtml(from)}</strong> to <strong>${escapeHtml(next)}</strong>${escapeHtml(by)}.</p>${link ? `<p><a href="${escapeHtml(link)}">View ticket in the debug portal</a></p>` : ""}`;
+    await sendEmailIfEnabled("debug_ticket.status.changed", to, () =>
+      sendSupportTicketNotificationEmail({
+        to,
+        headerTitle: "Debug ticket status updated!",
+        subjectLine: `${ticket.ticketId} is now ${next}`,
+        body,
+        bodyHtml,
+        greeting: "Hello,",
+      }),
+    );
   },
 
   async "contact.submitted"({ submissionId }) {

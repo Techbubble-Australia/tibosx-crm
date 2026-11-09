@@ -105,6 +105,11 @@ export default function TicketDetailPage() {
   const [savingSprint, setSavingSprint] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const router = useRouter();
+  /** "Back" returns to the Tickets list only when opened from it; otherwise (board, new ticket) to the Board. */
+  const [cameFromList, setCameFromList] = useState(false);
+  useEffect(() => {
+    setCameFromList(new URLSearchParams(window.location.search).get("from") === "list");
+  }, []);
   const confirm = useConfirm();
 
   async function deleteTicket() {
@@ -355,7 +360,7 @@ export default function TicketDetailPage() {
   if (!row) {
     return (
       <div className="space-y-4">
-        <PageHeader backHref="/tickets" backLabel="All tickets" title="Ticket not found" />
+        <PageHeader backHref="/board" backLabel="Board" title="Ticket not found" />
         <p className="text-sm text-red-700" role="alert">
           {error || "This ticket does not exist or you do not have access."}
         </p>
@@ -373,8 +378,8 @@ export default function TicketDetailPage() {
       <PageHeader
         title={row.ticketId}
         description={metaLine}
-        backHref="/tickets"
-        backLabel="All tickets"
+        backHref={cameFromList ? "/tickets" : "/board"}
+        backLabel={cameFromList ? "All tickets" : "Board"}
         action={
           <div className="flex flex-wrap items-center gap-2">
             <TypeBadge type={row.type} />

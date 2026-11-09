@@ -375,7 +375,7 @@ function TicketsListInner() {
                     ) : null}
                     <td className="dp-table-cell max-w-xs">
                       <Link
-                        href={`/tickets/${row.id}`}
+                        href={`/tickets/${row.id}?from=list`}
                         className="font-semibold text-sky-700 hover:text-sky-800 hover:underline"
                       >
                         {row.ticketId}

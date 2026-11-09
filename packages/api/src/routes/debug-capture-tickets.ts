@@ -11,6 +11,7 @@ import {
 } from "../lib/debug-portal-user.js";
 import { logDebugTicket } from "../lib/debug-ticket-log.js";
 import { activeDebugSprintId } from "../lib/debug-sprints.js";
+import { notifyAsync } from "../lib/notifications/index.js";
 
 const router: IRouter = Router();
 
@@ -188,6 +189,7 @@ router.post("/", async (req: AuthRequest, res) => {
           },
         });
         await logDebugTicket(prisma, row.id, { userId: u.id, email: u.email }, [{ action: "CREATED" }]);
+        notifyAsync("debug_ticket.created", { ticketId: row.id });
         return res.status(201).json({
           data: serializeRow(row),
           clientIp,

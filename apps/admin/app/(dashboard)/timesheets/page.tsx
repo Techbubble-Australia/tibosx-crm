@@ -42,16 +42,6 @@ type TimesheetRow = {
 
 type ClientOption = { id: string; name: string };
 
-function weekOverlapsRange(startDate: string, endDate: string, from: string, to: string): boolean {
-  const start = new Date(startDate).getTime();
-  const end = new Date(endDate).getTime();
-  const rangeFrom = from ? new Date(`${from}T00:00:00.000Z`).getTime() : null;
-  const rangeTo = to ? new Date(`${to}T23:59:59.999Z`).getTime() : null;
-  if (rangeFrom != null && end < rangeFrom) return false;
-  if (rangeTo != null && start > rangeTo) return false;
-  return true;
-}
-
 export default function TimesheetsPage() {
   const router = useRouter();
   const pathname = usePathname();
@@ -62,6 +52,8 @@ export default function TimesheetsPage() {
     useAdminSession();
   const isAdmin = role === "admin" || additionalRoles.includes("admin");
   const showCreateTimesheet = canCreateTimesheets;
+  /** Members work from the month-by-month section; the full table is for reviewers (PMs / admins). */
+  const showTable = canManageProjects || !isEffectiveProjectMember;
   const [rows, setRows] = useState<TimesheetRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -70,8 +62,6 @@ export default function TimesheetsPage() {
   const [statusFilter, setStatusFilter] = useState(listQuery.status);
   const [memberFilter, setMemberFilter] = useState(listQuery.member);
   const [clientFilter, setClientFilter] = useState(listQuery.clientId);
-  const [periodFrom, setPeriodFrom] = useState(listQuery.periodFrom);
-  const [periodTo, setPeriodTo] = useState(listQuery.periodTo);
   const [sortKey, setSortKey] = useState<TimesheetListSortKey>(listQuery.sortKey);
   const [sortDir, setSortDir] = useState<SortDir>(listQuery.sortDir);
   const [page, setPage] = useState(listQuery.page);
@@ -83,22 +73,20 @@ export default function TimesheetsPage() {
         status: statusFilter,
         member: memberFilter,
         clientId: clientFilter,
-        periodFrom,
-        periodTo,
+        periodFrom: "",
+        periodTo: "",
         sortKey,
         sortDir,
         page,
         pageSize,
       }),
-    [statusFilter, memberFilter, clientFilter, periodFrom, periodTo, sortKey, sortDir, page, pageSize],
+    [statusFilter, memberFilter, clientFilter, sortKey, sortDir, page, pageSize],
   );
 
   useEffect(() => {
     setStatusFilter(listQuery.status);
     setMemberFilter(listQuery.member);
     setClientFilter(listQuery.clientId);
-    setPeriodFrom(listQuery.periodFrom);
-    setPeriodTo(listQuery.periodTo);
     setSortKey(listQuery.sortKey);
     setSortDir(listQuery.sortDir);
     setPage(listQuery.page);
@@ -122,9 +110,6 @@ export default function TimesheetsPage() {
     if (clientFilter) {
       list = list.filter((row) => row.clientId === clientFilter);
     }
-    if (periodFrom || periodTo) {
-      list = list.filter((row) => weekOverlapsRange(row.startDate, row.endDate, periodFrom, periodTo));
-    }
     const sorted = [...list].sort((a, b) => {
       const dir = sortDir === "asc" ? 1 : -1;
       switch (sortKey) {
@@ -143,7 +128,7 @@ export default function TimesheetsPage() {
       }
     });
     return sorted;
-  }, [rows, statusFilter, memberFilter, clientFilter, periodFrom, periodTo, sortKey, sortDir]);
+  }, [rows, statusFilter, memberFilter, clientFilter, sortKey, sortDir]);
 
   const pagedRows = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -325,7 +310,7 @@ export default function TimesheetsPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            {rows.length > 0 ? (
+            {showTable && rows.length > 0 ? (
               <button
                 type="button"
                 onClick={() => void exportCsv()}
@@ -335,7 +320,7 @@ export default function TimesheetsPage() {
                 <Download className="h-4 w-4" /> Export Excel
               </button>
             ) : null}
-            {isEffectiveProjectMember && selected.size > 0 ? (
+            {showTable && isEffectiveProjectMember && selected.size > 0 ? (
               <button
                 type="button"
                 onClick={() => void submitSelected()}
@@ -357,9 +342,11 @@ export default function TimesheetsPage() {
           </div>
         </div>
 
-        {isEffectiveProjectMember ? <MonthlyTimesheetPeriods refreshKey={rows.length} /> : null}
+        {isEffectiveProjectMember ? (
+          <MonthlyTimesheetPeriods refreshKey={rows.length} onChanged={() => void fetchRows()} />
+        ) : null}
 
-        {isLoading ? (
+        {!showTable ? null : isLoading ? (
           <p className="text-sm text-gray-400">Loading…</p>
         ) : rows.length === 0 ? (
           <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/50 px-6 py-10 text-center dark:border-gray-700 dark:bg-gray-900/50">
@@ -384,32 +371,6 @@ export default function TimesheetsPage() {
                   placeholder="Search member…"
                   className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
                   aria-label="Filter by member name"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Period from</label>
-                <input
-                  type="date"
-                  value={periodFrom}
-                  onChange={(e) => {
-                    setPeriodFrom(e.target.value);
-                    setPage(1);
-                  }}
-                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
-                  aria-label="Period from"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Period to</label>
-                <input
-                  type="date"
-                  value={periodTo}
-                  onChange={(e) => {
-                    setPeriodTo(e.target.value);
-                    setPage(1);
-                  }}
-                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
-                  aria-label="Period to"
                 />
               </div>
               <div>

@@ -120,6 +120,26 @@ export const NOTIFICATION_CATALOG: NotificationCatalogEntry[] = [
     env: ["RESEND_API_KEY", "MAIL_FROM", "ADMIN_PUBLIC_URL"],
   },
   {
+    id: "debug_ticket.created",
+    channel: "email",
+    description: "New debug portal ticket — sent to portal admins and a confirmation to the reporter.",
+    implemented: true,
+    triggers: ["POST /api/debug-portal/tickets", "POST /api/admin/debug-capture-tickets"],
+    env: ["RESEND_API_KEY", "MAIL_FROM", "DEBUG_PORTAL_PUBLIC_URL"],
+  },
+  {
+    id: "debug_ticket.status.changed",
+    channel: "email",
+    description: "Debug ticket moved to another status — sent to the reporter (unless they moved it).",
+    implemented: true,
+    triggers: [
+      "PATCH /api/debug-portal/tickets/:id",
+      "PATCH /api/debug-portal/tickets/bulk-status",
+      "PATCH /api/debug-portal/agent/tickets/:id/status",
+    ],
+    env: ["RESEND_API_KEY", "MAIL_FROM", "DEBUG_PORTAL_PUBLIC_URL"],
+  },
+  {
     id: "contract.expiring",
     channel: "email",
     description: "Contract approaching or past end date.",

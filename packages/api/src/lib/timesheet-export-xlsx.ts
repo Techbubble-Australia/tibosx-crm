@@ -162,7 +162,7 @@ function writeTimesheetSheet(sheet: ExcelJS.Worksheet, row: TimesheetXlsxRow) {
       .filter((d) => d.kind === kind)
       .map((d) => formatTabDate(new Date(`${d.date}T00:00:00.000Z`)))
       .join(", ");
-  if (daysOff.some((d) => d.kind === "LEAVE")) sheet.addRow(pad(["Leave", listDays("LEAVE")]));
+  if (daysOff.some((d) => d.kind === "LEAVE")) sheet.addRow(pad(["Personal leave", listDays("LEAVE")]));
   if (daysOff.some((d) => d.kind === "HOLIDAY")) sheet.addRow(pad(["Public holidays", listDays("HOLIDAY")]));
   sheet.addRow(pad([]));
 

@@ -8,6 +8,9 @@ import { ChevronSelect } from "@/components/ChevronSelect";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MAX_TICKET_SCREENSHOTS, SCREENSHOT_ACCEPT, uploadScreenshots } from "@/lib/upload-screenshot";
 import { useSprints } from "@/lib/sprints";
+import { usePortalUser } from "@/lib/use-portal-user";
+import { useTicketStatuses } from "@/components/TicketStatusesProvider";
+import { StatusBadge } from "@/components/TicketBadges";
 
 type TicketType = "BUG" | "ENHANCEMENT";
 type ReportedEnvironment = "development" | "production";
@@ -25,6 +28,15 @@ export default function NewTicketPage() {
   const [dragOver, setDragOver] = useState(false);
   const { sprints, loading: sprintsLoading } = useSprints();
   const activeSprint = sprints.find((s) => s.status === "ACTIVE") ?? null;
+  const { isAdmin } = usePortalUser();
+  const { labelOf } = useTicketStatuses();
+  /** Set by the "+" on a board column; only admins can start a ticket in a later column. */
+  const [startStatus, setStartStatus] = useState<string | null>(null);
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("status");
+    if (requested) setStartStatus(requested);
+  }, []);
+  const effectiveStatus = startStatus && (isAdmin || startStatus === "PENDING") ? startStatus : null;
 
   const addFiles = useCallback((incoming: File[]) => {
     const images = incoming.filter((file) => SCREENSHOT_ACCEPT.split(",").includes(file.type));
@@ -94,6 +106,7 @@ export default function NewTicketPage() {
           userDescription: userDescription.trim(),
           currentUrl: currentUrl.trim() || undefined,
           screenshotUrls,
+          ...(effectiveStatus ? { status: effectiveStatus } : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -116,11 +129,16 @@ export default function NewTicketPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
-        backHref="/tickets"
-        backLabel="All tickets"
+        backHref="/board"
+        backLabel="Board"
         title="New ticket"
         description="Report a bug or enhancement that is not tied to a TBOS screen capture (API, infra, process, etc.)."
       />
+      {effectiveStatus ? (
+        <p className="flex items-center gap-2 text-sm text-slate-600">
+          This ticket will be added to the <StatusBadge status={effectiveStatus} /> column ({labelOf(effectiveStatus)}).
+        </p>
+      ) : null}
 
       <form onSubmit={(e) => void onSubmit(e)} className="dp-card space-y-6 p-5 sm:p-6">
         {error ? (

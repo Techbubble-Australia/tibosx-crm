@@ -13,6 +13,7 @@ import {
 } from "../lib/debug-media-url.js";
 import { ticketScreenshotUrls } from "../lib/debug-portal-user.js";
 import { AI_AGENT_ACTOR, logDebugTicket } from "../lib/debug-ticket-log.js";
+import { notifyAsync } from "../lib/notifications/index.js";
 import { isDebugTicketStatus, listDebugTicketStatuses } from "../lib/debug-ticket-statuses.js";
 import type { Prisma } from "@techbubble/database";
 
@@ -349,6 +350,12 @@ router.patch("/tickets/:idOrTicketId/status", async (req, res) => {
         { action: "STATUS_CHANGED", field: "status", oldValue: previousStatus, newValue: status },
       ]);
       return updated;
+    });
+    notifyAsync("debug_ticket.status.changed", {
+      ticketId: existing.id,
+      oldStatus: previousStatus,
+      newStatus: status,
+      actorEmail: AI_AGENT_ACTOR.email,
     });
 
     res.json({

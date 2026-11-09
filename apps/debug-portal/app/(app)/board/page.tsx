@@ -654,6 +654,16 @@ export default function BoardPage() {
                     <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
                       {items.length}
                     </span>
+                    {isAdmin || status.key === "PENDING" ? (
+                      <Link
+                        href={`/tickets/new?status=${encodeURIComponent(status.key)}`}
+                        className="rounded p-1 text-slate-400 hover:bg-slate-200/70 hover:text-slate-700"
+                        aria-label={`Add a ticket to ${status.label}`}
+                        title={`Add a ticket to ${status.label}`}
+                      >
+                        <Plus className="h-4 w-4" aria-hidden />
+                      </Link>
+                    ) : null}
                     {isAdmin ? (
                       <button
                         type="button"
@@ -714,7 +724,9 @@ export default function BoardPage() {
                   </div>
                 ) : null}
 
-                <ul className="flex flex-1 flex-col gap-2 px-2 pb-3">
+                {/* Each column scrolls on its own so long queues don't stretch the whole page. */}
+                <ul className="flex max-h-[calc(100vh-18rem)] min-h-[8rem] flex-1 flex-col gap-2 overflow-y-auto px-2 pb-3">
+
                   {items.length === 0 ? (
                     <li className="rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-xs text-slate-400">
                       {canDropOn(status.key) ? "Drop here" : "No tickets"}

@@ -13,6 +13,7 @@ import {
 import { logDebugTicket, serializeDebugTicketLog, type DebugTicketActor } from "../lib/debug-ticket-log.js";
 import { isDebugTicketStatus, previousDebugTicketStatus } from "../lib/debug-ticket-statuses.js";
 import { activeDebugSprintId } from "../lib/debug-sprints.js";
+import { notifyAsync } from "../lib/notifications/index.js";
 
 const router: IRouter = Router();
 
@@ -93,6 +94,8 @@ const portalCreateSchema = z.object({
   currentUrl: z.string().max(2000).optional(),
   screenshotUrl: z.string().max(2000).nullable().optional(),
   screenshotUrls: z.array(screenshotUrlSchema).max(MAX_TICKET_SCREENSHOTS).optional(),
+  /** Board "+" on a column: admins may start the ticket in that column; others always start in PENDING. */
+  status: z.string().trim().min(1).max(60).optional(),
 });
 
 const addScreenshotsSchema = z.object({
@@ -218,6 +221,8 @@ router.post("/", async (req: PortalRequest, res) => {
     };
 
     const sprintId = await activeDebugSprintId();
+    const initialStatus =
+      adminUser.isAdmin && input.status && (await isDebugTicketStatus(input.status)) ? input.status : "PENDING";
     let attemptId = ticketId;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -225,6 +230,7 @@ router.post("/", async (req: PortalRequest, res) => {
           data: {
             ticketId: attemptId,
             type: input.type,
+            status: initialStatus,
             reportedEnvironment: input.reportedEnvironment,
             userDescription: input.userDescription.trim(),
             reporterUserId: adminUser.id,
@@ -242,6 +248,7 @@ router.post("/", async (req: PortalRequest, res) => {
           include: { sprint: { select: SPRINT_SELECT } },
         });
         await logDebugTicket(prisma, row.id, actorOf(adminUser), [{ action: "CREATED" }]);
+        notifyAsync("debug_ticket.created", { ticketId: row.id });
         return res.status(201).json({ data: serializeRow(row) });
       } catch (err: unknown) {
         const code = (err as { code?: string })?.code;
@@ -358,6 +365,14 @@ router.patch("/bulk-status", async (req: PortalRequest, res) => {
       }
       return updated;
     });
+    for (const id of uniqueIds) {
+      notifyAsync("debug_ticket.status.changed", {
+        ticketId: id,
+        oldStatus: requiredFrom,
+        newStatus: status,
+        actorEmail: req.portalUser!.email,
+      });
+    }
 
     res.json({
       data: {
@@ -659,6 +674,14 @@ router.patch("/:id", async (req: PortalRequest, res) => {
         await tx.debugCaptureTicket.update({ where: { id: row.id }, data });
         await logDebugTicket(tx, row.id, actorOf(user), entries);
       });
+      if (data.status) {
+        notifyAsync("debug_ticket.status.changed", {
+          ticketId: row.id,
+          oldStatus: row.status,
+          newStatus: String(data.status),
+          actorEmail: user.email,
+        });
+      }
     }
     res.json({ data: await ticketDetail(row.id) });
   } catch (error) {

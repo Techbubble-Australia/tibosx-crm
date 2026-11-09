@@ -6,7 +6,7 @@ export type DayOffKind = "LEAVE" | "HOLIDAY";
 export type DayOff = { date: string; kind: DayOffKind };
 
 export const DAY_OFF_LABELS: Record<DayOffKind, string> = {
-  LEAVE: "Leave",
+  LEAVE: "Personal Leave",
   HOLIDAY: "Public holiday",
 };
 

@@ -258,6 +258,8 @@ export function TimesheetForm({
   const [uploading, setUploading] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [rawInputs, setRawInputs] = useState<Record<string, string>>({});
+  /** Tasks added on the selected day that have no hours yet; reset whenever another date is opened. */
+  const [dayLineKeys, setDayLineKeys] = useState<Set<string>>(() => new Set());
   const [navigating, setNavigating] = useState(false);
 
   const days = useMemo(() => monthDays(monthKey, bounds?.start, bounds?.end), [monthKey, bounds]);
@@ -368,44 +370,77 @@ export function TimesheetForm({
   }
 
   function setDayHours(line: LineEntry, iso: string, raw: string) {
+    if (daysOff.has(iso)) return;
     const sanitized = sanitizeHoursInput(raw);
     setRawInputs((prev) => ({ ...prev, [`${line.key}:${iso}`]: sanitized }));
     const n = sanitized && sanitized !== "." ? hoursInputToNumber(sanitized) : undefined;
     updateLine(line.key, { dailyHours: { ...line.dailyHours, [iso]: n && n > 0 ? n : undefined } });
-    // Working on leave isn't allowed, so logging hours clears a leave mark; public holidays keep theirs.
-    if (n && n > 0 && daysOff.get(iso) === "LEAVE") {
-      setDaysOff((prev) => {
-        const next = new Map(prev);
-        next.delete(iso);
-        return next;
-      });
-    }
   }
 
   function setDayComment(line: LineEntry, iso: string, value: string) {
+    if (daysOff.has(iso)) return;
     updateLine(line.key, { dailyComments: { ...line.dailyComments, [iso]: value || undefined } });
   }
 
+  function lineHasDayContent(line: LineEntry, iso: string): boolean {
+    return (Number(line.dailyHours[iso]) || 0) > 0 || Boolean(line.dailyComments[iso]?.trim());
+  }
+
+  /** Adds a task to the selected day only; tasks already used on other days are reused, not duplicated. */
   function addTask(caseKey: string) {
     if (!caseKey) return;
-    if (lines.some((l) => l.caseKey === caseKey)) return;
-    setLines((prev) => [...prev, { key: newLineKey(), caseKey, dailyHours: {}, dailyComments: {}, billable: true }]);
-  }
-
-  async function removeLine(line: LineEntry) {
-    const loggedDays = Object.values(line.dailyHours).filter((v) => (Number(v) || 0) > 0).length;
-    if (
-      loggedDays > 1 &&
-      !(await appConfirm(`Remove "${caseLabel(line)}" from this month? Its hours on ${loggedDays} days are removed too.`))
-    ) {
-      return;
+    const existing = lines.find((l) => l.caseKey === caseKey);
+    const key = existing?.key ?? newLineKey();
+    if (!existing) {
+      setLines((prev) => [...prev, { key, caseKey, dailyHours: {}, dailyComments: {}, billable: true }]);
     }
-    setLines((prev) => prev.filter((l) => l.key !== line.key));
+    setDayLineKeys((prev) => new Set(prev).add(key));
   }
 
-  /** null = working day; leave and public holidays count as filled. Hours are allowed on holidays, not on leave. */
-  function setDayOff(iso: string, kind: DayOffKind | null) {
-    if (kind === "LEAVE" && (totalsByDay.get(iso) ?? 0) > 0) return;
+  /** Removes this task's entry from the selected day only; other days keep their hours. */
+  function removeDayEntry(line: LineEntry, iso: string) {
+    const dailyHours = { ...line.dailyHours, [iso]: undefined };
+    const dailyComments = { ...line.dailyComments, [iso]: undefined };
+    const stillUsed =
+      Object.values(dailyHours).some((v) => (Number(v) || 0) > 0) ||
+      Object.values(dailyComments).some((v) => Boolean(v?.trim()));
+    setLines((prev) =>
+      stillUsed
+        ? prev.map((l) => (l.key === line.key ? { ...l, dailyHours, dailyComments } : l))
+        : prev.filter((l) => l.key !== line.key),
+    );
+    setDayLineKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(line.key);
+      return next;
+    });
+    setRawInputs((prev) => {
+      const next = { ...prev };
+      delete next[`${line.key}:${iso}`];
+      return next;
+    });
+  }
+
+  /**
+   * null = working day. Personal leave and public holidays count as filled; marking either clears that
+   * day's hours, tasks and comments, and the day stays read-only until it's set back to a working day.
+   */
+  async function setDayOff(iso: string, kind: DayOffKind | null) {
+    if (kind) {
+      const entries = lines.filter((l) => lineHasDayContent(l, iso));
+      if (entries.length) {
+        const hours = totalsByDay.get(iso) ?? 0;
+        const ok = await appConfirm(
+          `Marking this day as ${DAY_OFF_LABELS[kind]} clears ${entries.length} task entr${entries.length === 1 ? "y" : "ies"}${
+            hours ? ` (${formatHours(hours)} hours)` : ""
+          } on this day. Continue?`,
+          { title: `Mark as ${DAY_OFF_LABELS[kind]}`, confirmLabel: "Clear and mark" },
+        );
+        if (!ok) return;
+        for (const line of entries) removeDayEntry(line, iso);
+      }
+      setDayLineKeys(new Set());
+    }
     setDaysOff((prev) => {
       const next = new Map(prev);
       if (kind) next.set(iso, kind);
@@ -419,6 +454,7 @@ export function TimesheetForm({
     if (!day || day.locked) return;
     if (!editable && !(totalsByDay.get(iso) ?? 0) && !daysOff.has(iso)) return;
     setRawInputs({});
+    setDayLineKeys(new Set());
     setSelectedDay(iso);
   }
 
@@ -498,7 +534,11 @@ export function TimesheetForm({
     defaults.approverLabel ||
     approvers.find((a) => selectedApprover === `${a.kind}:${a.id}`)?.label ||
     (approvers.length === 1 ? approvers[0]!.label : "");
-  const usedCaseKeys = new Set(lines.map((l) => l.caseKey));
+  const dayLines = selectedDay
+    ? lines.filter((l) => dayLineKeys.has(l.key) || lineHasDayContent(l, selectedDay))
+    : [];
+  const dayCaseKeys = new Set(dayLines.map((l) => l.caseKey));
+  const selectedDayOff = selectedDay ? daysOff.get(selectedDay) ?? null : null;
   const selectedDayInfo = selectedDay ? days.find((d) => d.iso === selectedDay) : null;
   const selectedDayTotal = selectedDay ? totalsByDay.get(selectedDay) ?? 0 : 0;
   const progressPct = completion.requiredDays ? Math.round((completion.filledDays / completion.requiredDays) * 100) : 100;
@@ -598,7 +638,7 @@ export function TimesheetForm({
                 {leaveCount || holidayCount ? (
                   <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
                     {[
-                      leaveCount ? `${leaveCount} leave day${leaveCount === 1 ? "" : "s"}` : "",
+                      leaveCount ? `${leaveCount} personal leave day${leaveCount === 1 ? "" : "s"}` : "",
                       holidayCount ? `${holidayCount} public holiday${holidayCount === 1 ? "" : "s"}` : "",
                     ]
                       .filter(Boolean)
@@ -703,7 +743,7 @@ export function TimesheetForm({
               {(
                 [
                   ["logged", "Hours logged"],
-                  ["leave", "Leave"],
+                  ["leave", "Personal Leave"],
                   ["holiday", "Public holiday"],
                   ["weekend", "Weekend (optional)"],
                   ...(editable ? ([["missing", "Weekday still to fill"]] as const) : []),
@@ -898,20 +938,21 @@ export function TimesheetForm({
                   {(
                     [
                       [null, "Working day", "logged"],
-                      ["LEAVE", "Leave", "leave"],
-                      ["HOLIDAY", "Public holiday", "holiday"],
+                      ["LEAVE", DAY_OFF_LABELS.LEAVE, "leave"],
+                      ["HOLIDAY", DAY_OFF_LABELS.HOLIDAY, "holiday"],
                     ] as const
                   ).map(([kind, label, tone]) => {
-                    const active = (daysOff.get(selectedDay) ?? null) === kind;
-                    const blocked = !editable || (kind === "LEAVE" && selectedDayTotal > 0);
+                    const active = selectedDayOff === kind;
                     return (
                       <button
                         key={label}
                         type="button"
                         role="radio"
                         aria-checked={active}
-                        disabled={blocked && !active}
-                        onClick={() => setDayOff(selectedDay, kind)}
+                        disabled={!editable && !active}
+                        onClick={() => {
+                          if (editable && !active) void setDayOff(selectedDay, kind);
+                        }}
                         className={`flex items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                           active
                             ? `${DAY_TONES[tone].cell} ${DAY_TONES[tone].label} ring-1 ring-current`
@@ -926,108 +967,93 @@ export function TimesheetForm({
                   })}
                 </div>
                 <p className="text-xs text-gray-500">
-                  {daysOff.get(selectedDay) === "HOLIDAY"
-                    ? "Public holiday — you can still log hours below if you worked."
-                    : selectedDayTotal > 0
-                      ? "Clear the hours on this day to mark it as leave."
-                      : "Leave and public holidays count as filled. Hours can still be logged on a public holiday."}
+                  {selectedDayOff
+                    ? `Marked as ${DAY_OFF_LABELS[selectedDayOff]} — no hours, tasks or comments can be added. Choose Working day to log time.`
+                    : `${DAY_OFF_LABELS.LEAVE} and public holidays count as filled.`}
                 </p>
               </div>
             ) : null}
 
-            {lines.length === 0 && !editable ? <p className="text-sm text-gray-500">No hours logged.</p> : null}
+            {selectedDayOff ? null : (
+              <>
+                {dayLines.length === 0 ? (
+                  <p className="text-sm text-gray-500">
+                    {editable ? "No entries for this day yet. Add a task below." : "No hours logged."}
+                  </p>
+                ) : null}
 
-            {lines.map((line) => {
-              const rawKey = `${line.key}:${selectedDay}`;
-              const value = line.dailyHours[selectedDay];
-              const raw = rawInputs[rawKey] ?? (value ? String(value) : "");
-              if (!editable && !value && !line.dailyComments[selectedDay]) return null;
-              return (
-                <div key={line.key} className="space-y-2 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-                  <div className="flex items-start gap-2">
-                    {editable ? (
-                      <select
-                        className={`${selectClass} h-9 text-xs`}
-                        value={line.caseKey}
-                        onChange={(e) => updateLine(line.key, { caseKey: e.target.value, label: undefined })}
-                        aria-label="Task"
-                      >
-                        <option value="">Select task…</option>
-                        {cases.map((row) => {
-                          const key = `${row.kind}:${row.id}`;
-                          return (
-                            <option key={key} value={key} disabled={usedCaseKeys.has(key) && key !== line.caseKey}>
-                              {row.label}
-                            </option>
-                          );
-                        })}
-                        {line.caseKey && !cases.some((c) => `${c.kind}:${c.id}` === line.caseKey) ? (
-                          <option value={line.caseKey}>{caseLabel(line)}</option>
+                {dayLines.map((line) => {
+                  const rawKey = `${line.key}:${selectedDay}`;
+                  const value = line.dailyHours[selectedDay];
+                  const raw = rawInputs[rawKey] ?? (value ? String(value) : "");
+                  return (
+                    <div key={line.key} className="space-y-2 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                      <div className="flex items-start gap-2">
+                        <p className="min-w-0 flex-1 text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {caseLabel(line)}
+                        </p>
+                        {editable ? (
+                          <button
+                            type="button"
+                            onClick={() => removeDayEntry(line, selectedDay)}
+                            className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                            aria-label="Remove this entry from this day"
+                            title="Remove this entry from this day"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         ) : null}
-                      </select>
-                    ) : (
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{caseLabel(line)}</p>
-                    )}
-                    {editable ? (
-                      <button
-                        type="button"
-                        onClick={() => void removeLine(line)}
-                        className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                        aria-label="Remove task from this month"
-                        title="Remove task from this month"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    ) : null}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      readOnly={!editable}
-                      value={raw}
-                      onChange={(e) => setDayHours(line, selectedDay, e.target.value)}
-                      placeholder="0.00"
-                      className="h-9 w-24 rounded-md border border-gray-200 px-3 text-sm tabular-nums focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900"
-                      aria-label="Hours"
-                    />
-                    <span className="text-xs text-gray-500">hours</span>
-                  </div>
-                  <textarea
-                    rows={2}
-                    readOnly={!editable}
-                    value={line.dailyComments[selectedDay] ?? ""}
-                    onChange={(e) => setDayComment(line, selectedDay, e.target.value)}
-                    placeholder="What did you work on? (optional)"
-                    className="w-full resize-y rounded-md border border-gray-200 px-3 py-2 text-xs dark:border-gray-600 dark:bg-gray-900"
-                  />
-                </div>
-              );
-            })}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          readOnly={!editable}
+                          value={raw}
+                          onChange={(e) => setDayHours(line, selectedDay, e.target.value)}
+                          placeholder="0.00"
+                          className="h-9 w-24 rounded-md border border-gray-200 px-3 text-sm tabular-nums focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900"
+                          aria-label="Hours"
+                        />
+                        <span className="text-xs text-gray-500">hours</span>
+                      </div>
+                      <textarea
+                        rows={5}
+                        readOnly={!editable}
+                        value={line.dailyComments[selectedDay] ?? ""}
+                        onChange={(e) => setDayComment(line, selectedDay, e.target.value)}
+                        placeholder="What did you work on? (optional)"
+                        className="min-h-[7.5rem] w-full resize-y rounded-md border border-gray-200 px-3 py-2 text-sm leading-relaxed dark:border-gray-600 dark:bg-gray-900"
+                      />
+                    </div>
+                  );
+                })}
 
-            {editable ? (
-              <select
-                className={`${selectClass} border-dashed`}
-                value=""
-                onChange={(e) => addTask(e.target.value)}
-                aria-label="Add task"
-              >
-                <option value="">+ Add task for this month…</option>
-                {cases
-                  .filter((row) => !usedCaseKeys.has(`${row.kind}:${row.id}`))
-                  .map((row) => (
-                    <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
-                      {row.label}
-                    </option>
-                  ))}
-              </select>
-            ) : null}
-            {editable ? (
-              <p className="flex items-start gap-1.5 text-xs text-gray-500">
-                <Plus className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
-                Tasks apply to the whole month; enter hours per day. Changes are kept until you click Save Draft.
-              </p>
-            ) : null}
+                {editable ? (
+                  <select
+                    className={`${selectClass} border-dashed`}
+                    value=""
+                    onChange={(e) => addTask(e.target.value)}
+                    aria-label="Add task"
+                  >
+                    <option value="">+ Add task for this day…</option>
+                    {cases
+                      .filter((row) => !dayCaseKeys.has(`${row.kind}:${row.id}`))
+                      .map((row) => (
+                        <option key={`${row.kind}:${row.id}`} value={`${row.kind}:${row.id}`}>
+                          {row.label}
+                        </option>
+                      ))}
+                  </select>
+                ) : null}
+                {editable ? (
+                  <p className="flex items-start gap-1.5 text-xs text-gray-500">
+                    <Plus className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+                    Each day starts empty; add the tasks you worked on and their hours. Changes are kept until you click Save Draft.
+                  </p>
+                ) : null}
+              </>
+            )}
 
             <div className="flex gap-2 pt-1">
               {(() => {

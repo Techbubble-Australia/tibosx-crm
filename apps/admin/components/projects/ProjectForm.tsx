@@ -29,6 +29,19 @@ import {
 } from "@/components/projects/ProjectCustomerSupportSettings";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { getEffectiveRoles } from "@/lib/admin-roles";
+import { CurrencyInput, formatAmount } from "@/components/ui/CurrencyInput";
+
+/** "AUD 12,500.00 · INR 220,000.00" — rows can use different currencies, so totals are per currency. */
+function formatTotalsByCurrency(rows: Array<{ currency: string; amount: number }>): string {
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    const amount = Number(row.amount) || 0;
+    if (!amount) continue;
+    totals.set(row.currency || "AUD", (totals.get(row.currency || "AUD") ?? 0) + amount);
+  }
+  if (!totals.size) return "—";
+  return [...totals].map(([currency, amount]) => `${currency} ${formatAmount(amount)}`).join(" · ");
+}
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-white";
@@ -505,7 +518,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
 
         <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
           <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Financials</h3>
-          <div className="mb-6 grid gap-4 sm:grid-cols-2">
+          <div className="mb-6 grid gap-4 lg:grid-cols-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Budget</label>
               <div className="flex gap-2">
@@ -521,13 +534,10 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                   </select>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    className={`${inputClass} read-only:bg-gray-50 dark:read-only:bg-gray-900`}
+                  <CurrencyInput
+                    className={`${inputClass} tabular-nums read-only:bg-gray-50 dark:read-only:bg-gray-900`}
                     value={budget}
-                    onChange={(e) => setBudget(e.target.value)}
+                    onChange={(n) => setBudget(n === null ? "" : String(n))}
                     readOnly={!canEditEstimates || budgetLocked}
                     placeholder={budgetLocked && !defaults.id ? "Set from the contract value on save" : "0.00"}
                     aria-label="Budget amount"
@@ -541,6 +551,20 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                     ? "Set from the total contract value and kept in sync with it."
                     : "Optional. Enter a budget for projects without a contract."}
               </p>
+            </div>
+            <div>
+              <span className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Total estimated cost</span>
+              <p className={`${inputClass} flex items-center bg-gray-50 tabular-nums dark:bg-gray-900`}>
+                {formatTotalsByCurrency(estimates.map((row) => ({ currency: row.currency, amount: row.estimatedCost })))}
+              </p>
+              <p className="mt-1 text-xs text-gray-500">Sum of the estimate rows below.</p>
+            </div>
+            <div>
+              <span className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Total actual cost</span>
+              <p className={`${inputClass} flex items-center bg-gray-50 tabular-nums dark:bg-gray-900`}>
+                {formatTotalsByCurrency(actuals.map((row) => ({ currency: row.currency, amount: row.actualCost })))}
+              </p>
+              <p className="mt-1 text-xs text-gray-500">Sum of the actual rows below, including approved timesheets.</p>
             </div>
           </div>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -623,7 +647,12 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                         </select>
                       </td>
                       <td className="py-2 pr-3">
-                        <input type="number" min={0} step="0.01" className={inputClass} value={row.estimatedCost} onChange={(e) => updateEstimate(index, { estimatedCost: Number(e.target.value) })} />
+                        <CurrencyInput
+                          className={`${inputClass} tabular-nums`}
+                          value={row.estimatedCost}
+                          onChange={(n) => updateEstimate(index, { estimatedCost: n ?? 0 })}
+                          aria-label="Estimated cost"
+                        />
                       </td>
                       <td className="py-2 pr-3">
                         <select className={inputClass} value={row.costType} onChange={(e) => updateEstimate(index, { costType: e.target.value as ProjectCostType })}>
@@ -681,7 +710,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                           <>
                             <td className="py-2 pr-3">{row.qty} day{row.qty === 1 ? "" : "s"}</td>
                             <td className="py-2 pr-3">{row.currency}</td>
-                            <td className="py-2 pr-3">{row.actualCost.toFixed(2)}</td>
+                            <td className="py-2 pr-3 tabular-nums">{formatAmount(row.actualCost)}</td>
                             <td className="py-2">{PROJECT_COST_TYPE_LABELS[row.costType] ?? row.costType}</td>
                           </>
                         ) : (
@@ -695,7 +724,12 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                               </select>
                             </td>
                             <td className="py-2 pr-3">
-                              <input type="number" min={0} step="0.01" className={inputClass} value={row.actualCost} onChange={(e) => updateActual(index, { actualCost: Number(e.target.value) })} />
+                              <CurrencyInput
+                                className={`${inputClass} tabular-nums`}
+                                value={row.actualCost}
+                                onChange={(n) => updateActual(index, { actualCost: n ?? 0 })}
+                                aria-label="Actual cost"
+                              />
                             </td>
                             <td className="py-2">
                               <select className={inputClass} value={row.costType} onChange={(e) => updateActual(index, { costType: e.target.value as ProjectCostType })}>
@@ -781,22 +815,13 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                             >
                               {SALES_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
                             </select>
-                            <input
-                              type="number"
-                              min={0}
-                              step="0.01"
-                              className={`${compactInputClass} w-28 text-right tabular-nums`}
-                              value={member.rate ?? ""}
-                              placeholder="0.00"
+                            <CurrencyInput
+                              className={`${compactInputClass} w-32 text-right tabular-nums`}
+                              value={member.rate ?? null}
                               readOnly={!canEditEstimates}
                               aria-label="Rate"
-                              onChange={(e) =>
-                                updateMemberLocal(member.id, {
-                                  rate: e.target.value === "" ? null : Number(e.target.value),
-                                })
-                              }
-                              onBlur={(e) => {
-                                const next = e.target.value === "" ? null : Number(e.target.value);
+                              onChange={(n) => updateMemberLocal(member.id, { rate: n })}
+                              onCommit={(next) => {
                                 if (canEditEstimates && next !== (savedRatesRef.current[member.id] ?? null)) {
                                   void saveMemberRate(member.id, { rate: next });
                                 }

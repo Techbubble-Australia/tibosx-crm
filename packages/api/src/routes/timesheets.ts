@@ -945,7 +945,15 @@ router.get("/monthly-periods", async (req: AuthRequest, res) => {
 
     const projects = await prisma.project.findMany({
       where: { id: { in: projectIds } },
-      select: { id: true, projectNumber: true, title: true, startDate: true, endDate: true },
+      select: {
+        id: true,
+        projectNumber: true,
+        title: true,
+        startDate: true,
+        endDate: true,
+        projectManager: { select: { name: true, email: true } },
+        timesheetApprover: { select: { name: true, email: true } },
+      },
       orderBy: { projectNumber: "asc" },
     });
     if (!projects.length) return res.json({ data: [] });
@@ -960,6 +968,9 @@ router.get("/monthly-periods", async (req: AuthRequest, res) => {
         daysOff: true,
         dailyHours: true,
         rejectReason: true,
+        approverKind: true,
+        projectClientContactId: true,
+        projectClientContact: { include: { contact: { select: { name: true, email: true } } } },
         entries: { select: { dailyHours: true } },
       },
     });
@@ -987,6 +998,13 @@ router.get("/monthly-periods", async (req: AuthRequest, res) => {
           timesheetId: sheet?.id ?? null,
           status: sheet?.status ?? null,
           rejectReason: sheet?.status === "DRAFT" ? sheet.rejectReason : null,
+          approverLabel: resolveTimesheetApproverLabel({
+            approverKind: sheet?.approverKind ?? null,
+            project,
+            projectClientContact: sheet?.projectClientContact ?? null,
+          }),
+          approverKind: sheet?.approverKind ?? null,
+          projectClientContactId: sheet?.projectClientContactId ?? null,
           totalHours: hourRows.reduce((sum, row) => sum + sumDailyHours(row), 0),
           requiredDays: completion.requiredDays,
           filledDays: completion.filledDays,
@@ -1123,7 +1141,7 @@ const TIMESHEET_RULE_ERRORS: Record<string, string> = {
   TIMESHEET_HOURS_OUTSIDE_PERIOD: "Hours can only be logged on days within this month",
   MONTH_START_REQUIRED: "Timesheets must start on the first day of the month",
   INVALID_DAY_OFF: "Days off can only be weekdays within the project dates for this month",
-  DAY_OFF_HAS_HOURS: "A day marked as leave can't also have hours",
+  DAY_OFF_HAS_HOURS: "A day marked as personal leave or a public holiday can't also have hours",
   PROJECT_CHANGE_NOT_ALLOWED: "A saved timesheet can't be moved to another project",
 };
 
