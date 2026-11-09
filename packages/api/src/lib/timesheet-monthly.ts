@@ -105,19 +105,19 @@ export function dayOffDates(daysOff: DayOff[]): string[] {
   return daysOff.map((d) => d.date);
 }
 
-/** Days off must be open weekdays of the month with no hours logged. */
+/** Days off must be open weekdays of the month. Hours may be logged on a public holiday, not on leave. */
 export function assertValidDaysOff(
   monthKey: string,
   project: { startDate: Date; endDate: Date },
-  daysOff: string[],
+  daysOff: DayOff[],
   entryRows: Array<{ dailyHours: DailyHours }>,
 ) {
   const required = new Set(requiredDaysInMonth(monthKey, project));
   const { startIso } = monthBounds(monthKey);
   const hours = totalHoursByIsoDay(startIso, entryRows.map((r) => r.dailyHours));
-  for (const iso of daysOff) {
-    if (!required.has(iso)) throw new Error("INVALID_DAY_OFF");
-    if ((hours.get(iso) ?? 0) > 0) throw new Error("DAY_OFF_HAS_HOURS");
+  for (const { date, kind } of daysOff) {
+    if (!required.has(date)) throw new Error("INVALID_DAY_OFF");
+    if (kind === "LEAVE" && (hours.get(date) ?? 0) > 0) throw new Error("DAY_OFF_HAS_HOURS");
   }
 }
 

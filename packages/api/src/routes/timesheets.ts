@@ -1109,7 +1109,7 @@ async function assertTimesheetProjectDateRules(
   const { endIso } = monthBounds(monthKey);
   assertTimesheetWithinProjectDates(project, startIso, endIso, entryRows);
   const daysOff = normalizeDaysOff(data.daysOff);
-  assertValidDaysOff(monthKey, project, dayOffDates(daysOff), entryRows);
+  assertValidDaysOff(monthKey, project, daysOff, entryRows);
   return {
     startDate: new Date(`${startIso}T00:00:00.000Z`),
     endDate: new Date(`${endIso}T00:00:00.000Z`),
@@ -1123,7 +1123,7 @@ const TIMESHEET_RULE_ERRORS: Record<string, string> = {
   TIMESHEET_HOURS_OUTSIDE_PERIOD: "Hours can only be logged on days within this month",
   MONTH_START_REQUIRED: "Timesheets must start on the first day of the month",
   INVALID_DAY_OFF: "Days off can only be weekdays within the project dates for this month",
-  DAY_OFF_HAS_HOURS: "A day marked as a day off can't also have hours",
+  DAY_OFF_HAS_HOURS: "A day marked as leave can't also have hours",
   PROJECT_CHANGE_NOT_ALLOWED: "A saved timesheet can't be moved to another project",
 };
 

@@ -372,7 +372,8 @@ export function TimesheetForm({
     setRawInputs((prev) => ({ ...prev, [`${line.key}:${iso}`]: sanitized }));
     const n = sanitized && sanitized !== "." ? hoursInputToNumber(sanitized) : undefined;
     updateLine(line.key, { dailyHours: { ...line.dailyHours, [iso]: n && n > 0 ? n : undefined } });
-    if (n && n > 0 && daysOff.has(iso)) {
+    // Working on leave isn't allowed, so logging hours clears a leave mark; public holidays keep theirs.
+    if (n && n > 0 && daysOff.get(iso) === "LEAVE") {
       setDaysOff((prev) => {
         const next = new Map(prev);
         next.delete(iso);
@@ -402,9 +403,9 @@ export function TimesheetForm({
     setLines((prev) => prev.filter((l) => l.key !== line.key));
   }
 
-  /** null = working day; leave and public holidays count as filled. */
+  /** null = working day; leave and public holidays count as filled. Hours are allowed on holidays, not on leave. */
   function setDayOff(iso: string, kind: DayOffKind | null) {
-    if (kind && (totalsByDay.get(iso) ?? 0) > 0) return;
+    if (kind === "LEAVE" && (totalsByDay.get(iso) ?? 0) > 0) return;
     setDaysOff((prev) => {
       const next = new Map(prev);
       if (kind) next.set(iso, kind);
@@ -631,10 +632,10 @@ export function TimesheetForm({
                 const clickable = !day.locked && (editable || hours > 0 || Boolean(offKind));
                 const tone: DayTone = day.locked
                   ? "locked"
-                  : hours > 0
-                    ? "logged"
-                    : offKind === "HOLIDAY"
-                      ? "holiday"
+                  : offKind === "HOLIDAY"
+                    ? "holiday"
+                    : hours > 0
+                      ? "logged"
                       : offKind === "LEAVE"
                         ? "leave"
                         : isMissing
@@ -658,9 +659,16 @@ export function TimesheetForm({
                       <span className={`text-sm font-semibold ${tone === "locked" ? "" : "text-gray-800 dark:text-gray-200"}`}>
                         {day.day}
                       </span>
-                      <span className="flex items-center gap-1">
+                      <span className="flex min-w-0 items-center gap-1">
+                        {hours > 0 && offKind === "HOLIDAY" ? (
+                          <span className={`flex items-center gap-0.5 truncate text-[10px] font-semibold uppercase ${style.label}`}>
+                            <PartyPopper className="h-3 w-3 shrink-0" aria-hidden /> Holiday
+                          </span>
+                        ) : hours > 0 && day.weekend ? (
+                          <span className={`truncate text-[10px] font-semibold uppercase ${style.label}`}>Weekend</span>
+                        ) : null}
                         {hasComment && !day.locked ? (
-                          <MessageSquare className="h-3.5 w-3.5 text-blue-500" aria-label="Has comment" />
+                          <MessageSquare className="h-3.5 w-3.5 shrink-0 text-blue-500" aria-label="Has comment" />
                         ) : null}
                         {day.locked ? <Lock className="h-3.5 w-3.5" aria-label="Locked" /> : null}
                       </span>
@@ -895,7 +903,7 @@ export function TimesheetForm({
                     ] as const
                   ).map(([kind, label, tone]) => {
                     const active = (daysOff.get(selectedDay) ?? null) === kind;
-                    const blocked = !editable || (kind !== null && selectedDayTotal > 0);
+                    const blocked = !editable || (kind === "LEAVE" && selectedDayTotal > 0);
                     return (
                       <button
                         key={label}
@@ -918,9 +926,11 @@ export function TimesheetForm({
                   })}
                 </div>
                 <p className="text-xs text-gray-500">
-                  {selectedDayTotal > 0
-                    ? "Clear the hours on this day to mark it as leave or a public holiday."
-                    : "Leave and public holidays count as filled."}
+                  {daysOff.get(selectedDay) === "HOLIDAY"
+                    ? "Public holiday — you can still log hours below if you worked."
+                    : selectedDayTotal > 0
+                      ? "Clear the hours on this day to mark it as leave."
+                      : "Leave and public holidays count as filled. Hours can still be logged on a public holiday."}
                 </p>
               </div>
             ) : null}
