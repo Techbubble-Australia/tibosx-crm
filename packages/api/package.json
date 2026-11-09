@@ -9,6 +9,7 @@
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
+    "timesheets:convert-monthly": "tsx src/scripts/convert-weekly-timesheets.ts",
     "lint": "eslint src/"
   },
   "dependencies": {

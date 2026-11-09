@@ -18,8 +18,7 @@ export default function NewMemberTimesheetPage() {
   const [targets, setTargets] = useState<Target[]>([]);
   const [selected, setSelected] = useState("");
   const [managerName, setManagerName] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -63,7 +62,7 @@ export default function NewMemberTimesheetPage() {
       return;
     }
     try {
-      const body: Record<string, unknown> = { startDate, endDate };
+      const body: Record<string, unknown> = { month };
       if (kind === "project") body.projectId = id;
       else body.ticketId = id;
       const res = await workspaceFetch("/member-timesheets", {
@@ -120,27 +119,15 @@ export default function NewMemberTimesheetPage() {
           <label className="mb-1 block text-sm font-medium">Project manager / case creator</label>
           <input readOnly value={managerName} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm" />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-sm font-medium">Start date <span className="text-red-500">*</span></label>
-            <input
-              type="date"
-              required
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium">End date <span className="text-red-500">*</span></label>
-            <input
-              type="date"
-              required
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            />
-          </div>
+        <div className="sm:max-w-xs">
+          <label className="mb-1 block text-sm font-medium">Month <span className="text-red-500">*</span></label>
+          <input
+            type="month"
+            required
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          />
         </div>
         <button
           type="submit"

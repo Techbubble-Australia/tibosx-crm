@@ -107,8 +107,9 @@ function formatDay(iso: string, withYear = false) {
   });
 }
 
-function formatWeek(start: string, end: string) {
-  return `${formatDay(start)} – ${formatDay(end)}`;
+/** Timesheet periods are calendar months. */
+function formatPeriod(start: string) {
+  return new Date(start).toLocaleDateString("en-AU", { month: "long", year: "numeric", timeZone: "UTC" });
 }
 
 function formatRange(start: string, end: string) {
@@ -184,7 +185,7 @@ function Pill({ className, children }: { className: string; children: ReactNode 
 }
 
 function attentionDetail(item: DashboardData["attention"][number]): string {
-  const week = item.weekStart && item.weekEnd ? formatWeek(item.weekStart, item.weekEnd) : "";
+  const week = item.weekStart ? formatPeriod(item.weekStart) : "";
   switch (item.kind) {
     case "MISSING":
       return `${item.consultant}: nothing found for ${week}`;
@@ -586,7 +587,7 @@ export default function ProjectManagerDashboardPage() {
               <KpiCard
                 label="Missing timesheets"
                 value={kpis.missingTimesheets.count}
-                hint="expected last week, none found"
+                hint="expected last month, none found"
                 tone={kpis.missingTimesheets.count ? "alert" : "default"}
               />
               <KpiCard
@@ -685,7 +686,7 @@ export default function ProjectManagerDashboardPage() {
 
             <Section
               title="Timesheets by month"
-              subtitle={`Every week of ${formatMonthInput(timesheetMonth)}. Each project member is expected to log time each week; “Not yet submitted” means the week hasn't ended yet.`}
+              subtitle={`Monthly timesheets for ${formatMonthInput(timesheetMonth)}. Each project member is expected to submit one timesheet per month; “Not yet submitted” means the month hasn't ended yet.`}
               actions={
                 <div className="flex flex-wrap items-center gap-3">
                   <input
@@ -720,7 +721,7 @@ export default function ProjectManagerDashboardPage() {
                   <table className="min-w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
-                        <th className="py-2 pr-3">Week</th>
+                        <th className="py-2 pr-3">Month</th>
                         <th className="py-2 pr-3">Project</th>
                         <th className="py-2 pr-3">Consultant</th>
                         <th className="py-2 pr-3">Status</th>
@@ -730,7 +731,7 @@ export default function ProjectManagerDashboardPage() {
                     <tbody>
                       {weekRows.map((row) => (
                           <tr key={`${row.weekStart}-${row.projectId}-${row.consultant}`} className="border-b border-gray-50 dark:border-gray-800">
-                            <td className="whitespace-nowrap py-2 pr-3 text-gray-600 dark:text-gray-400">{formatWeek(row.weekStart, row.weekEnd)}</td>
+                            <td className="whitespace-nowrap py-2 pr-3 text-gray-600 dark:text-gray-400">{formatPeriod(row.weekStart)}</td>
                             <td className="py-2 pr-3">
                               <Link href={`/projects/${row.projectId}`} className="text-blue-600 hover:underline dark:text-blue-400">
                                 {row.projectLabel}

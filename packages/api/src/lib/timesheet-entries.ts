@@ -1,18 +1,14 @@
 import { z } from "zod";
 import { prisma, type Prisma } from "@techbubble/database";
 
+/** Legacy weekly keys (offset from the sheet's Monday) — only read when converting old weekly timesheets. */
 export const WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
-export type WeekdayKey = (typeof WEEKDAY_KEYS)[number];
-
-export const TIMESHEET_PERIODS = ["WEEKLY", "MONTHLY"] as const;
-export type TimesheetPeriod = (typeof TIMESHEET_PERIODS)[number];
 
 const ISO_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Weekly timesheets key hours by weekday (mon–sun); monthly timesheets key them by ISO date. */
-export type DayKey = WeekdayKey | string;
-export type DailyHours = Partial<Record<DayKey, number>>;
-export type DailyComments = Partial<Record<DayKey, string>>;
+/** Hours and comments are keyed by ISO date (YYYY-MM-DD). */
+export type DailyHours = Partial<Record<string, number>>;
+export type DailyComments = Partial<Record<string, string>>;
 
 export function isIsoDayKey(key: string): boolean {
   return ISO_DAY_RE.test(key);
@@ -22,7 +18,7 @@ function isDayKey(key: string): boolean {
   return (WEEKDAY_KEYS as readonly string[]).includes(key) || isIsoDayKey(key);
 }
 
-const dayKeySchema = z.string().refine(isDayKey, { message: "Invalid day key" });
+const dayKeySchema = z.string().refine(isIsoDayKey, { message: "Days must be dates (YYYY-MM-DD)" });
 
 export const dailyHoursSchema = z.record(
   dayKeySchema,
@@ -54,25 +50,13 @@ export function sumDailyHours(hours: DailyHours | null | undefined): number {
   );
 }
 
-export function mergeDailyHours(entries: DailyHours[]): DailyHours {
-  const merged: DailyHours = {};
-  for (const row of entries) {
-    for (const [key, value] of Object.entries(row ?? {})) {
-      const hours = Number(value) || 0;
-      if (!isDayKey(key) || hours <= 0) continue;
-      merged[key] = (merged[key] ?? 0) + hours;
-    }
-  }
-  return merged;
-}
-
 function addUtcDaysIso(iso: string, days: number): string {
   const d = new Date(`${iso}T00:00:00.000Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 
-/** Hours per calendar day for either layout (weekday keys are offset from the timesheet's Monday). */
+/** Hours per calendar day (legacy weekday keys are offset from the sheet's Monday). */
 export function hoursByIsoDay(
   startDate: Date | string,
   hours: DailyHours | null | undefined,
@@ -127,38 +111,6 @@ export function entryLabel(row: {
 
 export function activeEntryRows(entries: TimesheetEntryInput[] | undefined): TimesheetEntryInput[] {
   return (entries ?? []).filter((row) => entryHasHours(row.dailyHours));
-}
-
-export function resolveTimesheetTargets(data: {
-  projectId?: string;
-  opportunityId?: string;
-  ticketId?: string;
-  entries?: TimesheetEntryInput[];
-  dailyHours?: DailyHours;
-  dailyComments?: DailyComments;
-}) {
-  const entryRows = activeEntryRows(data.entries);
-  if (entryRows.length > 0) {
-    if (!data.projectId) {
-      throw new Error("PROJECT_REQUIRED");
-    }
-    return {
-      projectId: data.projectId,
-      opportunityId: null as string | null,
-      ticketId: null as string | null,
-      dailyHours: mergeDailyHours(entryRows.map((row) => row.dailyHours)),
-      dailyComments: null,
-      entryRows,
-    };
-  }
-  return {
-    projectId: data.projectId ?? null,
-    opportunityId: data.opportunityId ?? null,
-    ticketId: data.ticketId ?? null,
-    dailyHours: data.dailyHours,
-    dailyComments: data.dailyComments ?? null,
-    entryRows: [] as TimesheetEntryInput[],
-  };
 }
 
 export async function assertValidTimesheetEntries(

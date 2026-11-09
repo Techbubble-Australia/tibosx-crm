@@ -33,7 +33,6 @@ type TimesheetRow = {
   memberName: string;
   startDate: string;
   endDate: string;
-  period?: "WEEKLY" | "MONTHLY";
   monthKey?: string | null;
   status: TimesheetStatus;
   totalHours?: number;
@@ -42,10 +41,6 @@ type TimesheetRow = {
 };
 
 type ClientOption = { id: string; name: string };
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
-}
 
 function weekOverlapsRange(startDate: string, endDate: string, from: string, to: string): boolean {
   const start = new Date(startDate).getTime();
@@ -472,7 +467,7 @@ export default function TimesheetsPage() {
                       />
                     </th>
                     <SortableTh
-                      label="Timesheet period"
+                      label="Month"
                       sortKey="period"
                       activeKey={sortKey}
                       dir={sortDir}
@@ -519,10 +514,7 @@ export default function TimesheetsPage() {
                           ? `${row.projectNumber} — ${row.projectTitle}`
                           : row.targetLabel || "—";
                     const detailHref = timesheetDetailHref(row.id, listQueryParams);
-                    const periodText =
-                      row.period === "MONTHLY" && row.monthKey
-                        ? formatMonthLabel(row.monthKey)
-                        : `${formatDate(row.startDate)} – ${formatDate(row.endDate)}`;
+                    const periodText = formatMonthLabel(row.monthKey || row.startDate.slice(0, 7));
                     return (
                       <tr key={row.id} className="border-b border-gray-50 dark:border-gray-800">
                         <td className="px-4 py-2">
@@ -530,7 +522,7 @@ export default function TimesheetsPage() {
                             type="checkbox"
                             checked={selected.has(row.id)}
                             onChange={() => toggleExportSelect(row.id)}
-                            aria-label={`Select timesheet ${row.period === "MONTHLY" && row.monthKey ? formatMonthLabel(row.monthKey) : `${formatDate(row.startDate)} – ${formatDate(row.endDate)}`}`}
+                            aria-label={`Select timesheet ${formatMonthLabel(row.monthKey || row.startDate.slice(0, 7))}`}
                           />
                         </td>
                         <td className="max-w-[11rem] px-4 py-2 text-gray-500">

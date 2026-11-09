@@ -7,11 +7,10 @@ import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { workspaceFetch } from "@/lib/workspace-fetch";
 import { messageFromApiError } from "@/lib/api-error";
-import { TimesheetForm } from "@/components/timesheets/TimesheetForm";
-import { MonthlyTimesheetForm, type MonthlyTimesheetValues } from "@/components/timesheets/MonthlyTimesheetForm";
+import { TimesheetForm, type TimesheetFormValues } from "@/components/timesheets/TimesheetForm";
 import { TimesheetRejectDialog } from "@/components/timesheets/TimesheetRejectDialog";
 
-type TimesheetDetail = MonthlyTimesheetValues & { canApprove?: boolean; period?: string };
+type TimesheetDetail = TimesheetFormValues & { canApprove?: boolean };
 
 export default function WorkspaceTimesheetDetailPage() {
   const router = useRouter();
@@ -131,8 +130,8 @@ export default function WorkspaceTimesheetDetailPage() {
                 </button>
               </>
           ) : null;
-          return timesheet.period === "MONTHLY" ? (
-            <MonthlyTimesheetForm
+          return (
+            <TimesheetForm
               defaults={timesheet}
               monthKey={timesheet.monthKey || timesheet.startDate.slice(0, 7)}
               readOnly
@@ -141,8 +140,6 @@ export default function WorkspaceTimesheetDetailPage() {
               onSubmit={async () => {}}
               footerActions={footer}
             />
-          ) : (
-            <TimesheetForm defaults={timesheet} readOnly isSaving={false} onSubmit={async () => {}} footerActions={footer} />
           );
         })()
       ) : null}

@@ -44,15 +44,15 @@ function monthLabel(date: Date): string {
   return date.toLocaleDateString("en-AU", { month: "long", year: "numeric", timeZone: "UTC" });
 }
 
-function periodText(sheet: { startDate: Date; period: string }): string {
-  return sheet.period === "MONTHLY" ? monthLabel(sheet.startDate) : `week of ${isoDay(sheet.startDate)}`;
+function periodText(sheet: { startDate: Date }): string {
+  return monthLabel(sheet.startDate);
 }
 
 function projectLabel(project: { projectNumber: string; title: string } | null | undefined): string {
   return project ? `${project.projectNumber} · ${project.title}` : "Project";
 }
 
-type WeekStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "NOT_STARTED" | "MISSING";
+type MonthStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "NOT_STARTED" | "MISSING";
 
 /** Client and support-portal-only users have their own portal dashboard. */
 const PORTAL_ONLY_ROLES = new Set(["client", "customer_support"]);
@@ -68,12 +68,15 @@ router.get("/", async (req: AuthRequest, res) => {
 
     const today = startOfUtcDay(new Date());
     const currentMonday = mondayOfWeek(today);
-    const lastMonday = addDays(currentMonday, -7);
     const chartStart = addDays(currentMonday, -7 * (CHART_WEEKS - 1));
     const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+    const monthEnd = addDays(new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1)), -1);
     const nextMonthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1));
     const lastMonthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
-    const sheetsFrom = addDays(chartStart < lastMonthStart ? chartStart : lastMonthStart, -6);
+    const lastMonthEnd = addDays(monthStart, -1);
+    // Monthly sheets start on the 1st, so include the month the chart window starts in.
+    const earliest = chartStart < lastMonthStart ? chartStart : lastMonthStart;
+    const sheetsFrom = new Date(Date.UTC(earliest.getUTCFullYear(), earliest.getUTCMonth(), 1));
 
     const projectSelect = {
       id: true,
@@ -82,7 +85,6 @@ router.get("/", async (req: AuthRequest, res) => {
       status: true,
       startDate: true,
       endDate: true,
-      timesheetPeriod: true,
       client: { select: { name: true } },
       projectManager: { select: { name: true, email: true } },
     } satisfies Prisma.ProjectSelect;
@@ -92,7 +94,6 @@ router.get("/", async (req: AuthRequest, res) => {
       projectId: true,
       startDate: true,
       endDate: true,
-      period: true,
       status: true,
       rejectReason: true,
       dailyHours: true,
@@ -143,16 +144,15 @@ router.get("/", async (req: AuthRequest, res) => {
       .sort((a, b) => a.projectNumber.localeCompare(b.projectNumber));
     const activeProjects = projects.filter((project) => project.status === "ACTIVE");
 
-    const weekRows = (monday: Date, ended: boolean) => {
-      const sunday = addDays(monday, 6);
-      const key = isoDay(monday);
+    /** One expected timesheet per active project for each month the project overlaps. */
+    const monthRows = (start: Date, end: Date, ended: boolean) => {
+      const key = isoDay(start);
       return activeProjects
-        .filter((project) => project.timesheetPeriod !== "MONTHLY")
-        .filter((project) => project.startDate <= sunday && project.endDate >= monday)
+        .filter((project) => project.startDate <= end && project.endDate >= start)
         .map((project) => {
           const sheet = recentSheets.find((row) => row.projectId === project.id && isoDay(row.startDate) === key);
-          const status: WeekStatus = sheet
-            ? (sheet.status as WeekStatus)
+          const status: MonthStatus = sheet
+            ? (sheet.status as MonthStatus)
             : ended
               ? "MISSING"
               : "NOT_STARTED";
@@ -166,12 +166,12 @@ router.get("/", async (req: AuthRequest, res) => {
           };
         });
     };
-    const thisWeek = weekRows(currentMonday, false);
-    const lastWeek = weekRows(lastMonday, true);
+    const thisMonth = monthRows(monthStart, monthEnd, false);
+    const lastMonth = monthRows(lastMonthStart, lastMonthEnd, true);
 
     const returned = openSheets.filter((row) => row.status === "DRAFT" && row.rejectReason);
     const overdueDrafts = openSheets.filter(
-      (row) => row.status === "DRAFT" && !row.rejectReason && row.endDate < currentMonday,
+      (row) => row.status === "DRAFT" && !row.rejectReason && row.endDate < monthStart,
     );
     const awaiting = openSheets.filter((row) => row.status === "SUBMITTED");
 
@@ -223,29 +223,13 @@ router.get("/", async (req: AuthRequest, res) => {
       });
     }
     const lastMonthKey = isoDay(lastMonthStart).slice(0, 7);
-    const lastMonthEnd = addDays(monthStart, -1);
-    for (const project of activeProjects) {
-      if (project.timesheetPeriod !== "MONTHLY") continue;
-      if (project.startDate > lastMonthEnd || project.endDate < lastMonthStart) continue;
-      const hasSheet = recentSheets.some(
-        (row) => row.projectId === project.id && row.period === "MONTHLY" && isoDay(row.startDate) === isoDay(lastMonthStart),
-      );
-      if (hasSheet) continue;
+    for (const row of lastMonth.filter((r) => r.status === "MISSING")) {
       actionItems.push({
-        id: `missing:${project.id}:${lastMonthKey}`,
+        id: `missing:${row.projectId}:${lastMonthKey}`,
         kind: "MISSING",
         title: "Timesheet missing",
-        detail: `${projectLabel(project)}, ${monthLabel(lastMonthStart)}`,
-        href: `/timesheets/new?projectId=${encodeURIComponent(project.id)}&month=${lastMonthKey}`,
-      });
-    }
-    for (const row of lastWeek.filter((r) => r.status === "MISSING")) {
-      actionItems.push({
-        id: `missing:${row.projectId}:${isoDay(lastMonday)}`,
-        kind: "MISSING",
-        title: "Timesheet missing",
-        detail: `${row.projectLabel}, week of ${isoDay(lastMonday)}`,
-        href: `/timesheets/new?projectId=${encodeURIComponent(row.projectId)}&weekStart=${isoDay(lastMonday)}`,
+        detail: `${row.projectLabel}, ${monthLabel(lastMonthStart)}`,
+        href: `/timesheets/new?projectId=${encodeURIComponent(row.projectId)}&month=${lastMonthKey}`,
       });
     }
 
@@ -327,8 +311,8 @@ router.get("/", async (req: AuthRequest, res) => {
         userName: user?.name?.trim() || user?.email || "",
         weekStart: isoDay(currentMonday),
         weekEnd: isoDay(addDays(currentMonday, 6)),
-        lastWeekStart: isoDay(lastMonday),
-        lastWeekEnd: isoDay(addDays(lastMonday, 6)),
+        monthStart: isoDay(monthStart),
+        lastMonthStart: isoDay(lastMonthStart),
         isProjectMember: isMember,
         onboarding: {
           agreementPending,
@@ -343,8 +327,8 @@ router.get("/", async (req: AuthRequest, res) => {
           activeProjects: activeProjects.length,
         },
         actionItems,
-        thisWeek,
-        lastWeek,
+        thisMonth,
+        lastMonth,
         weeklyHours,
         projects: projectRows,
         recentActivity: activity.map((row) => ({

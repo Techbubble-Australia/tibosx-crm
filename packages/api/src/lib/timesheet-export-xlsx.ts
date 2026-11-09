@@ -84,14 +84,8 @@ function sanitizeSheetName(raw: string): string {
 }
 
 function sheetTitleForRow(row: TimesheetXlsxRow, index: number): string {
-  if (row.period === "MONTHLY") {
-    return sanitizeSheetName(
-      row.startDate.toLocaleDateString("en-AU", { month: "long", year: "numeric", timeZone: "UTC" }),
-    );
-  }
-  const start = formatTabDate(row.startDate);
-  const end = formatTabDate(row.endDate);
-  return sanitizeSheetName(`${start} - ${end}` || `Sheet ${index + 1}`);
+  const month = row.startDate.toLocaleDateString("en-AU", { month: "long", year: "numeric", timeZone: "UTC" });
+  return sanitizeSheetName(month || `Sheet ${index + 1}`);
 }
 
 export function buildTimesheetExportFilename(rows: TimesheetXlsxRow[]): string {
@@ -111,13 +105,10 @@ function padRow(cells: (string | number)[], columnCount: number): (string | numb
   return row.slice(0, columnCount);
 }
 
-/** Calendar days shown as columns: 7 for weekly sheets, every day of the month for monthly sheets. */
+/** Every day of the timesheet's month as a column. */
 function sheetDayIsos(row: TimesheetXlsxRow): string[] {
   const startIso = row.startDate.toISOString().slice(0, 10);
-  const count =
-    row.period === "MONTHLY"
-      ? Math.round((row.endDate.getTime() - row.startDate.getTime()) / 86_400_000) + 1
-      : WEEKDAY_KEYS.length;
+  const count = Math.round((row.endDate.getTime() - row.startDate.getTime()) / 86_400_000) + 1;
   return Array.from({ length: Math.max(1, count) }, (_, i) => addUtcDays(startIso, i).toISOString().slice(0, 10));
 }
 
@@ -165,7 +156,7 @@ function writeTimesheetSheet(sheet: ExcelJS.Worksheet, row: TimesheetXlsxRow) {
   sheet.addRow(pad(["Status", timesheetStatusLabel(row.status)]));
   sheet.addRow(pad(["Total hours", total]));
   const daysOff = Array.isArray(row.daysOff) ? (row.daysOff as string[]) : [];
-  if (row.period === "MONTHLY" && daysOff.length) {
+  if (daysOff.length) {
     sheet.addRow(pad(["Days off", daysOff.map((iso) => formatTabDate(new Date(`${iso}T00:00:00.000Z`))).join(", ")]));
   }
   sheet.addRow(pad([]));
@@ -196,7 +187,7 @@ function writeTimesheetSheet(sheet: ExcelJS.Worksheet, row: TimesheetXlsxRow) {
 
   sheet.getColumn(1).width = 36;
   for (let c = 2; c <= columnCount; c += 1) {
-    sheet.getColumn(c).width = row.period === "MONTHLY" ? 12 : 14;
+    sheet.getColumn(c).width = 12;
   }
 }
 

@@ -4,7 +4,7 @@ import type { AuthRequest } from "../middleware/auth";
 import { canManageProjects, getActorId } from "../lib/project-access";
 import { effectiveRolesForUser } from "../lib/admin-roles";
 import { toNumber } from "../lib/decimal";
-import { mondayOfWeek, startOfUtcDay } from "../lib/project-types";
+import { startOfUtcDay } from "../lib/project-types";
 import { sumDailyHours, type DailyHours } from "../lib/timesheet-entries";
 import {
   convertCurrency,
@@ -63,7 +63,6 @@ type WeekProject = {
   status: string;
   startDate: Date;
   endDate: Date;
-  timesheetPeriod: string;
   members: Array<{
     adminUserId: string | null;
     profile: { firstName: string };
@@ -76,7 +75,6 @@ type WeekSheet = {
   projectId: string | null;
   memberUserId: string;
   startDate: Date;
-  period: string;
   status: string;
   dailyHours: unknown;
   entries: Array<{ dailyHours: unknown }>;
@@ -93,41 +91,26 @@ const WEEK_STATUS_ORDER: Record<WeekRowStatus, number> = {
   APPROVED: 4,
 };
 
-/**
- * Every member with a login on an ACTIVE project is expected to log time for each period the project overlaps:
- * each week for weekly projects, each month for monthly projects.
- */
-function buildWeekRows(
-  projects: WeekProject[],
-  sheets: WeekSheet[],
-  weeks: Array<{ monday: Date; sunday: Date; ended: boolean }>,
-  months: ExpectedPeriod[] = [],
-): WeekRow[] {
-  const periods = [
-    ...weeks.map((week) => ({ period: "WEEKLY", start: week.monday, end: week.sunday, ended: week.ended })),
-    ...months.map((month) => ({ period: "MONTHLY", ...month })),
-  ];
-  return sortWeekRows(periods.flatMap((p) => buildPeriodRows(projects, sheets, p)));
+/** Every member with a login on an ACTIVE project is expected to log one timesheet per month the project overlaps. */
+function buildMonthRows(projects: WeekProject[], sheets: WeekSheet[], months: ExpectedPeriod[]): WeekRow[] {
+  return sortWeekRows(months.flatMap((month) => buildPeriodRows(projects, sheets, month)));
 }
 
-function buildPeriodRows(
-  projects: WeekProject[],
-  sheets: WeekSheet[],
-  window: { period: string; start: Date; end: Date; ended: boolean },
-): WeekRow[] {
+function monthPeriod(start: Date, today: Date): ExpectedPeriod {
+  const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0));
+  return { start, end, ended: end < today };
+}
+
+function buildPeriodRows(projects: WeekProject[], sheets: WeekSheet[], window: ExpectedPeriod): WeekRow[] {
   const projectById = new Map(projects.map((row) => [row.id, row]));
   const rows: WeekRow[] = [];
   const weekKey = isoDay(window.start);
   const weekEnd = isoDay(window.end);
-  const periodOf = (period: string) => (period === "MONTHLY" ? "MONTHLY" : "WEEKLY");
-  const sheetsThisWeek = sheets.filter(
-    (row) => isoDay(row.startDate) === weekKey && periodOf(row.period) === window.period,
-  );
+  const sheetsThisWeek = sheets.filter((row) => isoDay(row.startDate) === weekKey);
   const seen = new Set<string>();
 
   for (const project of projects) {
     if (project.status !== "ACTIVE") continue;
-    if (periodOf(project.timesheetPeriod) !== window.period) continue;
     if (project.startDate > window.end || project.endDate < window.start) continue;
     for (const member of project.members) {
       if (!member.adminUserId) continue;
@@ -194,7 +177,6 @@ const weekSheetSelect = {
   projectId: true,
   memberUserId: true,
   startDate: true,
-  period: true,
   status: true,
   dailyHours: true,
   entries: { select: { dailyHours: true } },
@@ -211,7 +193,7 @@ function scopeWhere(mine: boolean, actorId: string): Prisma.ProjectWhereInput {
   return mine ? { OR: [{ projectManagerId: actorId }, { timesheetApproverUserId: actorId }] } : {};
 }
 
-/** Timesheets for every week that overlaps the requested month (YYYY-MM, default current month). */
+/** Each member's timesheet for the requested month (YYYY-MM, default current month). */
 router.get("/timesheets-by-month", async (req: AuthRequest, res) => {
   try {
     const actorId = await requireProjectManager(req);
@@ -224,12 +206,6 @@ router.get("/timesheets-by-month", async (req: AuthRequest, res) => {
     if (month < 0 || month > 11) return res.status(400).json({ error: "Invalid month" });
 
     const monthStart = new Date(Date.UTC(year, month, 1));
-    const monthEnd = new Date(Date.UTC(year, month + 1, 0));
-    const weeks: Array<{ monday: Date; sunday: Date; ended: boolean }> = [];
-    for (let monday = mondayOfWeek(monthStart); monday <= monthEnd; monday = addDays(monday, 7)) {
-      const sunday = addDays(monday, 6);
-      weeks.push({ monday, sunday, ended: sunday < today });
-    }
 
     const projects = await prisma.project.findMany({
       where: scopeWhere(req.query.scope === "mine", actorId),
@@ -241,16 +217,12 @@ router.get("/timesheets-by-month", async (req: AuthRequest, res) => {
         status: true,
         startDate: true,
         endDate: true,
-        timesheetPeriod: true,
         members: weekProjectMembersSelect,
       },
     });
     const sheets = projects.length
       ? await prisma.timesheet.findMany({
-          where: {
-            projectId: { in: projects.map((row) => row.id) },
-            startDate: { gte: weeks[0]!.monday, lt: addDays(weeks[weeks.length - 1]!.monday, 7) },
-          },
+          where: { projectId: { in: projects.map((row) => row.id) }, startDate: monthStart },
           select: weekSheetSelect,
         })
       : [];
@@ -258,9 +230,7 @@ router.get("/timesheets-by-month", async (req: AuthRequest, res) => {
     res.json({
       data: {
         month: `${year}-${String(month + 1).padStart(2, "0")}`,
-        rows: buildWeekRows(projects, sheets, weeks, [
-          { start: monthStart, end: monthEnd, ended: monthEnd < today },
-        ]),
+        rows: buildMonthRows(projects, sheets, [monthPeriod(monthStart, today)]),
       },
     });
   } catch (error) {
@@ -281,9 +251,7 @@ router.get("/", async (req: AuthRequest, res) => {
       convertCurrency(amount, from || baseCurrency, baseCurrency, baseCurrency, rates);
 
     const today = startOfUtcDay(new Date());
-    const currentMonday = mondayOfWeek(today);
-    const lastMonday = addDays(currentMonday, -7);
-    const lastSunday = addDays(lastMonday, 6);
+    const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
 
     const projects = await prisma.project.findMany({
       where: scopeWhere(mine, actorId),
@@ -295,7 +263,6 @@ router.get("/", async (req: AuthRequest, res) => {
         status: true,
         startDate: true,
         endDate: true,
-        timesheetPeriod: true,
         client: { select: { name: true } },
         projectManager: { select: { name: true, email: true } },
         timesheetApprover: { select: { name: true, email: true } },
@@ -322,28 +289,23 @@ router.get("/", async (req: AuthRequest, res) => {
     } satisfies Prisma.TimesheetSelect;
 
     const lastMonthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
-    const lastMonthEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 0));
 
-    const [pendingTimesheets, lastWeekTimesheets, lastMonthTimesheets] = projectIds.length
+    const [pendingTimesheets, lastMonthTimesheets] = projectIds.length
       ? await Promise.all([
           prisma.timesheet.findMany({
             where: {
               projectId: { in: projectIds },
-              OR: [{ status: "SUBMITTED" }, { status: "DRAFT", endDate: { lt: currentMonday } }],
+              OR: [{ status: "SUBMITTED" }, { status: "DRAFT", endDate: { lt: monthStart } }],
             },
             orderBy: { startDate: "asc" },
             select: timesheetSelect,
           }),
           prisma.timesheet.findMany({
-            where: { projectId: { in: projectIds }, startDate: { gte: lastMonday, lt: currentMonday } },
-            select: weekSheetSelect,
-          }),
-          prisma.timesheet.findMany({
-            where: { projectId: { in: projectIds }, period: "MONTHLY", startDate: lastMonthStart },
+            where: { projectId: { in: projectIds }, startDate: lastMonthStart },
             select: weekSheetSelect,
           }),
         ])
-      : [[], [], []];
+      : [[], []];
 
     const memberName = (
       sheet: { memberUser: { name: string | null; email: string } },
@@ -363,21 +325,16 @@ router.get("/", async (req: AuthRequest, res) => {
       );
     };
 
-    const lastWeekRows = buildWeekRows(
-      projects,
-      [...lastWeekTimesheets, ...lastMonthTimesheets],
-      [{ monday: lastMonday, sunday: lastSunday, ended: true }],
-      [{ start: lastMonthStart, end: lastMonthEnd, ended: true }],
-    );
+    const lastMonthRows = buildMonthRows(projects, lastMonthTimesheets, [monthPeriod(lastMonthStart, today)]);
 
     const submitted = pendingTimesheets.filter((row) => row.status === "SUBMITTED");
     const overdueDrafts = pendingTimesheets.filter((row) => row.status === "DRAFT");
-    const missingLastWeek = lastWeekRows.filter((row) => row.status === "MISSING");
+    const missingLastMonth = lastMonthRows.filter((row) => row.status === "MISSING");
     const activeProjects = projects.filter((row) => row.status === "ACTIVE");
     const pastEnd = activeProjects.filter((row) => row.endDate < today);
 
     const attention = [
-      ...missingLastWeek.map((row) => ({
+      ...missingLastMonth.map((row) => ({
         kind: "MISSING" as const,
         projectId: row.projectId,
         projectLabel: row.projectLabel,
@@ -514,7 +471,7 @@ router.get("/", async (req: AuthRequest, res) => {
             count: overdueDrafts.length,
             hours: overdueDrafts.reduce((sum, row) => sum + timesheetHours(row), 0),
           },
-          missingTimesheets: { count: missingLastWeek.length },
+          missingTimesheets: { count: missingLastMonth.length },
           activeProjects: { count: activeProjects.length, pastEndDate: pastEnd.length },
           estimatedCost: {
             total: Math.round(estimatedTotal),

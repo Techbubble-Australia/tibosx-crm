@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Response } from "express";
 import { z } from "zod";
-import { prisma, type Prisma } from "@techbubble/database";
+import { prisma, Prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth";
 import {
   canManageAllTimesheets,
@@ -15,7 +15,7 @@ import { timesheetClientApproverWhere } from "../lib/timesheet-access";
 import { effectiveRolesForUser, hasEffectiveRole } from "../lib/admin-roles";
 import { getMemberOnboardingStatus } from "../lib/member-onboarding";
 import { notifyAsync } from "../lib/notifications";
-import { mondayOfWeek, sundayOfWeek, TIMESHEET_STATUSES, TIMESHEET_STATUS_LABELS } from "../lib/project-types";
+import { TIMESHEET_STATUS_LABELS } from "../lib/project-types";
 import { buildTimesheetExportFilename, buildTimesheetXlsxBuffer } from "../lib/timesheet-export-xlsx.js";
 import { syncProjectActualsFromTimesheets } from "../lib/project-financials.js";
 import { formatZodError } from "../lib/zod-error";
@@ -27,25 +27,15 @@ import {
 import {
   activeEntryRows,
   assertValidTimesheetEntries,
-  dailyCommentsSchema,
-  dailyHoursSchema,
   entryHasHours,
   entryLabel,
   replaceTimesheetEntries,
-  resolveTimesheetTargets,
   sumDailyHours,
   timesheetEntryInputSchema,
   type DailyHours,
-  type TimesheetPeriod,
+  type TimesheetEntryInput,
 } from "../lib/timesheet-entries";
-import {
-  assertTimesheetWithinProjectDates,
-  projectDateBoundsIso,
-  projectWeekMondayBounds,
-  snapWeekMondayToInput,
-  weekEndIsoFromMonday,
-  weekOverlapsProjectRange,
-} from "../lib/timesheet-project-dates";
+import { assertTimesheetWithinProjectDates, projectDateBoundsIso } from "../lib/timesheet-project-dates";
 import {
   assertValidDaysOff,
   formatIsoDayShort,
@@ -61,61 +51,25 @@ import {
 
 const router: IRouter = Router();
 
+/** Monthly timesheet for one project: startDate is the 1st of the month; hours are keyed by ISO date. */
 const timesheetSchema = z
   .object({
-    projectId: z.string().min(1).optional(),
-    opportunityId: z.string().min(1).optional(),
-    ticketId: z.string().min(1).optional(),
+    projectId: z.string().min(1, "Select a project"),
     entries: z.array(timesheetEntryInputSchema).optional(),
     approverKind: z.enum(["PM", "CLIENT_CONTACT"]).optional(),
     projectClientContactId: z.string().min(1).optional(),
     startDate: z.coerce.date(),
-    endDate: z.coerce.date(),
+    endDate: z.coerce.date().optional(),
     fileUrls: z.array(z.string().min(1)).optional(),
-    dailyHours: dailyHoursSchema.optional(),
-    dailyComments: dailyCommentsSchema.optional(),
     comments: z.string().max(10000).optional().nullable(),
-    /** Monthly timesheets: weekdays marked as a day off (leave / public holiday). */
+    /** Weekdays marked as a day off (leave / public holiday). */
     daysOff: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).max(31).optional(),
   })
-  .superRefine((data, ctx) => {
-    const entryRows = activeEntryRows(data.entries);
-    if (entryRows.length > 0) {
-      if (!data.projectId) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Select a project for line entries",
-          path: ["projectId"],
-        });
-      }
-      return;
-    }
-    if (!data.projectId && !data.opportunityId && !data.ticketId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Select a project, sales case, or support case",
-        path: ["projectId"],
-      });
-    }
-    if ([data.projectId, data.opportunityId, data.ticketId].filter(Boolean).length !== 1) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Select only one target",
-        path: ["projectId"],
-      });
-    }
-  })
   .refine(
-    (data) => {
-      const entryRows = activeEntryRows(data.entries);
-      const files = data.fileUrls?.length ?? 0;
-      const daysOff = data.daysOff?.length ?? 0;
-      if (entryRows.length > 0) {
-        return files > 0 || daysOff > 0 || entryRows.some((row) => entryHasHours(row.dailyHours));
-      }
-      const hours = data.dailyHours ? sumDailyHours(data.dailyHours) : 0;
-      return files > 0 || daysOff > 0 || hours > 0;
-    },
+    (data) =>
+      (data.fileUrls?.length ?? 0) > 0 ||
+      (data.daysOff?.length ?? 0) > 0 ||
+      activeEntryRows(data.entries).some((row) => entryHasHours(row.dailyHours)),
     { message: "Enter hours, mark a day off, or attach at least one file" },
   );
 
@@ -218,7 +172,6 @@ function serializeTimesheet(row: {
     projectNumber: string;
     startDate?: Date;
     endDate?: Date;
-    timesheetPeriod?: string;
     clientId?: string;
     client?: { id: string; name: string } | null;
     projectManagerId: string;
@@ -250,11 +203,10 @@ function serializeTimesheet(row: {
         ? serializedEntries[0]!.label
         : `${serializedEntries.length} entries — ${row.project?.projectNumber ?? ""} ${row.project?.title ?? ""}`.trim()
       : "";
-  const period = row.period === "MONTHLY" ? "MONTHLY" : "WEEKLY";
   const daysOff = normalizeDaysOff(row.daysOff);
-  const monthKey = period === "MONTHLY" ? monthKeyFromDate(row.startDate) : null;
+  const monthKey = monthKeyFromDate(row.startDate);
   const completion =
-    monthKey && row.project?.startDate && row.project?.endDate
+    row.project?.startDate && row.project?.endDate
       ? monthCompletion(
           monthKey,
           { startDate: row.project.startDate, endDate: row.project.endDate },
@@ -266,7 +218,7 @@ function serializeTimesheet(row: {
       : null;
   return {
     id: row.id,
-    period,
+    period: "MONTHLY" as const,
     monthKey,
     daysOff,
     completion,
@@ -320,7 +272,6 @@ const detailInclude = {
       projectNumber: true,
       startDate: true,
       endDate: true,
-      timesheetPeriod: true,
       projectManagerId: true,
       timesheetApproverUserId: true,
     },
@@ -389,7 +340,7 @@ async function mapDetailWithActions(
     canApprove = ids.includes(row.projectClientContactId);
   }
   const detail = mapDetail(row);
-  const monthIncomplete = detail.period === "MONTHLY" && detail.completion !== null && !detail.completion.complete;
+  const monthIncomplete = detail.completion !== null && !detail.completion.complete;
   const canSubmit = row.memberUserId === actorId && row.status === "DRAFT" && !monthIncomplete;
   const canDelete =
     (roles.includes("admin") && (row.status === "DRAFT" || row.status === "SUBMITTED")) ||
@@ -428,26 +379,15 @@ function formatTicketStatusLabel(status: string): string {
   return TICKET_STATUS_LABELS[status] ?? status.replace(/_/g, " ").toLowerCase();
 }
 
-function endOfWeekSundayUtc(weekStartIso: string): Date {
-  const sun = sundayOfWeek(new Date(`${weekStartIso}T00:00:00.000Z`));
-  const end = new Date(sun);
-  end.setUTCHours(23, 59, 59, 999);
-  return end;
-}
-
 type TicketWindow = { startIso: string; end: Date } | null;
-
-function weekTicketWindow(weekStartIso: string | null | undefined): TicketWindow {
-  return weekStartIso ? { startIso: weekStartIso, end: endOfWeekSundayUtc(weekStartIso) } : null;
-}
 
 function monthTicketWindow(monthKey: string): TicketWindow {
   const { startIso, endIso } = monthBounds(monthKey);
   return { startIso, end: new Date(`${endIso}T23:59:59.999Z`) };
 }
 
-/** Terminal tickets only appear for the week (or month) they were closed/resolved/cancelled in. */
-function ticketEligibleForTimesheetWeek(
+/** Terminal tickets only appear for the month they were closed/resolved/cancelled in. */
+function ticketEligibleForTimesheetMonth(
   ticket: { status: string; closedAt: Date | null; updatedAt: Date },
   window: TicketWindow,
 ): boolean {
@@ -480,7 +420,7 @@ async function listTimesheetTicketsForProject(projectId: string, window: TicketW
     orderBy: { updatedAt: "desc" },
     take: 200,
   });
-  return rows.filter((row) => ticketEligibleForTimesheetWeek(row, window));
+  return rows.filter((row) => ticketEligibleForTimesheetMonth(row, window));
 }
 
 async function timesheetAccessWhere(req: AuthRequest): Promise<Prisma.TimesheetWhereInput> {
@@ -542,11 +482,6 @@ function addDaysIso(iso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-type TimesheetEntryPoint = {
-  weekStart: string;
-  existingTimesheetId?: string;
-};
-
 function isLikelyTimesheetId(value: string): boolean {
   return /^c[a-z0-9]{20,}$/i.test(value);
 }
@@ -585,57 +520,6 @@ async function hydrateTimesheetApproverRow<
   return row;
 }
 
-async function findNextOpenTimesheetWeek(
-  actorId: string,
-  projectId: string,
-): Promise<TimesheetEntryPoint | null> {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { startDate: true, endDate: true, status: true },
-  });
-  if (!project) return null;
-  const { startDate, endDate } = projectDateBoundsIso(project);
-  const bounds = projectWeekMondayBounds(startDate, endDate);
-  const currentMonday = snapWeekMondayToInput(new Date().toISOString());
-
-  async function existingFor(weekStart: string) {
-    return prisma.timesheet.findFirst({
-      where: {
-        memberUserId: actorId,
-        projectId,
-        startDate: new Date(`${weekStart}T00:00:00.000Z`),
-      },
-      select: { id: true, status: true },
-    });
-  }
-
-  if (currentMonday > bounds.max) {
-    const existing = await existingFor(bounds.max);
-    return { weekStart: bounds.max, existingTimesheetId: existing?.id };
-  }
-
-  let monday = currentMonday < bounds.min ? bounds.min : currentMonday;
-  const fallbackMonday = monday;
-
-  for (let i = 0; i < 156; i++) {
-    if (monday > bounds.max) break;
-    if (!weekOverlapsProjectRange(monday, startDate, endDate)) {
-      monday = addDaysIso(monday, 7);
-      continue;
-    }
-    const existing = await existingFor(monday);
-    if (!existing) return { weekStart: monday };
-    if (existing.status === "DRAFT") {
-      return { weekStart: monday, existingTimesheetId: existing.id };
-    }
-    // SUBMITTED or APPROVED — advance to the next week without an existing timesheet.
-    monday = addDaysIso(monday, 7);
-  }
-  // Every remaining week is logged: open the current week so the member can still browse back.
-  const existing = await existingFor(fallbackMonday);
-  return { weekStart: fallbackMonday, existingTimesheetId: existing?.id };
-}
-
 async function resolveTimesheetEntryPoint(req: AuthRequest, res: Response) {
   const actorId = getActorId(req);
   const role = req.user?.role ?? "";
@@ -656,52 +540,33 @@ async function resolveTimesheetEntryPoint(req: AuthRequest, res: Response) {
     memberships[0];
   const projectId = match!.project.id;
   const monthly = await findNextOpenTimesheetMonth(actorId, projectId);
-  if (monthly) {
-    const { startIso, endIso } = monthBounds(monthly.month);
-    return res.json({
-      data: {
-        projectId,
-        period: "MONTHLY",
-        month: monthly.month,
-        weekStart: startIso,
-        weekEnd: endIso,
-        existingTimesheetId: monthly.existingTimesheetId ?? null,
-      },
-    });
-  }
-  const entry = await findNextOpenTimesheetWeek(actorId, projectId);
-  if (!entry) {
-    return res.status(409).json({
-      error: "All timesheet weeks are already logged for your active project assignments",
-    });
-  }
-  const mon = new Date(`${entry.weekStart}T00:00:00.000Z`);
-  const sun = sundayOfWeek(mon);
+  if (!monthly) return res.status(404).json({ error: "Project not found" });
+  const { startIso, endIso } = monthBounds(monthly.month);
   return res.json({
     data: {
       projectId,
-      period: "WEEKLY",
-      weekStart: entry.weekStart,
-      weekEnd: sun.toISOString().slice(0, 10),
-      existingTimesheetId: entry.existingTimesheetId ?? null,
+      month: monthly.month,
+      startDate: startIso,
+      endDate: endIso,
+      existingTimesheetId: monthly.existingTimesheetId ?? null,
     },
   });
 }
 
-/** Monthly projects: the current month (clamped to the project), or the next month that is still open. */
+/** The current month (clamped to the project dates), or the next month that is still open. */
 async function findNextOpenTimesheetMonth(
   actorId: string,
   projectId: string,
 ): Promise<{ month: string; existingTimesheetId?: string } | null> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { startDate: true, endDate: true, timesheetPeriod: true },
+    select: { startDate: true, endDate: true },
   });
-  if (!project || project.timesheetPeriod !== "MONTHLY") return null;
+  if (!project) return null;
   const months = projectMonthKeys(project);
   if (!months.length) return null;
   const sheets = await prisma.timesheet.findMany({
-    where: { memberUserId: actorId, projectId, period: "MONTHLY" },
+    where: { memberUserId: actorId, projectId },
     select: { id: true, status: true, startDate: true },
   });
   const byMonth = new Map(sheets.map((row) => [monthKeyFromDate(row.startDate), row]));
@@ -730,44 +595,17 @@ router.get("/active-projects", async (req: AuthRequest, res) => {
     const actorId = getActorId(req);
     const role = req.user?.role ?? "";
     const roles = await effectiveRolesForUser(actorId, role);
-    const weekStart =
-      typeof req.query.weekStart === "string" && req.query.weekStart.trim()
-        ? req.query.weekStart.trim()
-        : null;
     const projectMemberships = await listActiveProjectMembershipsForUser(actorId);
-    const options: Array<{ id: string; label: string; kind: string; timesheetPeriod: string }> = [];
+    const options: Array<{ id: string; label: string; kind: string }> = [];
     const seen = new Set<string>();
-    const periods = new Map(
-      (
-        await prisma.project.findMany({
-          where: { id: { in: projectMemberships.map((row) => row.project.id) } },
-          select: { id: true, timesheetPeriod: true },
-        })
-      ).map((row) => [row.id, row.timesheetPeriod]),
-    );
 
-    function pushProject(project: {
-      id: string;
-      projectNumber: string;
-      title: string;
-      kind: string;
-      startDate: Date;
-      endDate: Date;
-      timesheetPeriod?: string;
-    }) {
+    function pushProject(project: { id: string; projectNumber: string; title: string; kind: string }) {
       if (seen.has(project.id)) return;
-      const timesheetPeriod = project.timesheetPeriod ?? periods.get(project.id) ?? "WEEKLY";
-      // Monthly projects stay selectable from any week so the member can switch to their monthly sheet.
-      if (weekStart && timesheetPeriod !== "MONTHLY") {
-        const { startDate, endDate } = projectDateBoundsIso(project);
-        if (!weekOverlapsProjectRange(weekStart, startDate, endDate)) return;
-      }
       seen.add(project.id);
       options.push({
         id: project.id,
         label: `${project.projectNumber} — ${project.title}`,
         kind: project.kind,
-        timesheetPeriod,
       });
     }
 
@@ -778,15 +616,7 @@ router.get("/active-projects", async (req: AuthRequest, res) => {
     if (roles.includes("admin")) {
       const allActive = await prisma.project.findMany({
         where: { status: "ACTIVE" },
-        select: {
-          id: true,
-          projectNumber: true,
-          title: true,
-          kind: true,
-          startDate: true,
-          endDate: true,
-          timesheetPeriod: true,
-        },
+        select: { id: true, projectNumber: true, title: true, kind: true },
         orderBy: { projectNumber: "asc" },
       });
       for (const project of allActive) {
@@ -798,15 +628,7 @@ router.get("/active-projects", async (req: AuthRequest, res) => {
           status: "ACTIVE",
           OR: [{ projectManagerId: actorId }, { timesheetApproverUserId: actorId }],
         },
-        select: {
-          id: true,
-          projectNumber: true,
-          title: true,
-          kind: true,
-          startDate: true,
-          endDate: true,
-          timesheetPeriod: true,
-        },
+        select: { id: true, projectNumber: true, title: true, kind: true },
       });
       for (const project of managed) {
         pushProject(project);
@@ -825,10 +647,6 @@ router.get("/project-cases", async (req: AuthRequest, res) => {
     const role = req.user?.role ?? "";
     const roles = await effectiveRolesForUser(actorId, role);
     const projectId = typeof req.query.projectId === "string" ? req.query.projectId : "";
-    const weekStart =
-      typeof req.query.weekStart === "string" && req.query.weekStart.trim()
-        ? req.query.weekStart.trim()
-        : null;
     const asMemberUserId =
       typeof req.query.asMemberUserId === "string" && req.query.asMemberUserId.trim()
         ? req.query.asMemberUserId.trim()
@@ -864,7 +682,7 @@ router.get("/project-cases", async (req: AuthRequest, res) => {
     const monthParam = typeof req.query.month === "string" ? req.query.month.trim() : "";
     const tickets = await listTimesheetTicketsForProject(
       projectId,
-      isMonthKey(monthParam) ? monthTicketWindow(monthParam) : weekTicketWindow(weekStart),
+      isMonthKey(monthParam) ? monthTicketWindow(monthParam) : null,
     );
     const ticketOptions = tickets.map((row) => ({
       kind: "ticket" as const,
@@ -1021,7 +839,6 @@ router.get("/target-meta", async (req: AuthRequest, res) => {
           approvers,
           startDate,
           endDate,
-          timesheetPeriod: project.timesheetPeriod === "MONTHLY" ? "MONTHLY" : "WEEKLY",
         },
       });
     }
@@ -1077,10 +894,11 @@ async function buildProjectApprovers(projectId: string | null | undefined) {
 }
 
 router.get("/defaults", async (_req, res) => {
+  const { startIso, endIso } = monthBounds(monthKeyFromDate(new Date()));
   res.json({
     data: {
-      startDate: mondayOfWeek().toISOString(),
-      endDate: sundayOfWeek().toISOString(),
+      startDate: startIso,
+      endDate: endIso,
     },
   });
 });
@@ -1115,7 +933,7 @@ router.get("/monthly-periods", async (req: AuthRequest, res) => {
     if (!projectIds.length) return res.json({ data: [] });
 
     const projects = await prisma.project.findMany({
-      where: { id: { in: projectIds }, timesheetPeriod: "MONTHLY" },
+      where: { id: { in: projectIds } },
       select: { id: true, projectNumber: true, title: true, startDate: true, endDate: true },
       orderBy: { projectNumber: "asc" },
     });
@@ -1215,19 +1033,20 @@ router.get("/recent-submitted", async (req: AuthRequest, res) => {
   }
 });
 
-router.get("/for-week", async (req: AuthRequest, res) => {
+/** The member's timesheet for a project and month (YYYY-MM), if one exists. */
+router.get("/for-month", async (req: AuthRequest, res) => {
   try {
     const actorId = getActorId(req);
     const role = req.user?.role ?? "";
     const roles = await effectiveRolesForUser(actorId, role);
     const projectId = typeof req.query.projectId === "string" ? req.query.projectId : "";
-    const startDateRaw = typeof req.query.startDate === "string" ? req.query.startDate : "";
+    const monthRaw = typeof req.query.month === "string" ? req.query.month.trim() : "";
     const memberUserIdRaw =
       typeof req.query.memberUserId === "string" && req.query.memberUserId.trim()
         ? req.query.memberUserId.trim()
         : actorId;
-    if (!projectId || !startDateRaw) {
-      return res.status(400).json({ error: "projectId and startDate are required" });
+    if (!projectId || !isMonthKey(monthRaw)) {
+      return res.status(400).json({ error: "projectId and month (YYYY-MM) are required" });
     }
     if (memberUserIdRaw !== actorId) {
       const projectForAccess = await prisma.project.findUnique({
@@ -1238,18 +1057,9 @@ router.get("/for-week", async (req: AuthRequest, res) => {
         return res.status(403).json({ error: "Forbidden" });
       }
     }
-    const startDate = new Date(`${startDateRaw}T00:00:00.000Z`);
-    if (Number.isNaN(startDate.getTime())) {
-      return res.status(400).json({ error: "Invalid startDate" });
-    }
-    const periodRaw = typeof req.query.period === "string" ? req.query.period.toUpperCase() : "";
+    const startDate = new Date(`${monthBounds(monthRaw).startIso}T00:00:00.000Z`);
     const row = await prisma.timesheet.findFirst({
-      where: {
-        memberUserId: memberUserIdRaw,
-        projectId,
-        startDate,
-        period: periodRaw === "MONTHLY" ? "MONTHLY" : "WEEKLY",
-      },
+      where: { memberUserId: memberUserIdRaw, projectId, startDate },
       include: detailInclude,
     });
     if (!row) return res.json({ data: null });
@@ -1258,7 +1068,7 @@ router.get("/for-week", async (req: AuthRequest, res) => {
     if (!allowed) return res.json({ data: null });
     res.json({ data: mapDetail(row) });
   } catch (error) {
-    console.error("Error fetching timesheet for week:", error);
+    console.error("Error fetching timesheet for month:", error);
     res.status(500).json({ error: "Failed to fetch timesheet" });
   }
 });
@@ -1269,55 +1079,41 @@ function csvEscape(value: string | number | null | undefined) {
 }
 
 /**
- * Validates the period and logged days. Weekly sheets span Monday–Sunday; monthly sheets span the
- * calendar month, and days outside the project dates (e.g. 1–21 Oct for a 22 Oct start) are locked.
- * Returns the normalized period bounds and days off to store.
+ * Monthly sheets span the calendar month; days outside the project dates (e.g. 1–21 Oct for a
+ * 22 Oct start) are locked. Returns the normalized month bounds and days off to store.
  */
 async function assertTimesheetProjectDateRules(
   projectId: string,
-  period: TimesheetPeriod,
   data: { startDate: Date; daysOff?: string[] },
-  resolved: ReturnType<typeof resolveTimesheetTargets>,
-): Promise<{ startDate: Date; endDate: Date; daysOff: string[] | null }> {
+  entryRows: TimesheetEntryInput[],
+): Promise<{ startDate: Date; endDate: Date; daysOff: string[] }> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: { startDate: true, endDate: true, status: true },
   });
   if (!project) throw new Error("PROJECT_NOT_FOUND");
   const startIso = data.startDate.toISOString().slice(0, 10);
-
-  if (period === "MONTHLY") {
-    if (!isFirstOfMonthIso(startIso)) throw new Error("MONTH_START_REQUIRED");
-    const monthKey = startIso.slice(0, 7);
-    const { endIso } = monthBounds(monthKey);
-    assertTimesheetWithinProjectDates(project, startIso, endIso, resolved.entryRows, resolved.dailyHours ?? null);
-    const daysOff = normalizeDaysOff(data.daysOff);
-    const rows = resolved.entryRows.length
-      ? resolved.entryRows
-      : resolved.dailyHours
-        ? [{ dailyHours: resolved.dailyHours }]
-        : [];
-    assertValidDaysOff(monthKey, project, daysOff, rows);
-    return {
-      startDate: new Date(`${startIso}T00:00:00.000Z`),
-      endDate: new Date(`${endIso}T00:00:00.000Z`),
-      daysOff,
-    };
-  }
-
-  const endIso = weekEndIsoFromMonday(startIso);
-  assertTimesheetWithinProjectDates(project, startIso, endIso, resolved.entryRows, resolved.dailyHours ?? null);
-  return { startDate: data.startDate, endDate: new Date(`${endIso}T00:00:00.000Z`), daysOff: null };
+  if (!isFirstOfMonthIso(startIso)) throw new Error("MONTH_START_REQUIRED");
+  const monthKey = startIso.slice(0, 7);
+  const { endIso } = monthBounds(monthKey);
+  assertTimesheetWithinProjectDates(project, startIso, endIso, entryRows);
+  const daysOff = normalizeDaysOff(data.daysOff);
+  assertValidDaysOff(monthKey, project, daysOff, entryRows);
+  return {
+    startDate: new Date(`${startIso}T00:00:00.000Z`),
+    endDate: new Date(`${endIso}T00:00:00.000Z`),
+    daysOff,
+  };
 }
 
 const TIMESHEET_RULE_ERRORS: Record<string, string> = {
-  TIMESHEET_WEEK_OUTSIDE_PROJECT: "This period falls outside the project start and end dates",
+  TIMESHEET_WEEK_OUTSIDE_PROJECT: "This month falls outside the project start and end dates",
   TIMESHEET_HOURS_OUTSIDE_PROJECT: "Hours can only be logged on days within the project start and end dates",
-  TIMESHEET_HOURS_OUTSIDE_PERIOD: "Hours can only be logged on days within this timesheet period",
-  MONTH_START_REQUIRED: "Monthly timesheets must start on the first day of the month",
+  TIMESHEET_HOURS_OUTSIDE_PERIOD: "Hours can only be logged on days within this month",
+  MONTH_START_REQUIRED: "Timesheets must start on the first day of the month",
   INVALID_DAY_OFF: "Days off can only be weekdays within the project dates for this month",
   DAY_OFF_HAS_HOURS: "A day marked as a day off can't also have hours",
-  TIMESHEET_PERIOD_MISMATCH: "This timesheet's period doesn't match the project's timesheet type",
+  PROJECT_CHANGE_NOT_ALLOWED: "A saved timesheet can't be moved to another project",
 };
 
 function timesheetRuleErrorResponse(res: Response, error: unknown): boolean {
@@ -1418,7 +1214,6 @@ router.get("/", async (req: AuthRequest, res) => {
             projectNumber: true,
             startDate: true,
             endDate: true,
-            timesheetPeriod: true,
             clientId: true,
             client: { select: { id: true, name: true } },
             projectManagerId: true,
@@ -1499,104 +1294,52 @@ router.post("/", async (req: AuthRequest, res) => {
     }
     const data = timesheetSchema.parse(req.body);
     await assertMemberCanSubmitTimesheets(actorId, roles, { impersonatorId: req.user?.impersonatorId });
+    const entryRows = activeEntryRows(data.entries);
 
-    let resolved;
-    try {
-      resolved = resolveTimesheetTargets(data);
-    } catch (error) {
-      if (error instanceof Error && error.message === "PROJECT_REQUIRED") {
-        return res.status(400).json({ error: "Select a project for line entries" });
-      }
-      throw error;
+    const ok = await userHasActiveProjectMembership(actorId, data.projectId);
+    if (!ok) {
+      return res.status(400).json({ error: "You are not assigned to this active project" });
     }
-
-    let period: TimesheetPeriod = "WEEKLY";
-    let bounds: { startDate: Date; endDate: Date; daysOff: string[] | null } = {
-      startDate: data.startDate,
-      endDate: data.endDate,
-      daysOff: null,
-    };
-    if (resolved.projectId) {
-      const ok = await userHasActiveProjectMembership(actorId, resolved.projectId);
-      if (!ok) {
-        return res.status(400).json({ error: "You are not assigned to this active project" });
+    const approverOptions = await buildProjectApprovers(data.projectId);
+    if (approverOptions.length > 0) {
+      if (!data.approverKind) {
+        return res.status(400).json({ error: "Choose an approver for your timesheet" });
       }
-      const approverOptions = await buildProjectApprovers(resolved.projectId);
-      if (approverOptions.length > 0) {
-        if (!data.approverKind) {
-          return res.status(400).json({ error: "Choose an approver for your timesheet" });
-        }
-        if (data.approverKind === "CLIENT_CONTACT" && !data.projectClientContactId) {
-          return res.status(400).json({ error: "Choose an approver for your timesheet" });
-        }
-      }
-      const projectPeriod = await prisma.project.findUnique({
-        where: { id: resolved.projectId },
-        select: { timesheetPeriod: true },
-      });
-      period = projectPeriod?.timesheetPeriod === "MONTHLY" ? "MONTHLY" : "WEEKLY";
-      bounds = await assertTimesheetProjectDateRules(resolved.projectId, period, data, resolved);
-      const duplicate = await prisma.timesheet.findFirst({
-        where: {
-          memberUserId: actorId,
-          projectId: resolved.projectId,
-          period,
-          startDate: bounds.startDate,
-        },
-        select: { id: true },
-      });
-      if (duplicate) {
-        return res.status(409).json({
-          error: `A timesheet already exists for this project and ${period === "MONTHLY" ? "month" : "week"}`,
-          data: { id: duplicate.id },
-        });
-      }
-      if (resolved.entryRows.length > 0) {
-        await assertValidTimesheetEntries(actorId, resolved.projectId, resolved.entryRows);
-      }
-    } else if (data.opportunityId) {
-      const opportunity = await prisma.opportunity.findUnique({ where: { id: data.opportunityId } });
-      if (!opportunity || !opportunity.active) {
-        return res.status(400).json({ error: "Invalid case" });
-      }
-      if (opportunity.ownerId !== actorId) {
-        return res.status(400).json({ error: "You can only log time on cases you own" });
-      }
-    } else if (data.ticketId) {
-      const ticket = await prisma.ticket.findUnique({ where: { id: data.ticketId } });
-      if (!ticket?.projectId) return res.status(400).json({ error: "Invalid support case" });
-      const inGroup = await prisma.projectSupportGroupMember.findFirst({
-        where: { adminUserId: actorId, group: { projectId: ticket.projectId } },
-      });
-      if (!inGroup) {
-        return res.status(400).json({ error: "You are not on the support team for this case" });
+      if (data.approverKind === "CLIENT_CONTACT" && !data.projectClientContactId) {
+        return res.status(400).json({ error: "Choose an approver for your timesheet" });
       }
     }
+    const bounds = await assertTimesheetProjectDateRules(data.projectId, data, entryRows);
+    const duplicate = await prisma.timesheet.findFirst({
+      where: { memberUserId: actorId, projectId: data.projectId, startDate: bounds.startDate },
+      select: { id: true },
+    });
+    if (duplicate) {
+      return res.status(409).json({
+        error: "A timesheet already exists for this project and month",
+        data: { id: duplicate.id },
+      });
+    }
+    await assertValidTimesheetEntries(actorId, data.projectId, entryRows);
 
     const row = await prisma.$transaction(async (tx) => {
       const created = await tx.timesheet.create({
         data: {
-          projectId: resolved.projectId,
-          opportunityId: resolved.opportunityId,
-          ticketId: resolved.ticketId,
+          projectId: data.projectId,
           approverKind: data.approverKind ?? null,
           projectClientContactId:
             data.approverKind === "CLIENT_CONTACT" ? data.projectClientContactId ?? null : null,
           memberUserId: actorId,
           startDate: bounds.startDate,
           endDate: bounds.endDate,
-          period,
-          daysOff: bounds.daysOff ?? undefined,
+          period: "MONTHLY",
+          daysOff: bounds.daysOff,
           status: "DRAFT",
           fileUrls: data.fileUrls ?? [],
-          dailyHours: resolved.dailyHours ?? undefined,
-          dailyComments: resolved.dailyComments ?? undefined,
           comments: data.comments?.trim() || null,
         },
       });
-      if (resolved.entryRows.length > 0) {
-        await replaceTimesheetEntries(tx, created.id, resolved.entryRows);
-      }
+      await replaceTimesheetEntries(tx, created.id, entryRows);
       await tx.timesheetActivityLog.create({
         data: {
           timesheetId: created.id,
@@ -1646,76 +1389,53 @@ router.put("/:id", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Only draft timesheets can be edited" });
     }
 
-    let resolved;
-    try {
-      resolved = resolveTimesheetTargets(data);
-    } catch (error) {
-      if (error instanceof Error && error.message === "PROJECT_REQUIRED") {
-        return res.status(400).json({ error: "Select a project for line entries" });
-      }
-      throw error;
+    if (existing.projectId && data.projectId !== existing.projectId) {
+      return res.status(400).json({ error: TIMESHEET_RULE_ERRORS.PROJECT_CHANGE_NOT_ALLOWED });
     }
-
-    const period: TimesheetPeriod = existing.period === "MONTHLY" ? "MONTHLY" : "WEEKLY";
-    let bounds: { startDate: Date; endDate: Date; daysOff: string[] | null } = {
-      startDate: data.startDate,
-      endDate: data.endDate,
-      daysOff: null,
-    };
-    if (period === "MONTHLY" && resolved.projectId !== existing.projectId) {
-      return res.status(400).json({ error: TIMESHEET_RULE_ERRORS.TIMESHEET_PERIOD_MISMATCH });
+    const entryRows = activeEntryRows(data.entries);
+    const ok = await userHasActiveProjectMembership(actorId, data.projectId);
+    if (!ok) {
+      return res.status(400).json({ error: "You are not assigned to this active project" });
     }
-    if (resolved.projectId) {
-      const ok = await userHasActiveProjectMembership(actorId, resolved.projectId);
-      if (!ok) {
-        return res.status(400).json({ error: "You are not assigned to this active project" });
-      }
-      bounds = await assertTimesheetProjectDateRules(resolved.projectId, period, data, resolved);
-      const duplicate = await prisma.timesheet.findFirst({
-        where: {
-          memberUserId: actorId,
-          projectId: resolved.projectId,
-          period,
-          startDate: bounds.startDate,
-          id: { not: req.params.id },
-        },
-        select: { id: true },
+    const bounds = await assertTimesheetProjectDateRules(data.projectId, data, entryRows);
+    const duplicate = await prisma.timesheet.findFirst({
+      where: {
+        memberUserId: actorId,
+        projectId: data.projectId,
+        startDate: bounds.startDate,
+        id: { not: req.params.id },
+      },
+      select: { id: true },
+    });
+    if (duplicate) {
+      return res.status(409).json({
+        error: "A timesheet already exists for this project and month",
+        data: { id: duplicate.id },
       });
-      if (duplicate) {
-        return res.status(409).json({
-          error: `A timesheet already exists for this project and ${period === "MONTHLY" ? "month" : "week"}`,
-          data: { id: duplicate.id },
-        });
-      }
-      if (resolved.entryRows.length > 0) {
-        await assertValidTimesheetEntries(actorId, resolved.projectId, resolved.entryRows);
-      }
     }
+    await assertValidTimesheetEntries(actorId, data.projectId, entryRows);
 
     const row = await prisma.$transaction(async (tx) => {
       const updated = await tx.timesheet.update({
         where: { id: req.params.id },
         data: {
-          projectId: resolved.projectId,
-          opportunityId: resolved.opportunityId,
-          ticketId: resolved.ticketId,
+          projectId: data.projectId,
+          opportunityId: null,
+          ticketId: null,
           approverKind: data.approverKind ?? null,
           projectClientContactId:
             data.approverKind === "CLIENT_CONTACT" ? data.projectClientContactId ?? null : null,
           startDate: bounds.startDate,
           endDate: bounds.endDate,
-          ...(period === "MONTHLY" ? { daysOff: bounds.daysOff ?? [] } : {}),
+          period: "MONTHLY",
+          daysOff: bounds.daysOff,
           fileUrls: data.fileUrls ?? [],
-          dailyHours: resolved.dailyHours ?? undefined,
-          dailyComments: resolved.dailyComments ?? undefined,
+          dailyHours: Prisma.DbNull,
+          dailyComments: Prisma.DbNull,
           comments: data.comments?.trim() || null,
         },
       });
-      if (resolved.entryRows.length > 0) {
-        await replaceTimesheetEntries(tx, updated.id, resolved.entryRows);
-      } else if (data.entries) {
-        await tx.timesheetEntry.deleteMany({ where: { timesheetId: updated.id } });
-      }
+      await replaceTimesheetEntries(tx, updated.id, entryRows);
       await tx.timesheetActivityLog.create({
         data: { timesheetId: updated.id, action: "UPDATED", performedById: actorId },
       });
@@ -1828,7 +1548,7 @@ router.post("/submit", async (req: AuthRequest, res) => {
     if (!rows.length) return res.status(400).json({ error: "No draft timesheets found" });
 
     for (const row of rows) {
-      if (row.period !== "MONTHLY" || !row.project) continue;
+      if (!row.project) continue;
       const completion = monthCompletion(
         monthKeyFromDate(row.startDate),
         row.project,

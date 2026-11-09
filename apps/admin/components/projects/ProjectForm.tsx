@@ -100,7 +100,6 @@ export type ProjectFormValues = {
   budgetCurrency?: string | null;
   startDate: string;
   endDate: string;
-  timesheetPeriod?: "WEEKLY" | "MONTHLY";
   fileUrls: string[];
   estimates: ProjectEstimateRow[];
   actuals: ProjectActualRow[];
@@ -184,9 +183,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
   );
   const [contractId, setContractId] = useState(defaults.contractId ?? "");
   const [startDate, setStartDate] = useState(toDateInput(defaults.startDate) || new Date().toISOString().slice(0, 10));
-  const [endDate, setEndDate] = useState(toDateInput(defaults.endDate) || new Date().toISOString().slice(0, 10));
-  const [timesheetPeriod, setTimesheetPeriod] = useState<"WEEKLY" | "MONTHLY">(defaults.timesheetPeriod ?? "WEEKLY");
-  const [estimates, setEstimates] = useState<ProjectEstimateRow[]>(defaults.estimates ?? []);
+  const [endDate, setEndDate] = useState(toDateInput(defaults.endDate) || new Date().toISOString().slice(0, 10));  const [estimates, setEstimates] = useState<ProjectEstimateRow[]>(defaults.estimates ?? []);
   const [actuals, setActuals] = useState<ProjectActualRow[]>(defaults.actuals ?? []);
   const [members, setMembers] = useState<ProjectMemberRow[]>(defaults.members ?? []);
   const [budget, setBudget] = useState(defaults.budget != null ? String(defaults.budget) : "");
@@ -399,7 +396,6 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
       contractId: contractId || null,
       startDate,
       endDate,
-      timesheetPeriod,
       fileUrls,
       ...(budgetLocked
         ? {}
@@ -503,37 +499,6 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">End date <span className="text-red-500">*</span></label>
               <input type="date" className={inputClass} value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
-            </div>
-            <div className="sm:col-span-2">
-              <span className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Timesheet type <span className="text-red-500">*</span>
-              </span>
-              <div className="inline-flex rounded-lg border border-gray-200 p-0.5 dark:border-gray-700" role="radiogroup" aria-label="Timesheet type">
-                {(["WEEKLY", "MONTHLY"] as const).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    role="radio"
-                    aria-checked={timesheetPeriod === value}
-                    onClick={() => setTimesheetPeriod(value)}
-                    className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-                      timesheetPeriod === value
-                        ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
-                        : "text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
-                    }`}
-                  >
-                    {value === "WEEKLY" ? "Weekly" : "Monthly"}
-                  </button>
-                ))}
-              </div>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {timesheetPeriod === "MONTHLY"
-                  ? "Members fill in one timesheet per calendar month. Days outside the project dates are locked, and a month can only be submitted once every weekday has hours or is marked as a day off."
-                  : "Members fill in one timesheet per week (Monday to Sunday)."}
-                {defaults.id && defaults.timesheetPeriod && defaults.timesheetPeriod !== timesheetPeriod
-                  ? " Existing timesheets keep their current layout; new timesheets use the new type."
-                  : ""}
-              </p>
             </div>
           </div>
         </section>

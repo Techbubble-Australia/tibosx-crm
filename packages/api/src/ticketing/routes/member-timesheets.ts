@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@techbubble/database";
 import { authMiddleware, type TicketingRequest } from "../middleware/auth.js";
 import { formatZodError } from "../../lib/zod-error.js";
+import { monthBounds } from "../../lib/timesheet-monthly.js";
 
 const router: IRouter = Router();
 
@@ -133,8 +134,8 @@ router.get("/", async (req: TicketingRequest, res) => {
 const createSchema = z.object({
   projectId: z.string().optional(),
   ticketId: z.string().optional(),
-  startDate: z.coerce.date(),
-  endDate: z.coerce.date(),
+  /** YYYY-MM — timesheets are monthly. */
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Select a month"),
 });
 
 router.post("/", async (req: TicketingRequest, res) => {
@@ -154,17 +155,26 @@ router.post("/", async (req: TicketingRequest, res) => {
   if (!input.projectId && !input.ticketId) {
     return res.status(400).json({ error: "Select a project or case" });
   }
-  if (input.endDate < input.startDate) {
-    return res.status(400).json({ error: "End date must be on or after start date" });
-  }
+  const { startIso, endIso } = monthBounds(input.month);
+  const startDate = new Date(`${startIso}T00:00:00.000Z`);
+  const existing = await prisma.timesheet.findFirst({
+    where: {
+      memberUserId,
+      startDate,
+      ...(input.projectId ? { projectId: input.projectId } : { ticketId: input.ticketId ?? null }),
+    },
+    select: { id: true },
+  });
+  if (existing) return res.status(200).json({ data: { id: existing.id } });
 
   const row = await prisma.timesheet.create({
     data: {
       memberUserId,
       projectId: input.projectId ?? null,
       ticketId: input.ticketId ?? null,
-      startDate: input.startDate,
-      endDate: input.endDate,
+      startDate,
+      endDate: new Date(`${endIso}T00:00:00.000Z`),
+      period: "MONTHLY",
       status: "DRAFT",
       approverKind: input.ticketId ? "CLIENT_CONTACT" : "PM",
     },

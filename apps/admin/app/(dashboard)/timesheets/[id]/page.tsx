@@ -9,7 +9,6 @@ import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
 import { TimesheetForm, type TimesheetFormValues } from "@/components/timesheets/TimesheetForm";
-import { MonthlyTimesheetForm, type MonthlyTimesheetValues } from "@/components/timesheets/MonthlyTimesheetForm";
 import { TimesheetRejectDialog } from "@/components/timesheets/TimesheetRejectDialog";
 import { messageFromApiError } from "@/lib/api-error";
 import { timesheetsListHref } from "@/lib/timesheet-list-query";
@@ -21,10 +20,9 @@ export default function TimesheetDetailPage() {
   const backHref = timesheetsListHref(listBack);
   const { isEffectiveProjectMember, userId, role } = useAdminSession();
   const [timesheet, setTimesheet] = useState<
-    | (MonthlyTimesheetValues & {
+    | (TimesheetFormValues & {
         canApprove?: boolean;
         canSubmit?: boolean;
-        period?: string;
         updatedAt?: string;
       })
     | null
@@ -59,14 +57,6 @@ export default function TimesheetDetailPage() {
   useEffect(() => {
     void loadTimesheet(id);
   }, [id, loadTimesheet]);
-
-  const handleWeekTimesheetResolved = useCallback(
-    (detail: TimesheetFormValues) => {
-      if (!detail.id || detail.id !== id) return;
-      void loadTimesheet(detail.id);
-    },
-    [id, loadTimesheet],
-  );
 
   async function handleSubmit(payload: Record<string, unknown>) {
     setIsSaving(true);
@@ -194,7 +184,10 @@ export default function TimesheetDetailPage() {
   const pmCanAct = Boolean(timesheet?.canApprove);
   const awaitingClient =
     status === "SUBMITTED" && timesheet?.approverKind === "CLIENT_CONTACT" && !pmCanAct;
-  const canSubmitTimesheet = Boolean(timesheet?.canSubmit) && isEffectiveProjectMember;
+  // Shown (disabled until the month is complete) to the owner of a draft; the API re-checks completeness.
+  const showSubmitForApproval = Boolean(
+    timesheet && timesheet.memberUserId === userId && status === "DRAFT" && isEffectiveProjectMember,
+  );
   const viewingOthersSheet = Boolean(
     timesheet?.memberUserId && userId && timesheet.memberUserId !== userId,
   );
@@ -251,7 +244,7 @@ export default function TimesheetDetailPage() {
         {timesheet && viewingOthersSheet ? (
           <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">
             Viewing {timesheet.memberName ? `${timesheet.memberName}'s` : "another member's"} timesheet
-            (read-only). Week navigation shows that member&apos;s records for this project.
+            (read-only). Month navigation shows that member&apos;s records for this project.
           </div>
         ) : null}
 
@@ -261,8 +254,8 @@ export default function TimesheetDetailPage() {
           <p className="text-sm text-gray-400">Loading…</p>
         ) : !timesheet ? (
           <p className="text-sm text-gray-400">Timesheet not found.</p>
-        ) : timesheet.period === "MONTHLY" ? (
-          <MonthlyTimesheetForm
+        ) : (
+          <TimesheetForm
             key={`${timesheet.id}-${timesheet.startDate}-${timesheet.status}-${timesheet.updatedAt ?? ""}`}
             defaults={timesheet}
             monthKey={timesheet.monthKey || timesheet.startDate.slice(0, 7)}
@@ -270,23 +263,7 @@ export default function TimesheetDetailPage() {
             isSaving={isSaving}
             readOnly={formReadOnly}
             canStartTimesheetForEmptyMonth={!viewingOthersSheet && isEffectiveProjectMember}
-            showSubmitForApproval={Boolean(timesheet.memberUserId === userId && status === "DRAFT" && isEffectiveProjectMember)}
-            submitForApprovalLoading={actionLoading}
-            onSubmitForApproval={() => void submitForApproval()}
-            footerActions={approvalActions}
-          />
-        ) : (
-          <TimesheetForm
-            key={`${timesheet.id}-${timesheet.startDate}-${timesheet.status}`}
-            defaults={timesheet}
-            routeTimesheetId={id}
-            onWeekTimesheetResolved={handleWeekTimesheetResolved}
-            onSubmit={handleSubmit}
-            isSaving={isSaving}
-            readOnly={formReadOnly}
-            canStartTimesheetForEmptyWeek={!viewingOthersSheet && isEffectiveProjectMember}
-            weekNavigationLoading={isLoading}
-            showSubmitForApproval={canSubmitTimesheet}
+            showSubmitForApproval={showSubmitForApproval}
             submitForApprovalLoading={actionLoading}
             onSubmitForApproval={() => void submitForApproval()}
             footerActions={approvalActions}

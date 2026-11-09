@@ -114,6 +114,39 @@ export function mondayOffset(monthKey: string): number {
   return (dow + 6) % 7;
 }
 
+/** Allow up to 2 digits before the decimal and 2 after (e.g. 12.34). */
+export function sanitizeHoursInput(raw: string): string {
+  if (!raw) return "";
+  let out = "";
+  let dot = false;
+  let digitsBeforeDot = 0;
+  let digitsAfterDot = 0;
+  for (const ch of raw) {
+    if (ch >= "0" && ch <= "9") {
+      if (!dot) {
+        if (digitsBeforeDot >= 2) continue;
+        digitsBeforeDot += 1;
+      } else {
+        if (digitsAfterDot >= 2) continue;
+        digitsAfterDot += 1;
+      }
+      out += ch;
+    } else if (ch === "." && !dot) {
+      out += ch;
+      dot = true;
+    }
+  }
+  return out;
+}
+
+export function hoursInputToNumber(raw: string): number | undefined {
+  const s = sanitizeHoursInput(raw);
+  if (!s || s === ".") return undefined;
+  const n = Number(s);
+  if (!Number.isFinite(n) || n < 0) return undefined;
+  return n;
+}
+
 export function sumDateHours(hours: DateHours | null | undefined): number {
   return Object.values(hours ?? {}).reduce<number>((sum, v) => sum + (Number(v) || 0), 0);
 }

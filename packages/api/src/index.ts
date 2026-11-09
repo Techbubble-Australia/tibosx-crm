@@ -33,6 +33,7 @@ import { debugPortalTicketRoutes } from "./routes/debug-portal-tickets.js";
 import { debugPortalStatusRoutes } from "./routes/debug-portal-statuses.js";
 import { debugPortalSprintRoutes } from "./routes/debug-portal-sprints.js";
 import { debugPortalAgentRoutes } from "./routes/debug-portal-agent.js";
+import { runTimesheetConversionOnStartup } from "./lib/timesheet-weekly-conversion.js";
 import { authMiddleware } from "./middleware/auth";
 import { requireMfaEnrolled } from "./middleware/requireMfaEnrolled";
 import { requireRole, requireModule, requireAnyModule, blockModuleMutations } from "./middleware/requireRole";
@@ -259,4 +260,5 @@ const HOST = process.env.HOST || "0.0.0.0";
 
 app.listen(Number(PORT), HOST, () => {
   console.log(`🚀 API server listening on http://${HOST}:${PORT}`);
+  void runTimesheetConversionOnStartup();
 });

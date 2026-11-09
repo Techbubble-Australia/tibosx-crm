@@ -33,7 +33,7 @@ function monthHref(projectId: string, row: MonthRow): string {
     : `/timesheets/new?projectId=${encodeURIComponent(projectId)}&month=${row.month}`;
 }
 
-/** Month-by-month listing for projects that use monthly timesheets (project start → end). */
+/** Month-by-month listing of the member's projects (project start → end). */
 export function MonthlyTimesheetPeriods({ refreshKey = 0 }: { refreshKey?: number }) {
   const [projects, setProjects] = useState<ProjectMonths[]>([]);
 
@@ -56,9 +56,6 @@ export function MonthlyTimesheetPeriods({ refreshKey = 0 }: { refreshKey?: numbe
           <header className="flex items-center gap-2 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
             <CalendarDays className="h-4 w-4 text-gray-400" aria-hidden />
             <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{project.projectLabel}</h3>
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-              Monthly timesheets
-            </span>
           </header>
           <ul className="divide-y divide-gray-50 dark:divide-gray-800">
             {project.months.map((row) => {

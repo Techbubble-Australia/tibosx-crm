@@ -25,13 +25,13 @@ import { useDismissedToday } from "@/hooks/useDismissedToday";
 import { TimesheetStatusBadge } from "@/lib/timesheet-status-styles";
 import { PROJECT_STATUS_LABELS, type ProjectStatus } from "@/lib/project-types";
 
-type WeekStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "NOT_STARTED" | "MISSING";
+type MonthStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "NOT_STARTED" | "MISSING";
 type ActionKind = "AGREEMENT" | "PROFILE" | "RETURNED" | "OVERDUE_DRAFT" | "MISSING";
 
-type WeekRow = {
+type MonthRow = {
   projectId: string;
   projectLabel: string;
-  status: WeekStatus;
+  status: MonthStatus;
   hours: number;
   timesheetId: string | null;
   rejectReason: string | null;
@@ -42,8 +42,8 @@ type MemberDashboard = {
   userName: string;
   weekStart: string;
   weekEnd: string;
-  lastWeekStart: string;
-  lastWeekEnd: string;
+  monthStart: string;
+  lastMonthStart: string;
   isProjectMember: boolean;
   onboarding: { agreementPending: boolean; profilePending: boolean };
   kpis: {
@@ -55,8 +55,8 @@ type MemberDashboard = {
     activeProjects: number;
   };
   actionItems: Array<{ id: string; kind: ActionKind; title: string; detail: string; href: string }>;
-  thisWeek: WeekRow[];
-  lastWeek: WeekRow[];
+  thisMonth: MonthRow[];
+  lastMonth: MonthRow[];
   weeklyHours: Array<{ weekStart: string; approved: number; submitted: number; draft: number }>;
   projects: Array<{
     id: string;
@@ -115,8 +115,12 @@ function relativeTime(iso: string) {
   return formatDay(iso, true);
 }
 
-function newTimesheetHref(projectId: string, weekStart: string) {
-  return `/timesheets/new?projectId=${encodeURIComponent(projectId)}&weekStart=${weekStart}`;
+function newTimesheetHref(projectId: string, monthStart: string) {
+  return `/timesheets/new?projectId=${encodeURIComponent(projectId)}&month=${monthStart.slice(0, 7)}`;
+}
+
+function formatMonth(iso: string) {
+  return new Date(iso).toLocaleDateString("en-AU", { month: "long", year: "numeric", timeZone: "UTC" });
 }
 
 function Card({ title, subtitle, actions, children }: { title: string; subtitle?: string; actions?: ReactNode; children: ReactNode }) {
@@ -175,7 +179,7 @@ function Kpi({
   );
 }
 
-function WeekStatusBadge({ status }: { status: WeekStatus }) {
+function MonthStatusBadge({ status }: { status: MonthStatus }) {
   if (status === "MISSING") {
     return (
       <span className="inline-flex whitespace-nowrap rounded-md bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800 ring-1 ring-inset ring-red-200">
@@ -193,13 +197,13 @@ function WeekStatusBadge({ status }: { status: WeekStatus }) {
   return <TimesheetStatusBadge status={status} />;
 }
 
-function WeekTable({ rows, weekStart, emptyText }: { rows: WeekRow[]; weekStart: string; emptyText: string }) {
+function MonthTable({ rows, monthStart, emptyText }: { rows: MonthRow[]; monthStart: string; emptyText: string }) {
   if (!rows.length) return <p className="text-sm text-gray-400">{emptyText}</p>;
   return (
     <ul className="divide-y divide-gray-100 dark:divide-gray-800">
       {rows.map((row) => {
         const needsStart = row.status === "NOT_STARTED" || row.status === "MISSING";
-        const href = row.timesheetId ? `/timesheets/${row.timesheetId}` : newTimesheetHref(row.projectId, weekStart);
+        const href = row.timesheetId ? `/timesheets/${row.timesheetId}` : newTimesheetHref(row.projectId, monthStart);
         const actionLabel = needsStart
           ? "Log time"
           : row.status === "DRAFT"
@@ -212,7 +216,7 @@ function WeekTable({ rows, weekStart, emptyText }: { rows: WeekRow[]; weekStart:
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{row.projectLabel}</p>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                <WeekStatusBadge status={row.status} />
+                <MonthStatusBadge status={row.status} />
                 {row.hours > 0 ? <span className="tabular-nums">{formatHours(row.hours)}</span> : null}
                 {row.rejectReason ? (
                   <span className="text-red-600 dark:text-red-400">Returned: {row.rejectReason}</span>
@@ -338,7 +342,7 @@ export default function WorkspacePage() {
               {firstName ? `Welcome back, ${firstName}` : "Workspace"}
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {data ? `This week: ${formatWeek(data.weekStart, data.weekEnd)}` : "Loading…"}
+              {data ? `This month: ${formatMonth(data.monthStart)}` : "Loading…"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -489,11 +493,11 @@ export default function WorkspacePage() {
             </div>
 
             <div className="grid gap-6 lg:grid-cols-2">
-              <Card title="This week" subtitle={formatWeek(data.weekStart, data.weekEnd)}>
-                <WeekTable rows={data.thisWeek} weekStart={data.weekStart} emptyText="No active projects this week." />
+              <Card title="This month" subtitle={formatMonth(data.monthStart)}>
+                <MonthTable rows={data.thisMonth} monthStart={data.monthStart} emptyText="No active projects this month." />
               </Card>
-              <Card title="Last week" subtitle={formatWeek(data.lastWeekStart, data.lastWeekEnd)}>
-                <WeekTable rows={data.lastWeek} weekStart={data.lastWeekStart} emptyText="No active projects last week." />
+              <Card title="Last month" subtitle={formatMonth(data.lastMonthStart)}>
+                <MonthTable rows={data.lastMonth} monthStart={data.lastMonthStart} emptyText="No active projects last month." />
               </Card>
             </div>
 
@@ -545,10 +549,10 @@ export default function WorkspacePage() {
                       </dl>
                       {project.status === "ACTIVE" && !project.ended ? (
                         <Link
-                          href={newTimesheetHref(project.id, data.weekStart)}
+                          href={newTimesheetHref(project.id, data.monthStart)}
                           className="mt-3 inline-flex text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
                         >
-                          Log time for this week →
+                          Log time for this month →
                         </Link>
                       ) : null}
                     </div>
@@ -570,7 +574,7 @@ export default function WorkspacePage() {
                         <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${meta.dot}`} />
                         <Link href={`/timesheets/${item.timesheetId}`} className="min-w-0 hover:underline">
                           <span className="block text-sm text-gray-900 dark:text-gray-100">
-                            <span className="font-medium">{meta.label}</span> · {formatWeek(item.weekStart, item.weekEnd)}
+                            <span className="font-medium">{meta.label}</span> · {formatMonth(item.weekStart)}
                           </span>
                           <span className="block truncate text-xs text-gray-500">{item.projectLabel}</span>
                           {item.reason ? (
