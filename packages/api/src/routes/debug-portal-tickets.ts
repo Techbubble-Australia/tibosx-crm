@@ -515,9 +515,19 @@ router.patch("/:id/comments/:commentId", async (req: PortalRequest, res) => {
     if (comment.authorUserId !== user.id) {
       return res.status(403).json({ error: "You can only edit your own comments" });
     }
-    const updated = await prisma.debugCaptureTicketComment.update({
-      where: { id: comment.id },
-      data: { body, attachments, editedAt: new Date() },
+    const updated = await prisma.$transaction(async (tx) => {
+      const next = await tx.debugCaptureTicketComment.update({
+        where: { id: comment.id },
+        data: { body, attachments, editedAt: new Date() },
+      });
+      await logDebugTicket(tx, comment.ticketId, actorOf(user), [
+        {
+          action: "COMMENT_EDITED",
+          oldValue: commentLogPreview(comment.body, commentAttachments(comment.attachments).length),
+          newValue: commentLogPreview(body, attachments.length),
+        },
+      ]);
+      return next;
     });
     res.json({ data: serializeComment(updated) });
   } catch (error) {
@@ -541,7 +551,16 @@ router.delete("/:id/comments/:commentId", async (req: PortalRequest, res) => {
     if (comment.authorUserId !== user.id && !user.isAdmin) {
       return res.status(403).json({ error: "You can only delete your own comments" });
     }
-    await prisma.debugCaptureTicketComment.delete({ where: { id: comment.id } });
+    await prisma.$transaction(async (tx) => {
+      await tx.debugCaptureTicketComment.delete({ where: { id: comment.id } });
+      await logDebugTicket(tx, comment.ticketId, actorOf(user), [
+        {
+          action: "COMMENT_DELETED",
+          field: comment.authorUserId === user.id ? undefined : comment.authorEmail,
+          oldValue: commentLogPreview(comment.body, commentAttachments(comment.attachments).length),
+        },
+      ]);
+    });
     res.json({ data: { id: comment.id } });
   } catch (error) {
     console.error("debug portal comment delete error:", error);

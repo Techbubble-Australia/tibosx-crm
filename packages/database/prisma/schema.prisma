@@ -1396,7 +1396,7 @@ model DebugCaptureTicketLog {
   id          String             @id @default(cuid())
   ticketId    String
   ticket      DebugCaptureTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  /// CREATED | STATUS_CHANGED | UPDATED | SCREENSHOTS_ADDED | SCREENSHOT_REMOVED | COMMENT_ADDED
+  /// CREATED | STATUS_CHANGED | UPDATED | SCREENSHOTS_ADDED | SCREENSHOT_REMOVED | COMMENT_ADDED | COMMENT_EDITED | COMMENT_DELETED
   action      String
   field       String?
   oldValue    String?            @db.Text

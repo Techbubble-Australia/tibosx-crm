@@ -69,6 +69,13 @@ function describe(
       return { title: "Removed a screenshot" };
     case "COMMENT_ADDED":
       return { title: "Added a comment", detail: entry.newValue ? `“${entry.newValue}”` : undefined };
+    case "COMMENT_EDITED":
+      return { title: "Edited a comment", detail: entry.newValue ? `“${entry.newValue}”` : undefined };
+    case "COMMENT_DELETED":
+      return {
+        title: entry.field ? `Deleted a comment by ${entry.field}` : "Deleted a comment",
+        detail: entry.oldValue ? `“${entry.oldValue}”` : undefined,
+      };
     case "UPDATED": {
       const label = FIELD_LABELS[entry.field ?? ""] ?? entry.field ?? "Field";
       if (entry.field === "userDescription") return { title: `Edited ${label.toLowerCase()}` };

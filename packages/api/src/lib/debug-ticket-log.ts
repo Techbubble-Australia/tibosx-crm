@@ -8,7 +8,9 @@ export type DebugTicketLogAction =
   | "UPDATED"
   | "SCREENSHOTS_ADDED"
   | "SCREENSHOT_REMOVED"
-  | "COMMENT_ADDED";
+  | "COMMENT_ADDED"
+  | "COMMENT_EDITED"
+  | "COMMENT_DELETED";
 
 export type DebugTicketActor = { userId: string | null; email: string };
 

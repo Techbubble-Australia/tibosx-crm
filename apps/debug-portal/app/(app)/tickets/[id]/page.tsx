@@ -254,7 +254,7 @@ export default function TicketDetailPage() {
     void load();
   }, [load]);
 
-  /** Re-reads only the activity log (e.g. after a comment is posted) without a loading state. */
+  /** Re-reads only the activity log (e.g. after a comment change) without a loading state. */
   const refreshLogs = useCallback(async () => {
     try {
       const res = await fetch(`/api/debug-portal/tickets/${id}`, { credentials: "include" });
@@ -679,9 +679,8 @@ export default function TicketDetailPage() {
         currentUserId={user?.id ?? null}
         isAdmin={isAdmin}
         onChange={(comments) => {
-          const added = comments.length > (row.comments?.length ?? 0);
           setRow((prev) => (prev ? { ...prev, comments } : prev));
-          if (added) void refreshLogs();
+          void refreshLogs();
         }}
       />
 
