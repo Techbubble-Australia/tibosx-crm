@@ -5,12 +5,28 @@
  *   pnpm --filter @techbubble/api timesheets:convert-monthly             # dry run (no writes)
  *   pnpm --filter @techbubble/api timesheets:convert-monthly --rehearse  # write, verify, roll back
  *   pnpm --filter @techbubble/api timesheets:convert-monthly --apply     # write
+ *
+ * Uses the same database as `prisma migrate deploy` (packages/database/.env) unless DATABASE_URL is set.
  */
-import "dotenv/config";
+import path from "node:path";
+import { config } from "dotenv";
+
+config({ path: path.join(__dirname, "../../../database/.env") });
+
 import { prisma } from "@techbubble/database";
 import { convertWeeklyTimesheetsToMonthly } from "../lib/timesheet-weekly-conversion.js";
 
+function databaseHost(): string {
+  try {
+    const url = new URL(process.env.DATABASE_URL ?? "");
+    return `${url.hostname}:${url.port}${url.pathname}`;
+  } catch {
+    return "(DATABASE_URL not set)";
+  }
+}
+
 async function main() {
+  console.log(`Database: ${databaseHost()}`);
   const apply = process.argv.includes("--apply");
   const rehearse = process.argv.includes("--rehearse");
   const summary = await convertWeeklyTimesheetsToMonthly(rehearse ? { rehearse: true } : { dryRun: !apply });
