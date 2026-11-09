@@ -22,6 +22,7 @@ import { FilterField } from "@/components/ui/FilterField";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SprintForm } from "@/components/SprintForm";
 import { SprintSelect } from "@/components/SprintSelect";
+import { TypeBadge } from "@/components/TicketBadges";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
 import {
   ALL_SPRINTS,
@@ -37,10 +38,8 @@ import {
   STATUS_COLORS,
   canMoveStatus,
   formatEnvironment,
-  formatTicketType,
   memberStatusTarget,
   statusColorClasses,
-  typeBadgeClass,
   type StatusOption,
   type TicketStatus,
 } from "@/lib/tickets";
@@ -619,8 +618,12 @@ export default function BoardPage() {
                         <GripVertical className="h-4 w-4" aria-hidden />
                       </span>
                     ) : null}
-                    <h2 className="truncate text-sm font-semibold text-slate-800" title={status.label}>
-                      {status.label}
+                    <h2
+                      className={`inline-flex min-w-0 items-center gap-1.5 truncate rounded-full px-2.5 py-0.5 text-sm font-semibold ${statusColorClasses(status.color).badge}`}
+                      title={status.label}
+                    >
+                      <span className={`h-2 w-2 shrink-0 rounded-full ${statusColorClasses(status.color).swatch}`} aria-hidden />
+                      <span className="truncate">{status.label}</span>
                     </h2>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
@@ -706,9 +709,11 @@ export default function BoardPage() {
                           setDraggingId(null);
                           setDropTarget(null);
                         }}
-                        className={`rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition ${
-                          canDrag(ticket) ? "cursor-grab active:cursor-grabbing" : ""
-                        } ${draggingId === ticket.id ? "opacity-50" : ""}`}
+                        className={`rounded-lg border border-l-4 border-slate-200 bg-white p-3 shadow-sm transition ${
+                          ticket.type === "ENHANCEMENT" ? "border-l-indigo-400" : "border-l-red-400"
+                        } ${canDrag(ticket) ? "cursor-grab active:cursor-grabbing" : ""} ${
+                          draggingId === ticket.id ? "opacity-50" : ""
+                        }`}
                       >
                         <div className="mb-1.5 flex items-center justify-between gap-2">
                           <Link
@@ -724,9 +729,7 @@ export default function BoardPage() {
                               {isSprintLocked(ticket.sprintStatus, isAdmin) ? (
                                 <Lock className="h-3.5 w-3.5 text-slate-400" aria-label="Locked (completed sprint)" />
                               ) : null}
-                              <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ${typeBadgeClass(ticket.type)}`}>
-                                {formatTicketType(ticket.type)}
-                              </span>
+                              <TypeBadge type={ticket.type} size="sm" />
                             </span>
                           )}
                         </div>

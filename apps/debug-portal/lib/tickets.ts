@@ -52,8 +52,8 @@ export function statusColorClasses(color: string | undefined) {
 
 export function typeBadgeClass(type: string): string {
   return type === "ENHANCEMENT"
-    ? "bg-indigo-50 text-indigo-800 ring-1 ring-indigo-200/80"
-    : "bg-rose-50 text-rose-800 ring-1 ring-rose-200/80";
+    ? "bg-indigo-100 text-indigo-800 ring-1 ring-indigo-300/80"
+    : "bg-red-100 text-red-800 ring-1 ring-red-300/80";
 }
 
 export function formatTicketType(type: string): string {

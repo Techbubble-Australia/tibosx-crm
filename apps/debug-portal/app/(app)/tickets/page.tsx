@@ -9,14 +9,9 @@ import { FilterField } from "@/components/ui/FilterField";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
 import { SprintSelect } from "@/components/SprintSelect";
+import { StatusBadge, TypeBadge } from "@/components/TicketBadges";
 import { ALL_SPRINTS, defaultSprintSelection, useSprints } from "@/lib/sprints";
-import {
-  formatEnvironment,
-  formatTicketType,
-  nextStatusInOrder,
-  typeBadgeClass,
-  type TicketStatus,
-} from "@/lib/tickets";
+import { formatEnvironment, nextStatusInOrder, type TicketStatus } from "@/lib/tickets";
 
 type TicketRow = {
   id: string;
@@ -62,7 +57,7 @@ function TicketsListInner() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [page, setPage] = useState(0);
 
-  const { statuses, labelOf, badgeClassOf } = useTicketStatuses();
+  const { statuses, labelOf } = useTicketStatuses();
 
   const filteredStatus = useMemo((): TicketStatus | null => {
     if (!statusFilter) return null;
@@ -390,18 +385,10 @@ function TicketsListInner() {
                       </p>
                     </td>
                     <td className="dp-table-cell">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${badgeClassOf(row.status)}`}
-                      >
-                        {labelOf(row.status)}
-                      </span>
+                      <StatusBadge status={row.status} />
                     </td>
                     <td className="dp-table-cell">
-                      <span
-                        className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${typeBadgeClass(row.type)}`}
-                      >
-                        {formatTicketType(row.type)}
-                      </span>
+                      <TypeBadge type={row.type} />
                     </td>
                     <td className="dp-table-cell whitespace-nowrap">
                       {formatEnvironment(row.reportedEnvironment)}

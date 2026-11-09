@@ -10,6 +10,7 @@ type TicketStatusesValue = {
   labelOf: (key: string) => string;
   badgeClassOf: (key: string) => string;
   accentClassOf: (key: string) => string;
+  swatchClassOf: (key: string) => string;
   reload: () => Promise<void>;
   /** Replace the list after a successful admin change (the API returns the full ordered list). */
   setStatuses: (rows: StatusOption[]) => void;
@@ -50,6 +51,7 @@ export function TicketStatusesProvider({ children }: { children: ReactNode }) {
       labelOf: (key) => byKey.get(key)?.label ?? humanize(key),
       badgeClassOf: (key) => statusColorClasses(byKey.get(key)?.color).badge,
       accentClassOf: (key) => statusColorClasses(byKey.get(key)?.color).accent,
+      swatchClassOf: (key) => statusColorClasses(byKey.get(key)?.color).swatch,
       reload,
       setStatuses: (rows) => setStatusesState([...rows].sort((a, b) => a.position - b.position)),
     };

@@ -14,7 +14,8 @@ import { usePortalUser } from "@/lib/use-portal-user";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
 import { SprintSelect } from "@/components/SprintSelect";
 import { BACKLOG, SPRINT_STATUS_LABELS, isSprintLocked, useSprints, type SprintStatus } from "@/lib/sprints";
-import { formatEnvironment, formatTicketType, memberStatusTarget, type TicketStatus } from "@/lib/tickets";
+import { formatEnvironment, memberStatusTarget, type TicketStatus } from "@/lib/tickets";
+import { StatusBadge, TypeBadge } from "@/components/TicketBadges";
 
 type TicketDetail = {
   id: string;
@@ -96,7 +97,7 @@ export default function TicketDetailPage() {
     currentUrl: "",
   });
   const { isAdmin } = usePortalUser();
-  const { labelOf, badgeClassOf } = useTicketStatuses();
+  const { labelOf } = useTicketStatuses();
   const { sprints, reload: reloadSprints } = useSprints();
   const [savingSprint, setSavingSprint] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -346,14 +347,25 @@ export default function TicketDetailPage() {
     );
   }
 
-  const metaLine = `${formatTicketType(row.type)} · ${formatEnvironment(row.reportedEnvironment)} · ${new Date(row.createdAt).toLocaleString("en-AU", {
+  const metaLine = `${formatEnvironment(row.reportedEnvironment)} · ${new Date(row.createdAt).toLocaleString("en-AU", {
     dateStyle: "medium",
     timeStyle: "short",
   })}`;
 
   return (
     <div className="space-y-6">
-      <PageHeader title={row.ticketId} description={metaLine} backHref="/tickets" backLabel="All tickets" />
+      <PageHeader
+        title={row.ticketId}
+        description={metaLine}
+        backHref="/tickets"
+        backLabel="All tickets"
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <TypeBadge type={row.type} />
+            <StatusBadge status={row.status} />
+          </div>
+        }
+      />
 
       {!locked ? (
         <section
@@ -426,11 +438,7 @@ export default function TicketDetailPage() {
       <div className="dp-card flex flex-col gap-4 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:p-5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-slate-700">Workflow status</span>
-          <span
-            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${badgeClassOf(row.status)}`}
-          >
-            {labelOf(row.status)}
-          </span>
+          <StatusBadge status={row.status} />
         </div>
         {isAdmin ? (
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
