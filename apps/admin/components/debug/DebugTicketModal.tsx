@@ -9,45 +9,6 @@ import {
   type DebugCaptureType,
   type ReportedEnvironment,
 } from "@/contexts/DebugModeContext";
-import { JsonTreePreview } from "@/components/debug/JsonTreePreview";
-
-function trafficLogHint(reason: string | undefined): string {
-  switch (reason) {
-    case "element_text":
-      return "Matched a recent API response using text or ids from the element you clicked (and nearby labels).";
-    case "list_context":
-      return "Matched a recent list/table API call for this part of the page.";
-    case "recent_request":
-      return "Matched a recent API call on this page (no strong text match — verify the endpoint below).";
-    default:
-      return "Inferred from recent adminFetch traffic on this page.";
-  }
-}
-
-function Accordion({
-  title,
-  children,
-  defaultOpen = false,
-}: {
-  title: string;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-700">
-      <button
-        type="button"
-        className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium"
-        onClick={() => setOpen((v) => !v)}
-      >
-        {title}
-        <span className="text-xs text-gray-500">{open ? "−" : "+"}</span>
-      </button>
-      {open ? <div className="border-t border-gray-100 px-3 py-2 dark:border-gray-800">{children}</div> : null}
-    </div>
-  );
-}
 
 function isDebugUi(el: Element | null): boolean {
   return Boolean(el?.closest("[data-debug-ui], [role='alertdialog']"));
@@ -198,7 +159,6 @@ export function DebugTicketModal() {
     captureLoading,
     draft,
     setDraftField,
-    buildPayloadJson,
     submitTicket,
     copyPayloadJson,
     recaptureViewport,
@@ -497,61 +457,6 @@ export function DebugTicketModal() {
                   </p>
                 )}
               </div>
-
-              <Accordion title={draft.elementDiagnostics.captureScope === "viewport" ? "Screen metadata" : "DOM metadata"} defaultOpen>
-                <dl className="space-y-1 text-xs text-gray-700 dark:text-gray-300">
-                  <div>
-                    <dt className="font-medium">Tag</dt>
-                    <dd>{draft.elementDiagnostics.tagName}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium">Selector</dt>
-                    <dd className="break-all font-mono">{draft.elementDiagnostics.cssSelector}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium">Text preview</dt>
-                    <dd>{draft.elementDiagnostics.innerText ?? "—"}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium">Bounding box</dt>
-                    <dd>{JSON.stringify(draft.elementDiagnostics.boundingRect)}</dd>
-                  </div>
-                </dl>
-              </Accordion>
-
-              <Accordion title="API prerequisite">
-                {draft.apiPrerequisite ? (
-                  <>
-                    {draft.apiPrerequisite.captureSource === "traffic_log" ? (
-                      <p className="mb-2 text-xs text-sky-700 dark:text-sky-300">
-                        {trafficLogHint(draft.apiPrerequisite.trafficMatchReason)}
-                      </p>
-                    ) : draft.apiPrerequisite.captureSource === "dom" ? (
-                      <p className="mb-2 text-xs text-gray-500">
-                        From <code className="text-[11px]">data-api-endpoint</code> on this element or a parent.
-                      </p>
-                    ) : null}
-                    <JsonTreePreview value={draft.apiPrerequisite} />
-                  </>
-                ) : (
-                  <p className="text-xs text-gray-500">
-                    No API captured. In development, load the page so data appears (API calls are recorded), then
-                    capture again. For a guaranteed link, add{" "}
-                    <code className="text-[11px]">data-api-endpoint=&quot;/api/...&quot;</code> on a parent of
-                    this UI.
-                  </p>
-                )}
-              </Accordion>
-
-              <Accordion title="User metadata">
-                <JsonTreePreview value={draft.userMetadata} />
-              </Accordion>
-
-              <Accordion title="JSON payload preview">
-                <pre className="max-h-48 overflow-auto rounded bg-gray-950 p-2 text-[11px] text-gray-100">
-                  {buildPayloadJson()}
-                </pre>
-              </Accordion>
             </>
           )}
         </div>
