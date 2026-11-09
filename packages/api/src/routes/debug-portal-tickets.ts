@@ -531,4 +531,22 @@ router.patch("/:id", async (req: PortalRequest, res) => {
   }
 });
 
+/** Admins can delete any ticket; reporters can delete their own unless its sprint is completed. Logs cascade. */
+router.delete("/:id", async (req: PortalRequest, res) => {
+  try {
+    const user = req.portalUser!;
+    const row = await prisma.debugCaptureTicket.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, ticketId: true, reporterUserId: true, sprintId: true },
+    });
+    if (!row || !canViewTicket(user, row)) return res.status(404).json({ error: "Not found" });
+    if (await lockedForUser(user, row.sprintId)) return res.status(403).json({ error: LOCKED_SPRINT_ERROR });
+    await prisma.debugCaptureTicket.delete({ where: { id: row.id } });
+    res.json({ data: { id: row.id, ticketId: row.ticketId } });
+  } catch (error) {
+    console.error("debug portal delete error:", error);
+    res.status(500).json({ error: "Failed to delete ticket" });
+  }
+});
+
 export { router as debugPortalTicketRoutes };

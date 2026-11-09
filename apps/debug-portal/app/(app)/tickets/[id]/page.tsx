@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Copy, Download, ExternalLink, Loader2, Lock, Pencil, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
 import { ChevronSelect } from "@/components/ChevronSelect";
@@ -99,6 +99,26 @@ export default function TicketDetailPage() {
   const { labelOf, badgeClassOf } = useTicketStatuses();
   const { sprints, reload: reloadSprints } = useSprints();
   const [savingSprint, setSavingSprint] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const router = useRouter();
+
+  async function deleteTicket() {
+    if (!row) return;
+    if (!window.confirm(`Delete ${row.ticketId}? Its screenshots and activity log are removed too. This cannot be undone.`)) {
+      return;
+    }
+    setDeleting(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/debug-portal/tickets/${id}`, { method: "DELETE", credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Could not delete ticket");
+      router.push("/board");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete ticket");
+      setDeleting(false);
+    }
+  }
 
   async function changeSprint(value: string) {
     setSavingSprint(true);
@@ -509,10 +529,21 @@ export default function TicketDetailPage() {
               {row.userDescription.trim() || "No description provided."}
             </p>
             {!locked ? (
-              <button type="button" onClick={startEdit} className="dp-btn-secondary py-2">
-                <Pencil className="h-4 w-4" aria-hidden />
-                Edit ticket
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={startEdit} className="dp-btn-secondary py-2">
+                  <Pencil className="h-4 w-4" aria-hidden />
+                  Edit ticket
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void deleteTicket()}
+                  disabled={deleting}
+                  className="dp-btn-ghost py-2 text-red-700 hover:bg-red-50"
+                >
+                  {deleting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Trash2 className="h-4 w-4" aria-hidden />}
+                  Delete ticket
+                </button>
+              </div>
             ) : null}
           </div>
         </SectionCard>
