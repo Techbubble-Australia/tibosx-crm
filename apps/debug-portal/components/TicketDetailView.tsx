@@ -408,6 +408,99 @@ export function TicketDetailView({
     timeStyle: "short",
   })}`;
 
+  /** Sprint + workflow status controls: main column on the full page, above Activity in the modal. */
+  const cardClass = inModal
+    ? "dp-card flex flex-col gap-3 p-4"
+    : "dp-card flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:p-5";
+  const sprintAndStatus = (
+    <>
+        <div className={cardClass}>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-slate-700">Sprint</span>
+            {!isAdmin ? (
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-800 ring-1 ring-slate-200">
+                {row.sprintName ?? "Backlog"}
+              </span>
+            ) : null}
+            {row.sprintStatus && row.sprintStatus !== "ACTIVE" ? (
+              <span className="text-xs text-slate-500">
+                {SPRINT_STATUS_LABELS[row.sprintStatus as SprintStatus] ?? row.sprintStatus}
+              </span>
+            ) : null}
+          </div>
+          {locked ? (
+            <p className="flex items-center gap-1.5 text-xs text-slate-600">
+              <Lock className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />
+              This sprint is completed and locked. You can view this ticket but not change it.
+            </p>
+          ) : null}
+          {isAdmin ? (
+            <div className={inModal ? "flex w-full items-center gap-2" : "flex items-center gap-2"}>
+              {savingSprint ? <Loader2 className="h-4 w-4 animate-spin text-slate-400" aria-label="Saving sprint" /> : null}
+              <SprintSelect
+                value={row.sprintId ?? BACKLOG}
+                onChange={(value) => void changeSprint(value)}
+                sprints={sprints}
+                disabled={savingSprint}
+                className={inModal ? "w-full" : "min-w-[16rem]"}
+                aria-label="Move ticket to sprint"
+              />
+            </div>
+          ) : null}
+        </div>
+        <div className={cardClass}>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-slate-700">Workflow status</span>
+            <StatusBadge status={row.status} />
+          </div>
+          {isAdmin ? (
+            <div className={inModal ? "flex items-center gap-2" : "flex flex-col gap-2 sm:flex-row sm:items-center"}>
+              <StatusSelect
+                value={status}
+                onChange={setStatus}
+                className={inModal ? "min-w-0 flex-1" : undefined}
+                aria-label="Change ticket status"
+              />
+              <button
+                type="button"
+                disabled={saving || status === row.status}
+                onClick={() => void saveStatus()}
+                className="dp-btn-primary shrink-0"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+                Save status
+              </button>
+            </div>
+          ) : memberTarget ? (
+            <div className={inModal ? "flex flex-col items-start gap-1" : "flex flex-col items-start gap-1 sm:items-end"}>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void saveStatus(memberTarget)}
+                className={memberTarget === "COMPLETED" ? "dp-btn-primary" : "dp-btn-secondary"}
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+                {memberTarget === "COMPLETED"
+                  ? `Mark ${labelOf("COMPLETED").toLowerCase()}`
+                  : `Reopen (move to ${labelOf("PENDING")})`}
+              </button>
+              <p className="text-xs text-slate-500">
+                {memberTarget === "COMPLETED"
+                  ? "Confirm the fix works, then mark it completed."
+                  : "Not fixed after all? Reopen it for the team."}
+              </p>
+            </div>
+          ) : locked ? (
+            <p className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+              <Lock className="h-3.5 w-3.5" aria-hidden /> Locked (completed sprint)
+            </p>
+          ) : (
+            <p className="text-xs text-slate-500">An admin will update the status as this is worked on.</p>
+          )}
+        </div>
+    </>
+  );
+
   return (
     <div className="space-y-4">
       {inModal ? (
@@ -467,85 +560,7 @@ export function TicketDetailView({
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_26rem]">
       <div className="min-w-0 space-y-4">
-      <div className="dp-card flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-slate-700">Sprint</span>
-          {!isAdmin ? (
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-800 ring-1 ring-slate-200">
-              {row.sprintName ?? "Backlog"}
-            </span>
-          ) : null}
-          {row.sprintStatus && row.sprintStatus !== "ACTIVE" ? (
-            <span className="text-xs text-slate-500">
-              {SPRINT_STATUS_LABELS[row.sprintStatus as SprintStatus] ?? row.sprintStatus}
-            </span>
-          ) : null}
-        </div>
-        {locked ? (
-          <p className="flex items-center gap-1.5 text-xs text-slate-600">
-            <Lock className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />
-            This sprint is completed and locked. You can view this ticket but not change it.
-          </p>
-        ) : null}
-        {isAdmin ? (
-          <div className="flex items-center gap-2">
-            {savingSprint ? <Loader2 className="h-4 w-4 animate-spin text-slate-400" aria-label="Saving sprint" /> : null}
-            <SprintSelect
-              value={row.sprintId ?? BACKLOG}
-              onChange={(value) => void changeSprint(value)}
-              sprints={sprints}
-              disabled={savingSprint}
-              className="min-w-[16rem]"
-              aria-label="Move ticket to sprint"
-            />
-          </div>
-        ) : null}
-      </div>
-      <div className="dp-card flex flex-col gap-4 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-slate-700">Workflow status</span>
-          <StatusBadge status={row.status} />
-        </div>
-        {isAdmin ? (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <StatusSelect value={status} onChange={setStatus} aria-label="Change ticket status" />
-            <button
-              type="button"
-              disabled={saving || status === row.status}
-              onClick={() => void saveStatus()}
-              className="dp-btn-primary"
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-              Save status
-            </button>
-          </div>
-        ) : memberTarget ? (
-          <div className="flex flex-col items-start gap-1 sm:items-end">
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void saveStatus(memberTarget)}
-              className={memberTarget === "COMPLETED" ? "dp-btn-primary" : "dp-btn-secondary"}
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-              {memberTarget === "COMPLETED"
-                ? `Mark ${labelOf("COMPLETED").toLowerCase()}`
-                : `Reopen (move to ${labelOf("PENDING")})`}
-            </button>
-            <p className="text-xs text-slate-500">
-              {memberTarget === "COMPLETED"
-                ? "Confirm the fix works, then mark it completed."
-                : "Not fixed after all? Reopen it for the team."}
-            </p>
-          </div>
-        ) : locked ? (
-          <p className="inline-flex items-center gap-1.5 text-xs text-slate-500">
-            <Lock className="h-3.5 w-3.5" aria-hidden /> Locked (completed sprint)
-          </p>
-        ) : (
-          <p className="text-xs text-slate-500">An admin will update the status as this is worked on.</p>
-        )}
-      </div>
+      {inModal ? null : sprintAndStatus}
 
       {error ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
@@ -858,6 +873,7 @@ export function TicketDetailView({
           inModal ? "lg:top-0 lg:max-h-[calc(90vh-6rem)]" : "lg:top-20 lg:max-h-[calc(100vh-6rem)]"
         }`}
       >
+        {inModal ? <div className="mb-4 space-y-4">{sprintAndStatus}</div> : null}
         <TicketActivityLog logs={row.logs ?? []} />
       </aside>
       </div>
