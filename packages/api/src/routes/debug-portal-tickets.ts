@@ -452,6 +452,13 @@ async function ticketDetail(id: string) {
   };
 }
 
+/** Short text for the activity log: the start of the comment, or the attachment count when there's no text. */
+function commentLogPreview(body: string, attachmentCount: number): string {
+  const text = body.replace(/\s+/g, " ").trim();
+  if (text) return text.length > 160 ? `${text.slice(0, 157)}…` : text;
+  return `${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`;
+}
+
 const commentSchema = z
   .object({
     body: z.string().trim().max(5000).default(""),
@@ -469,15 +476,21 @@ router.post("/:id/comments", async (req: PortalRequest, res) => {
       select: { id: true, reporterUserId: true },
     });
     if (!row || !canViewTicket(user, row)) return res.status(404).json({ error: "Not found" });
-    const created = await prisma.debugCaptureTicketComment.create({
-      data: {
-        ticketId: row.id,
-        authorUserId: user.id,
-        authorEmail: user.email,
-        authorName: user.name || null,
-        body,
-        attachments,
-      },
+    const created = await prisma.$transaction(async (tx) => {
+      const comment = await tx.debugCaptureTicketComment.create({
+        data: {
+          ticketId: row.id,
+          authorUserId: user.id,
+          authorEmail: user.email,
+          authorName: user.name || null,
+          body,
+          attachments,
+        },
+      });
+      await logDebugTicket(tx, row.id, actorOf(user), [
+        { action: "COMMENT_ADDED", newValue: commentLogPreview(body, attachments.length) },
+      ]);
+      return comment;
     });
     res.status(201).json({ data: serializeComment(created) });
   } catch (error) {

@@ -254,6 +254,19 @@ export default function TicketDetailPage() {
     void load();
   }, [load]);
 
+  /** Re-reads only the activity log (e.g. after a comment is posted) without a loading state. */
+  const refreshLogs = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/debug-portal/tickets/${id}`, { credentials: "include" });
+      if (!res.ok) return;
+      const data = await res.json();
+      const logs = (data.data as TicketDetail).logs;
+      setRow((prev) => (prev ? { ...prev, logs } : prev));
+    } catch {
+      // The comment itself succeeded; the log catches up on the next load.
+    }
+  }, [id]);
+
   const shots = useMemo(() => (row ? resolveTicketScreenshotUrls(row) : []), [row]);
   /** Stored URLs (what the API expects for removal), aligned with `shots`. */
   const storedShots = useMemo(
@@ -665,7 +678,11 @@ export default function TicketDetailPage() {
         comments={row.comments ?? []}
         currentUserId={user?.id ?? null}
         isAdmin={isAdmin}
-        onChange={(comments) => setRow((prev) => (prev ? { ...prev, comments } : prev))}
+        onChange={(comments) => {
+          const added = comments.length > (row.comments?.length ?? 0);
+          setRow((prev) => (prev ? { ...prev, comments } : prev));
+          if (added) void refreshLogs();
+        }}
       />
 
       <SectionCard title="Capture overview">
