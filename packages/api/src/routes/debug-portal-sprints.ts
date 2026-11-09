@@ -157,13 +157,51 @@ router.patch("/:id", async (req: AuthRequest, res) => {
 });
 
 /** Deleting a sprint moves its tickets back to the backlog. */
+const deleteSprintSchema = z.object({ confirmName: z.string() });
+
+/**
+ * Strict delete: admins only, never the active sprint, and the request must repeat the sprint's exact name.
+ * Its tickets move to the backlog and each ticket's activity log records it.
+ */
 router.delete("/:id", async (req: AuthRequest, res) => {
   try {
     if (!(await requireAdmin(req, res))) return;
+    const actor = (await resolveDebugPortalUser(req.user!.id))!;
+    const parsed = deleteSprintSchema.safeParse(req.body ?? {});
     const existing = await prisma.debugSprint.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: "Sprint not found" });
-    await prisma.debugSprint.delete({ where: { id: existing.id } });
-    res.json({ message: "Deleted" });
+    if (existing.status === "ACTIVE") {
+      return res.status(409).json({
+        error: "The active sprint can't be deleted. Set another sprint as active or mark this one Completed first.",
+        code: "SPRINT_ACTIVE",
+      });
+    }
+    if (!parsed.success || parsed.data.confirmName.trim() !== existing.name) {
+      return res.status(400).json({
+        error: `Type the sprint name "${existing.name}" exactly to confirm deletion.`,
+        code: "CONFIRM_NAME_MISMATCH",
+      });
+    }
+
+    const moved = await prisma.$transaction(async (tx) => {
+      const tickets = await tx.debugCaptureTicket.findMany({ where: { sprintId: existing.id }, select: { id: true } });
+      if (tickets.length) {
+        await tx.debugCaptureTicketLog.createMany({
+          data: tickets.map((t) => ({
+            ticketId: t.id,
+            action: "UPDATED",
+            field: "sprint",
+            oldValue: existing.name,
+            newValue: "Backlog (sprint deleted)",
+            actorUserId: actor.id,
+            actorEmail: actor.email,
+          })),
+        });
+      }
+      await tx.debugSprint.delete({ where: { id: existing.id } });
+      return tickets.length;
+    });
+    res.json({ message: "Deleted", data: { id: existing.id, ticketsMovedToBacklog: moved } });
   } catch (error) {
     console.error("debug sprint delete error:", error);
     res.status(500).json({ error: "Failed to delete sprint" });

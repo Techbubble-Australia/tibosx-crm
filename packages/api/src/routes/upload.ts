@@ -49,6 +49,59 @@ const upload = multer({
   },
 });
 
+const ATTACHMENT_EXT = /\.(jpe?g|png|gif|webp|pdf|docx?|xlsx?|csv|txt|log|json|zip)$/i;
+const ATTACHMENT_MIME = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv",
+  "text/plain",
+  "application/json",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/octet-stream",
+]);
+
+/** Debug ticket comment attachments: images plus common work files (logs, spreadsheets, archives). */
+const attachmentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ATTACHMENT_EXT.test(ext) && ATTACHMENT_MIME.has((file.mimetype || "").toLowerCase())) {
+      return cb(null, true);
+    }
+    cb(new Error("Unsupported file type. Allowed: images, PDF, Word, Excel, CSV, TXT, LOG, JSON, ZIP"));
+  },
+});
+
+router.post("/attachment", attachmentUpload.single("file"), async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const filename = makeStoredFilename("attachment", req.file.originalname);
+    await persistUploadedFile(req.file, filename);
+    res.json({
+      message: "File uploaded successfully",
+      data: {
+        url: `/uploads/${filename}`,
+        filename,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+      },
+    });
+  } catch (error) {
+    console.error("Error uploading attachment:", error);
+    next(error);
+  }
+});
+
 // Upload image endpoint
 router.post("/image", upload.single("image"), async (req, res, next) => {
   try {

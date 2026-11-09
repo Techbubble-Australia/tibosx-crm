@@ -23,13 +23,16 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SprintForm } from "@/components/SprintForm";
 import { SprintSelect } from "@/components/SprintSelect";
 import { TypeBadge } from "@/components/TicketBadges";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
 import {
   ALL_SPRINTS,
   BACKLOG,
   SPRINT_STATUS_LABELS,
+  ACTIVE_SPRINT_DELETE_HINT,
   defaultSprintSelection,
   isSprintLocked,
+  sprintDeleteConfirm,
   sprintDateRange,
   useSprints,
   type Sprint,
@@ -97,6 +100,7 @@ function ColorSwatches({ value, onChange }: { value: string; onChange: (color: s
 
 export default function BoardPage() {
   const { isAdmin } = usePortalUser();
+  const confirm = useConfirm();
   const { statuses, setStatuses } = useTicketStatuses();
   const [tickets, setTickets] = useState<BoardTicket[]>([]);
   const [total, setTotal] = useState(0);
@@ -139,10 +143,14 @@ export default function BoardPage() {
   const selectedLocked = isSprintLocked(selectedSprint?.status, isAdmin);
 
   async function activateSprint(sprint: Sprint) {
-    const message = activeSprint
-      ? `Make "${sprint.name}" the active sprint? "${activeSprint.name}" will be marked Completed.`
-      : `Make "${sprint.name}" the active sprint?`;
-    if (!window.confirm(message)) return;
+    const ok = await confirm({
+      title: `Make "${sprint.name}" the active sprint?`,
+      message: activeSprint
+        ? `"${activeSprint.name}" will be marked Completed. New tickets will go to "${sprint.name}".`
+        : `New tickets will go to "${sprint.name}".`,
+      confirmLabel: "Set as active",
+    });
+    if (!ok) return;
     setSprintSaving(true);
     setError("");
     try {
@@ -191,20 +199,16 @@ export default function BoardPage() {
   }, [reporterFilter, sprintFilter]);
 
   async function deleteSprint() {
-    if (!selectedSprint) return;
-    if (
-      !window.confirm(
-        `Delete "${selectedSprint.name}"? Its ${selectedSprint.ticketCount} ticket(s) move back to the backlog.`,
-      )
-    ) {
-      return;
-    }
+    if (!selectedSprint || selectedSprint.status === "ACTIVE") return;
+    if (!(await confirm(sprintDeleteConfirm(selectedSprint)))) return;
     setSprintSaving(true);
     setError("");
     try {
       const res = await fetch(`/api/debug-portal/sprints/${selectedSprint.id}`, {
         method: "DELETE",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmName: selectedSprint.name }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Could not delete sprint");
@@ -316,7 +320,13 @@ export default function BoardPage() {
   }
 
   async function deleteColumn(status: StatusOption) {
-    if (!window.confirm(`Delete the "${status.label}" column?`)) return;
+    const ok = await confirm({
+      title: `Delete the "${status.label}" column?`,
+      message: "The column is removed from the board for every sprint.",
+      confirmLabel: "Delete column",
+      tone: "danger",
+    });
+    if (!ok) return;
     setStatusSaving(true);
     setError("");
     try {
@@ -428,9 +438,10 @@ export default function BoardPage() {
                   </button>
                   <button
                     type="button"
-                    disabled={sprintSaving}
+                    disabled={sprintSaving || selectedSprint.status === "ACTIVE"}
+                    title={selectedSprint.status === "ACTIVE" ? ACTIVE_SPRINT_DELETE_HINT : undefined}
                     onClick={() => void deleteSprint()}
-                    className="dp-btn-ghost py-2 text-red-700 hover:bg-red-50"
+                    className="dp-btn-ghost py-2 text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
                   >
                     <Trash2 className="h-4 w-4" aria-hidden /> Delete sprint
                   </button>

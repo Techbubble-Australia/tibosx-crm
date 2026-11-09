@@ -375,12 +375,36 @@ router.patch("/bulk-status", async (req: PortalRequest, res) => {
   }
 });
 
+const commentAttachmentSchema = z.object({
+  url: z
+    .string()
+    .trim()
+    .min(1)
+    .max(2000)
+    .refine((u) => u.startsWith("/uploads/") || /^https:\/\//.test(u), "Invalid attachment URL"),
+  name: z.string().trim().min(1).max(255),
+  kind: z.enum(["image", "file"]),
+  size: z.number().int().nonnegative().optional(),
+});
+
+type CommentAttachment = z.infer<typeof commentAttachmentSchema>;
+
+function commentAttachments(raw: unknown): CommentAttachment[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((item) => {
+    const parsed = commentAttachmentSchema.safeParse(item);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+
 function serializeComment(row: {
   id: string;
   authorUserId: string;
   authorEmail: string;
   authorName: string | null;
   body: string;
+  attachments?: unknown;
+  editedAt?: Date | null;
   createdAt: Date;
 }) {
   return {
@@ -389,6 +413,8 @@ function serializeComment(row: {
     authorEmail: row.authorEmail,
     authorName: row.authorName,
     body: row.body,
+    attachments: commentAttachments(row.attachments),
+    editedAt: row.editedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -411,13 +437,18 @@ async function ticketDetail(id: string) {
   };
 }
 
-const commentSchema = z.object({ body: z.string().trim().min(1, "Write a comment").max(5000) });
+const commentSchema = z
+  .object({
+    body: z.string().trim().max(5000).default(""),
+    attachments: z.array(commentAttachmentSchema).max(10, "Up to 10 attachments per comment").default([]),
+  })
+  .refine((c) => c.body.length > 0 || c.attachments.length > 0, { message: "Write a comment or attach a file" });
 
 /** Anyone who can open the ticket can comment (including on completed sprints). */
 router.post("/:id/comments", async (req: PortalRequest, res) => {
   try {
     const user = req.portalUser!;
-    const { body } = commentSchema.parse(req.body);
+    const { body, attachments } = commentSchema.parse(req.body);
     const row = await prisma.debugCaptureTicket.findUnique({
       where: { id: req.params.id },
       select: { id: true, reporterUserId: true },
@@ -430,6 +461,7 @@ router.post("/:id/comments", async (req: PortalRequest, res) => {
         authorEmail: user.email,
         authorName: user.name || null,
         body,
+        attachments,
       },
     });
     res.status(201).json({ data: serializeComment(created) });
@@ -439,6 +471,33 @@ router.post("/:id/comments", async (req: PortalRequest, res) => {
     }
     console.error("debug portal comment create error:", error);
     res.status(500).json({ error: "Failed to add comment" });
+  }
+});
+
+/** Only the author can edit a comment (text and attachments are replaced). */
+router.patch("/:id/comments/:commentId", async (req: PortalRequest, res) => {
+  try {
+    const user = req.portalUser!;
+    const { body, attachments } = commentSchema.parse(req.body);
+    const comment = await prisma.debugCaptureTicketComment.findFirst({
+      where: { id: req.params.commentId, ticketId: req.params.id },
+      include: { ticket: { select: { reporterUserId: true } } },
+    });
+    if (!comment || !canViewTicket(user, comment.ticket)) return res.status(404).json({ error: "Not found" });
+    if (comment.authorUserId !== user.id) {
+      return res.status(403).json({ error: "You can only edit your own comments" });
+    }
+    const updated = await prisma.debugCaptureTicketComment.update({
+      where: { id: comment.id },
+      data: { body, attachments, editedAt: new Date() },
+    });
+    res.json({ data: serializeComment(updated) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors[0]?.message ?? "Validation error", details: error.errors });
+    }
+    console.error("debug portal comment update error:", error);
+    res.status(500).json({ error: "Failed to update comment" });
   }
 });
 

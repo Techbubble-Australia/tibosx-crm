@@ -1381,6 +1381,10 @@ model DebugCaptureTicketComment {
   authorEmail  String
   authorName   String?
   body         String             @db.Text
+  /// [{ url, name, kind: "image" | "file", size? }]
+  attachments  Json?
+  /// Set when the author edits the comment.
+  editedAt     DateTime?
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 

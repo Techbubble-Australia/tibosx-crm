@@ -17,6 +17,7 @@ import { BACKLOG, SPRINT_STATUS_LABELS, isSprintLocked, useSprints, type SprintS
 import { formatEnvironment, memberStatusTarget, type TicketStatus } from "@/lib/tickets";
 import { StatusBadge, TypeBadge } from "@/components/TicketBadges";
 import { TicketComments, type TicketComment } from "@/components/TicketComments";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 type TicketDetail = {
   id: string;
@@ -104,12 +105,17 @@ export default function TicketDetailPage() {
   const [savingSprint, setSavingSprint] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const router = useRouter();
+  const confirm = useConfirm();
 
   async function deleteTicket() {
     if (!row) return;
-    if (!window.confirm(`Delete ${row.ticketId}? Its screenshots and activity log are removed too. This cannot be undone.`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: `Delete ${row.ticketId}?`,
+      message: "Its screenshots, comments and activity log are removed too. This can't be undone.",
+      confirmLabel: "Delete ticket",
+      tone: "danger",
+    });
+    if (!ok) return;
     setDeleting(true);
     setError("");
     try {
@@ -194,7 +200,13 @@ export default function TicketDetailPage() {
   }
 
   async function removeScreenshot(storedUrl: string) {
-    if (!window.confirm("Remove this screenshot from the ticket?")) return;
+    const ok = await confirm({
+      title: "Remove this screenshot?",
+      message: "It will no longer be attached to the ticket.",
+      confirmLabel: "Remove screenshot",
+      tone: "danger",
+    });
+    if (!ok) return;
     setRemovingShot(storedUrl);
     setError("");
     try {

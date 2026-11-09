@@ -59,6 +59,25 @@ export function defaultSprintSelection(sprints: Sprint[]): string {
   return (sprints.find((s) => s.status === "ACTIVE") ?? latestSprint(sprints))?.id ?? ALL_SPRINTS;
 }
 
+/** Strict confirmation for deleting a sprint (the API also requires the exact name). */
+export function sprintDeleteConfirm(sprint: Sprint) {
+  const n = sprint.ticketCount;
+  return {
+    title: `Permanently delete "${sprint.name}"?`,
+    message:
+      `This cannot be undone. The sprint's name, dates and goal are lost` +
+      (n
+        ? `, and its ${n} ticket${n === 1 ? "" : "s"} move back to the Backlog (each ticket's activity log records the move).`
+        : ". It has no tickets."),
+    confirmLabel: "Delete sprint permanently",
+    tone: "danger" as const,
+    requireText: sprint.name,
+  };
+}
+
+export const ACTIVE_SPRINT_DELETE_HINT =
+  "The active sprint can't be deleted. Set another sprint as active or mark this one Completed first.";
+
 /** Completed sprints are read-only for non-admins. */
 export function isSprintLocked(sprintStatus: string | null | undefined, isAdmin: boolean): boolean {
   return !isAdmin && sprintStatus === "COMPLETED";

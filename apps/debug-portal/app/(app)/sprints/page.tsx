@@ -5,7 +5,17 @@ import { useState } from "react";
 import { CalendarRange, KanbanSquare, Loader2, Lock, Pencil, PlayCircle, Plus, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SprintForm } from "@/components/SprintForm";
-import { BACKLOG, SPRINT_STATUS_LABELS, isSprintLocked, sprintDateRange, useSprints, type Sprint } from "@/lib/sprints";
+import { useConfirm } from "@/components/ConfirmDialog";
+import {
+  ACTIVE_SPRINT_DELETE_HINT,
+  BACKLOG,
+  SPRINT_STATUS_LABELS,
+  isSprintLocked,
+  sprintDateRange,
+  sprintDeleteConfirm,
+  useSprints,
+  type Sprint,
+} from "@/lib/sprints";
 import { usePortalUser } from "@/lib/use-portal-user";
 
 function statusBadgeClass(status: Sprint["status"]): string {
@@ -16,6 +26,7 @@ function statusBadgeClass(status: Sprint["status"]): string {
 
 export default function SprintsPage() {
   const { isAdmin } = usePortalUser();
+  const confirm = useConfirm();
   const { sprints, loading, reload } = useSprints();
   const [form, setForm] = useState<{ sprint: Sprint | null } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -42,17 +53,26 @@ export default function SprintsPage() {
     }
   }
 
-  function activate(sprint: Sprint) {
-    const message = activeSprint
-      ? `Make "${sprint.name}" the active sprint? "${activeSprint.name}" will be marked Completed.`
-      : `Make "${sprint.name}" the active sprint?`;
-    if (!window.confirm(message)) return;
+  async function activate(sprint: Sprint) {
+    const ok = await confirm({
+      title: `Make "${sprint.name}" the active sprint?`,
+      message: activeSprint
+        ? `"${activeSprint.name}" will be marked Completed. New tickets will go to "${sprint.name}".`
+        : `New tickets will go to "${sprint.name}".`,
+      confirmLabel: "Set as active",
+    });
+    if (!ok) return;
     void request(sprint, { method: "PATCH", body: JSON.stringify({ status: "ACTIVE" }) }, "Could not activate sprint");
   }
 
-  function remove(sprint: Sprint) {
-    if (!window.confirm(`Delete "${sprint.name}"? Its ${sprint.ticketCount} ticket(s) move back to the backlog.`)) return;
-    void request(sprint, { method: "DELETE" }, "Could not delete sprint");
+  async function remove(sprint: Sprint) {
+    if (sprint.status === "ACTIVE") return;
+    if (!(await confirm(sprintDeleteConfirm(sprint)))) return;
+    void request(
+      sprint,
+      { method: "DELETE", body: JSON.stringify({ confirmName: sprint.name }) },
+      "Could not delete sprint",
+    );
   }
 
   return (
@@ -133,7 +153,7 @@ export default function SprintsPage() {
                       <button
                         type="button"
                         disabled={busyId !== null}
-                        onClick={() => activate(sprint)}
+                        onClick={() => void activate(sprint)}
                         className="dp-btn-secondary py-2 text-emerald-800"
                       >
                         <PlayCircle className="h-4 w-4" aria-hidden /> Set as active
@@ -144,9 +164,10 @@ export default function SprintsPage() {
                     </button>
                     <button
                       type="button"
-                      disabled={busyId !== null}
-                      onClick={() => remove(sprint)}
-                      className="dp-btn-ghost py-2 text-red-700 hover:bg-red-50"
+                      disabled={busyId !== null || sprint.status === "ACTIVE"}
+                      title={sprint.status === "ACTIVE" ? ACTIVE_SPRINT_DELETE_HINT : undefined}
+                      onClick={() => void remove(sprint)}
+                      className="dp-btn-ghost py-2 text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
                     >
                       <Trash2 className="h-4 w-4" aria-hidden /> Delete
                     </button>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bug, CalendarRange, KanbanSquare, LogOut, Plus, Ticket } from "lucide-react";
 import { TicketStatusesProvider } from "@/components/TicketStatusesProvider";
+import { ConfirmDialogProvider } from "@/components/ConfirmDialog";
 
 function navClass(active: boolean): string {
   return active ? "dp-nav-link dp-nav-link-active" : "dp-nav-link";
@@ -62,7 +63,9 @@ export default function AppShellLayout({ children }: { children: React.ReactNode
         </div>
       </header>
       <main className={`mx-auto px-4 py-8 sm:px-6 ${onBoard ? "max-w-[100rem]" : "max-w-6xl"}`}>
-        <TicketStatusesProvider>{children}</TicketStatusesProvider>
+        <ConfirmDialogProvider>
+          <TicketStatusesProvider>{children}</TicketStatusesProvider>
+        </ConfirmDialogProvider>
       </main>
     </div>
   );
