@@ -1363,12 +1363,28 @@ model DebugCaptureTicket {
   screenshotUrls       String[]                 @default([])
   fullPayload          Json
   logs                 DebugCaptureTicketLog[]
+  comments             DebugCaptureTicketComment[]
   createdAt            DateTime                 @default(now())
 
   @@index([createdAt])
   @@index([reporterUserId])
   @@index([status])
   @@index([sprintId])
+}
+
+/// Discussion on a debug ticket; anyone who can open the ticket can read and post.
+model DebugCaptureTicketComment {
+  id           String             @id @default(cuid())
+  ticketId     String
+  ticket       DebugCaptureTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorUserId String
+  authorEmail  String
+  authorName   String?
+  body         String             @db.Text
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([ticketId, createdAt])
 }
 
 /// Who changed what on a debug ticket (portal edits, status moves, AI agent updates).

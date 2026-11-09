@@ -16,6 +16,7 @@ import { SprintSelect } from "@/components/SprintSelect";
 import { BACKLOG, SPRINT_STATUS_LABELS, isSprintLocked, useSprints, type SprintStatus } from "@/lib/sprints";
 import { formatEnvironment, memberStatusTarget, type TicketStatus } from "@/lib/tickets";
 import { StatusBadge, TypeBadge } from "@/components/TicketBadges";
+import { TicketComments, type TicketComment } from "@/components/TicketComments";
 
 type TicketDetail = {
   id: string;
@@ -36,6 +37,7 @@ type TicketDetail = {
   fullPayload: unknown;
   createdAt: string;
   logs?: TicketLogEntry[];
+  comments?: TicketComment[];
   sprintId?: string | null;
   sprintName?: string | null;
   sprintStatus?: string | null;
@@ -96,7 +98,7 @@ export default function TicketDetailPage() {
     userDescription: "",
     currentUrl: "",
   });
-  const { isAdmin } = usePortalUser();
+  const { user, isAdmin } = usePortalUser();
   const { labelOf } = useTicketStatuses();
   const { sprints, reload: reloadSprints } = useSprints();
   const [savingSprint, setSavingSprint] = useState(false);
@@ -272,6 +274,8 @@ export default function TicketDetailPage() {
   }
 
   const locked = isSprintLocked(row?.sprintStatus, isAdmin);
+  /** Only the ticket's creator can edit its details or delete it (the API enforces the same rule). */
+  const isCreator = Boolean(row && user && row.reporterUserId === user.id);
   const memberTarget = row && !isAdmin && !locked ? memberStatusTarget(row.status) : null;
   const el = (row?.elementDiagnostics ?? {}) as ElementDiagnosticsShape;
   const api = (row?.apiPrerequisite ?? null) as ApiPrerequisiteShape | null;
@@ -367,7 +371,7 @@ export default function TicketDetailPage() {
         }
       />
 
-      {!locked ? (
+      {isCreator && !locked ? (
         <section
           aria-label="Ticket actions"
           className="dp-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"
@@ -638,6 +642,14 @@ export default function TicketDetailPage() {
           ) : null}
         </div>
       </SectionCard>
+
+      <TicketComments
+        ticketId={row.id}
+        comments={row.comments ?? []}
+        currentUserId={user?.id ?? null}
+        isAdmin={isAdmin}
+        onChange={(comments) => setRow((prev) => (prev ? { ...prev, comments } : prev))}
+      />
 
       <SectionCard title="Capture overview">
         <dl className="space-y-3">

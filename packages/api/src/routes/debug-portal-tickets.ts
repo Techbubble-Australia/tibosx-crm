@@ -72,7 +72,10 @@ const patchSchema = z
     message: "Nothing to update",
   });
 
+/** Ticket details only the creator may change (status and sprint follow their own rules). */
 const EDITABLE_FIELDS = ["type", "reportedEnvironment", "userDescription", "currentUrl"] as const;
+
+const ONLY_CREATOR_ERROR = "Only the person who created this ticket can edit or delete it.";
 
 const removeScreenshotSchema = z.object({ screenshotUrl: screenshotUrlSchema });
 
@@ -372,18 +375,92 @@ router.patch("/bulk-status", async (req: PortalRequest, res) => {
   }
 });
 
-/** Ticket detail plus its activity log (newest first). */
+function serializeComment(row: {
+  id: string;
+  authorUserId: string;
+  authorEmail: string;
+  authorName: string | null;
+  body: string;
+  createdAt: Date;
+}) {
+  return {
+    id: row.id,
+    authorUserId: row.authorUserId,
+    authorEmail: row.authorEmail,
+    authorName: row.authorName,
+    body: row.body,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/** Ticket detail plus its activity log (newest first) and comments (oldest first). */
 async function ticketDetail(id: string) {
   const row = await prisma.debugCaptureTicket.findUnique({
     where: { id },
     include: {
       logs: { orderBy: { createdAt: "desc" } },
+      comments: { orderBy: { createdAt: "asc" } },
       sprint: { select: SPRINT_SELECT },
     },
   });
   if (!row) return null;
-  return { ...serializeRow(row), logs: row.logs.map(serializeDebugTicketLog) };
+  return {
+    ...serializeRow(row),
+    logs: row.logs.map(serializeDebugTicketLog),
+    comments: row.comments.map(serializeComment),
+  };
 }
+
+const commentSchema = z.object({ body: z.string().trim().min(1, "Write a comment").max(5000) });
+
+/** Anyone who can open the ticket can comment (including on completed sprints). */
+router.post("/:id/comments", async (req: PortalRequest, res) => {
+  try {
+    const user = req.portalUser!;
+    const { body } = commentSchema.parse(req.body);
+    const row = await prisma.debugCaptureTicket.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, reporterUserId: true },
+    });
+    if (!row || !canViewTicket(user, row)) return res.status(404).json({ error: "Not found" });
+    const created = await prisma.debugCaptureTicketComment.create({
+      data: {
+        ticketId: row.id,
+        authorUserId: user.id,
+        authorEmail: user.email,
+        authorName: user.name || null,
+        body,
+      },
+    });
+    res.status(201).json({ data: serializeComment(created) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors[0]?.message ?? "Validation error", details: error.errors });
+    }
+    console.error("debug portal comment create error:", error);
+    res.status(500).json({ error: "Failed to add comment" });
+  }
+});
+
+/** Authors can delete their own comments; admins can remove any. */
+router.delete("/:id/comments/:commentId", async (req: PortalRequest, res) => {
+  try {
+    const user = req.portalUser!;
+    const comment = await prisma.debugCaptureTicketComment.findFirst({
+      where: { id: req.params.commentId, ticketId: req.params.id },
+      include: { ticket: { select: { reporterUserId: true } } },
+    });
+    if (!comment || !canViewTicket(user, comment.ticket)) return res.status(404).json({ error: "Not found" });
+    if (comment.authorUserId !== user.id && !user.isAdmin) {
+      return res.status(403).json({ error: "You can only delete your own comments" });
+    }
+    await prisma.debugCaptureTicketComment.delete({ where: { id: comment.id } });
+    res.json({ data: { id: comment.id } });
+  } catch (error) {
+    console.error("debug portal comment delete error:", error);
+    res.status(500).json({ error: "Failed to delete comment" });
+  }
+});
 
 router.get("/:id", async (req: PortalRequest, res) => {
   try {
@@ -495,6 +572,9 @@ router.patch("/:id", async (req: PortalRequest, res) => {
       if (next === undefined) continue;
       const value = field === "currentUrl" ? next || "manual://debug-portal" : next;
       if (value === row[field]) continue;
+      if (row.reporterUserId !== user.id) {
+        return res.status(403).json({ error: ONLY_CREATOR_ERROR });
+      }
       data[field] = value as never;
       entries.push({ action: "UPDATED", field, oldValue: String(row[field] ?? ""), newValue: String(value) });
     }
@@ -531,7 +611,7 @@ router.patch("/:id", async (req: PortalRequest, res) => {
   }
 });
 
-/** Admins can delete any ticket; reporters can delete their own unless its sprint is completed. Logs cascade. */
+/** Only the ticket's creator can delete it (not while its sprint is completed). Logs and comments cascade. */
 router.delete("/:id", async (req: PortalRequest, res) => {
   try {
     const user = req.portalUser!;
@@ -540,6 +620,7 @@ router.delete("/:id", async (req: PortalRequest, res) => {
       select: { id: true, ticketId: true, reporterUserId: true, sprintId: true },
     });
     if (!row || !canViewTicket(user, row)) return res.status(404).json({ error: "Not found" });
+    if (row.reporterUserId !== user.id) return res.status(403).json({ error: ONLY_CREATOR_ERROR });
     if (await lockedForUser(user, row.sprintId)) return res.status(403).json({ error: LOCKED_SPRINT_ERROR });
     await prisma.debugCaptureTicket.delete({ where: { id: row.id } });
     res.json({ data: { id: row.id, ticketId: row.ticketId } });
