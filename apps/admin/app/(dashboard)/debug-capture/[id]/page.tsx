@@ -15,6 +15,7 @@ type Detail = {
   ticketId: string;
   type: string;
   reportedEnvironment: string;
+  title?: string | null;
   userDescription: string;
   screenshotUrl: string | null;
   screenshotUrls?: string[];
@@ -64,7 +65,8 @@ export default function DebugCaptureDetailPage() {
         Back to list
       </Link>
       <div>
-        <h2 className="text-xl font-semibold">{row.ticketId}</h2>
+        <p className="text-sm font-medium text-gray-500">{row.ticketId}</p>
+        <h2 className="text-xl font-semibold">{row.title || row.ticketId}</h2>
         <p className="text-sm text-gray-500">
           {row.type} · {row.reportedEnvironment} · {new Date(row.createdAt).toLocaleString("en-AU")}
         </p>

@@ -36,6 +36,8 @@ export async function resolveDebugPortalUser(id: string): Promise<DebugPortalUse
 
 export const MAX_TICKET_SCREENSHOTS = 20;
 
+export const TICKET_TITLE_MAX = 200;
+
 /** Every screenshot on a ticket, including tickets saved before multiple screenshots existed. */
 export function ticketScreenshotUrls(row: {
   screenshotUrl: string | null;

@@ -95,6 +95,7 @@ type DbRow = {
   type: string;
   status: string;
   reportedEnvironment: string;
+  title: string | null;
   userDescription: string;
   reporterUserId: string;
   reporterEmail: string;
@@ -117,6 +118,7 @@ function toAgentExportTicket(row: DbRow): AgentExportTicket {
     type: row.type,
     status: row.status,
     reportedEnvironment: row.reportedEnvironment,
+    title: row.title,
     userDescription: row.userDescription,
     reporterEmail: row.reporterEmail,
     reporterRole: row.reporterRole,
@@ -195,6 +197,7 @@ function serializeForAgent(row: DbRow, includeFullPayload: boolean) {
     sprint: serializeSprint(row.sprint),
     locked: row.sprint?.status === "COMPLETED",
     origin: ticketOrigin(row.fullPayload),
+    title: row.title,
     summary: row.userDescription.trim().slice(0, 280),
     userDescription: row.userDescription,
     pageUrl: row.currentUrl,

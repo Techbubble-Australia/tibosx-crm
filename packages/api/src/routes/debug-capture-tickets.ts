@@ -5,6 +5,7 @@ import type { Prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth.js";
 import {
   MAX_TICKET_SCREENSHOTS,
+  TICKET_TITLE_MAX,
   resolveDebugPortalUser,
   screenshotFieldsFromInput,
   ticketScreenshotUrls,
@@ -48,6 +49,7 @@ const createSchema = z.object({
   ticketId: z.string().min(1).max(80),
   type: z.enum(["BUG", "ENHANCEMENT"]),
   reportedEnvironment: z.enum(["development", "staging", "production"]).default("development"),
+  title: z.string().trim().min(1, "Title is required").max(TICKET_TITLE_MAX),
   userDescription: z.string().min(1).max(20_000),
   userMetadata: z.object({
     userId: z.string(),
@@ -97,6 +99,7 @@ function serializeRow(row: {
   type: string;
   status: string;
   reportedEnvironment: string;
+  title: string | null;
   userDescription: string;
   reporterUserId: string;
   reporterEmail: string;
@@ -117,6 +120,7 @@ function serializeRow(row: {
     type: row.type,
     status: row.status,
     reportedEnvironment: row.reportedEnvironment,
+    title: row.title ?? null,
     userDescription: row.userDescription,
     reporterUserId: row.reporterUserId,
     reporterEmail: row.reporterEmail,
@@ -154,6 +158,7 @@ router.post("/", async (req: AuthRequest, res) => {
       timestamp: new Date().toISOString(),
       type: input.type,
       reportedEnvironment: input.reportedEnvironment,
+      title: input.title,
       userDescription: input.userDescription,
       userMetadata: {
         ...input.userMetadata,
@@ -174,6 +179,7 @@ router.post("/", async (req: AuthRequest, res) => {
             ticketId,
             type: input.type,
             reportedEnvironment: input.reportedEnvironment,
+            title: input.title,
             userDescription: input.userDescription,
             reporterUserId: u.id,
             reporterEmail: u.email,
@@ -229,6 +235,7 @@ router.get("/", async (req: AuthRequest, res) => {
           type: true,
           status: true,
           reportedEnvironment: true,
+          title: true,
           userDescription: true,
           reporterUserId: true,
           reporterEmail: true,

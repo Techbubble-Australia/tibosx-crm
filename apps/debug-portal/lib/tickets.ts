@@ -56,6 +56,8 @@ export function typeBadgeClass(type: string): string {
     : "bg-red-100 text-red-800 ring-1 ring-red-300/80";
 }
 
+export const TICKET_TITLE_MAX = 200;
+
 export function formatTicketType(type: string): string {
   return type === "ENHANCEMENT" ? "Enhancement" : type === "BUG" ? "Bug" : type;
 }

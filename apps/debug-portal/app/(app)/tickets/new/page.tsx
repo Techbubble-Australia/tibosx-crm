@@ -11,6 +11,7 @@ import { useSprints } from "@/lib/sprints";
 import { usePortalUser } from "@/lib/use-portal-user";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
 import { StatusBadge } from "@/components/TicketBadges";
+import { TICKET_TITLE_MAX } from "@/lib/tickets";
 
 type TicketType = "BUG" | "ENHANCEMENT";
 type ReportedEnvironment = "development" | "production";
@@ -21,6 +22,7 @@ export default function NewTicketPage() {
   const [type, setType] = useState<TicketType>("BUG");
   const [reportedEnvironment, setReportedEnvironment] = useState<ReportedEnvironment>("development");
   const [currentUrl, setCurrentUrl] = useState("");
+  const [title, setTitle] = useState("");
   const [userDescription, setUserDescription] = useState("");
   const [shots, setShots] = useState<PendingShot[]>([]);
   const [error, setError] = useState("");
@@ -87,6 +89,10 @@ export default function NewTicketPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (!title.trim()) {
+      setError("Please add a short title for this ticket.");
+      return;
+    }
     if (!userDescription.trim()) {
       setError("Please add a description so others can understand the issue.");
       return;
@@ -103,6 +109,7 @@ export default function NewTicketPage() {
         body: JSON.stringify({
           type,
           reportedEnvironment,
+          title: title.trim(),
           userDescription: userDescription.trim(),
           currentUrl: currentUrl.trim() || undefined,
           screenshotUrls,
@@ -193,6 +200,22 @@ export default function NewTicketPage() {
             value={currentUrl}
             onChange={(e) => setCurrentUrl(e.target.value)}
             placeholder="https://…"
+            className="dp-input"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="title" className="dp-label">
+            Title <span className="text-red-600">*</span>
+          </label>
+          <input
+            id="title"
+            type="text"
+            required
+            maxLength={TICKET_TITLE_MAX}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Short summary, e.g. Export button does nothing on the timesheets page"
             className="dp-input"
           />
         </div>

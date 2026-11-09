@@ -20,6 +20,7 @@ type TicketRow = {
   type: string;
   status: TicketStatus;
   reportedEnvironment: string;
+  title?: string | null;
   userDescription: string;
   reporterEmail: string;
   createdAt: string;
@@ -385,6 +386,9 @@ function TicketsListInner() {
                       >
                         {row.ticketId}
                       </button>
+                      {row.title ? (
+                        <p className="mt-1 line-clamp-1 text-sm font-medium text-slate-900">{row.title}</p>
+                      ) : null}
                       <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">
                         {row.userDescription}
                       </p>

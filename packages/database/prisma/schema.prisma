@@ -1350,6 +1350,8 @@ model DebugCaptureTicket {
   sprintId             String?
   sprint               DebugSprint?             @relation(fields: [sprintId], references: [id], onDelete: SetNull)
   reportedEnvironment  DebugReportedEnvironment @default(development)
+  /// Required for new tickets; null on tickets created before titles existed.
+  title                String?
   userDescription      String                   @db.Text
   reporterUserId       String
   reporterEmail        String

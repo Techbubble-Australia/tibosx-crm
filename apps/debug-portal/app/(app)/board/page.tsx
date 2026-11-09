@@ -55,6 +55,7 @@ type BoardTicket = {
   type: string;
   status: TicketStatus;
   reportedEnvironment: string;
+  title?: string | null;
   userDescription: string;
   reporterUserId: string;
   reporterEmail: string;
@@ -774,7 +775,10 @@ export default function BoardPage() {
                             </span>
                           )}
                         </div>
-                        <p className="line-clamp-3 text-xs leading-relaxed text-slate-600">
+                        {ticket.title ? (
+                          <p className="mb-1 line-clamp-2 text-sm font-medium leading-snug text-slate-900">{ticket.title}</p>
+                        ) : null}
+                        <p className={`${ticket.title ? "line-clamp-2" : "line-clamp-3"} text-xs leading-relaxed text-slate-600`}>
                           {ticket.userDescription || "No description"}
                         </p>
                         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">

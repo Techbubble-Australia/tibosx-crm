@@ -268,13 +268,15 @@ export const notificationHandlers: {
     const link = debugTicketUrl(ticket.id);
     const summary = ticket.userDescription.length > 400 ? `${ticket.userDescription.slice(0, 400)}…` : ticket.userDescription;
     const kind = ticket.type === "ENHANCEMENT" ? "enhancement" : "bug";
+    const title = ticket.title?.trim() ?? "";
     const body = [
       `${ticket.reporterEmail} reported a new ${kind}: ${ticket.ticketId} (${statusLabel}).`,
       "",
+      ...(title ? [title, ""] : []),
       summary,
       link ? `\nView ticket: ${link}` : "",
     ].join("\n");
-    const bodyHtml = `<p><strong>${escapeHtml(ticket.reporterEmail)}</strong> reported a new ${kind}: <strong>${ticket.ticketId}</strong> (${escapeHtml(statusLabel)}).</p><p style="white-space:pre-wrap;">${escapeHtml(summary)}</p>${link ? `<p><a href="${escapeHtml(link)}">View ticket in the debug portal</a></p>` : ""}`;
+    const bodyHtml = `<p><strong>${escapeHtml(ticket.reporterEmail)}</strong> reported a new ${kind}: <strong>${ticket.ticketId}</strong> (${escapeHtml(statusLabel)}).</p>${title ? `<p><strong>${escapeHtml(title)}</strong></p>` : ""}<p style="white-space:pre-wrap;">${escapeHtml(summary)}</p>${link ? `<p><a href="${escapeHtml(link)}">View ticket in the debug portal</a></p>` : ""}`;
 
     const recipients = new Set([...(await debugPortalAdminEmails()), ticket.reporterEmail.toLowerCase()]);
     for (const to of recipients) {
@@ -282,7 +284,7 @@ export const notificationHandlers: {
         sendSupportTicketNotificationEmail({
           to,
           headerTitle: "New debug ticket!",
-          subjectLine: `New debug ticket ${ticket.ticketId}`,
+          subjectLine: `New debug ticket ${ticket.ticketId}${title ? `: ${title}` : ""}`,
           body,
           bodyHtml,
           greeting: "Hi Team,",
@@ -299,8 +301,9 @@ export const notificationHandlers: {
     const [from, next] = await Promise.all([debugStatusLabel(oldStatus), debugStatusLabel(newStatus)]);
     const link = debugTicketUrl(ticket.id);
     const by = actorEmail ? ` by ${actorEmail}` : "";
-    const body = `Your ticket ${ticket.ticketId} moved from ${from} to ${next}${by}.${link ? `\n\nView ticket: ${link}` : ""}`;
-    const bodyHtml = `<p>Your ticket <strong>${ticket.ticketId}</strong> moved from <strong>${escapeHtml(from)}</strong> to <strong>${escapeHtml(next)}</strong>${escapeHtml(by)}.</p>${link ? `<p><a href="${escapeHtml(link)}">View ticket in the debug portal</a></p>` : ""}`;
+    const named = ticket.title?.trim() ? ` "${ticket.title.trim()}"` : "";
+    const body = `Your ticket ${ticket.ticketId}${named} moved from ${from} to ${next}${by}.${link ? `\n\nView ticket: ${link}` : ""}`;
+    const bodyHtml = `<p>Your ticket <strong>${ticket.ticketId}</strong>${escapeHtml(named)} moved from <strong>${escapeHtml(from)}</strong> to <strong>${escapeHtml(next)}</strong>${escapeHtml(by)}.</p>${link ? `<p><a href="${escapeHtml(link)}">View ticket in the debug portal</a></p>` : ""}`;
     await sendEmailIfEnabled("debug_ticket.status.changed", to, () =>
       sendSupportTicketNotificationEmail({
         to,

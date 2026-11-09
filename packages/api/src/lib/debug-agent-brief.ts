@@ -5,6 +5,7 @@ export type AgentExportTicket = {
   type: string;
   status: string;
   reportedEnvironment: string;
+  title?: string | null;
   userDescription: string;
   reporterEmail: string;
   reporterRole: string;
@@ -66,7 +67,7 @@ export function buildAgentIssueBriefMarkdown(ticket: AgentExportTicket): string 
   const shot = screenshotUrlFromTicket(ticket);
   const lines: string[] = [];
 
-  lines.push(`# Debug capture: ${ticket.ticketId}`);
+  lines.push(`# Debug capture: ${ticket.ticketId}${ticket.title ? ` — ${ticket.title}` : ""}`);
   lines.push("");
   lines.push("## Summary");
   lines.push(`- **Status:** ${ticket.status}`);

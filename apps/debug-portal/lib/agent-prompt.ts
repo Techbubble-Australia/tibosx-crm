@@ -6,6 +6,7 @@ export type AgentPromptTicket = {
   type: string;
   status: TicketStatus;
   reportedEnvironment: string;
+  title?: string | null;
   userDescription: string;
   reporterEmail: string;
   reporterRole: string;
@@ -78,7 +79,7 @@ export function buildAgentIssuePrompt(ticket: AgentPromptTicket): string {
   const shots = screenshotUrlsForTicket(ticket);
   const lines: string[] = [];
 
-  lines.push(`# Debug capture: ${ticket.ticketId}`);
+  lines.push(`# Debug capture: ${ticket.ticketId}${ticket.title ? ` — ${ticket.title}` : ""}`);
   lines.push("");
   lines.push("## Summary");
   lines.push(`- **Type:** ${ticket.type}`);

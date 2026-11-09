@@ -18,6 +18,7 @@ export type TicketLogEntry = {
 
 const FIELD_LABELS: Record<string, string> = {
   type: "Type",
+  title: "Title",
   reportedEnvironment: "Environment",
   userDescription: "Description",
   currentUrl: "Related URL",

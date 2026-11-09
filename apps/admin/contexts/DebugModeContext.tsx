@@ -41,6 +41,7 @@ export type DebugCaptureDraft = {
   ticketId: string;
   type: DebugCaptureType;
   reportedEnvironment: ReportedEnvironment;
+  title: string;
   userDescription: string;
   elementDiagnostics: ElementDiagnostics;
   apiPrerequisite: ApiPrerequisiteCapture | null;
@@ -230,6 +231,7 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
           ticketId: `TICK-${Date.now()}`,
           type: "BUG",
           reportedEnvironment: defaultReportedEnvironment,
+          title: "",
           userDescription: "",
           elementDiagnostics: captureElementDiagnostics(el),
           apiPrerequisite,
@@ -256,6 +258,7 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
         ticketId: `TICK-${Date.now()}`,
         type: "BUG",
         reportedEnvironment: defaultReportedEnvironment,
+        title: "",
         userDescription: "",
         elementDiagnostics: captureViewportDiagnostics(),
         apiPrerequisite: null,
@@ -295,6 +298,7 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
       timestamp: new Date().toISOString(),
       type: draft.type,
       reportedEnvironment: draft.reportedEnvironment,
+      title: draft.title,
       userDescription: draft.userDescription,
       userMetadata: draft.userMetadata,
       elementDiagnostics: draft.elementDiagnostics,
@@ -322,6 +326,9 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
 
   const submitTicket = useCallback(async () => {
     if (!draft) return { ok: false, error: "Nothing to save" };
+    if (!draft.title.trim()) {
+      return { ok: false, error: "Title is required" };
+    }
     if (!draft.userDescription.trim()) {
       return { ok: false, error: "Description is required" };
     }
@@ -364,6 +371,7 @@ export function DebugModeProvider({ children }: { children: ReactNode }) {
         ticketId: draft.ticketId,
         type: draft.type,
         reportedEnvironment: draft.reportedEnvironment,
+        title: draft.title.trim(),
         userDescription: draft.userDescription.trim(),
         userMetadata: {
           userId: draft.userMetadata.userId,

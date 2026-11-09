@@ -13,7 +13,7 @@ import { usePortalUser } from "@/lib/use-portal-user";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
 import { SprintSelect } from "@/components/SprintSelect";
 import { BACKLOG, SPRINT_STATUS_LABELS, isSprintLocked, useSprints, type SprintStatus } from "@/lib/sprints";
-import { formatEnvironment, memberStatusTarget, type TicketStatus } from "@/lib/tickets";
+import { TICKET_TITLE_MAX, formatEnvironment, memberStatusTarget, type TicketStatus } from "@/lib/tickets";
 import { StatusBadge, TypeBadge } from "@/components/TicketBadges";
 import { TicketComments, type TicketComment } from "@/components/TicketComments";
 import { useConfirm } from "@/components/ConfirmDialog";
@@ -24,6 +24,7 @@ export type TicketDetail = {
   type: string;
   status: TicketStatus;
   reportedEnvironment: string;
+  title?: string | null;
   userDescription: string;
   reporterUserId: string;
   reporterEmail: string;
@@ -46,6 +47,7 @@ export type TicketDetail = {
 type EditDraft = {
   type: "BUG" | "ENHANCEMENT";
   reportedEnvironment: string;
+  title: string;
   userDescription: string;
   currentUrl: string;
 };
@@ -115,6 +117,7 @@ export function TicketDetailView({
   const [editDraft, setEditDraft] = useState<EditDraft>({
     type: "BUG",
     reportedEnvironment: "development",
+    title: "",
     userDescription: "",
     currentUrl: "",
   });
@@ -180,6 +183,7 @@ export function TicketDetailView({
     setEditDraft({
       type: row.type === "ENHANCEMENT" ? "ENHANCEMENT" : "BUG",
       reportedEnvironment: row.reportedEnvironment,
+      title: row.title ?? "",
       userDescription: row.userDescription,
       currentUrl: row.currentUrl.startsWith("manual://") ? "" : row.currentUrl,
     });
@@ -187,6 +191,10 @@ export function TicketDetailView({
   }
 
   async function saveEdit() {
+    if (!editDraft.title.trim()) {
+      setError("Title is required.");
+      return;
+    }
     if (!editDraft.userDescription.trim()) {
       setError("Description is required.");
       return;
@@ -201,6 +209,7 @@ export function TicketDetailView({
         body: JSON.stringify({
           type: editDraft.type,
           reportedEnvironment: editDraft.reportedEnvironment,
+          title: editDraft.title.trim(),
           userDescription: editDraft.userDescription.trim(),
           currentUrl: editDraft.currentUrl.trim(),
         }),
@@ -621,6 +630,20 @@ export function TicketDetailView({
               />
             </div>
             <div>
+              <label htmlFor="edit-title" className="dp-label">
+                Title <span className="text-red-600">*</span>
+              </label>
+              <input
+                id="edit-title"
+                type="text"
+                maxLength={TICKET_TITLE_MAX}
+                value={editDraft.title}
+                onChange={(e) => setEditDraft((d) => ({ ...d, title: e.target.value }))}
+                placeholder="Short summary of the issue"
+                className="dp-input"
+              />
+            </div>
+            <div>
               <label htmlFor="edit-description" className="dp-label">
                 Description <span className="text-red-600">*</span>
               </label>
@@ -644,11 +667,16 @@ export function TicketDetailView({
           </div>
         </SectionCard>
       ) : (
+        <>
+        <h2 className={`px-1 text-xl font-semibold leading-snug ${row.title ? "text-slate-900" : "text-slate-400"}`}>
+          {row.title || "Untitled ticket"}
+        </h2>
         <SectionCard title="Description">
           <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
             {row.userDescription.trim() || "No description provided."}
           </p>
         </SectionCard>
+        </>
       )}
 
       <SectionCard title={shots.length > 1 ? `Screenshots (${shots.length})` : "Screenshot"}>

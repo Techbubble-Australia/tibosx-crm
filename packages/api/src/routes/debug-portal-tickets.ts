@@ -5,6 +5,7 @@ import type { Prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth.js";
 import {
   MAX_TICKET_SCREENSHOTS,
+  TICKET_TITLE_MAX,
   resolveDebugPortalUser,
   screenshotFieldsFromInput,
   ticketScreenshotUrls,
@@ -64,6 +65,7 @@ const patchSchema = z
     status: statusSchema.optional(),
     type: z.enum(["BUG", "ENHANCEMENT"]).optional(),
     reportedEnvironment: z.enum(["development", "staging", "production"]).optional(),
+    title: z.string().trim().min(1, "Title is required").max(TICKET_TITLE_MAX).optional(),
     userDescription: z.string().trim().min(1).max(20_000).optional(),
     currentUrl: z.string().trim().max(2000).optional(),
     /** Admin-only: move the ticket into a sprint (null = backlog). */
@@ -74,7 +76,7 @@ const patchSchema = z
   });
 
 /** Ticket details only the creator may change (status and sprint follow their own rules). */
-const EDITABLE_FIELDS = ["type", "reportedEnvironment", "userDescription", "currentUrl"] as const;
+const EDITABLE_FIELDS = ["type", "reportedEnvironment", "title", "userDescription", "currentUrl"] as const;
 
 const ONLY_CREATOR_ERROR = "Only the person who created this ticket can edit or delete it.";
 
@@ -90,6 +92,7 @@ const bulkStatusSchema = z.object({
 const portalCreateSchema = z.object({
   type: z.enum(["BUG", "ENHANCEMENT"]),
   reportedEnvironment: z.enum(["development", "staging", "production"]).default("development"),
+  title: z.string().trim().min(1, "Title is required").max(TICKET_TITLE_MAX),
   userDescription: z.string().min(1).max(20_000),
   currentUrl: z.string().max(2000).optional(),
   screenshotUrl: z.string().max(2000).nullable().optional(),
@@ -146,6 +149,7 @@ function serializeRow(row: {
   type: string;
   status: string;
   reportedEnvironment: string;
+  title: string | null;
   userDescription: string;
   reporterUserId: string;
   reporterEmail: string;
@@ -171,6 +175,7 @@ function serializeRow(row: {
     type: row.type,
     status: row.status,
     reportedEnvironment: row.reportedEnvironment,
+    title: row.title ?? null,
     userDescription: row.userDescription,
     reporterUserId: row.reporterUserId,
     reporterEmail: row.reporterEmail,
@@ -205,6 +210,7 @@ router.post("/", async (req: PortalRequest, res) => {
       timestamp: new Date().toISOString(),
       type: input.type,
       reportedEnvironment: input.reportedEnvironment,
+      title: input.title,
       userDescription: input.userDescription,
       userMetadata: {
         userId: adminUser.id,
@@ -232,6 +238,7 @@ router.post("/", async (req: PortalRequest, res) => {
             type: input.type,
             status: initialStatus,
             reportedEnvironment: input.reportedEnvironment,
+            title: input.title,
             userDescription: input.userDescription.trim(),
             reporterUserId: adminUser.id,
             reporterEmail: adminUser.email,

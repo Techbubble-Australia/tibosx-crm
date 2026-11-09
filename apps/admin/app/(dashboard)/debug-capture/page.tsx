@@ -12,6 +12,7 @@ type Row = {
   ticketId: string;
   type: string;
   reportedEnvironment: string;
+  title?: string | null;
   userDescription: string;
   reporterEmail: string;
   currentUrl: string;
@@ -70,6 +71,7 @@ export default function DebugCaptureListPage() {
                   <Link href={`/debug-capture/${row.id}`} className="font-medium text-sky-600 hover:underline">
                     {row.ticketId}
                   </Link>
+                  {row.title ? <p className="mt-0.5 max-w-xs truncate text-xs text-gray-600 dark:text-gray-400">{row.title}</p> : null}
                 </td>
                 <td className="px-4 py-3">{row.type}</td>
                 <td className="px-4 py-3">{row.reportedEnvironment}</td>
