@@ -17,11 +17,12 @@ import { createCareerApplicationForProfile } from "../lib/profile-to-application
 
 const router: IRouter = Router();
 
+/** Deactivating a job cancels its open applications; selected candidates keep their status. */
 async function cancelCareerApplicationsForJobListing(jobListingId: string) {
   await prisma.careerApplication.updateMany({
     where: {
       jobListingId,
-      status: { notIn: ["CANCELLED", "REJECTED"] },
+      status: { notIn: ["CANCELLED", "REJECTED", "SELECTED"] },
     },
     data: { status: "CANCELLED" },
   });
