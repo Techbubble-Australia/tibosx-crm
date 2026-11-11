@@ -6,7 +6,7 @@ import { prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth";
 import { ADMIN_ROLES_LIST, assertCanModifyAdminUser, isAdminRole } from "../lib/admin-roles";
 import { logAdminUserCreated, logAdminUserFieldChange } from "../lib/admin-user-activity";
-import { withdrawAgreement } from "../lib/withdraw-agreement";
+import { removeAgreement } from "../lib/remove-agreement";
 import { adminUserFieldLabel } from "../lib/admin-user-field-labels";
 import {
   assertMappedContactAvailable,
@@ -689,7 +689,7 @@ router.post("/:id/agreements/:recordId/withdraw", async (req: AuthRequest, res) 
     const recordId = req.params.recordId;
     if (!userId || !recordId) return res.status(400).json({ error: "Invalid id" });
     const actorId = req.user?.impersonatorId ?? req.user?.id ?? null;
-    const result = await withdrawAgreement(userId, recordId, actorId);
+    const result = await removeAgreement(userId, recordId, actorId, "withdraw");
     if ("error" in result) return res.status(result.status).json({ error: result.error });
     const agreementRecords = await buildAgreementRecordsForUser(userId);
     res.json({ data: { agreementRecords, withdrawn: result } });
@@ -704,13 +704,10 @@ router.delete("/:id/agreements/:recordId", async (req: AuthRequest, res) => {
     const userId = req.params.id;
     const recordId = req.params.recordId;
     if (!userId || !recordId) return res.status(400).json({ error: "Invalid id" });
-
-    const record = await prisma.adminUserAgreementRecord.findFirst({
-      where: { id: recordId, adminUserId: userId },
-    });
-    if (!record) return res.status(404).json({ error: "Agreement record not found" });
-
-    await prisma.adminUserAgreementRecord.delete({ where: { id: recordId } });
+    const actorId = req.user?.impersonatorId ?? req.user?.id ?? null;
+    // Also clears the assignment behind it; otherwise the list rebuilds the agreement from it.
+    const result = await removeAgreement(userId, recordId, actorId, "delete");
+    if ("error" in result) return res.status(result.status).json({ error: result.error });
     const agreementRecords = await buildAgreementRecordsForUser(userId);
     res.json({ data: { agreementRecords } });
   } catch (error) {

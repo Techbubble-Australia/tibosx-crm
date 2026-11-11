@@ -137,7 +137,11 @@ export function UserAgreementsSection({
 
   async function deleteForEdit(record: AgreementRecordRow) {
     if (!editableUserId || !onRecordsChange) return;
-    const ok = await appConfirm("This will delete the agreement record. Do you want to continue?");
+    const ok = await appConfirm(
+      record.withdrawnAt
+        ? `Delete the replaced copy of "${record.templateName}" from the history? This can't be undone.`
+        : `Delete "${record.templateName}"? It is removed from this user's agreements and they will no longer be asked to sign it. This can't be undone.`,
+    );
     if (!ok) return;
     setSavingId(record.id);
     try {

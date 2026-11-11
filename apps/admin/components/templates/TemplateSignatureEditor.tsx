@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import { appAlert } from "@/lib/app-alert";
 import {
   applyFlowSignatureStyles,
   createFlowSignatureBlockHtml,
@@ -97,6 +98,31 @@ export function TemplateSignatureEditor({
     syncHtmlFromCanvas();
   }
 
+  /** Caret position saved when the Image button is pressed (the file picker takes focus away). */
+  const savedRangeRef = useRef<Range | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  function rememberCaret() {
+    const canvas = canvasRef.current;
+    const selection = window.getSelection();
+    const range = selection && selection.rangeCount ? selection.getRangeAt(0) : null;
+    savedRangeRef.current = canvas && range && canvas.contains(range.commonAncestorContainer) ? range.cloneRange() : null;
+  }
+
+  async function insertImageFile(file: File | undefined) {
+    const canvas = canvasRef.current;
+    if (!canvas || !file) return;
+    const problem = templateImageProblem(file);
+    if (problem) {
+      appAlert(problem);
+      return;
+    }
+    const dataUrl = await readFileAsDataUrl(file);
+    insertTemplateImage(canvas, dataUrl, savedRangeRef.current);
+    savedRangeRef.current = null;
+    syncHtmlFromCanvas();
+  }
+
   function applyFontSize(sizePt: string) {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -169,6 +195,27 @@ export function TemplateSignatureEditor({
         <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => runFormat("outdent")} title="Decrease list level">
           Outdent
         </button>
+        <button
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            rememberCaret();
+          }}
+          onClick={() => imageInputRef.current?.click()}
+          title="Insert an image (e.g. the company logo) where the cursor is, or at the top of the document"
+        >
+          Image
+        </button>
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept={TEMPLATE_IMAGE_ACCEPT}
+          className="hidden"
+          onChange={(e) => {
+            void insertImageFile(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
         <label className="inline-flex items-center gap-1 text-xs text-gray-600">
           Size
           <select
@@ -219,6 +266,19 @@ function attachContentEditable(canvas: HTMLElement, onChange: () => void) {
 
   canvas.addEventListener("paste", (event) => {
     event.preventDefault();
+    const image = Array.from(event.clipboardData?.files ?? []).find((file) => file.type.startsWith("image/"));
+    if (image) {
+      const problem = templateImageProblem(image);
+      if (problem) {
+        appAlert(problem);
+        return;
+      }
+      void readFileAsDataUrl(image).then((dataUrl) => {
+        document.execCommand("insertHTML", false, templateImageHtml(dataUrl, canvas));
+        onChange();
+      });
+      return;
+    }
     const text = event.clipboardData?.getData("text/plain") ?? "";
     document.execCommand("insertText", false, text);
     onChange();
@@ -393,4 +453,42 @@ function highlightDropTarget(
 function clearDropHighlight(dropHighlightRef: React.MutableRefObject<HTMLElement | null>) {
   dropHighlightRef.current?.classList.remove("template-drop-target");
   dropHighlightRef.current = null;
+}
+
+const TEMPLATE_IMAGE_ACCEPT = "image/png,image/jpeg,image/gif,image/webp";
+/** Images are stored inside the template, so keep them small enough to save and render quickly. */
+const TEMPLATE_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+
+function templateImageProblem(file: File): string | null {
+  if (!TEMPLATE_IMAGE_ACCEPT.split(",").includes(file.type)) return "Use a PNG, JPEG, GIF or WebP image.";
+  if (file.size > TEMPLATE_IMAGE_MAX_BYTES) return "Images must be 2 MB or smaller.";
+  return null;
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+/** The first image in a template is styled as the logo; later ones as inline images. */
+function templateImageHtml(dataUrl: string, canvas: HTMLElement): string {
+  const cssClass = canvas.querySelector("img.docx-logo") ? "docx-inline-image" : "docx-logo";
+  return `<img class="${cssClass}" alt="" src="${dataUrl}" />`;
+}
+
+function insertTemplateImage(canvas: HTMLElement, dataUrl: string, range: Range | null) {
+  const html = templateImageHtml(dataUrl, canvas);
+  if (range) {
+    canvas.focus();
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    document.execCommand("insertHTML", false, html);
+    return;
+  }
+  canvas.insertAdjacentHTML("afterbegin", html);
 }

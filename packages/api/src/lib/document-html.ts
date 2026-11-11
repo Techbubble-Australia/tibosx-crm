@@ -291,6 +291,8 @@ async function extractDocxHeaderImagesHtml(buffer: Buffer): Promise<string> {
     .sort();
 
   const images: string[] = [];
+  /** The same logo is often repeated in the first-page, odd and even page headers. */
+  const seen = new Set<string>();
   let logoAssigned = false;
 
   for (const headerPath of headerPaths) {
@@ -300,15 +302,21 @@ async function extractDocxHeaderImagesHtml(buffer: Buffer): Promise<string> {
     const relsXml = await zip.file(relsPath)?.async("string");
     if (!relsXml) continue;
 
+    // Attribute order differs between Word, Google Docs and LibreOffice exports.
     const relById = new Map<string, string>();
-    for (const match of relsXml.matchAll(/<Relationship[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"[^>]*\/>/g)) {
-      const id = match[1];
-      const target = match[2];
+    for (const match of relsXml.matchAll(/<Relationship\b([^>]*)\/?>/g)) {
+      const attrs = match[1] ?? "";
+      const id = attrs.match(/\bId="([^"]+)"/)?.[1];
+      const target = attrs.match(/\bTarget="([^"]+)"/)?.[1];
       if (id && target) relById.set(id, resolveDocxPartPath(target));
     }
 
-    for (const match of headerXml.matchAll(/r:embed="([^"]+)"/g)) {
-      const relId = match[1];
+    // Modern drawings use r:embed; older Word / VML shapes use <v:imagedata r:id="…">.
+    const relIds = [
+      ...[...headerXml.matchAll(/r:embed="([^"]+)"/g)].map((m) => m[1]),
+      ...[...headerXml.matchAll(/<v:imagedata\b[^>]*\br:id="([^"]+)"/g)].map((m) => m[1]),
+    ];
+    for (const relId of relIds) {
       if (!relId) continue;
       const target = relById.get(relId);
       if (!target || !target.includes("/media/")) continue;
@@ -317,6 +325,8 @@ async function extractDocxHeaderImagesHtml(buffer: Buffer): Promise<string> {
       const data = await mediaFile.async("base64");
       const contentType = await mimeForMediaPath(zip, target);
       if (!contentType.startsWith("image/")) continue;
+      if (seen.has(data)) continue;
+      seen.add(data);
       const cssClass = !logoAssigned ? "docx-logo" : "docx-inline-image";
       logoAssigned = true;
       images.push(`<img class="${cssClass}" alt="" src="data:${contentType};base64,${data}" />`);
@@ -326,10 +336,15 @@ async function extractDocxHeaderImagesHtml(buffer: Buffer): Promise<string> {
   return images.length ? `<div class="docx-header-images">${images.join("")}</div>` : "";
 }
 
+/** Adds header images (usually the logo) unless the same image already appears in the body. */
 function prependUniqueHeaderImages(html: string, headerHtml: string): string {
-  if (!headerHtml.trim()) return html;
-  if (html.includes('class="docx-logo"') || html.includes("docx-header-images")) return html;
-  return `${headerHtml}${html}`;
+  if (!headerHtml.trim() || html.includes("docx-header-images")) return html;
+  const headerSrcs = [...headerHtml.matchAll(/src="([^"]+)"/g)].map((m) => m[1] ?? "");
+  if (headerSrcs.length && headerSrcs.every((src) => html.includes(src))) return html;
+  if (!html.includes('class="docx-logo"')) return `${headerHtml}${html}`;
+  // The body's first image was labelled as the logo; the header image is the real logo.
+  const body = html.replace('class="docx-logo"', 'class="docx-inline-image"');
+  return `${headerHtml}${body}`;
 }
 
 export function readTextOrHtmlBuffer(buffer: Buffer, filename: string): string {

@@ -715,6 +715,13 @@ model CredentialTemplate {
   updatedAt        DateTime        @updatedAt
 }
 
+/// One row per scheduled job occurrence (e.g. "timesheet-reminder:2026-11-27"); the key makes runs idempotent.
+model ScheduledJobRun {
+  key    String   @id
+  ranAt  DateTime @default(now())
+  detail Json?
+}
+
 model EmailNotificationPreference {
   id             String   @id @default(cuid())
   notificationId String

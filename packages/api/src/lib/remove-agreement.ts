@@ -3,7 +3,7 @@ import { agreementDatesFromCredentialData } from "./user-agreement-records";
 
 type Tx = Prisma.TransactionClient;
 
-export type WithdrawAgreementResult =
+export type RemoveAgreementResult =
   | { error: string; status: number }
   | { templateName: string; wasSigned: boolean };
 
@@ -73,16 +73,18 @@ async function materializeLegacyAgreementRecords(tx: Tx, adminUserId: string): P
 }
 
 /**
- * Takes back an agreement that was sent to a user so an updated template can be sent instead.
- * - Not signed yet: the request is removed and the user is no longer asked to sign it.
- * - Already signed: the signed copy stays in history (marked withdrawn / replaced), and the
- *   assignment is cleared so a new template can be assigned and signed.
+ * Takes an agreement off a user, clearing the template assignment behind it so it is neither
+ * offered for signing nor rebuilt into their agreement list.
+ * - "withdraw": unsigned agreements are removed; a signed copy stays in history marked
+ *   withdrawn ("Replaced") so an updated template can be sent.
+ * - "delete": the agreement record is removed entirely, signed or not.
  */
-export async function withdrawAgreement(
+export async function removeAgreement(
   adminUserId: string,
   recordId: string,
   performedById: string | null,
-): Promise<WithdrawAgreementResult> {
+  mode: "withdraw" | "delete",
+): Promise<RemoveAgreementResult> {
   return prisma.$transaction(async (tx) => {
     let id = recordId;
     if (recordId.startsWith("assignment-") || recordId.startsWith("member-")) {
@@ -93,46 +95,53 @@ export async function withdrawAgreement(
 
     const record = await tx.adminUserAgreementRecord.findFirst({ where: { id, adminUserId } });
     if (!record) return { error: "Agreement record not found", status: 404 };
-    if (record.withdrawnAt) return { error: "This agreement has already been withdrawn", status: 400 };
+    if (record.withdrawnAt && mode === "withdraw") {
+      return { error: "This agreement has already been withdrawn", status: 400 };
+    }
 
-    const cleared = {
-      credentialTemplateId: null,
-      credentialData: Prisma.DbNull,
-      agreementSignedAt: null,
-      signatureDataUrl: null,
-    };
-    if (record.projectMemberId) {
-      await tx.projectMember.updateMany({
-        where: { id: record.projectMemberId, credentialTemplateId: record.credentialTemplateId },
-        data: cleared,
-      });
-    } else {
-      await tx.adminUserCredentialAssignment.deleteMany({
-        where: { adminUserId, credentialTemplateId: record.credentialTemplateId },
+    // A withdrawn copy no longer backs the live assignment, which may already hold the updated
+    // agreement (possibly the same template), so only active records clear it.
+    if (!record.withdrawnAt) {
+      if (record.projectMemberId) {
+        await tx.projectMember.updateMany({
+          where: { id: record.projectMemberId, credentialTemplateId: record.credentialTemplateId },
+          data: {
+            credentialTemplateId: null,
+            credentialData: Prisma.DbNull,
+            agreementSignedAt: null,
+            signatureDataUrl: null,
+          },
+        });
+      } else {
+        await tx.adminUserCredentialAssignment.deleteMany({
+          where: { adminUserId, credentialTemplateId: record.credentialTemplateId },
+        });
+      }
+
+      // Unsigned copies of the same agreement (including earlier re-sends) would otherwise still
+      // be offered to the user for signing.
+      await tx.adminUserAgreementRecord.deleteMany({
+        where: {
+          adminUserId,
+          credentialTemplateId: record.credentialTemplateId,
+          projectMemberId: record.projectMemberId,
+          agreementSignedAt: null,
+          withdrawnAt: null,
+        },
       });
     }
 
-    // Unsigned copies of the same agreement (including earlier re-sends) would otherwise still be
-    // offered to the user for signing.
-    await tx.adminUserAgreementRecord.deleteMany({
-      where: {
-        adminUserId,
-        credentialTemplateId: record.credentialTemplateId,
-        projectMemberId: record.projectMemberId,
-        agreementSignedAt: null,
-        withdrawnAt: null,
-      },
-    });
-
     const wasSigned = Boolean(record.agreementSignedAt);
-    if (wasSigned) {
+    if (mode === "delete") {
+      await tx.adminUserAgreementRecord.deleteMany({ where: { id: record.id } });
+    } else if (wasSigned) {
       await tx.adminUserAgreementRecord.update({ where: { id: record.id }, data: { withdrawnAt: new Date() } });
     }
 
     await tx.adminUserActivityLog.create({
       data: {
         adminUserId,
-        action: "AGREEMENT_WITHDRAWN",
+        action: mode === "delete" ? "AGREEMENT_DELETED" : "AGREEMENT_WITHDRAWN",
         fieldName: null,
         oldValue: wasSigned ? "signed" : "awaiting signature",
         newValue: record.templateName,

@@ -205,6 +205,39 @@ export async function sendTimesheetMemberDecisionEmail(input: {
   });
 }
 
+export async function sendTimesheetReminderEmail(input: {
+  to: string;
+  memberName: string;
+  monthLabel: string;
+  projectLabels: string[];
+  timesheetsUrl: string;
+  finalDay: boolean;
+}): Promise<void> {
+  const when = input.finalDay
+    ? `Today is the last business day of ${input.monthLabel}.`
+    : `${input.monthLabel} ends in the next couple of business days.`;
+  const projects = input.projectLabels.length ? input.projectLabels : ["your active project"];
+  const bodyText = [
+    `${when} Please fill in your timesheet and submit it for approval.`,
+    "",
+    "Timesheet still to submit for:",
+    ...projects.map((p) => `- ${p}`),
+    "",
+    `Open your timesheets: ${input.timesheetsUrl}`,
+  ].join("\n");
+  const bodyHtml = `<p>${escapeHtml(when)} Please fill in your timesheet and submit it for approval.</p><p>Timesheet still to submit for:</p><ul>${projects
+    .map((p) => `<li>${escapeHtml(p)}</li>`)
+    .join("")}</ul><p><a href="${escapeHtml(input.timesheetsUrl)}">Open your timesheets</a></p>`;
+  await sendSupportTicketNotificationEmail({
+    to: input.to,
+    headerTitle: input.finalDay ? "Last day to submit your timesheet!" : "Timesheet reminder!",
+    subjectLine: `Reminder: submit your ${input.monthLabel} timesheet`,
+    body: bodyText,
+    bodyHtml,
+    greeting: `Hello ${input.memberName},`,
+  });
+}
+
 export type ContactFormEmailData = {
   firstName: string;
   lastName: string;

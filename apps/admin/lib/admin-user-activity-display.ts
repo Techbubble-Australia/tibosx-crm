@@ -36,6 +36,9 @@ export function formatAdminUserActivityTitle(row: AdminUserActivityRow): string 
   if (row.action === "AGREEMENT_WITHDRAWN") {
     return row.newValue ? `Agreement withdrawn: ${row.newValue}` : "Agreement withdrawn";
   }
+  if (row.action === "AGREEMENT_DELETED") {
+    return row.newValue ? `Agreement deleted: ${row.newValue}` : "Agreement deleted";
+  }
   const label =
     row.fieldLabel?.trim() ||
     (row.fieldName ? humanizeFieldName(row.fieldName) : null);

@@ -109,6 +109,15 @@ export const NOTIFICATION_CATALOG: NotificationCatalogEntry[] = [
     env: ["RESEND_API_KEY", "MAIL_FROM", "ADMIN_PUBLIC_URL"],
   },
   {
+    id: "timesheet.reminder",
+    channel: "email",
+    description:
+      "Reminder to submit the month's timesheet — sent on the last 2 business days of each month (9am Sydney) to internal members of Active projects who haven't submitted yet.",
+    implemented: true,
+    triggers: ["Scheduled job: timesheet reminders (API process)"],
+    env: ["RESEND_API_KEY", "ADMIN_PUBLIC_URL", "TIMESHEET_REMINDERS_ENABLED (optional)"],
+  },
+  {
     id: "ticket.status.changed",
     channel: "email",
     description: "Ticket status updated (open, in progress, resolved, closed, etc.).",
