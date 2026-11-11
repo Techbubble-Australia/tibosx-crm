@@ -563,7 +563,6 @@ export default function EditUserPage() {
           records={agreementRecords}
           editableUserId={id}
           onRecordsChange={setAgreementRecords}
-          onEditAgreement={() => setOfflineAgreementOpen(true)}
           onWithdrawn={() => {
             if (canAssignTemplate) setAssignOpen(true);
           }}

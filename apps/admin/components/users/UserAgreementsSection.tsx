@@ -100,7 +100,6 @@ type Props = {
   headerAction?: React.ReactNode;
   editableUserId?: string;
   onRecordsChange?: (records: AgreementRecordRow[]) => void;
-  onEditAgreement?: (record: AgreementRecordRow) => void;
   /** After an agreement is withdrawn (e.g. open "Assign template" to send the updated one). */
   onWithdrawn?: (record: AgreementRecordRow) => void;
 };
@@ -111,7 +110,6 @@ export function UserAgreementsSection({
   headerAction,
   editableUserId,
   onRecordsChange,
-  onEditAgreement,
   onWithdrawn,
 }: Props) {
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -152,7 +150,7 @@ export function UserAgreementsSection({
       if (!res.ok) throw new Error((data as { error?: string }).error || "Delete failed");
       const next = (data.data?.agreementRecords as AgreementRecordRow[]) ?? [];
       onRecordsChange(next);
-      onEditAgreement?.(record);
+      appAlert(`"${record.templateName}" was deleted.`);
     } catch (error) {
       appAlert(error instanceof Error ? error.message : "Delete failed");
     } finally {

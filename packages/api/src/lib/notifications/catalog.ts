@@ -131,7 +131,8 @@ export const NOTIFICATION_CATALOG: NotificationCatalogEntry[] = [
   {
     id: "debug_ticket.created",
     channel: "email",
-    description: "New debug portal ticket — sent to portal admins and a confirmation to the reporter.",
+    description:
+      "New debug portal ticket — sent to portal admins and a confirmation to the reporter. Off unless DEBUG_PORTAL_EMAILS_ENABLED=true.",
     implemented: true,
     triggers: ["POST /api/debug-portal/tickets", "POST /api/admin/debug-capture-tickets"],
     env: ["RESEND_API_KEY", "MAIL_FROM", "DEBUG_PORTAL_PUBLIC_URL"],
@@ -139,7 +140,8 @@ export const NOTIFICATION_CATALOG: NotificationCatalogEntry[] = [
   {
     id: "debug_ticket.status.changed",
     channel: "email",
-    description: "Debug ticket moved to another status — sent to the reporter (unless they moved it).",
+    description:
+      "Debug ticket moved to another status — sent to the reporter (unless they moved it). Off unless DEBUG_PORTAL_EMAILS_ENABLED=true.",
     implemented: true,
     triggers: [
       "PATCH /api/debug-portal/tickets/:id",

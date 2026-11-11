@@ -38,6 +38,11 @@ function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+/** Debug portal emails are off unless DEBUG_PORTAL_EMAILS_ENABLED=true (they use up the daily email quota). */
+function debugPortalEmailsEnabled(): boolean {
+  return process.env.DEBUG_PORTAL_EMAILS_ENABLED?.trim().toLowerCase() === "true";
+}
+
 function debugTicketUrl(id: string): string | null {
   const base = process.env.DEBUG_PORTAL_PUBLIC_URL?.trim().replace(/\/$/, "");
   return base ? `${base}/tickets/${id}` : null;
@@ -262,6 +267,7 @@ export const notificationHandlers: {
   },
 
   async "debug_ticket.created"({ ticketId }) {
+    if (!debugPortalEmailsEnabled()) return;
     const ticket = await prisma.debugCaptureTicket.findUnique({ where: { id: ticketId } });
     if (!ticket) return;
     const statusLabel = await debugStatusLabel(ticket.status);
@@ -294,6 +300,7 @@ export const notificationHandlers: {
   },
 
   async "debug_ticket.status.changed"({ ticketId, oldStatus, newStatus, actorEmail }) {
+    if (!debugPortalEmailsEnabled()) return;
     const ticket = await prisma.debugCaptureTicket.findUnique({ where: { id: ticketId } });
     if (!ticket) return;
     const to = ticket.reporterEmail.toLowerCase();
