@@ -564,6 +564,9 @@ export default function EditUserPage() {
           editableUserId={id}
           onRecordsChange={setAgreementRecords}
           onEditAgreement={() => setOfflineAgreementOpen(true)}
+          onWithdrawn={() => {
+            if (canAssignTemplate) setAssignOpen(true);
+          }}
           emptyMessage="No agreements assigned yet. Assign a template or record an offline agreement."
           headerAction={
             canAssignTemplate ? (

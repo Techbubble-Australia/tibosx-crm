@@ -43,6 +43,7 @@ export async function markLatestAgreementSigned(
       adminUserId: input.adminUserId,
       credentialTemplateId: input.credentialTemplateId,
       agreementSignedAt: null,
+      withdrawnAt: null,
       ...(input.projectMemberId ? { projectMemberId: input.projectMemberId } : {}),
     },
     orderBy: { assignedAt: "desc" },
@@ -88,6 +89,7 @@ export async function listAgreementRecordsForUser(adminUserId: string) {
       createdAt: true,
       agreementSignedAt: true,
       agreementDocumentUrl: true,
+      withdrawnAt: true,
       project: { select: { projectNumber: true, title: true } },
     },
   });
@@ -143,6 +145,8 @@ export type SerializedAgreementRecord = {
   createdAt: string;
   signedAt: string | null;
   documentUrl: string | null;
+  /** Signed agreement that was withdrawn and replaced by an updated one. */
+  withdrawnAt: string | null;
 };
 
 function serializeRow(
@@ -155,6 +159,7 @@ function serializeRow(
     createdAt: Date;
     agreementSignedAt: Date | null;
     agreementDocumentUrl: string | null;
+    withdrawnAt?: Date | null;
     project?: { projectNumber: string; title: string } | null;
   },
   extras?: { startDateDisplay?: string | null; endDateDisplay?: string | null; documentUrl?: string | null },
@@ -171,6 +176,7 @@ function serializeRow(
     createdAt: row.createdAt.toISOString(),
     signedAt: row.agreementSignedAt?.toISOString() ?? null,
     documentUrl: extras?.documentUrl ?? row.agreementDocumentUrl,
+    withdrawnAt: row.withdrawnAt?.toISOString() ?? null,
   };
 }
 

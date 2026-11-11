@@ -6,6 +6,7 @@ import { prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth";
 import { ADMIN_ROLES_LIST, assertCanModifyAdminUser, isAdminRole } from "../lib/admin-roles";
 import { logAdminUserCreated, logAdminUserFieldChange } from "../lib/admin-user-activity";
+import { withdrawAgreement } from "../lib/withdraw-agreement";
 import { adminUserFieldLabel } from "../lib/admin-user-field-labels";
 import {
   assertMappedContactAvailable,
@@ -678,6 +679,23 @@ router.patch("/:id/agreements/:recordId", async (req: AuthRequest, res) => {
     }
     console.error("Error updating agreement record:", error);
     res.status(500).json({ error: "Failed to update agreement record" });
+  }
+});
+
+/** Take back a sent agreement (signed or not) so an updated template can be assigned. */
+router.post("/:id/agreements/:recordId/withdraw", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.params.id;
+    const recordId = req.params.recordId;
+    if (!userId || !recordId) return res.status(400).json({ error: "Invalid id" });
+    const actorId = req.user?.impersonatorId ?? req.user?.id ?? null;
+    const result = await withdrawAgreement(userId, recordId, actorId);
+    if ("error" in result) return res.status(result.status).json({ error: result.error });
+    const agreementRecords = await buildAgreementRecordsForUser(userId);
+    res.json({ data: { agreementRecords, withdrawn: result } });
+  } catch (error) {
+    console.error("Error withdrawing agreement:", error);
+    res.status(500).json({ error: "Failed to withdraw agreement" });
   }
 });
 

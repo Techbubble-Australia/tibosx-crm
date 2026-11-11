@@ -1078,6 +1078,8 @@ model AdminUserAgreementRecord {
   assignedAt           DateTime           @default(now())
   agreementSignedAt    DateTime?
   agreementDocumentUrl String?            @db.Text
+  /// Set when a signed agreement is withdrawn so an updated one can be sent; kept as history ("Replaced").
+  withdrawnAt          DateTime?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 

@@ -22,6 +22,7 @@ export type AdminUserActivityRow = {
   action: string;
   fieldName?: string | null;
   fieldLabel?: string | null;
+  newValue?: string | null;
 };
 
 function humanizeFieldName(fieldName: string): string {
@@ -32,6 +33,9 @@ function humanizeFieldName(fieldName: string): string {
 
 export function formatAdminUserActivityTitle(row: AdminUserActivityRow): string {
   if (row.action === "USER_CREATED") return "User created";
+  if (row.action === "AGREEMENT_WITHDRAWN") {
+    return row.newValue ? `Agreement withdrawn: ${row.newValue}` : "Agreement withdrawn";
+  }
   const label =
     row.fieldLabel?.trim() ||
     (row.fieldName ? humanizeFieldName(row.fieldName) : null);

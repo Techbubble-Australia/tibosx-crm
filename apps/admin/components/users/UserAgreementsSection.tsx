@@ -2,7 +2,7 @@
 import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useState } from "react";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2, Undo2 } from "lucide-react";
 import { resolveDocumentHref } from "@/lib/media-url";
 import { adminFetch } from "@/lib/admin-api";
 
@@ -16,6 +16,8 @@ export type AgreementRecordRow = {
   signedAt: string | null;
   createdAt?: string | null;
   documentUrl: string | null;
+  /** Signed agreement withdrawn so an updated one could be sent. */
+  withdrawnAt?: string | null;
 };
 
 function formatDate(iso: string | null | undefined, display?: string | null) {
@@ -43,9 +45,10 @@ function endDateForRow(row: AgreementRecordRow): Date | null {
   return null;
 }
 
-type AgreementStatus = "awaiting" | "active" | "expiring" | "expired";
+type AgreementStatus = "awaiting" | "active" | "expiring" | "expired" | "replaced";
 
 function agreementStatus(row: AgreementRecordRow): AgreementStatus {
+  if (row.withdrawnAt) return "replaced";
   const signed = Boolean(row.signedAt || row.documentUrl);
   if (!signed) return "awaiting";
   const end = endDateForRow(row);
@@ -69,6 +72,8 @@ function statusLabel(status: AgreementStatus): string {
       return "Expiring soon";
     case "expired":
       return "Expired";
+    case "replaced":
+      return "Replaced";
     default:
       return "Active";
   }
@@ -82,6 +87,8 @@ function statusClass(status: AgreementStatus): string {
       return "bg-orange-100 text-orange-900";
     case "expired":
       return "bg-red-100 text-red-800";
+    case "replaced":
+      return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300";
     default:
       return "bg-green-100 text-green-900";
   }
@@ -94,6 +101,8 @@ type Props = {
   editableUserId?: string;
   onRecordsChange?: (records: AgreementRecordRow[]) => void;
   onEditAgreement?: (record: AgreementRecordRow) => void;
+  /** After an agreement is withdrawn (e.g. open "Assign template" to send the updated one). */
+  onWithdrawn?: (record: AgreementRecordRow) => void;
 };
 
 export function UserAgreementsSection({
@@ -103,6 +112,7 @@ export function UserAgreementsSection({
   editableUserId,
   onRecordsChange,
   onEditAgreement,
+  onWithdrawn,
 }: Props) {
   const [savingId, setSavingId] = useState<string | null>(null);
 
@@ -146,6 +156,31 @@ export function UserAgreementsSection({
     }
   }
 
+  async function withdraw(record: AgreementRecordRow) {
+    if (!editableUserId || !onRecordsChange) return;
+    const signed = Boolean(record.signedAt);
+    const ok = await appConfirm(
+      signed
+        ? `Withdraw "${record.templateName}"? The signed copy stays in the history as "Replaced", and you can then assign the updated template for them to sign.`
+        : `Withdraw "${record.templateName}"? It will no longer be waiting for their signature, and you can then assign the updated template.`,
+    );
+    if (!ok) return;
+    setSavingId(record.id);
+    try {
+      const res = await adminFetch(`/api/admin/users/${editableUserId}/agreements/${record.id}/withdraw`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Withdraw failed");
+      onRecordsChange((data.data?.agreementRecords as AgreementRecordRow[]) ?? []);
+      onWithdrawn?.(record);
+    } catch (error) {
+      appAlert(error instanceof Error ? error.message : "Withdraw failed");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   const editable = Boolean(editableUserId && onRecordsChange);
 
   return (
@@ -176,6 +211,7 @@ export function UserAgreementsSection({
               {records.map((row) => {
                 const status = agreementStatus(row);
                 const busy = savingId === row.id;
+                const rowEditable = editable && status !== "replaced";
                 return (
                   <tr key={row.id} className="border-b border-gray-100 dark:border-gray-800">
                     <td className="py-2 pr-3">
@@ -199,7 +235,7 @@ export function UserAgreementsSection({
                       {formatDate(row.createdAt ?? null)}
                     </td>
                     <td className="py-2 pr-3 whitespace-nowrap">
-                      {editable ? (
+                      {rowEditable ? (
                         <input
                           type="date"
                           disabled={busy}
@@ -216,7 +252,7 @@ export function UserAgreementsSection({
                       )}
                     </td>
                     <td className="py-2 pr-3 whitespace-nowrap">
-                      {editable ? (
+                      {rowEditable ? (
                         <input
                           type="date"
                           disabled={busy}
@@ -233,7 +269,7 @@ export function UserAgreementsSection({
                       )}
                     </td>
                     <td className="py-2 pr-3">
-                      {editable ? (
+                      {rowEditable ? (
                         <select
                           disabled={busy}
                           className="rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-800"
@@ -258,6 +294,19 @@ export function UserAgreementsSection({
                     </td>
                     {editable ? (
                       <td className="py-2 pr-3">
+                        <div className="flex items-center gap-1">
+                        {status !== "replaced" ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void withdraw(row)}
+                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                            title="Withdraw this agreement so an updated one can be sent"
+                          >
+                            <Undo2 className="h-3.5 w-3.5" aria-hidden />
+                            Withdraw
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           disabled={busy}
@@ -268,6 +317,7 @@ export function UserAgreementsSection({
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
+                        </div>
                       </td>
                     ) : null}
                   </tr>

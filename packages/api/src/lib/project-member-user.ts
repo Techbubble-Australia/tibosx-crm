@@ -118,7 +118,7 @@ export async function findUserCredentialAgreement(userId: string): Promise<UserC
   });
   if (!assignment?.credentialTemplate) {
     const pendingRecord = await prisma.adminUserAgreementRecord.findFirst({
-      where: { adminUserId: userId, agreementSignedAt: null },
+      where: { adminUserId: userId, agreementSignedAt: null, withdrawnAt: null },
       orderBy: { assignedAt: "desc" },
       include: { credentialTemplate: true },
     });
