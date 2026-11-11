@@ -20,7 +20,71 @@ type DashboardStats = {
     clientName: string;
     count: number;
   }>;
+  profilesByRecruiter: {
+    months: string[];
+    rows: Array<{ recruiterId: string | null; recruiterName: string; counts: number[]; total: number }>;
+  };
 };
+
+function monthShort(monthKey: string): string {
+  return new Date(`${monthKey}-01T00:00:00.000Z`).toLocaleDateString("en-AU", { month: "short", timeZone: "UTC" });
+}
+
+function ProfilesByRecruiter({ data }: { data: DashboardStats["profilesByRecruiter"] }) {
+  const monthTotals = data.months.map((_, i) => data.rows.reduce((sum, row) => sum + (row.counts[i] ?? 0), 0));
+  const grandTotal = monthTotals.reduce((a, b) => a + b, 0);
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+      <div className="mb-4">
+        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Profiles added per recruiter</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          New profiles in the last 3 months, by the recruiter who sourced them.
+        </p>
+      </div>
+      {!data.rows.length ? (
+        <p className="text-sm text-gray-400">No profiles added in the last 3 months.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
+                <th className="py-2 pr-3">Recruiter</th>
+                {data.months.map((m) => (
+                  <th key={m} className="py-2 pr-3 text-right">{monthShort(m)}</th>
+                ))}
+                <th className="py-2 text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((row) => (
+                <tr key={row.recruiterId ?? "unassigned"} className="border-b border-gray-50 dark:border-gray-800">
+                  <td className={`py-2 pr-3 ${row.recruiterId ? "font-medium text-gray-800 dark:text-gray-200" : "italic text-gray-500"}`}>
+                    {row.recruiterName}
+                  </td>
+                  {row.counts.map((count, i) => (
+                    <td key={data.months[i]} className="py-2 pr-3 text-right tabular-nums text-gray-700 dark:text-gray-300">
+                      {count || "—"}
+                    </td>
+                  ))}
+                  <td className="py-2 text-right font-semibold tabular-nums text-gray-900 dark:text-gray-100">{row.total}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="font-semibold text-gray-900 dark:text-gray-100">
+                <td className="py-2 pr-3">Total</td>
+                {monthTotals.map((total, i) => (
+                  <td key={data.months[i]} className="py-2 pr-3 text-right tabular-nums">{total}</td>
+                ))}
+                <td className="py-2 text-right tabular-nums">{grandTotal}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
 
 function BarChart({
   title,
@@ -154,6 +218,7 @@ export default function DatabaseDashboardPage() {
           clients: raw.clients ?? [],
           profilesByTechnology: raw.profilesByTechnology ?? [],
           applicationsByActiveJob: raw.applicationsByActiveJob ?? [],
+          profilesByRecruiter: raw.profilesByRecruiter ?? { months: [], rows: [] },
         });
       } catch (error) {
         console.error(error);
@@ -223,6 +288,8 @@ export default function DatabaseDashboardPage() {
             return `/database/profiles?${params.toString()}`;
           }}
         />
+        <div className="space-y-6">
+        <ProfilesByRecruiter data={stats?.profilesByRecruiter ?? { months: [], rows: [] }} />
         <BarChart
           title="Applications by active jobs"
           subtitle="Application counts for published job listings."
@@ -243,6 +310,7 @@ export default function DatabaseDashboardPage() {
             return `/career-applications/active?${params.toString()}`;
           }}
         />
+        </div>
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import { useTicketStatuses } from "@/components/TicketStatusesProvider";
 import { SprintSelect } from "@/components/SprintSelect";
 import { StatusBadge, TypeBadge } from "@/components/TicketBadges";
 import { TicketModal } from "@/components/TicketModal";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { ALL_SPRINTS, defaultSprintSelection, useSprints } from "@/lib/sprints";
 import { formatEnvironment, nextStatusInOrder, type TicketStatus } from "@/lib/tickets";
 
@@ -136,10 +137,11 @@ function TicketsListInner() {
   );
 
   const loadSeq = useRef(0);
-  const load = useCallback(async () => {
+  /** `silent` refreshes in the background (auto-refresh) without the loading state. */
+  const load = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
     if (!filtersReady || sprintFilter === null) return;
     const seq = ++loadSeq.current;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const qs = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(page * PAGE_SIZE) });
       if (statusFilter) qs.set("status", statusFilter);
@@ -152,13 +154,15 @@ function TicketsListInner() {
       setRows(data.data ?? []);
       setTotal(typeof data.total === "number" ? data.total : 0);
     } catch {
-      if (seq !== loadSeq.current) return;
+      if (seq !== loadSeq.current || silent) return;
       setRows([]);
       setTotal(0);
     } finally {
-      if (seq === loadSeq.current) setLoading(false);
+      if (seq === loadSeq.current && !silent) setLoading(false);
     }
   }, [filtersReady, reporterFilter, statusFilter, sprintFilter, page]);
+
+  useAutoRefresh(() => void load({ silent: true }), { paused: Boolean(openTicket || bulkSaving) });
 
   useEffect(() => {
     void load();

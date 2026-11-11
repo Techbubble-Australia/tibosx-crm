@@ -18,7 +18,7 @@ export function ImpersonationBanner() {
         throw new Error((data as { error?: string }).error || "Failed");
       }
       await refreshSession();
-      window.location.href = "/settings/profile";
+      window.location.href = "/my-workspace";
     } catch (e) {
       appAlert(e instanceof Error ? e.message : "Could not end impersonation");
     } finally {

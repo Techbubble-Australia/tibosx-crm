@@ -23,27 +23,36 @@ export async function grantCustomerSupportRoleToProjectMembers(projectId: string
   }
 }
 
+/**
+ * `timesheetsOnly`: selected contacts only approve timesheets — no client portal tickets, and the
+ * project accepts no support tickets.
+ */
 export async function applyProjectCustomerSupportSettings(
   projectId: string,
   enabled: boolean,
   contacts: Array<{ contactId: string; portalAccess: boolean; canApproveTimesheets: boolean }>,
+  timesheetsOnly = false,
 ) {
   if (!enabled) {
     await prisma.project.update({
       where: { id: projectId },
-      data: { kind: "DELIVERY" },
+      data: { kind: "DELIVERY", clientTicketsEnabled: true },
     });
     return;
   }
 
-  if (!contacts.some((c) => c.portalAccess)) {
+  const effective = timesheetsOnly
+    ? contacts.map((c) => ({ contactId: c.contactId, portalAccess: false, canApproveTimesheets: true }))
+    : contacts;
+  if (!effective.some((c) => c.portalAccess || (timesheetsOnly && c.canApproveTimesheets))) {
     throw new Error("CLIENT_ACCESS_REQUIRED");
   }
 
   await prisma.project.update({
     where: { id: projectId },
-    data: { kind: "SUPPORT" },
+    data: { kind: "SUPPORT", clientTicketsEnabled: !timesheetsOnly },
   });
+  contacts = effective;
   await syncProjectClientContacts(projectId, contacts);
   await grantCustomerSupportRoleToProjectMembers(projectId);
 }

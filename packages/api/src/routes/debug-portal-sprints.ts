@@ -77,7 +77,11 @@ router.get("/", async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
     const rows = await prisma.debugSprint.findMany({
-      orderBy: [{ startDate: "desc" }, { createdAt: "desc" }],
+      orderBy: [
+        { startDate: { sort: "asc", nulls: "last" } },
+        { endDate: { sort: "asc", nulls: "last" } },
+        { createdAt: "asc" },
+      ],
       include: { _count: { select: { tickets: true } } },
     });
     const rank: Record<string, number> = { ACTIVE: 0, PLANNED: 1, COMPLETED: 2 };

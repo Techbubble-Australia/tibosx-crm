@@ -42,6 +42,16 @@ type TimesheetRow = {
 
 type ClientOption = { id: string; name: string };
 
+/** Pseudo status (dashboard "Overdue drafts"): project drafts for a month that has already ended. */
+const OVERDUE_DRAFT = "OVERDUE_DRAFT";
+
+function isOverdueDraft(row: TimesheetRow): boolean {
+  if (row.status !== "DRAFT" || !row.projectNumber) return false;
+  const now = new Date();
+  const monthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+  return new Date(row.endDate).getTime() < monthStart;
+}
+
 export default function TimesheetsPage() {
   const router = useRouter();
   const pathname = usePathname();
@@ -102,7 +112,8 @@ export default function TimesheetsPage() {
 
   const filteredRows = useMemo(() => {
     let list = rows;
-    if (statusFilter) list = list.filter((row) => row.status === statusFilter);
+    if (statusFilter === OVERDUE_DRAFT) list = list.filter(isOverdueDraft);
+    else if (statusFilter) list = list.filter((row) => row.status === statusFilter);
     const memberNeedle = memberFilter.trim().toLowerCase();
     if (memberNeedle) {
       list = list.filter((row) => row.memberName.toLowerCase().includes(memberNeedle));
@@ -409,6 +420,7 @@ export default function TimesheetsPage() {
                       {TIMESHEET_STATUS_LABELS[value]}
                     </option>
                   ))}
+                  <option value={OVERDUE_DRAFT}>Overdue drafts (past months)</option>
                 </select>
               </div>
             </div>

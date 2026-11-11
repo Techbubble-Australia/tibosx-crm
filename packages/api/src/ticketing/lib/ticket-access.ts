@@ -199,11 +199,12 @@ export async function organizationIdsForClientPortal(
     }
   }
 
+  // Timesheet-only projects give clients no access to support tickets.
   const orgs = await prisma.organization.findMany({
     where: {
       active: true,
       projectId: { in: [...projectIds] },
-      project: { status: "ACTIVE", kind: "SUPPORT" },
+      project: { status: "ACTIVE", kind: "SUPPORT", clientTicketsEnabled: true },
     },
     select: { id: true },
   });

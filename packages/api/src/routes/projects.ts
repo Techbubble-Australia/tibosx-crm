@@ -93,6 +93,8 @@ const projectSchema = z.object({
   projectManagerId: z.string().min(1),
   timesheetApproverUserId: z.string().min(1).optional(),
   forCustomerSupport: z.boolean().optional(),
+  /** With forCustomerSupport: TIMESHEETS_ONLY = client contacts only approve timesheets (no tickets). */
+  clientAccessMode: z.enum(["SUPPORT_AND_TIMESHEETS", "TIMESHEETS_ONLY"]).optional(),
   supportClientContacts: z
     .array(
       z.object({
@@ -305,6 +307,7 @@ function serializeProject(row: {
   endDate: Date;
   ticketPrefix?: string;
   ticketNumberDigits?: number;
+  clientTicketsEnabled?: boolean;
   fileUrls: unknown;
   createdAt: Date;
   updatedAt: Date;
@@ -349,6 +352,7 @@ function serializeProject(row: {
     startDate: row.startDate.toISOString(),
     endDate: row.endDate.toISOString(),
     ticketPrefix: row.ticketPrefix ?? "TKT",
+    clientAccessMode: row.clientTicketsEnabled === false ? "TIMESHEETS_ONLY" : "SUPPORT_AND_TIMESHEETS",
     ticketNumberDigits: row.ticketNumberDigits ?? 5,
     fileUrls,
     createdAt: row.createdAt.toISOString(),
@@ -894,6 +898,7 @@ router.post("/", async (req: AuthRequest, res) => {
           row.id,
           true,
           data.supportClientContacts ?? [],
+          data.clientAccessMode === "TIMESHEETS_ONLY",
         );
       } catch (error) {
         if (error instanceof Error && error.message === "CLIENT_ACCESS_REQUIRED") {
@@ -940,7 +945,9 @@ router.put("/:id", async (req: AuthRequest, res) => {
     const nextTicketDigits = normalizedTicketDigits(data.ticketNumberDigits ?? existing.ticketNumberDigits);
     const supportEnabled =
       data.forCustomerSupport !== undefined ? data.forCustomerSupport : existing.kind === "SUPPORT";
-    if (supportEnabled && !nextTicketPrefix) {
+    const ticketsEnabled =
+      data.clientAccessMode !== undefined ? data.clientAccessMode !== "TIMESHEETS_ONLY" : existing.clientTicketsEnabled;
+    if (supportEnabled && ticketsEnabled && !nextTicketPrefix) {
       return res.status(400).json({ error: "Ticket prefix is required for customer support projects" });
     }
     try {
@@ -1032,6 +1039,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
           projectId,
           data.forCustomerSupport,
           data.supportClientContacts ?? [],
+          data.clientAccessMode === "TIMESHEETS_ONLY",
         );
       } catch (error) {
         if (error instanceof Error && error.message === "CLIENT_ACCESS_REQUIRED") {

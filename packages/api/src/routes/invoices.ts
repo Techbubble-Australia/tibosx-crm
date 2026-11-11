@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { prisma, type Prisma } from "@techbubble/database";
 import { CONTRACT_INVOICE_STATUSES } from "../lib/contract-invoice-status";
+import { invoiceFiles, invoiceLineItems } from "../lib/invoice-lines";
 
 const router: IRouter = Router();
 
@@ -155,6 +156,8 @@ router.get("/:id", async (req, res) => {
         taxAmount: toNumber(row.taxAmount),
         totalAmount: toNumber(row.totalAmount),
         fileUrl: row.fileUrl,
+        lineItems: invoiceLineItems(row),
+        files: invoiceFiles(row),
         defaultCurrency: row.contract.currency,
       },
     });

@@ -9,8 +9,8 @@ export type PortalOrganizationRow = {
   projectTitle: string | null;
 };
 
-/** Only ACTIVE Customer Support projects accept new tickets. */
-export const TICKETABLE_PROJECT_WHERE = { status: "ACTIVE", kind: "SUPPORT" } as const;
+/** Only ACTIVE Customer Support projects with client tickets enabled accept new tickets. */
+export const TICKETABLE_PROJECT_WHERE = { status: "ACTIVE", kind: "SUPPORT", clientTicketsEnabled: true } as const;
 
 /**
  * One row per ACTIVE Customer Support (kind SUPPORT) TBOS project that has an enabled support portal org.

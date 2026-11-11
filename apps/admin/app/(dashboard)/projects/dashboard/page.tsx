@@ -8,9 +8,10 @@ import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { useDismissedToday } from "@/hooks/useDismissedToday";
 import { TimesheetStatusBadge } from "@/lib/timesheet-status-styles";
-import { PROJECT_STATUS_LABELS, PROJECT_COST_TYPE_LABELS, formatProjectMonth, type ProjectStatus, type ProjectCostType } from "@/lib/project-types";
+import { PROJECT_STATUS_LABELS, formatProjectMonth, type ProjectStatus } from "@/lib/project-types";
 
-const BASE_CURRENCIES = ["AUD", "USD", "INR"] as const;
+/** Costs are filtered to one currency (as recorded on estimates and actuals), not converted. */
+const CURRENCIES = ["AUD", "USD", "GBP", "EUR", "INR"] as const;
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 type AttentionKind = "MISSING" | "AWAITING_APPROVAL" | "DRAFT_NOT_SUBMITTED" | "PAST_END_DATE";
@@ -40,6 +41,7 @@ function formatMonthInput(value: string): string {
 
 type DashboardData = {
   today: string;
+  currency?: string;
   baseCurrency: string;
   scope: "all" | "mine";
   kpis: {
@@ -82,6 +84,8 @@ type DashboardData = {
     progress: number;
     remainingDays: number;
     ended: boolean;
+    estimatedCost?: number;
+    actualCost?: number;
   }>;
 };
 
@@ -362,10 +366,9 @@ function ProjectTimeline({ projects, today }: { projects: DashboardData["project
 function CostByMonth({ rows, currency }: { rows: DashboardData["costByMonth"]; currency: string }) {
   const max = Math.max(...rows.map((r) => Math.max(r.estimated, r.actual)), 1);
   const totals = rows.reduce(
-    (acc, row) => ({ days: acc.days + row.days, estimated: acc.estimated + row.estimated, actual: acc.actual + row.actual }),
-    { days: 0, estimated: 0, actual: 0 },
+    (acc, row) => ({ estimated: acc.estimated + row.estimated, actual: acc.actual + row.actual }),
+    { estimated: 0, actual: 0 },
   );
-  const dayRate = totals.days > 0 ? totals.estimated / totals.days : null;
 
   if (!rows.length) {
     return <p className="text-sm text-gray-400">No estimates or actuals for this year. Use Run Estimates on a project to populate this.</p>;
@@ -375,7 +378,16 @@ function CostByMonth({ rows, currency }: { rows: DashboardData["costByMonth"]; c
     <div className="space-y-6">
       <div className="flex h-44 items-end gap-2 overflow-x-auto border-b border-gray-100 pb-1 dark:border-gray-800">
         {rows.map((row) => (
-          <div key={`${row.year}-${row.month}`} className="flex min-w-[3rem] flex-1 flex-col items-center justify-end gap-1">
+          <div
+            key={`${row.year}-${row.month}`}
+            className="group relative flex min-w-[3rem] flex-1 flex-col items-center justify-end gap-1"
+            title={`${formatProjectMonth(row.year, row.month)} · Estimated ${formatMoney(row.estimated, currency)} · Actual ${formatMoney(row.actual, currency)}`}
+          >
+            <div className="pointer-events-none absolute -top-2 left-1/2 z-10 hidden -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[11px] text-white shadow-lg group-hover:block dark:bg-gray-100 dark:text-gray-900">
+              <p className="font-semibold">{formatProjectMonth(row.year, row.month)}</p>
+              <p>Estimated: {formatMoney(row.estimated, currency)}</p>
+              <p>Actual: {formatMoney(row.actual, currency)}</p>
+            </div>
             <span className="text-[11px] tabular-nums text-gray-600 dark:text-gray-400">
               {formatMoney(row.estimated, currency, true)}
             </span>
@@ -398,34 +410,24 @@ function CostByMonth({ rows, currency }: { rows: DashboardData["costByMonth"]; c
           <thead>
             <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
               <th className="py-2 pr-3">Month</th>
-              <th className="py-2 pr-3 text-right">Days</th>
               <th className="py-2 pr-3 text-right">Estimated</th>
-              <th className="py-2 pr-3 text-right">Actual</th>
-              <th className="py-2">Type</th>
+              <th className="py-2 text-right">Actual</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
               <tr key={`${row.year}-${row.month}`} className="border-b border-gray-50 dark:border-gray-800">
                 <td className="py-2 pr-3">{formatProjectMonth(row.year, row.month)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">{row.days || "—"}</td>
                 <td className="py-2 pr-3 text-right tabular-nums">{formatMoney(row.estimated, currency)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">{row.actual > 0 ? formatMoney(row.actual, currency) : "None"}</td>
-                <td className="py-2">
-                  {row.costTypes.map((t) => PROJECT_COST_TYPE_LABELS[t as ProjectCostType] ?? t).join(", ")}
-                </td>
+                <td className="py-2 text-right tabular-nums">{row.actual > 0 ? formatMoney(row.actual, currency) : "None"}</td>
               </tr>
             ))}
           </tbody>
           <tfoot>
             <tr className="font-semibold text-gray-900 dark:text-gray-100">
               <td className="py-2 pr-3">Total</td>
-              <td className="py-2 pr-3 text-right tabular-nums">{Math.round(totals.days * 100) / 100}</td>
               <td className="py-2 pr-3 text-right tabular-nums">{formatMoney(totals.estimated, currency)}</td>
-              <td className="py-2 pr-3 text-right tabular-nums">{totals.actual > 0 ? formatMoney(totals.actual, currency) : "None"}</td>
-              <td className="py-2 font-normal text-gray-500">
-                {dayRate != null ? `Avg day rate ${formatMoney(dayRate, currency)}` : ""}
-              </td>
+              <td className="py-2 text-right tabular-nums">{totals.actual > 0 ? formatMoney(totals.actual, currency) : "None"}</td>
             </tr>
           </tfoot>
         </table>
@@ -436,7 +438,7 @@ function CostByMonth({ rows, currency }: { rows: DashboardData["costByMonth"]; c
 
 export default function ProjectManagerDashboardPage() {
   const [scope, setScope] = useState<"all" | "mine">("all");
-  const [baseCurrency, setBaseCurrency] = useState("AUD");
+  const [baseCurrency, setBaseCurrency] = useState<string>("AUD");
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -445,7 +447,7 @@ export default function ProjectManagerDashboardPage() {
   const load = useCallback(() => {
     setLoading(true);
     setError("");
-    const params = new URLSearchParams({ scope, baseCurrency });
+    const params = new URLSearchParams({ scope, currency: baseCurrency });
     void adminFetch(`/api/admin/project-dashboard?${params}`)
       .then(async (res) => {
         const body = await res.json();
@@ -460,7 +462,7 @@ export default function ProjectManagerDashboardPage() {
     load();
   }, [load]);
 
-  const currency = data?.baseCurrency ?? baseCurrency;
+  const currency = data?.currency ?? data?.baseCurrency ?? baseCurrency;
   const kpis = data?.kpis;
   const { userId } = useAdminSession();
   const { dismissed, dismiss, restoreAll } = useDismissedToday("pm-dashboard-attention", userId);
@@ -544,9 +546,17 @@ export default function ProjectManagerDashboardPage() {
               <option value="all">All projects</option>
               <option value="mine">Managed by me</option>
             </select>
-            <select value={baseCurrency} onChange={(e) => setBaseCurrency(e.target.value)} className={selectClass}>
-              {BASE_CURRENCIES.map((code) => <option key={code} value={code}>{code}</option>)}
-            </select>
+            <label className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+              Currency
+              <select
+                value={baseCurrency}
+                onChange={(e) => setBaseCurrency(e.target.value)}
+                className={selectClass}
+                aria-label="Show costs recorded in this currency"
+              >
+                {CURRENCIES.map((code) => <option key={code} value={code}>{code}</option>)}
+              </select>
+            </label>
             <button
               type="button"
               onClick={() => {
@@ -580,9 +590,9 @@ export default function ProjectManagerDashboardPage() {
               <KpiCard
                 label="Overdue drafts"
                 value={kpis.overdueDrafts.count}
-                hint={`${formatHours(kpis.overdueDrafts.hours)} not yet submitted`}
+                hint={`${formatHours(kpis.overdueDrafts.hours)} from past months not yet submitted`}
                 tone={kpis.overdueDrafts.count ? "warn" : "default"}
-                href="/timesheets?status=DRAFT"
+                href="/timesheets?status=OVERDUE_DRAFT"
               />
               <KpiCard
                 label="Missing timesheets"
@@ -760,7 +770,7 @@ export default function ProjectManagerDashboardPage() {
 
             <Section
               title="Estimated vs Actual costs by month"
-              subtitle={`Project estimates and actuals combined, in ${currency}.`}
+              subtitle="Project estimates and actuals for the selected currency. Hover a month to see both figures."
               actions={
                 <select
                   value={selectedCostYear ?? ""}
@@ -801,8 +811,8 @@ export default function ProjectManagerDashboardPage() {
                     <thead>
                       <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
                         <th className="py-2 pr-3">Project</th>
-                        <th className="py-2 pr-3">Client</th>
-                        <th className="py-2 pr-3">Consultant</th>
+                        <th className="py-2 pr-3 text-right">Estimate</th>
+                        <th className="py-2 pr-3 text-right">Actual</th>
                         <th className="py-2 pr-3">Dates</th>
                         <th className="py-2 pr-3">Progress</th>
                         <th className="py-2 pr-3">Remaining</th>
@@ -817,8 +827,12 @@ export default function ProjectManagerDashboardPage() {
                               {project.projectNumber} · {project.title}
                             </Link>
                           </td>
-                          <td className="py-2 pr-3">{project.clientName}</td>
-                          <td className="py-2 pr-3">{project.consultants.join(", ") || "—"}</td>
+                          <td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">
+                            {project.estimatedCost ? formatMoney(project.estimatedCost, currency) : "—"}
+                          </td>
+                          <td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">
+                            {project.actualCost ? formatMoney(project.actualCost, currency) : "—"}
+                          </td>
                           <td className="whitespace-nowrap py-2 pr-3">{formatRange(project.startDate, project.endDate)}</td>
                           <td className="py-2 pr-3">
                             <div className="flex items-center gap-2">

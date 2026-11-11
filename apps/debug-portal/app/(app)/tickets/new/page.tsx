@@ -3,10 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Upload, X } from "lucide-react";
+import { FileText, Loader2, Upload, X } from "lucide-react";
 import { ChevronSelect } from "@/components/ChevronSelect";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { MAX_TICKET_SCREENSHOTS, SCREENSHOT_ACCEPT, uploadScreenshots } from "@/lib/upload-screenshot";
+import {
+  MAX_TICKET_SCREENSHOTS,
+  TICKET_ATTACHMENT_ACCEPT,
+  isPdfFile,
+  uploadScreenshots,
+} from "@/lib/upload-screenshot";
 import { useSprints } from "@/lib/sprints";
 import { usePortalUser } from "@/lib/use-portal-user";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
@@ -41,9 +46,9 @@ export default function NewTicketPage() {
   const effectiveStatus = startStatus && (isAdmin || startStatus === "PENDING") ? startStatus : null;
 
   const addFiles = useCallback((incoming: File[]) => {
-    const images = incoming.filter((file) => SCREENSHOT_ACCEPT.split(",").includes(file.type));
+    const images = incoming.filter((file) => TICKET_ATTACHMENT_ACCEPT.split(",").includes(file.type) || isPdfFile(file));
     if (incoming.length && !images.length) {
-      setError("Only PNG, JPEG, GIF, or WebP images can be attached.");
+      setError("Only PNG, JPEG, GIF, WebP images or PDF files can be attached.");
       return;
     }
     setShots((prev) => {
@@ -253,7 +258,7 @@ export default function NewTicketPage() {
         >
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <span className="dp-label mb-0">
-              Screenshots <span className="font-normal text-slate-500">(optional)</span>
+              Screenshots & files <span className="font-normal text-slate-500">(optional)</span>
             </span>
             {shots.length ? (
               <span className="text-xs text-slate-500">
@@ -265,8 +270,15 @@ export default function NewTicketPage() {
             <ul className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {shots.map((shot, index) => (
                 <li key={shot.previewUrl} className="relative rounded-lg border border-slate-200 bg-slate-50 p-1">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={shot.previewUrl} alt={`Screenshot ${index + 1}`} className="h-28 w-full rounded object-contain" />
+                  {isPdfFile(shot.file) ? (
+                    <div className="flex h-28 w-full flex-col items-center justify-center gap-1 rounded bg-white text-red-600">
+                      <FileText className="h-8 w-8" aria-hidden />
+                      <span className="text-xs font-semibold">PDF</span>
+                    </div>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={shot.previewUrl} alt={`Screenshot ${index + 1}`} className="h-28 w-full rounded object-contain" />
+                  )}
                   <p className="mt-1 truncate px-1 text-[11px] text-slate-500" title={shot.file.name}>
                     {shot.file.name}
                   </p>
@@ -285,11 +297,11 @@ export default function NewTicketPage() {
           {shots.length < MAX_TICKET_SCREENSHOTS ? (
             <label className="dp-btn-secondary inline-flex cursor-pointer">
               <Upload className="h-4 w-4" aria-hidden />
-              {shots.length ? "Add more images" : "Choose images"}
+              {shots.length ? "Add more files" : "Choose images or PDFs"}
               <input
                 type="file"
                 multiple
-                accept={SCREENSHOT_ACCEPT}
+                accept={TICKET_ATTACHMENT_ACCEPT}
                 className="sr-only"
                 onChange={(e) => {
                   onPickScreenshots(e.target.files);
@@ -299,8 +311,8 @@ export default function NewTicketPage() {
             </label>
           ) : null}
           <p className="mt-2 text-xs text-slate-500">
-            Choose several at once, drag images here, or paste with Ctrl/Cmd+V. PNG, JPEG, GIF, or WebP · max 10 MB
-            each · up to {MAX_TICKET_SCREENSHOTS} images
+            Choose several at once, drag files here, or paste with Ctrl/Cmd+V. PNG, JPEG, GIF, WebP or PDF · max 10
+            MB each · up to {MAX_TICKET_SCREENSHOTS} files
           </p>
         </div>
 

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
-import { prisma, type Prisma } from "@techbubble/database";
+import { prisma, Prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth";
 import {
   CONTRACT_TYPES,
@@ -39,6 +39,14 @@ import { createProjectFromContract } from "../lib/create-project-from-contract";
 import { syncProjectBudgetsForContract } from "../lib/project-budget";
 import { normalizeContractFileUrls } from "../lib/contract-file-urls";
 import { toNumber, toNumberOrNull } from "../lib/decimal";
+import {
+  invoiceFiles,
+  invoiceFileSchema,
+  invoiceLineItems,
+  invoiceLineItemSchema,
+  lineItemsSubtotal,
+  type InvoiceLineItem,
+} from "../lib/invoice-lines";
 
 const router: IRouter = Router();
 
@@ -115,7 +123,18 @@ const invoiceSchema = z.object({
   rate: decimalField,
   taxRate: z.coerce.number().nonnegative().default(10),
   fileUrl: z.string().min(1).optional().nullable(),
+  /** When given, the invoice amount is the sum of these lines (qty/rate are then 1 × subtotal). */
+  lineItems: z.array(invoiceLineItemSchema).min(1).max(50).optional(),
+  fileUrls: z.array(invoiceFileSchema).max(20).optional(),
 });
+
+/** Line items win over qty/rate; one line is stored as plain qty/rate. */
+function invoicePricing(input: { qty: number; rate: number; lineItems?: InvoiceLineItem[] }) {
+  const lines = input.lineItems;
+  if (!lines?.length) return { qty: input.qty, rate: input.rate, lineItems: Prisma.DbNull };
+  if (lines.length === 1) return { qty: lines[0]!.qty, rate: lines[0]!.rate, lineItems: Prisma.DbNull };
+  return { qty: 1, rate: lineItemsSubtotal(lines), lineItems: lines as Prisma.InputJsonValue };
+}
 
 const fileUrlsSchema = z.object({
   fileUrls: z.array(z.string().min(1)),
@@ -573,6 +592,8 @@ function serializeInvoice(row: {
   taxAmount: { toString(): string } | number;
   totalAmount: { toString(): string } | number;
   fileUrl: string | null;
+  lineItems?: unknown;
+  fileUrls?: unknown;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -593,6 +614,8 @@ function serializeInvoice(row: {
     taxAmount: toNumber(row.taxAmount),
     totalAmount: toNumber(row.totalAmount),
     fileUrl: row.fileUrl,
+    lineItems: invoiceLineItems({ ...row, lineItems: row.lineItems ?? null }),
+    files: invoiceFiles({ fileUrls: row.fileUrls ?? null, fileUrl: row.fileUrl }),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -1969,11 +1992,8 @@ router.post("/:id/invoices", async (req, res) => {
     }
 
     const invoiceNumber = await allocateInvoiceNumber();
-    const { amount, taxAmount, totalAmount } = computeInvoiceAmounts(
-      input.qty,
-      input.rate,
-      input.taxRate,
-    );
+    const pricing = invoicePricing(input);
+    const { amount, taxAmount, totalAmount } = computeInvoiceAmounts(pricing.qty, pricing.rate, input.taxRate);
 
     const row = await prisma.$transaction(async (tx) => {
       const created = await tx.contractInvoice.create({
@@ -1986,13 +2006,15 @@ router.post("/:id/invoices", async (req, res) => {
           status: input.status,
           currency: input.currency ?? contract.currency,
           description: input.description.trim(),
-          qty: input.qty,
-          rate: input.rate,
+          qty: pricing.qty,
+          rate: pricing.rate,
+          lineItems: pricing.lineItems,
           amount,
           taxRate: input.taxRate,
           taxAmount,
           totalAmount,
           fileUrl: input.fileUrl ?? null,
+          ...(input.fileUrls ? { fileUrls: input.fileUrls } : {}),
         },
       });
       await syncContractConsumed(tx, contract.id);
@@ -2019,14 +2041,15 @@ router.patch("/:id/invoices/:invoiceId", async (req, res) => {
 
     const body = invoiceUpdateSchema.parse(req.body);
     const revertingToDraft = body.status === "DRAFT" && invoice.status !== "DRAFT";
-    const nonDraftAllowedKeys = new Set(["status", "dueDate"]);
+    // Attached documents can be added at any stage (e.g. the issued PDF once it's sent).
+    const nonDraftAllowedKeys = new Set(["status", "dueDate", "fileUrls"]);
     const onlyNonDraftFields = Object.entries(body).every(
       ([key, value]) => value === undefined || nonDraftAllowedKeys.has(key),
     );
 
     if (invoice.status !== "DRAFT" && !revertingToDraft && !onlyNonDraftFields) {
       return res.status(400).json({
-        error: "Only status and due date can be updated when invoice is not in Draft status",
+        error: "Only status, due date and files can be updated when invoice is not in Draft status",
       });
     }
 
@@ -2036,13 +2059,26 @@ router.patch("/:id/invoices/:invoiceId", async (req, res) => {
         data: {
           ...(body.status !== undefined ? { status: body.status } : {}),
           ...(body.dueDate !== undefined ? { dueDate: body.dueDate } : {}),
+          ...(body.fileUrls !== undefined ? { fileUrls: body.fileUrls } : {}),
         },
       });
       return res.json({ data: serializeInvoice(row) });
     }
 
-    const qty = body.qty ?? toNumber(invoice.qty);
-    const rate = body.rate != null ? body.rate : toNumber(invoice.rate);
+    // Sending qty/rate without lines (e.g. the contract page's single-line form) replaces any lines.
+    const keepLines = body.lineItems === undefined && body.qty === undefined && body.rate === undefined;
+    const pricing = keepLines
+      ? {
+          qty: toNumber(invoice.qty),
+          rate: toNumber(invoice.rate),
+          lineItems: (invoice.lineItems ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
+        }
+      : invoicePricing({
+          qty: body.qty ?? toNumber(invoice.qty),
+          rate: body.rate != null ? body.rate : toNumber(invoice.rate),
+          lineItems: body.lineItems,
+        });
+    const { qty, rate } = pricing;
     const taxRate = body.taxRate != null ? body.taxRate : toNumber(invoice.taxRate);
     const { amount, taxAmount, totalAmount } = computeInvoiceAmounts(qty, rate, taxRate);
 
@@ -2058,11 +2094,13 @@ router.patch("/:id/invoices/:invoiceId", async (req, res) => {
           description: body.description?.trim() ?? invoice.description,
           qty,
           rate,
+          lineItems: pricing.lineItems,
           amount,
           taxRate,
           taxAmount,
           totalAmount,
           fileUrl: body.fileUrl !== undefined ? body.fileUrl : invoice.fileUrl,
+          ...(body.fileUrls !== undefined ? { fileUrls: body.fileUrls } : {}),
         },
       });
       await syncContractConsumed(tx, contract.id);

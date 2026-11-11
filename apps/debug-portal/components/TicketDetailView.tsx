@@ -1,14 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Copy, Download, ExternalLink, Loader2, Lock, Pencil, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
+import { Copy, Download, ExternalLink, FileText, Loader2, Lock, Pencil, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
 import { ChevronSelect } from "@/components/ChevronSelect";
 import { StatusSelect } from "@/components/StatusSelect";
 import { TicketActivityLog, type TicketLogEntry } from "@/components/TicketActivityLog";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { buildAgentIssuePrompt, resolveTicketScreenshotUrls } from "@/lib/agent-prompt";
-import { MAX_TICKET_SCREENSHOTS, SCREENSHOT_ACCEPT, uploadScreenshots } from "@/lib/upload-screenshot";
+import {
+  MAX_TICKET_SCREENSHOTS,
+  TICKET_ATTACHMENT_ACCEPT,
+  attachmentLabel,
+  isPdfUrl,
+  uploadScreenshots,
+} from "@/lib/upload-screenshot";
 import { usePortalUser } from "@/lib/use-portal-user";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
 import { SprintSelect } from "@/components/SprintSelect";
@@ -679,23 +685,30 @@ export function TicketDetailView({
         </>
       )}
 
-      <SectionCard title={shots.length > 1 ? `Screenshots (${shots.length})` : "Screenshot"}>
+      <SectionCard title={shots.length ? `Screenshots & files (${shots.length})` : "Screenshots & files"}>
         <div className="space-y-6">
           {shots.length ? (
             shots.map((shot, index) => (
               <div key={shot} className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  {shots.length > 1 ? (
+                  {isPdfUrl(shot) ? (
+                    <span className="mr-1 inline-flex items-center gap-1.5 text-sm font-medium text-slate-700">
+                      <FileText className="h-4 w-4 text-red-600" aria-hidden />
+                      PDF · {attachmentLabel(shot)}
+                    </span>
+                  ) : shots.length > 1 ? (
                     <span className="mr-1 text-sm font-medium text-slate-700">Image {index + 1}</span>
                   ) : null}
                   <a href={shot} target="_blank" rel="noreferrer" className="dp-btn-secondary py-2">
-                    Open full size
+                    {isPdfUrl(shot) ? "Open PDF" : "Open full size"}
                     <ExternalLink className="h-4 w-4" aria-hidden />
                   </a>
-                  <button type="button" onClick={() => void downloadScreenshot(shot, index)} className="dp-btn-secondary py-2">
-                    <Download className="h-4 w-4" aria-hidden />
-                    Download
-                  </button>
+                  {isPdfUrl(shot) ? null : (
+                    <button type="button" onClick={() => void downloadScreenshot(shot, index)} className="dp-btn-secondary py-2">
+                      <Download className="h-4 w-4" aria-hidden />
+                      Download
+                    </button>
+                  )}
                   {storedShots[index] && !locked ? (
                     <button
                       type="button"
@@ -712,26 +725,28 @@ export function TicketDetailView({
                     </button>
                   ) : null}
                 </div>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={shot}
-                  alt={`Debug capture screenshot ${index + 1}`}
-                  className="max-h-[min(520px,70vh)] w-full rounded-lg border border-slate-200 bg-slate-50 object-contain"
-                />
+                {isPdfUrl(shot) ? null : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={shot}
+                    alt={`Debug capture screenshot ${index + 1}`}
+                    className="max-h-[min(520px,70vh)] w-full rounded-lg border border-slate-200 bg-slate-50 object-contain"
+                  />
+                )}
               </div>
             ))
           ) : (
-            <p className="text-sm leading-relaxed text-slate-600">No screenshots attached yet.</p>
+            <p className="text-sm leading-relaxed text-slate-600">No screenshots or files attached yet.</p>
           )}
           {shots.length < MAX_TICKET_SCREENSHOTS && !locked ? (
             <div className="border-t border-slate-100 pt-4">
               <label className={`dp-btn-secondary inline-flex cursor-pointer ${uploadingShots ? "pointer-events-none opacity-60" : ""}`}>
                 {uploadingShots ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Upload className="h-4 w-4" aria-hidden />}
-                {uploadingShots ? "Uploading…" : "Add screenshots"}
+                {uploadingShots ? "Uploading…" : "Add screenshots or PDFs"}
                 <input
                   type="file"
                   multiple
-                  accept={SCREENSHOT_ACCEPT}
+                  accept={TICKET_ATTACHMENT_ACCEPT}
                   className="sr-only"
                   disabled={uploadingShots}
                   onChange={(e) => {
@@ -741,7 +756,7 @@ export function TicketDetailView({
                 />
               </label>
               <p className="mt-2 text-xs text-slate-500">
-                PNG, JPEG, GIF, or WebP · max 10 MB each · up to {MAX_TICKET_SCREENSHOTS} per ticket
+                PNG, JPEG, GIF, WebP or PDF · max 10 MB each · up to {MAX_TICKET_SCREENSHOTS} per ticket
               </p>
             </div>
           ) : null}

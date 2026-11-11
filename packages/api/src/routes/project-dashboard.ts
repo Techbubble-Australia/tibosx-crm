@@ -6,22 +6,17 @@ import { effectiveRolesForUser } from "../lib/admin-roles";
 import { toNumber } from "../lib/decimal";
 import { startOfUtcDay } from "../lib/project-types";
 import { sumDailyHours, type DailyHours } from "../lib/timesheet-entries";
-import {
-  convertCurrency,
-  DASHBOARD_BASE_CURRENCIES,
-  getExchangeRatesFromBase,
-  type DashboardBaseCurrency,
-} from "../lib/exchange-rates";
+/** Costs are shown for one currency at a time (no conversion), as recorded on estimates and actuals. */
+const DASHBOARD_CURRENCIES = ["AUD", "USD", "GBP", "EUR", "INR"] as const;
+type DashboardCurrency = (typeof DASHBOARD_CURRENCIES)[number];
 
 const router: IRouter = Router();
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function parseBaseCurrency(value: unknown): DashboardBaseCurrency {
+function parseCurrency(value: unknown): DashboardCurrency {
   const normalized = typeof value === "string" ? value.trim().toUpperCase() : "";
-  return DASHBOARD_BASE_CURRENCIES.includes(normalized as DashboardBaseCurrency)
-    ? (normalized as DashboardBaseCurrency)
-    : "AUD";
+  return DASHBOARD_CURRENCIES.includes(normalized as DashboardCurrency) ? (normalized as DashboardCurrency) : "AUD";
 }
 
 function addDays(date: Date, days: number): Date {
@@ -245,10 +240,9 @@ router.get("/", async (req: AuthRequest, res) => {
     if (!actorId) return res.status(403).json({ error: "Forbidden" });
 
     const mine = req.query.scope === "mine";
-    const baseCurrency = parseBaseCurrency(req.query.baseCurrency);
-    const rates = await getExchangeRatesFromBase(baseCurrency);
-    const toBase = (amount: number, from: string) =>
-      convertCurrency(amount, from || baseCurrency, baseCurrency, baseCurrency, rates);
+    // `baseCurrency` is the older name of this parameter.
+    const currency = parseCurrency(req.query.currency ?? req.query.baseCurrency);
+    const inCurrency = (code: string | null | undefined) => (code || "AUD").toUpperCase() === currency;
 
     const today = startOfUtcDay(new Date());
     const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
@@ -384,7 +378,7 @@ router.get("/", async (req: AuthRequest, res) => {
       })),
     ];
 
-    // Financials, converted to the base currency.
+    // Financials: only estimates/actuals recorded in the selected currency.
     const currentYm = today.getUTCFullYear() * 12 + today.getUTCMonth();
     const monthMap = new Map<
       number,
@@ -404,10 +398,22 @@ router.get("/", async (req: AuthRequest, res) => {
     let estimatedBeforeThisMonth = 0;
     let actualTotal = 0;
     const actualMonths = new Set<number>();
+    const projectTotals = new Map<string, { estimated: number; actual: number }>();
     for (const project of projects) {
+      const totals = { estimated: 0, actual: 0 };
+      projectTotals.set(project.id, totals);
+      for (const row of project.estimates) {
+        if (!inCurrency(row.currency)) continue;
+        const amount = toNumber(row.estimatedCost);
+        totals.estimated += amount;
+      }
+      for (const row of project.actuals) {
+        if (inCurrency(row.currency)) totals.actual += toNumber(row.actualCost);
+      }
       if (project.status === "CANCELLED") continue;
       for (const row of project.estimates) {
-        const amount = toBase(toNumber(row.estimatedCost), row.currency);
+        if (!inCurrency(row.currency)) continue;
+        const amount = toNumber(row.estimatedCost);
         estimatedTotal += amount;
         if (row.year * 12 + row.month < currentYm) estimatedBeforeThisMonth += amount;
         const bucket = monthBucket(row.year, row.month);
@@ -416,7 +422,8 @@ router.get("/", async (req: AuthRequest, res) => {
         bucket.costTypes.add(row.costType);
       }
       for (const row of project.actuals) {
-        const amount = toBase(toNumber(row.actualCost), row.currency);
+        if (!inCurrency(row.currency)) continue;
+        const amount = toNumber(row.actualCost);
         actualTotal += amount;
         actualMonths.add(row.year * 12 + row.month);
         const bucket = monthBucket(row.year, row.month);
@@ -454,13 +461,16 @@ router.get("/", async (req: AuthRequest, res) => {
         progress,
         remainingDays,
         ended: project.endDate < today,
+        estimatedCost: Math.round((projectTotals.get(project.id)?.estimated ?? 0) * 100) / 100,
+        actualCost: Math.round((projectTotals.get(project.id)?.actual ?? 0) * 100) / 100,
       };
     });
 
     res.json({
       data: {
         today: today.toISOString(),
-        baseCurrency,
+        currency,
+        baseCurrency: currency,
         scope: mine ? "mine" : "all",
         kpis: {
           awaitingApproval: {

@@ -25,6 +25,7 @@ import {
 import { ProjectActivityLogSection } from "@/components/projects/ProjectActivityLogSection";
 import {
   ProjectCustomerSupportSettings,
+  type ClientAccessMode,
   type SupportClientContactRow,
 } from "@/components/projects/ProjectCustomerSupportSettings";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
@@ -149,6 +150,7 @@ export type ProjectFormValues = {
   ticketPrefix?: string;
   ticketNumberDigits?: number;
   ticketSettingsLocked?: boolean;
+  clientAccessMode?: ClientAccessMode;
 };
 
 type ClientOption = { id: string; name: string };
@@ -181,6 +183,10 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
     defaults.projectManagerId ?? defaultProjectManagerId ?? "",
   );
   const [forCustomerSupport, setForCustomerSupport] = useState(defaults.kind === "SUPPORT");
+  const [clientAccessMode, setClientAccessMode] = useState<ClientAccessMode>(
+    defaults.clientAccessMode ?? "SUPPORT_AND_TIMESHEETS",
+  );
+  const timesheetsOnly = forCustomerSupport && clientAccessMode === "TIMESHEETS_ONLY";
   const [ticketPrefix, setTicketPrefix] = useState(defaults.ticketPrefix ?? "TKT");
   const [ticketNumberDigits, setTicketNumberDigits] = useState(defaults.ticketNumberDigits ?? 5);
   const [supportClientContacts, setSupportClientContacts] = useState<SupportClientContactRow[]>(
@@ -387,15 +393,19 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (forCustomerSupport && !supportClientContacts.some((c) => c.portalAccess)) {
+    if (timesheetsOnly && !supportClientContacts.length) {
+      appAlert("Select at least one client contact as timesheet approver.");
+      return;
+    }
+    if (forCustomerSupport && !timesheetsOnly && !supportClientContacts.some((c) => c.portalAccess)) {
       appAlert("Select at least one client contact when Customer Support is enabled.");
       return;
     }
-    if (forCustomerSupport && !ticketPrefix.trim()) {
+    if (forCustomerSupport && !timesheetsOnly && !ticketPrefix.trim()) {
       appAlert("Ticket prefix is required for customer support projects.");
       return;
     }
-    if (forCustomerSupport && (ticketNumberDigits < 1 || ticketNumberDigits > 10)) {
+    if (forCustomerSupport && !timesheetsOnly && (ticketNumberDigits < 1 || ticketNumberDigits > 10)) {
       appAlert("Number of ticket digits must be between 1 and 10.");
       return;
     }
@@ -419,9 +429,10 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
       estimates,
       actuals,
       forCustomerSupport,
+      clientAccessMode: forCustomerSupport ? clientAccessMode : undefined,
       supportClientContacts: forCustomerSupport ? supportClientContacts : [],
-      ticketPrefix: forCustomerSupport ? ticketPrefix.trim().toUpperCase() : undefined,
-      ticketNumberDigits: forCustomerSupport ? ticketNumberDigits : undefined,
+      ticketPrefix: forCustomerSupport && !timesheetsOnly ? ticketPrefix.trim().toUpperCase() : undefined,
+      ticketNumberDigits: forCustomerSupport && !timesheetsOnly ? ticketNumberDigits : undefined,
     });
   }
 
@@ -896,6 +907,8 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
           clientId={clientId}
           enabled={forCustomerSupport}
           onEnabledChange={setForCustomerSupport}
+          mode={clientAccessMode}
+          onModeChange={setClientAccessMode}
           rows={supportClientContacts}
           onRowsChange={setSupportClientContacts}
           ticketPrefix={ticketPrefix}
@@ -905,7 +918,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
           ticketSettingsLocked={defaults.ticketSettingsLocked}
         />
 
-        {defaults.id && (kind === "SUPPORT" || forCustomerSupport) ? (
+        {defaults.id && (kind === "SUPPORT" || forCustomerSupport) && !timesheetsOnly ? (
           <ProjectTicketsSection projectId={defaults.id} />
         ) : null}
 

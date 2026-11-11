@@ -541,6 +541,10 @@ model ContractInvoice {
   taxAmount     Decimal  @db.Decimal(14, 2)
   totalAmount   Decimal  @db.Decimal(14, 2)
   fileUrl       String?
+  /// [{ description, qty, rate }] when the invoice has line items; qty/rate then hold 1 × subtotal.
+  lineItems     Json?
+  /// Attached documents [{ name, url }] (e.g. the issued invoice PDF).
+  fileUrls      Json?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -772,6 +776,8 @@ model Project {
   ticketPrefix         String              @default("TKT")
   /// Zero-padded sequence width for support ticket numbers.
   ticketNumberDigits   Int                 @default(5)
+  /// SUPPORT projects: false = clients only get timesheet approval access (no support tickets).
+  clientTicketsEnabled Boolean             @default(true)
   /// Contract value (or variation value) when created from a contract; editable afterwards.
   budget               Decimal?            @db.Decimal(14, 2)
   budgetCurrency       String?

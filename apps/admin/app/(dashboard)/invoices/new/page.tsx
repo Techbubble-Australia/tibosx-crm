@@ -12,6 +12,15 @@ import {
   CONTRACT_INVOICE_STATUS_LABELS,
   type ContractInvoiceStatus,
 } from "@/lib/contract-invoice-status";
+import { AdminUserFilesField, type UserFileRow } from "@/components/users/AdminUserFilesField";
+import {
+  InvoiceLineItemsEditor,
+  emptyInvoiceLine,
+  invoiceLinesPayload,
+  invoiceLinesProblem,
+  invoiceLinesSubtotal,
+  type InvoiceLineDraft,
+} from "@/components/invoices/InvoiceLineItemsEditor";
 
 type ContractOption = {
   id: string;
@@ -33,8 +42,8 @@ export default function NewInvoicePage() {
   const [dueDate, setDueDate] = useState("");
   const [status, setStatus] = useState<ContractInvoiceStatus>("DRAFT");
   const [description, setDescription] = useState("");
-  const [qty, setQty] = useState("1");
-  const [rate, setRate] = useState("");
+  const [lines, setLines] = useState<InvoiceLineDraft[]>([emptyInvoiceLine()]);
+  const [files, setFiles] = useState<UserFileRow[]>([]);
   const [taxRate, setTaxRate] = useState("10");
   const [saving, setSaving] = useState(false);
 
@@ -69,6 +78,11 @@ export default function NewInvoicePage() {
       appAlert("Description is required.");
       return;
     }
+    const linesProblem = invoiceLinesProblem(lines);
+    if (linesProblem) {
+      appAlert(linesProblem);
+      return;
+    }
     setSaving(true);
     try {
       const res = await adminFetch(`/api/admin/contracts/${contractId}/invoices`, {
@@ -81,9 +95,11 @@ export default function NewInvoicePage() {
           status,
           currency: selectedContract?.currency,
           description: description.trim(),
-          qty: Number.parseFloat(qty) || 0,
-          rate: Number.parseFloat(rate) || 0,
+          qty: 1,
+          rate: invoiceLinesSubtotal(lines),
+          lineItems: invoiceLinesPayload(lines),
           taxRate: Number.parseFloat(taxRate) || 0,
+          fileUrls: files,
         }),
       });
       const data = await res.json();
@@ -147,20 +163,28 @@ export default function NewInvoicePage() {
             <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Description <span className="text-red-500">*</span></label>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} required className={inputClass} />
           </div>
+          <InvoiceLineItemsEditor lines={lines} onChange={setLines} currency={selectedContract?.currency ?? "AUD"} />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Qty <span className="text-red-500">*</span></label>
-              <input type="number" min="0" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} required className={inputClass} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Rate <span className="text-red-500">*</span></label>
-              <input type="number" min="0" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} required className={inputClass} />
-            </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Tax rate (%)</label>
               <input type="number" min="0" step="0.01" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} className={inputClass} />
             </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Total (incl. tax)</label>
+              <p className={inputClass}>
+                {selectedContract?.currency ?? "AUD"}{" "}
+                {new Intl.NumberFormat("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+                  invoiceLinesSubtotal(lines) * (1 + (Number.parseFloat(taxRate) || 0) / 100),
+                )}
+              </p>
+            </div>
           </div>
+          <AdminUserFilesField
+            files={files}
+            onChange={setFiles}
+            title="Files"
+            description="Attach copies of the actual invoice (PDF, Word, etc.)."
+          />
           <div className="flex gap-3">
             <button
               type="submit"

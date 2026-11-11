@@ -24,6 +24,7 @@ import { SprintForm } from "@/components/SprintForm";
 import { SprintSelect } from "@/components/SprintSelect";
 import { TypeBadge } from "@/components/TicketBadges";
 import { TicketModal } from "@/components/TicketModal";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
 import {
@@ -178,12 +179,15 @@ export default function BoardPage() {
   }
 
   const loadSeq = useRef(0);
-  const load = useCallback(async () => {
+  /** `silent` refreshes in the background (auto-refresh) without the loading state or clearing errors. */
+  const load = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
     if (sprintFilter === null) return;
     // Switching sprints quickly must not let a slower, older response overwrite the newer board.
     const seq = ++loadSeq.current;
-    setLoading(true);
-    setError("");
+    if (!silent) {
+      setLoading(true);
+      setError("");
+    }
     try {
       const qs = new URLSearchParams({ limit: String(BOARD_LIMIT) });
       if (reporterFilter) qs.set("reporterUserId", reporterFilter);
@@ -195,13 +199,17 @@ export default function BoardPage() {
       setTickets((data.data ?? []) as BoardTicket[]);
       setTotal(typeof data.total === "number" ? data.total : 0);
     } catch (err) {
-      if (seq !== loadSeq.current) return;
+      if (seq !== loadSeq.current || silent) return;
       setError(err instanceof Error ? err.message : "Failed to load tickets");
       setTickets([]);
     } finally {
-      if (seq === loadSeq.current) setLoading(false);
+      if (seq === loadSeq.current && !silent) setLoading(false);
     }
   }, [reporterFilter, sprintFilter]);
+
+  useAutoRefresh(() => void load({ silent: true }), {
+    paused: Boolean(draggingId || savingId || openTicket || editingColumn || adding || statusSaving),
+  });
 
   async function deleteSprint() {
     if (!selectedSprint || selectedSprint.status === "ACTIVE") return;

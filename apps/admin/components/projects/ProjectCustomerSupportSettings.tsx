@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { adminFetch } from "@/lib/admin-api";
 
+export type ClientAccessMode = "SUPPORT_AND_TIMESHEETS" | "TIMESHEETS_ONLY";
+
 export type SupportClientContactRow = {
   contactId: string;
   portalAccess: boolean;
@@ -22,6 +24,8 @@ type Props = {
   clientId: string;
   enabled: boolean;
   onEnabledChange: (value: boolean) => void;
+  mode: ClientAccessMode;
+  onModeChange: (mode: ClientAccessMode) => void;
   rows: SupportClientContactRow[];
   onRowsChange: (rows: SupportClientContactRow[]) => void;
   ticketPrefix: string;
@@ -36,6 +40,8 @@ export function ProjectCustomerSupportSettings({
   clientId,
   enabled,
   onEnabledChange,
+  mode,
+  onModeChange,
   rows,
   onRowsChange,
   ticketPrefix,
@@ -66,7 +72,30 @@ export function ProjectCustomerSupportSettings({
       onRowsChange(rows.filter((r) => r.contactId !== contactId));
       return;
     }
-    onRowsChange([...rows, { contactId, portalAccess: true, canApproveTimesheets: false }]);
+    onRowsChange([
+      ...rows,
+      timesheetsOnly
+        ? { contactId, portalAccess: false, canApproveTimesheets: true }
+        : { contactId, portalAccess: true, canApproveTimesheets: false },
+    ]);
+  }
+
+  const timesheetsOnly = mode === "TIMESHEETS_ONLY";
+  const choice = !enabled ? "NONE" : mode;
+
+  function choose(next: "NONE" | ClientAccessMode) {
+    if (next === "NONE") {
+      onEnabledChange(false);
+      return;
+    }
+    onEnabledChange(true);
+    onModeChange(next);
+    // Timesheet-only access is approval access: every selected contact becomes a timesheet approver.
+    if (next === "TIMESHEETS_ONLY") {
+      onRowsChange(rows.map((r) => ({ ...r, portalAccess: false, canApproveTimesheets: true })));
+    } else if (mode === "TIMESHEETS_ONLY") {
+      onRowsChange(rows.map((r) => ({ ...r, portalAccess: true })));
+    }
   }
 
   function patchRow(contactId: string, patch: Partial<SupportClientContactRow>) {
@@ -76,23 +105,46 @@ export function ProjectCustomerSupportSettings({
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
       <h3 className="mb-4 font-semibold text-gray-900 dark:text-gray-100">Project settings</h3>
-      <label className="flex items-start gap-2 text-sm">
-        <input
-          type="checkbox"
-          className="mt-1"
-          checked={enabled}
-          onChange={(e) => onEnabledChange(e.target.checked)}
-        />
-        <span>
-          <span className="font-medium text-gray-900 dark:text-gray-100">This project is for Customer Support</span>
-          <span className="mt-1 block text-gray-500">
-            Enables client portal access, timesheet approvals, and support tickets for this project.
-          </span>
-        </span>
-      </label>
+      <fieldset className="space-y-3 text-sm">
+        <legend className="sr-only">Client access</legend>
+        {(
+          [
+            {
+              value: "SUPPORT_AND_TIMESHEETS",
+              label: "This project requires customer support and timesheet access for the client",
+              hint: "Selected client contacts can raise and follow support tickets, and approvers can approve timesheets.",
+            },
+            {
+              value: "TIMESHEETS_ONLY",
+              label: "This project requires only timesheet access for the client",
+              hint: "No support tickets. Only the selected timesheet approvers get access, to approve or reject timesheets.",
+            },
+            {
+              value: "NONE",
+              label: "No client access",
+              hint: "Clients don't sign in for this project.",
+            },
+          ] as const
+        ).map((option) => (
+          <label key={option.value} className="flex items-start gap-2">
+            <input
+              type="radio"
+              name="client-access-mode"
+              className="mt-1"
+              checked={choice === option.value}
+              onChange={() => choose(option.value)}
+            />
+            <span>
+              <span className="font-medium text-gray-900 dark:text-gray-100">{option.label}</span>
+              <span className="mt-0.5 block text-gray-500">{option.hint}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
 
       {enabled ? (
         <div className="mt-6 space-y-6">
+          {timesheetsOnly ? null : (
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-800 dark:text-gray-200">
@@ -133,6 +185,7 @@ export function ProjectCustomerSupportSettings({
               </p>
             </div>
           </div>
+          )}
           <div>
           <h4 className="mb-2 text-sm font-medium text-gray-800 dark:text-gray-200">Client access</h4>
           {!clientId ? (
@@ -144,10 +197,10 @@ export function ProjectCustomerSupportSettings({
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
-                    <th className="py-2 pr-3">Access</th>
+                    <th className="py-2 pr-3">{timesheetsOnly ? "Timesheet approver" : "Access"}</th>
                     <th className="py-2 pr-3">Contact</th>
                     <th className="py-2 pr-3">User record</th>
-                    <th className="py-2">Timesheet approver</th>
+                    {timesheetsOnly ? null : <th className="py-2">Timesheet approver</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -170,19 +223,21 @@ export function ProjectCustomerSupportSettings({
                             <span className="text-amber-700 dark:text-amber-400">None — ask admin to create</span>
                           )}
                         </td>
-                        <td className="py-2">
-                          {selected ? (
-                            <input
-                              type="checkbox"
-                              checked={row?.canApproveTimesheets ?? false}
-                              onChange={(e) =>
-                                patchRow(c.id, { canApproveTimesheets: e.target.checked })
-                              }
-                            />
-                          ) : (
-                            "—"
-                          )}
-                        </td>
+                        {timesheetsOnly ? null : (
+                          <td className="py-2">
+                            {selected ? (
+                              <input
+                                type="checkbox"
+                                checked={row?.canApproveTimesheets ?? false}
+                                onChange={(e) =>
+                                  patchRow(c.id, { canApproveTimesheets: e.target.checked })
+                                }
+                              />
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                        )}
                       </tr>
                     );
                   })}

@@ -14,6 +14,15 @@ import {
   type ContractInvoiceStatus,
 } from "@/lib/contract-invoice-status";
 import { appAlert } from "@/lib/app-alert";
+import { AdminUserFilesField, type UserFileRow } from "@/components/users/AdminUserFilesField";
+import {
+  InvoiceLineItemsEditor,
+  emptyInvoiceLine,
+  invoiceLinesPayload,
+  invoiceLinesProblem,
+  invoiceLinesSubtotal,
+  type InvoiceLineDraft,
+} from "@/components/invoices/InvoiceLineItemsEditor";
 
 type InvoiceDetail = {
   id: string;
@@ -36,6 +45,8 @@ type InvoiceDetail = {
   taxAmount: number;
   totalAmount: number;
   fileUrl: string | null;
+  lineItems?: Array<{ description: string; qty: number; rate: number }>;
+  files?: UserFileRow[];
   defaultCurrency: string;
 };
 
@@ -54,8 +65,7 @@ function formatMoney(currency: string, amount: number) {
   return `${currency} ${new Intl.NumberFormat("en-US").format(amount)}`;
 }
 
-function computePreview(qty: number, rate: number, taxRate: number) {
-  const amount = qty * rate;
+function computePreview(amount: number, taxRate: number) {
   const taxAmount = (amount * taxRate) / 100;
   return { amount, taxAmount, totalAmount: amount + taxAmount };
 }
@@ -75,10 +85,9 @@ export default function InvoiceDetailPage() {
   const [status, setStatus] = useState<ContractInvoiceStatus>("DRAFT");
   const [description, setDescription] = useState("");
   const [currency, setCurrency] = useState("AUD");
-  const [qty, setQty] = useState("1");
-  const [rate, setRate] = useState("");
+  const [lines, setLines] = useState<InvoiceLineDraft[]>([emptyInvoiceLine()]);
   const [taxRate, setTaxRate] = useState("10");
-  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [files, setFiles] = useState<UserFileRow[]>([]);
 
   useEffect(() => {
     if (!invoiceId) return;
@@ -95,10 +104,14 @@ export default function InvoiceDetailPage() {
         setStatus(detail.status);
         setDescription(detail.description);
         setCurrency(detail.currency || detail.defaultCurrency || "AUD");
-        setQty(String(detail.qty));
-        setRate(String(detail.rate));
+        setLines(
+          (detail.lineItems?.length
+            ? detail.lineItems
+            : [{ description: detail.description, qty: detail.qty, rate: detail.rate }]
+          ).map((line) => ({ description: line.description, qty: String(line.qty), rate: String(line.rate) })),
+        );
         setTaxRate(String(detail.taxRate));
-        setFileUrl(detail.fileUrl);
+        setFiles(detail.files ?? (detail.fileUrl ? [{ name: "Invoice file", url: detail.fileUrl }] : []));
       })
       .catch((error) => {
         appAlert(error instanceof Error ? error.message : "Failed to load invoice");
@@ -108,13 +121,10 @@ export default function InvoiceDetailPage() {
   }, [invoiceId, router]);
 
   const fieldsEditable = status === "DRAFT";
-  const preview = useMemo(() => {
-    return computePreview(
-      Number.parseFloat(qty) || 0,
-      Number.parseFloat(rate) || 0,
-      Number.parseFloat(taxRate) || 0,
-    );
-  }, [qty, rate, taxRate]);
+  const preview = useMemo(
+    () => computePreview(invoiceLinesSubtotal(lines), Number.parseFloat(taxRate) || 0),
+    [lines, taxRate],
+  );
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -123,23 +133,32 @@ export default function InvoiceDetailPage() {
       appAlert("Due date and description are required.");
       return;
     }
+    const editingAll = fieldsEditable || row.status === "DRAFT";
+    const linesProblem = editingAll ? invoiceLinesProblem(lines) : null;
+    if (linesProblem) {
+      appAlert(linesProblem);
+      return;
+    }
     setSaving(true);
     try {
+      // Sent invoices only accept status, due date and files.
+      const body = editingAll
+        ? {
+            reference,
+            issueDate,
+            dueDate,
+            status,
+            description: description.trim(),
+            currency,
+            lineItems: invoiceLinesPayload(lines),
+            taxRate: Number.parseFloat(taxRate) || 0,
+            fileUrls: files,
+          }
+        : { status, dueDate, fileUrls: files };
       const res = await adminFetch(`/api/admin/contracts/${row.contractId}/invoices/${row.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reference,
-          issueDate,
-          dueDate,
-          status,
-          description: description.trim(),
-          currency,
-          qty: Number.parseFloat(qty) || 0,
-          rate: Number.parseFloat(rate) || 0,
-          taxRate: Number.parseFloat(taxRate) || 0,
-          fileUrl,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update invoice");
@@ -223,7 +242,8 @@ export default function InvoiceDetailPage() {
             <label className="mb-1 block text-sm font-medium">Description <span className="text-red-500">*</span></label>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} readOnly={!fieldsEditable} required className={inputClass} />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <InvoiceLineItemsEditor lines={lines} onChange={setLines} currency={currency} readOnly={!fieldsEditable} />
+          <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <label className="mb-1 block text-sm font-medium">Currency</label>
               <select value={currency} onChange={(e) => setCurrency(e.target.value)} disabled={!fieldsEditable} className={inputClass}>
@@ -233,19 +253,11 @@ export default function InvoiceDetailPage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Qty</label>
-              <input type="number" min="0" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} readOnly={!fieldsEditable} className={inputClass} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Rate</label>
-              <input type="number" min="0" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} readOnly={!fieldsEditable} className={inputClass} />
-            </div>
-            <div>
               <label className="mb-1 block text-sm font-medium">Tax rate %</label>
               <input type="number" min="0" step="0.01" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} readOnly={!fieldsEditable} className={inputClass} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Amount</label>
+              <label className="mb-1 block text-sm font-medium">Amount (before tax)</label>
               <p className={inputClass}>{formatMoney(currency, preview.amount)}</p>
             </div>
           </div>
@@ -259,13 +271,12 @@ export default function InvoiceDetailPage() {
               <p className={inputClass}>{formatMoney(currency, preview.totalAmount)}</p>
             </div>
           </div>
-          {fileUrl ? (
-            <p className="text-sm">
-              <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-sky-600 hover:underline">
-                View uploaded invoice file
-              </a>
-            </p>
-          ) : null}
+          <AdminUserFilesField
+            files={files}
+            onChange={setFiles}
+            title="Files"
+            description="Attach copies of the actual invoice (PDF, Word, etc.). Files can be added at any status; click Save invoice to keep them."
+          />
           <div className="flex gap-2">
             <button type="submit" disabled={saving} className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black">
               {saving ? "Saving…" : "Save invoice"}

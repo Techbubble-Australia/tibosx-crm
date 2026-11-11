@@ -15,6 +15,8 @@ type Props = {
   onChange: (files: UserFileRow[]) => void;
   allowUpload?: boolean;
   allowRemove?: boolean;
+  title?: string;
+  description?: string;
 };
 
 export function AdminUserFilesField({
@@ -23,6 +25,8 @@ export function AdminUserFilesField({
   onChange,
   allowUpload = true,
   allowRemove = true,
+  title = "Files",
+  description = "ID, address, and other uploads. Contracts and start/expiry dates are under Agreements.",
 }: Props) {
   const pinned = pinnedFiles.filter((f) => f.url.trim());
   const hasAny = pinned.length > 0 || files.length > 0;
@@ -52,10 +56,8 @@ export function AdminUserFilesField({
     <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100">Files</h3>
-          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-            ID, address, and other uploads. Contracts and start/expiry dates are under Agreements.
-          </p>
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
+          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{description}</p>
         </div>
         {allowUpload ? (
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800">
