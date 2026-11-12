@@ -79,7 +79,7 @@ export default function EditCustomerUserPage() {
       setPasswordNeedsReset(saved.passwordNeedsReset);
       const passwordInput = form.querySelector<HTMLInputElement>('input[name="password"]');
       if (passwordInput) passwordInput.value = "";
-      appAlert("Customer user saved. Password updates apply to TBOS sign-in for this email.");
+      appAlert("Customer user saved. Password updates apply to TIBOSX at the time of signing in.");
     } catch (error) {
       appAlert(error instanceof Error ? error.message : "Failed to save");
     } finally {
