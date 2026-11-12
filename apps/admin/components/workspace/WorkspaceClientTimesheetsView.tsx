@@ -15,6 +15,8 @@ type TimesheetRow = {
   startDate: string;
   endDate: string;
   targetLabel: string;
+  /** This user is the timesheet's assigned client approver (and it is still submitted). */
+  canApprove?: boolean;
 };
 
 function formatDate(value: string) {
@@ -86,7 +88,8 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
   const load = useCallback(() => {
     setLoading(true);
     setError("");
-    const listPath = mode === "submitted" ? "/timesheets/pending-approval" : "/timesheets?status=APPROVED";
+    // Everyone with access to the project sees its timesheets; approve/reject is per row.
+    const listPath = mode === "submitted" ? "/timesheets?status=SUBMITTED" : "/timesheets?status=APPROVED";
     void Promise.all([
       workspaceFetch("/auth/me").then(async (r) => {
         const body = await r.json();
@@ -187,8 +190,9 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
   const title = mode === "submitted" ? "Submitted timesheets" : "Approved timesheets";
   const subtitle =
     mode === "submitted"
-      ? "Timesheets waiting for your approval."
+      ? "Timesheets submitted for your projects and waiting for approval."
       : "Previously approved timesheets for reference.";
+  const anyApprovable = rows.some((row) => row.canApprove);
 
   return (
     <div>
@@ -201,11 +205,12 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
         <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
       ) : null}
 
-      {!canApprove && mode === "submitted" ? (
-        <p className="text-sm text-slate-500">
-          To approve timesheets, ask your project manager to enable <strong>Timesheet approver</strong> on your client contact in TBOS.
+      {mode === "submitted" && rows.length > 0 && !anyApprovable ? (
+        <p className="mb-4 text-sm text-slate-500">
+          You can view these timesheets. Only the project&apos;s <strong>Timesheet approver</strong> can approve or reject them.
         </p>
-      ) : (
+      ) : null}
+      {(
         <>
           <AdminSearchField
             id="workspace-timesheet-search"
@@ -248,6 +253,7 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{row.targetLabel || "—"}</td>
                       {mode === "submitted" ? (
                         <td className="px-4 py-3 text-right">
+                          {row.canApprove ? (
                           <div className="inline-flex gap-2">
                             <button
                               type="button"
@@ -266,6 +272,9 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
                               Reject
                             </button>
                           </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">View only</span>
+                          )}
                         </td>
                       ) : null}
                     </tr>

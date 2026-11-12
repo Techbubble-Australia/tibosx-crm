@@ -17,8 +17,10 @@ export default function WorkspaceTimesheetsLayout({ children }: { children: Reac
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Approve/Reject Timesheets</h1>
-        <p className="mt-1 text-sm text-slate-500">Review team timesheets for projects where you are the designated approver.</p>
+        <h1 className="text-2xl font-semibold text-slate-900">Timesheets</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Team timesheets for your projects. Timesheet approvers can approve or reject submitted timesheets.
+        </p>
       </div>
 
       {!isDetailPage ? (

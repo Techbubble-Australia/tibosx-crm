@@ -24,8 +24,8 @@ export async function grantCustomerSupportRoleToProjectMembers(projectId: string
 }
 
 /**
- * `timesheetsOnly`: selected contacts only approve timesheets — no client portal tickets, and the
- * project accepts no support tickets.
+ * `timesheetsOnly`: the project accepts no support tickets. Contacts keep their Access and
+ * Timesheet approver ticks: Access shows their projects and timesheets, approvers also approve.
  */
 export async function applyProjectCustomerSupportSettings(
   projectId: string,
@@ -41,10 +41,7 @@ export async function applyProjectCustomerSupportSettings(
     return;
   }
 
-  const effective = timesheetsOnly
-    ? contacts.map((c) => ({ contactId: c.contactId, portalAccess: false, canApproveTimesheets: true }))
-    : contacts;
-  if (!effective.some((c) => c.portalAccess || (timesheetsOnly && c.canApproveTimesheets))) {
+  if (!contacts.some((c) => c.portalAccess)) {
     throw new Error("CLIENT_ACCESS_REQUIRED");
   }
 
@@ -52,7 +49,6 @@ export async function applyProjectCustomerSupportSettings(
     where: { id: projectId },
     data: { kind: "SUPPORT", clientTicketsEnabled: !timesheetsOnly },
   });
-  contacts = effective;
   await syncProjectClientContacts(projectId, contacts);
   await grantCustomerSupportRoleToProjectMembers(projectId);
 }

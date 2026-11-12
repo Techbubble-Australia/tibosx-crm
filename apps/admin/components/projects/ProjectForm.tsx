@@ -393,12 +393,8 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (timesheetsOnly && !supportClientContacts.length) {
-      appAlert("Select at least one client contact as timesheet approver.");
-      return;
-    }
-    if (forCustomerSupport && !timesheetsOnly && !supportClientContacts.some((c) => c.portalAccess)) {
-      appAlert("Select at least one client contact when Customer Support is enabled.");
+    if (forCustomerSupport && !supportClientContacts.some((c) => c.portalAccess)) {
+      appAlert("Tick Access for at least one client contact.");
       return;
     }
     if (forCustomerSupport && !timesheetsOnly && !ticketPrefix.trim()) {

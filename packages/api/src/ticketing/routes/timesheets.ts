@@ -129,11 +129,16 @@ router.get("/", async (req: TicketingRequest, res) => {
   }
 
   const status = typeof req.query.status === "string" ? req.query.status : "";
+  // Links every contact (access or approver) to this portal user, and returns the approver links.
+  const approverLinkIds = (await ensureClientApproverContactLinks(user.id, user.email)).map((l) => l.id);
   const projectIds = await resolveClientTimesheetProjectIds(user.id, user.organizationId);
   if (!projectIds.length) return res.json({ data: [] });
 
-  const where: { projectId: { in: string[] }; status?: string } = { projectId: { in: projectIds } };
-  if (status) where.status = status;
+  const where: { projectId: { in: string[] }; status?: string | { in: string[] } } = {
+    projectId: { in: projectIds },
+    // Drafts belong to the team member until they're submitted.
+    status: status || { in: ["SUBMITTED", "APPROVED", "REJECTED"] },
+  };
 
   const rows = await prisma.timesheet.findMany({
     where,
@@ -154,6 +159,10 @@ router.get("/", async (req: TicketingRequest, res) => {
       startDate: row.startDate.toISOString(),
       endDate: row.endDate.toISOString(),
       approverKind: row.approverKind,
+      canApprove:
+        row.status === "SUBMITTED" &&
+        row.approverKind === "CLIENT_CONTACT" &&
+        Boolean(row.projectClientContactId && approverLinkIds.includes(row.projectClientContactId)),
       targetLabel: row.ticket
         ? `${row.ticket.ticketNumber} — ${row.ticket.subject}`
         : row.project
@@ -212,7 +221,6 @@ router.get("/:id", async (req: TicketingRequest, res) => {
 
   const links = await ensureClientApproverContactLinks(user.id, user.email);
   const linkIds = links.map((row) => row.id);
-  if (!linkIds.length) return res.status(403).json({ error: "Forbidden" });
 
   const timesheetId = req.params.id;
   if (!timesheetId) return res.status(400).json({ error: "Invalid id" });
@@ -220,12 +228,14 @@ router.get("/:id", async (req: TicketingRequest, res) => {
   const timesheet = await fetchTimesheet(timesheetId);
   if (!timesheet) return res.status(404).json({ error: "Not found" });
 
-  if (
-    timesheet.approverKind !== "CLIENT_CONTACT" ||
-    !timesheet.projectClientContactId ||
-    !linkIds.includes(timesheet.projectClientContactId)
-  ) {
-    return res.status(403).json({ error: "Forbidden" });
+  const isApprover =
+    timesheet.approverKind === "CLIENT_CONTACT" &&
+    Boolean(timesheet.projectClientContactId && linkIds.includes(timesheet.projectClientContactId));
+  if (!isApprover) {
+    const projectIds = await resolveClientTimesheetProjectIds(user.id, user.organizationId);
+    if (!timesheet.projectId || !projectIds.includes(timesheet.projectId)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
   }
 
   if (timesheet.status === "DRAFT") {
@@ -238,7 +248,7 @@ router.get("/:id", async (req: TicketingRequest, res) => {
     return res.status(404).json({ error: "Not found" });
   }
 
-  const canApprove = timesheet.status === "SUBMITTED";
+  const canApprove = isApprover && timesheet.status === "SUBMITTED";
   res.json({ data: { ...mapDetail(timesheet), canApprove } });
 });
 

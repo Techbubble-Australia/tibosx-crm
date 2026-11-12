@@ -109,15 +109,24 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    /** Clients get the same Project Management section as project members (their projects + timesheet approvals). */
+    id: "client_project_management",
+    label: "Project Management",
+    icon: FolderKanban,
+    roles: ["client"],
+    items: [
+      { href: "/workspace/projects", label: "Projects", icon: FolderKanban, roles: ["client"] },
+      { href: "/workspace/timesheets", label: "Timesheets", icon: ClipboardCheck, roles: ["client"] },
+    ],
+  },
+  {
     id: "workspace",
     label: "Customer support",
     icon: ClipboardList,
     roles: ["admin", "customer_support", "client"],
     items: [
-      { href: "/workspace/client", label: "Client workspace", icon: Building2, roles: ["client"] },
       { href: "/workspace/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["customer_support", "client"] },
       { href: "/workspace/tickets", label: "Tickets", icon: Ticket, roles: ["customer_support", "client"] },
-      { href: "/workspace/timesheets", label: "Approve/Reject Timesheets", icon: ClipboardCheck, roles: ["client"] },
       { href: "/support-tickets/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin"] },
       { href: "/support-tickets", label: "Tickets", icon: Ticket, roles: ["admin"] },
     ],
@@ -185,10 +194,6 @@ function isProjectManagementPath(pathname: string): boolean {
   );
 }
 
-function isWorkspacePath(pathname: string): boolean {
-  return pathUnder("/workspace", pathname) || pathUnder("/support-tickets", pathname);
-}
-
 function groupIsActive(group: NavGroup, pathname: string): boolean {
   if (group.id === "recruitment" && (isJobListingsPath(pathname) || isCareerApplicationsPath(pathname))) {
     return true;
@@ -207,11 +212,7 @@ function groupIsActive(group: NavGroup, pathname: string): boolean {
     return isProjectManagementPath(pathname);
   }
   if (group.id === "workspace") {
-    // Admins reach Client workspace from the Workspace group, not Customer support.
-    if (pathUnder("/workspace/client", pathname)) {
-      return group.items.some((item) => item.href === "/workspace/client");
-    }
-    return isWorkspacePath(pathname);
+    return pathUnder("/support-tickets", pathname) || group.items.some((item) => navItemIsActive(item, pathname));
   }
   return group.items.some((item) => navItemIsActive(item, pathname));
 }
@@ -278,14 +279,11 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
   const isDevAppEnv = useIsDevelopmentAppEnv();
   const accessLabel = loading ? null : formatRolesLabel(role, additionalRoles);
 
-  const isAdminUser = anyEffectiveRole(role, additionalRoles, ["admin"]);
   useEffect(() => {
     setOpenGroups((prev) => {
       const next = { ...prev };
       for (const group of navGroups) {
-        const adminClientWorkspace =
-          isAdminUser && group.id === "workspace" && pathUnder("/workspace/client", pathname);
-        const active = !adminClientWorkspace && groupIsActive(group, pathname);
+        const active = groupIsActive(group, pathname);
         if (active) {
           next[group.id] = true;
         } else if (group.id === "project_management" || group.id === "workspace") {
@@ -294,7 +292,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
       }
       return next;
     });
-  }, [pathname, isAdminUser]);
+  }, [pathname]);
 
   const visibleGroups = useMemo(() => {
     function itemVisible(item: NavItem): boolean {
@@ -308,13 +306,13 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
       }
       if (item.href === "/workspace/timesheets") {
         if (anyEffectiveRole(role, additionalRoles, ["customer_support"])) return false;
-        return canAccessWorkspaceTimesheets;
+        // Contacts with Access see their projects' timesheets; approvers also approve them.
+        return canAccessWorkspaceTimesheets || canAccessClientWorkspace;
       }
       if (item.href === "/debug-capture" && !isDevAppEnv) {
         return false;
       }
-      if (item.href === "/workspace/client") {
-        // Admins reach it under Workspace; clients need "Access to client workspace" on their contact.
+      if (item.href === "/workspace/projects") {
         return canAccessClientWorkspace && !hasAdmin;
       }
       // Clients only linked to timesheet-only projects get no support dashboard or tickets.
@@ -337,22 +335,16 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
       }
       return anyEffectiveRole(role, additionalRoles, item.roles);
     }
-    const clientWithoutTicketsMenu =
-      anyEffectiveRole(role, additionalRoles, ["client"]) &&
-      !anyEffectiveRole(role, additionalRoles, ["customer_support", "admin"]) &&
-      !canAccessClientTickets;
     return navGroups
       .map((group) => ({
         ...group,
-        // Without support tickets the group only holds the client's projects and timesheets.
-        label: group.id === "workspace" && clientWithoutTicketsMenu ? "Workspace" : group.label,
         items: group.items.filter(itemVisible),
       }))
       .filter((group) => {
         const groupAllowed =
           anyEffectiveRole(role, additionalRoles, group.roles) ||
           (group.id === "project_management" && canAccessProjectManagementTimesheets) ||
-          (group.id === "workspace" && (canAccessWorkspaceTimesheets || canAccessClientWorkspace));
+          (group.id === "workspace" && canAccessWorkspaceTimesheets);
         return groupAllowed && group.items.length > 0;
       });
       }, [
@@ -366,9 +358,15 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         isDevAppEnv,
       ]);
 
+  /** Clients' Workspace home is their Client workspace; everyone else's is /my-workspace. */
+  const clientHome =
+    anyEffectiveRole(role, additionalRoles, ["client"]) &&
+    !anyEffectiveRole(role, additionalRoles, ["admin", "customer_support"]) &&
+    canAccessClientWorkspace;
+  const workspaceHomeHref = clientHome ? "/workspace/client" : workspaceNavItem.href;
   const showWorkspaceHome =
-    !loading && role !== "client" && !isRestrictedToWorkspaceOnly(role, additionalRoles);
-  const workspaceHomeActive = pathUnder("/my-workspace", pathname);
+    !loading && (clientHome || (role !== "client" && !isRestrictedToWorkspaceOnly(role, additionalRoles)));
+  const workspaceHomeActive = pathUnder(workspaceHomeHref, pathname);
   /** Admins get Workspace as a group: their home plus the Client workspace preview. */
   const workspaceSubItems: NavItem[] = anyEffectiveRole(role, additionalRoles, ["admin"])
     ? [
@@ -515,7 +513,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
             </div>
           ) : showWorkspaceHome ? (
             <Link
-              href={workspaceNavItem.href}
+              href={workspaceHomeHref}
               title={sidebarCollapsed ? workspaceNavItem.label : undefined}
               className={`mb-2 flex items-center rounded-lg text-sm font-semibold transition-colors ${
                 sidebarCollapsed ? "justify-center p-2.5" : "gap-2.5 px-3 py-2.5"

@@ -225,7 +225,7 @@ function serializeForAgent(row: DbRow, includeFullPayload: boolean) {
 }
 
 const AGENT_INSTRUCTIONS =
-  "Each ticket includes structured fields plus agentBriefMarkdown. Use pageUrl, element.cssSelector, apiContext, and screenshot.publicUrl together. Work in the techbubble-website monorepo with minimal, pattern-matching fixes. When a fix is done, PATCH /api/debug-portal/agent/tickets/:ticketId/status with { \"status\": \"FOR_REVIEW\" }. Tickets in a completed sprint are locked.";
+  "Each ticket includes structured fields plus agentBriefMarkdown. Use pageUrl, element.cssSelector, apiContext, and screenshot.publicUrl together. Work in the techbubble-website monorepo with minimal, pattern-matching fixes. Read comments (and reopenedFromReview) for reviewer feedback. When a fix is done, PATCH /api/debug-portal/agent/tickets/:ticketId/status with { \"status\": \"FOR_REVIEW\" } and POST a comment to /api/debug-portal/agent/tickets/:ticketId/comments with an X-Forwarded-User header. Tickets in a completed sprint are locked.";
 
 function scopeLabel(scope: SprintScope): string {
   if (scope.kind === "sprint") return scope.sprint.name;
@@ -256,12 +256,40 @@ router.get("/tickets/in-progress", async (req, res) => {
         where,
         orderBy: { createdAt: "asc" },
         take: limit,
-        include: { sprint: { select: SPRINT_SELECT } },
+        include: {
+          sprint: { select: SPRINT_SELECT },
+          // Reviewer feedback (e.g. why a ticket went back to In progress), oldest first.
+          comments: {
+            orderBy: { createdAt: "asc" },
+            select: { authorEmail: true, authorName: true, body: true, createdAt: true },
+          },
+          logs: {
+            where: { action: "STATUS_CHANGED" },
+            orderBy: { createdAt: "desc" },
+            take: 5,
+            select: { oldValue: true, newValue: true, actorEmail: true, createdAt: true },
+          },
+        },
       }),
       prisma.debugCaptureTicket.count({ where }),
     ]);
 
-    const tickets = rows.map((row) => serializeForAgent(row as DbRow, includeFullPayload));
+    const tickets = rows.map((row) => ({
+      ...serializeForAgent(row as DbRow, includeFullPayload),
+      reopenedFromReview: row.logs[0]?.oldValue === "FOR_REVIEW" && row.logs[0]?.newValue === "IN_PROGRESS",
+      statusHistory: row.logs.map((l) => ({
+        from: l.oldValue,
+        to: l.newValue,
+        by: l.actorEmail,
+        at: l.createdAt.toISOString(),
+      })),
+      comments: row.comments.map((c) => ({
+        author: c.authorName || c.authorEmail,
+        authorEmail: c.authorEmail,
+        body: c.body,
+        createdAt: c.createdAt.toISOString(),
+      })),
+    }));
     const combinedAgentBriefMarkdown = tickets
       .map((t) => t.agentBriefMarkdown)
       .join("\n\n---\n\n");

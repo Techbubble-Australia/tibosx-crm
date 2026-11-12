@@ -72,12 +72,7 @@ export function ProjectCustomerSupportSettings({
       onRowsChange(rows.filter((r) => r.contactId !== contactId));
       return;
     }
-    onRowsChange([
-      ...rows,
-      timesheetsOnly
-        ? { contactId, portalAccess: false, canApproveTimesheets: true }
-        : { contactId, portalAccess: true, canApproveTimesheets: false },
-    ]);
+    onRowsChange([...rows, { contactId, portalAccess: true, canApproveTimesheets: false }]);
   }
 
   const timesheetsOnly = mode === "TIMESHEETS_ONLY";
@@ -90,12 +85,8 @@ export function ProjectCustomerSupportSettings({
     }
     onEnabledChange(true);
     onModeChange(next);
-    // Timesheet-only access is approval access: every selected contact becomes a timesheet approver.
-    if (next === "TIMESHEETS_ONLY") {
-      onRowsChange(rows.map((r) => ({ ...r, portalAccess: false, canApproveTimesheets: true })));
-    } else if (mode === "TIMESHEETS_ONLY") {
-      onRowsChange(rows.map((r) => ({ ...r, portalAccess: true })));
-    }
+    // Older timesheet-only setups stored approvers without Access; give them Access back.
+    if (rows.some((r) => !r.portalAccess)) onRowsChange(rows.map((r) => ({ ...r, portalAccess: true })));
   }
 
   function patchRow(contactId: string, patch: Partial<SupportClientContactRow>) {
@@ -117,7 +108,7 @@ export function ProjectCustomerSupportSettings({
             {
               value: "TIMESHEETS_ONLY",
               label: "This project requires only timesheet access for the client",
-              hint: "No support tickets. Only the selected timesheet approvers get access, to approve or reject timesheets.",
+              hint: "No support tickets. Contacts with Access see their projects and timesheets; timesheet approvers can also approve or reject them.",
             },
             {
               value: "NONE",
@@ -197,10 +188,10 @@ export function ProjectCustomerSupportSettings({
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
-                    <th className="py-2 pr-3">{timesheetsOnly ? "Timesheet approver" : "Access"}</th>
+                    <th className="py-2 pr-3">Access</th>
                     <th className="py-2 pr-3">Contact</th>
                     <th className="py-2 pr-3">User record</th>
-                    {timesheetsOnly ? null : <th className="py-2">Timesheet approver</th>}
+                    <th className="py-2">Timesheet approver</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -223,21 +214,19 @@ export function ProjectCustomerSupportSettings({
                             <span className="text-amber-700 dark:text-amber-400">None — ask admin to create</span>
                           )}
                         </td>
-                        {timesheetsOnly ? null : (
-                          <td className="py-2">
-                            {selected ? (
-                              <input
-                                type="checkbox"
-                                checked={row?.canApproveTimesheets ?? false}
-                                onChange={(e) =>
-                                  patchRow(c.id, { canApproveTimesheets: e.target.checked })
-                                }
-                              />
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                        )}
+                        <td className="py-2">
+                          {selected ? (
+                            <input
+                              type="checkbox"
+                              checked={row?.canApproveTimesheets ?? false}
+                              onChange={(e) =>
+                                patchRow(c.id, { canApproveTimesheets: e.target.checked })
+                              }
+                            />
+                          ) : (
+                            "—"
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
