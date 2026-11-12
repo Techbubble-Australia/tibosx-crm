@@ -114,7 +114,7 @@ const navGroups: NavGroup[] = [
     icon: ClipboardList,
     roles: ["admin", "customer_support", "client"],
     items: [
-      { href: "/workspace/client", label: "Client workspace", icon: Building2, roles: ["client"] },
+      { href: "/workspace/client", label: "Client workspace", icon: Building2, roles: ["client", "admin"] },
       { href: "/workspace/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["customer_support", "client"] },
       { href: "/workspace/tickets", label: "Tickets", icon: Ticket, roles: ["customer_support", "client"] },
       { href: "/workspace/timesheets", label: "Approve/Reject Timesheets", icon: ClipboardCheck, roles: ["client"] },
@@ -306,7 +306,8 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         return false;
       }
       if (item.href === "/workspace/client") {
-        return canAccessClientWorkspace && !hasAdmin;
+        // Admins preview any client's workspace; clients need "Access to client workspace" on their contact.
+        return hasAdmin || canAccessClientWorkspace;
       }
       if (item.href.startsWith("/workspace/")) {
         if (hasAdmin) return false;
