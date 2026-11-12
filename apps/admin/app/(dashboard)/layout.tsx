@@ -207,6 +207,10 @@ function groupIsActive(group: NavGroup, pathname: string): boolean {
     return isProjectManagementPath(pathname);
   }
   if (group.id === "workspace") {
+    // Admins reach Client workspace from the Workspace group, not Customer support.
+    if (pathUnder("/workspace/client", pathname)) {
+      return group.items.some((item) => item.href === "/workspace/client");
+    }
     return isWorkspacePath(pathname);
   }
   return group.items.some((item) => navItemIsActive(item, pathname));
@@ -273,11 +277,14 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
   const isDevAppEnv = useIsDevelopmentAppEnv();
   const accessLabel = loading ? null : formatRolesLabel(role, additionalRoles);
 
+  const isAdminUser = anyEffectiveRole(role, additionalRoles, ["admin"]);
   useEffect(() => {
     setOpenGroups((prev) => {
       const next = { ...prev };
       for (const group of navGroups) {
-        const active = groupIsActive(group, pathname);
+        const adminClientWorkspace =
+          isAdminUser && group.id === "workspace" && pathUnder("/workspace/client", pathname);
+        const active = !adminClientWorkspace && groupIsActive(group, pathname);
         if (active) {
           next[group.id] = true;
         } else if (group.id === "project_management" || group.id === "workspace") {
@@ -286,7 +293,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
       }
       return next;
     });
-  }, [pathname]);
+  }, [pathname, isAdminUser]);
 
   const visibleGroups = useMemo(() => {
     function itemVisible(item: NavItem): boolean {
