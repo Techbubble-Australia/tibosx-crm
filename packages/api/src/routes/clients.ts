@@ -16,6 +16,7 @@ const contactSchema = z.object({
   phoneCountryCode: z.string().min(1).max(8),
   phoneNumber: z.string().min(4).max(20),
   order: z.number().int().default(0),
+  clientWorkspaceAccess: z.boolean().optional().default(false),
 });
 
 const clientSchema = z.object({
@@ -343,6 +344,7 @@ router.get("/:id", async (req, res) => {
       phoneCountryCode: string;
       phoneNumber: string;
       order: number;
+      clientWorkspaceAccess?: boolean;
     }>).map((c) => ({
       id: c.id,
       name: c.name,
@@ -351,6 +353,7 @@ router.get("/:id", async (req, res) => {
       phoneCountryCode: c.phoneCountryCode,
       phoneNumber: c.phoneNumber,
       order: c.order,
+      clientWorkspaceAccess: Boolean(c.clientWorkspaceAccess),
       adminUserId: userByContactId.get(c.id) ?? null,
     }));
 
@@ -380,6 +383,7 @@ router.post("/", async (req, res) => {
             phoneCountryCode: contact.phoneCountryCode,
             phoneNumber: contact.phoneNumber,
             order: contact.order ?? index,
+            clientWorkspaceAccess: contact.clientWorkspaceAccess ?? false,
           })),
         },
       },
@@ -429,6 +433,7 @@ router.put("/:id", async (req, res) => {
               phoneCountryCode: contact.phoneCountryCode,
               phoneNumber: contact.phoneNumber,
               order: contact.order ?? index,
+              clientWorkspaceAccess: contact.clientWorkspaceAccess ?? false,
             },
           });
         }

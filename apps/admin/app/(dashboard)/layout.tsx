@@ -114,6 +114,7 @@ const navGroups: NavGroup[] = [
     icon: ClipboardList,
     roles: ["admin", "customer_support", "client"],
     items: [
+      { href: "/workspace/client", label: "Client workspace", icon: Building2, roles: ["client"] },
       { href: "/workspace/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["customer_support", "client"] },
       { href: "/workspace/tickets", label: "Tickets", icon: Ticket, roles: ["customer_support", "client"] },
       { href: "/workspace/timesheets", label: "Approve/Reject Timesheets", icon: ClipboardCheck, roles: ["client"] },
@@ -264,6 +265,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
     impersonation,
     canAccessProjectManagementTimesheets,
     canAccessWorkspaceTimesheets,
+    canAccessClientWorkspace,
   } = useAdminSession();
   const [impersonateOpen, setImpersonateOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
@@ -303,6 +305,9 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
       if (item.href === "/debug-capture" && !isDevAppEnv) {
         return false;
       }
+      if (item.href === "/workspace/client") {
+        return canAccessClientWorkspace && !hasAdmin;
+      }
       if (item.href.startsWith("/workspace/")) {
         if (hasAdmin) return false;
         if (item.href === "/workspace/timesheets") {
@@ -324,10 +329,18 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         const groupAllowed =
           anyEffectiveRole(role, additionalRoles, group.roles) ||
           (group.id === "project_management" && canAccessProjectManagementTimesheets) ||
-          (group.id === "workspace" && canAccessWorkspaceTimesheets);
+          (group.id === "workspace" && (canAccessWorkspaceTimesheets || canAccessClientWorkspace));
         return groupAllowed && group.items.length > 0;
       });
-      }, [role, additionalRoles, canAccessProjectManagementTimesheets, canAccessWorkspaceTimesheets, impersonation, isDevAppEnv]);
+      }, [
+        role,
+        additionalRoles,
+        canAccessProjectManagementTimesheets,
+        canAccessWorkspaceTimesheets,
+        canAccessClientWorkspace,
+        impersonation,
+        isDevAppEnv,
+      ]);
 
   const showWorkspaceHome =
     !loading && role !== "client" && !isRestrictedToWorkspaceOnly(role, additionalRoles);

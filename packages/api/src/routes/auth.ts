@@ -481,6 +481,8 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
     }
     const { getTimesheetAccessForUser } = await import("../lib/timesheet-access.js");
     const timesheetAccess = await getTimesheetAccessForUser(customer.id, "client", []);
+    const { clientWorkspaceClientIds } = await import("../lib/client-workspace.js");
+    const clientWorkspace = (await clientWorkspaceClientIds(customer.id)).length > 0;
     let impersonation: { impersonatorId: string; impersonatorName: string } | null = null;
     if (u.impersonatorId) {
       const impersonator = await prisma.adminUser.findUnique({
@@ -508,6 +510,7 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
           additionalRoles: [],
           onboarding: null,
           timesheetAccess,
+          clientWorkspace,
           agreementRecords: [],
         },
       },
@@ -544,6 +547,8 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
 
   const { buildAgreementRecordsForUser } = await import("../lib/user-agreement-records.js");
   const agreementRecords = await buildAgreementRecordsForUser(user.id);
+  const { clientWorkspaceClientIds } = await import("../lib/client-workspace.js");
+  const clientWorkspace = (await clientWorkspaceClientIds(user.id)).length > 0;
 
   let impersonation: { impersonatorId: string; impersonatorName: string } | null = null;
   if (u.impersonatorId) {
@@ -588,6 +593,7 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
           : [],
         onboarding,
         timesheetAccess,
+        clientWorkspace,
         agreementRecords,
       },
     },

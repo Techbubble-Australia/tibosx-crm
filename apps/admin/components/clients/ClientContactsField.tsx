@@ -12,6 +12,8 @@ export type ClientContactInput = {
   phoneCountryCode: string;
   phoneNumber: string;
   adminUserId?: string | null;
+  /** The contact's portal account can open the Client workspace overview. */
+  clientWorkspaceAccess?: boolean;
 };
 
 type ClientContactsFieldProps = {
@@ -177,6 +179,21 @@ export function ClientContactsField({
                     />
                   </div>
                 </div>
+                <label className="flex items-start gap-2 text-sm text-gray-800 dark:text-gray-200">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={Boolean(contact.clientWorkspaceAccess)}
+                    onChange={(e) => updateContact(index, { clientWorkspaceAccess: e.target.checked })}
+                  />
+                  <span>
+                    <span className="font-medium">Access to client workspace</span>
+                    <span className="block text-xs text-gray-500 dark:text-gray-400">
+                      Lets this contact&apos;s portal account see the Client workspace: projects, timesheets, invoices and
+                      payments for this client.
+                    </span>
+                  </span>
+                </label>
               </div>
             </li>
           ))}

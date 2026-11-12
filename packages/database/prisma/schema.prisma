@@ -562,6 +562,8 @@ model ClientContact {
   phoneCountryCode String
   phoneNumber      String
   order            Int           @default(0)
+  /// "Access to client workspace": this contact's portal account can open the client workspace overview.
+  clientWorkspaceAccess Boolean  @default(false)
   opportunities    Opportunity[]
   projectLinks     ProjectClientContact[]
   mappedAdminUser     AdminUser?     @relation("AdminUserMappedContact")
@@ -1080,8 +1082,9 @@ model AdminUserAgreementRecord {
   id                   String             @id @default(cuid())
   adminUserId          String
   adminUser            AdminUser          @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
-  credentialTemplateId String
-  credentialTemplate   CredentialTemplate @relation(fields: [credentialTemplateId], references: [id], onDelete: Restrict)
+  /// Null once the template is deleted; the record keeps `templateName` and its signed document.
+  credentialTemplateId String?
+  credentialTemplate   CredentialTemplate? @relation(fields: [credentialTemplateId], references: [id], onDelete: SetNull)
   templateName         String
   projectId            String?
   project              Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)

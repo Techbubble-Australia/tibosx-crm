@@ -100,8 +100,9 @@ export async function removeAgreement(
     }
 
     // A withdrawn copy no longer backs the live assignment, which may already hold the updated
-    // agreement (possibly the same template), so only active records clear it.
-    if (!record.withdrawnAt) {
+    // agreement (possibly the same template), so only active records clear it. Records whose
+    // template was deleted have nothing live left.
+    if (!record.withdrawnAt && record.credentialTemplateId) {
       if (record.projectMemberId) {
         await tx.projectMember.updateMany({
           where: { id: record.projectMemberId, credentialTemplateId: record.credentialTemplateId },

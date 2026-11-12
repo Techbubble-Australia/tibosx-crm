@@ -174,9 +174,60 @@ router.put("/:id", async (req, res) => {
   }
 });
 
+function personLabel(user: { name: string | null; email: string } | null | undefined, fallback: string): string {
+  return user?.name?.trim() || user?.email || fallback;
+}
+
+/**
+ * A template can't be deleted while it is assigned to anyone (awaiting signature or signed);
+ * those agreements must be withdrawn or deleted first. Past agreement records stay in history.
+ */
 router.delete("/:id", async (req, res) => {
   try {
-    await prisma.credentialTemplate.delete({ where: { id: req.params.id } });
+    const templateId = req.params.id;
+    const template = await prisma.credentialTemplate.findUnique({ where: { id: templateId }, select: { id: true } });
+    if (!template) return res.status(404).json({ error: "Template not found" });
+
+    const [assignments, members] = await Promise.all([
+      prisma.adminUserCredentialAssignment.findMany({
+        where: { credentialTemplateId: templateId },
+        select: { agreementSignedAt: true, adminUser: { select: { name: true, email: true } } },
+      }),
+      prisma.projectMember.findMany({
+        where: { credentialTemplateId: templateId },
+        select: {
+          agreementSignedAt: true,
+          adminUser: { select: { name: true, email: true } },
+          profile: { select: { firstName: true, lastName: true } },
+          project: { select: { projectNumber: true } },
+        },
+      }),
+    ]);
+    const inUse = [
+      ...assignments.map((a) => ({ who: personLabel(a.adminUser, "a user"), signed: Boolean(a.agreementSignedAt) })),
+      ...members.map((m) => ({
+        who: `${personLabel(m.adminUser, `${m.profile.firstName} ${m.profile.lastName}`.trim())} (${m.project.projectNumber})`,
+        signed: Boolean(m.agreementSignedAt),
+      })),
+    ];
+    if (inUse.length) {
+      const names = inUse
+        .slice(0, 5)
+        .map((u) => `${u.who} — ${u.signed ? "signed" : "awaiting signature"}`)
+        .join("; ");
+      const more = inUse.length > 5 ? ` and ${inUse.length - 5} more` : "";
+      return res.status(409).json({
+        error: `This template is still assigned to ${inUse.length} ${inUse.length === 1 ? "person" : "people"}: ${names}${more}. Withdraw or delete those agreements (on each user's Agreements section) first, then delete the template.`,
+      });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Requests that were never signed and are no longer assigned would otherwise linger in the list.
+      await tx.adminUserAgreementRecord.deleteMany({
+        where: { credentialTemplateId: templateId, agreementSignedAt: null, withdrawnAt: null },
+      });
+      await tx.credentialTemplate.delete({ where: { id: templateId } });
+    });
     res.json({ message: "Deleted" });
   } catch (error) {
     console.error("Error deleting credential template:", error);

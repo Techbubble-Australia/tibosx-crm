@@ -157,26 +157,42 @@ router.post("/", async (req: TicketingRequest, res) => {
   }
   const { startIso, endIso } = monthBounds(input.month);
   const startDate = new Date(`${startIso}T00:00:00.000Z`);
+
+  // One timesheet per member, project and month: a ticket is logged as a line on its project's sheet.
+  const ticket = input.ticketId
+    ? await prisma.ticket.findUnique({ where: { id: input.ticketId }, select: { id: true, projectId: true } })
+    : null;
+  if (input.ticketId && !ticket) return res.status(404).json({ error: "Case not found" });
+  const projectId = input.projectId ?? ticket?.projectId ?? null;
+
   const existing = await prisma.timesheet.findFirst({
     where: {
       memberUserId,
       startDate,
-      ...(input.projectId ? { projectId: input.projectId } : { ticketId: input.ticketId ?? null }),
+      ...(projectId ? { projectId } : { ticketId: input.ticketId ?? null }),
     },
-    select: { id: true },
+    select: { id: true, entries: { select: { ticketId: true } } },
   });
-  if (existing) return res.status(200).json({ data: { id: existing.id } });
+  if (existing) {
+    if (projectId && ticket && !existing.entries.some((e) => e.ticketId === ticket.id)) {
+      await prisma.timesheetEntry.create({
+        data: { timesheetId: existing.id, ticketId: ticket.id, sortOrder: existing.entries.length },
+      });
+    }
+    return res.status(200).json({ data: { id: existing.id } });
+  }
 
   const row = await prisma.timesheet.create({
     data: {
       memberUserId,
-      projectId: input.projectId ?? null,
-      ticketId: input.ticketId ?? null,
+      projectId,
+      ticketId: projectId ? null : input.ticketId ?? null,
       startDate,
       endDate: new Date(`${endIso}T00:00:00.000Z`),
       period: "MONTHLY",
       status: "DRAFT",
       approverKind: input.ticketId ? "CLIENT_CONTACT" : "PM",
+      ...(projectId && ticket ? { entries: { create: [{ ticketId: ticket.id, sortOrder: 0 }] } } : {}),
     },
   });
 

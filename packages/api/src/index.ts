@@ -48,6 +48,7 @@ import { projectRoutes } from "./routes/projects";
 import { timesheetRoutes } from "./routes/timesheets";
 import { notificationRoutes } from "./routes/notifications";
 import { invoiceRoutes } from "./routes/invoices";
+import { clientWorkspaceRoutes } from "./routes/client-workspace";
 import { authRoutes as ticketingPortalAuthRoutes } from "./ticketing/routes/auth";
 import { ticketRoutes as ticketingTicketRoutes } from "./ticketing/routes/tickets";
 import { organizationRoutes as ticketingOrgRoutes } from "./ticketing/routes/organizations";
@@ -208,6 +209,8 @@ app.use(
   projectDashboardRoutes,
 );
 app.use("/api/admin/member-dashboard", authMiddleware, requireMfaEnrolled, memberDashboardRoutes);
+// Client users with "Access to client workspace" on their contact (and admins, for any client).
+app.use("/api/admin/client-workspace", authMiddleware, requireMfaEnrolled, clientWorkspaceRoutes);
 app.use(
   "/api/admin/notifications",
   authMiddleware,

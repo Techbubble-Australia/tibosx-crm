@@ -59,6 +59,8 @@ type AdminSession = {
   isEffectiveProjectMember: boolean;
   canAccessProjectManagementTimesheets: boolean;
   canAccessWorkspaceTimesheets: boolean;
+  /** Client contact has "Access to client workspace" ticked. */
+  canAccessClientWorkspace: boolean;
   canCreateTimesheets: boolean;
   canLogOwnTimesheets: boolean;
   canManageUsers: boolean;
@@ -83,6 +85,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
   const [sessionLoaded, setSessionLoaded] = useState(false);
   const [canAccessProjectManagementTimesheets, setCanAccessProjectManagementTimesheets] = useState(false);
   const [canAccessWorkspaceTimesheets, setCanAccessWorkspaceTimesheets] = useState(false);
+  const [canAccessClientWorkspace, setCanAccessClientWorkspace] = useState(false);
   const [canLogOwnTimesheets, setCanLogOwnTimesheets] = useState(false);
   const [memberOnboarding, setMemberOnboarding] = useState<MemberOnboardingState | null>(null);
   const [impersonation, setImpersonation] = useState<ImpersonationState | null>(null);
@@ -125,6 +128,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       setCanAccessProjectManagementTimesheets(Boolean(access?.projectManagementTimesheets));
       setCanAccessWorkspaceTimesheets(Boolean(access?.workspaceTimesheets));
       setCanLogOwnTimesheets(Boolean(access?.canLogOwnTimesheets));
+      setCanAccessClientWorkspace(Boolean(data?.data?.user?.clientWorkspace));
       const onboarding = data?.data?.user?.onboarding as MemberOnboardingState | null | undefined;
       if (onboarding && typeof onboarding === "object") {
         setMemberOnboarding({
@@ -190,6 +194,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       isEffectiveProjectMember: isEffectiveProjectMember(role, additionalRoles),
       canAccessProjectManagementTimesheets,
       canAccessWorkspaceTimesheets,
+      canAccessClientWorkspace,
       canCreateTimesheets: canLogOwnTimesheets,
       canLogOwnTimesheets,
       canManageUsers: canManageUsers(role),
@@ -214,6 +219,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
       sessionLoaded,
       canAccessProjectManagementTimesheets,
       canAccessWorkspaceTimesheets,
+      canAccessClientWorkspace,
       canLogOwnTimesheets,
       refreshSession,
     ],

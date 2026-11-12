@@ -59,13 +59,16 @@ function ratedMembers(
     .filter((row) => row.rate > 0);
 }
 
-/** Working days per project month: contract work units when available, otherwise weekdays in the project range. */
+/**
+ * Working days per project month. From the contract: its work units, which are the total days for
+ * everyone on the contract (`shared`). Otherwise: weekdays in the project range, worked by each member.
+ */
 async function projectMonthDays(project: {
   startDate: Date;
   endDate: Date;
   contractId: string | null;
   contractVariationId: string | null;
-}): Promise<Array<{ year: number; month: number; days: number }>> {
+}): Promise<{ shared: boolean; months: Array<{ year: number; month: number; days: number }> }> {
   if (project.contractId) {
     const contract = await prisma.contract.findUnique({
       where: { id: project.contractId },
@@ -92,14 +95,17 @@ async function projectMonthDays(project: {
           };
         })
         .filter((row) => row.days > 0);
-      if (rows.length) return rows;
+      if (rows.length) return { shared: true, months: rows };
     }
   }
-  return generateProjectMonths(project.startDate, project.endDate, "T_AND_M", "DAY").map((row) => ({
-    year: row.year,
-    month: row.month,
-    days: row.qty,
-  }));
+  return {
+    shared: false,
+    months: generateProjectMonths(project.startDate, project.endDate, "T_AND_M", "DAY").map((row) => ({
+      year: row.year,
+      month: row.month,
+      days: row.qty,
+    })),
+  };
 }
 
 /** Replaces personnel estimates with monthly contract days × each member's daily rate. */
@@ -120,16 +126,20 @@ export async function runProjectEstimates(projectId: string) {
   const members = ratedMembers(project.members);
   if (!members.length) throw new Error("NO_MEMBER_RATES");
 
-  const months = await projectMonthDays(project);
+  const { shared, months } = await projectMonthDays(project);
   const rows: Array<{ year: number; month: number; qty: number; currency: string; estimatedCost: number }> = [];
   for (const { year, month, days } of months) {
-    const byCurrency = new Map<string, number>();
+    // Contract days are split evenly across members; otherwise every member works every day.
+    const memberDays = shared ? days / members.length : days;
+    const byCurrency = new Map<string, { days: number; cost: number }>();
     for (const member of members) {
-      const cost = days * dailyRateFor(member.rate, member.rateFrequency, year, month);
-      byCurrency.set(member.rateCurrency, (byCurrency.get(member.rateCurrency) ?? 0) + cost);
+      const bucket = byCurrency.get(member.rateCurrency) ?? { days: 0, cost: 0 };
+      bucket.days += memberDays;
+      bucket.cost += memberDays * dailyRateFor(member.rate, member.rateFrequency, year, month);
+      byCurrency.set(member.rateCurrency, bucket);
     }
-    for (const [currency, cost] of byCurrency) {
-      rows.push({ year, month, qty: round2(days), currency, estimatedCost: round2(cost) });
+    for (const [currency, bucket] of byCurrency) {
+      rows.push({ year, month, qty: round2(bucket.days), currency, estimatedCost: round2(bucket.cost) });
     }
   }
 
@@ -150,7 +160,10 @@ export function addUtcDays(date: Date, days: number): Date {
   return d;
 }
 
-/** Rebuilds timesheet-sourced actuals: days worked per month on approved timesheets × member daily rate. */
+/**
+ * Rebuilds timesheet-sourced actuals from approved timesheets: hourly members are paid for the hours
+ * logged; other rates count each day pro rata (8 hours = one day, at most one day per date).
+ */
 export async function syncProjectActualsFromTimesheets(projectId: string) {
   const [members, timesheets] = await Promise.all([
     prisma.projectMember.findMany({
@@ -188,8 +201,12 @@ export async function syncProjectActualsFromTimesheets(projectId: string) {
       const currency = member.rateCurrency || "AUD";
       const bucketKey = `${year}-${month}-${currency}`;
       const bucket = totals.get(bucketKey) ?? { year, month, currency, days: 0, cost: 0 };
-      bucket.days += 1;
-      bucket.cost += dailyRateFor(rate, member.rateFrequency, year, month);
+      const dayFraction = Math.min(hours / HOURS_PER_DAY, 1);
+      bucket.days += member.rateFrequency === "HOURLY" ? hours / HOURS_PER_DAY : dayFraction;
+      bucket.cost +=
+        member.rateFrequency === "HOURLY"
+          ? hours * rate
+          : dayFraction * dailyRateFor(rate, member.rateFrequency, year, month);
       totals.set(bucketKey, bucket);
     });
   }
@@ -202,7 +219,7 @@ export async function syncProjectActualsFromTimesheets(projectId: string) {
           projectId,
           year: row.year,
           month: row.month,
-          qty: row.days,
+          qty: round2(row.days),
           currency: row.currency,
           actualCost: round2(row.cost),
           costType: "personnel",
