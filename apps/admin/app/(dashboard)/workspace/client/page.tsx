@@ -188,7 +188,7 @@ export default function ClientWorkspacePage() {
                 You have {plural(kpis.projectsInProgress, "project")} in progress and{" "}
                 {plural(kpis.timesheetsAwaiting.count, "timesheet")} awaiting your approval.
               </p>
-              <p className="mt-1 text-xs text-gray-500">Snapshot as of {day(data.today)}. Showing the projects you're assigned to.</p>
+              <p className="mt-1 text-xs text-gray-500">Snapshot as of {day(data.today)}. Showing the projects you&apos;re assigned to.</p>
             </>
           )}
         </div>
