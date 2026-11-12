@@ -9,6 +9,8 @@ export type SupportClientContactRow = {
   contactId: string;
   portalAccess: boolean;
   canApproveTimesheets: boolean;
+  /** Contact can open the Client workspace with invoices and payments (applies across this client). */
+  clientWorkspaceAccess?: boolean;
 };
 
 type AvailableContact = {
@@ -16,6 +18,7 @@ type AvailableContact = {
   name: string;
   email: string;
   position: string | null;
+  clientWorkspaceAccess?: boolean;
   userRecord: { id: string; email: string } | null;
 };
 
@@ -72,7 +75,16 @@ export function ProjectCustomerSupportSettings({
       onRowsChange(rows.filter((r) => r.contactId !== contactId));
       return;
     }
-    onRowsChange([...rows, { contactId, portalAccess: true, canApproveTimesheets: false }]);
+    const contact = available.find((c) => c.id === contactId);
+    onRowsChange([
+      ...rows,
+      {
+        contactId,
+        portalAccess: true,
+        canApproveTimesheets: false,
+        clientWorkspaceAccess: Boolean(contact?.clientWorkspaceAccess),
+      },
+    ]);
   }
 
   const timesheetsOnly = mode === "TIMESHEETS_ONLY";
@@ -178,7 +190,11 @@ export function ProjectCustomerSupportSettings({
           </div>
           )}
           <div>
-          <h4 className="mb-2 text-sm font-medium text-gray-800 dark:text-gray-200">Client access</h4>
+          <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200">Client access</h4>
+          <p className="mb-2 text-xs text-gray-500">
+            Client workspace lets the contact see this client&apos;s invoices and payments when they sign in. Leave it unticked
+            to keep payment details private.
+          </p>
           {!clientId ? (
             <p className="text-sm text-gray-500">Select a client to configure client access.</p>
           ) : available.length === 0 ? (
@@ -191,7 +207,10 @@ export function ProjectCustomerSupportSettings({
                     <th className="py-2 pr-3">Access</th>
                     <th className="py-2 pr-3">Contact</th>
                     <th className="py-2 pr-3">User record</th>
-                    <th className="py-2">Timesheet approver</th>
+                    <th className="py-2 pr-3">Timesheet approver</th>
+                    <th className="py-2" title="Can see invoices and payments in the Client workspace">
+                      Client workspace
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -214,7 +233,7 @@ export function ProjectCustomerSupportSettings({
                             <span className="text-amber-700 dark:text-amber-400">None — ask admin to create</span>
                           )}
                         </td>
-                        <td className="py-2">
+                        <td className="py-2 pr-3">
                           {selected ? (
                             <input
                               type="checkbox"
@@ -222,6 +241,18 @@ export function ProjectCustomerSupportSettings({
                               onChange={(e) =>
                                 patchRow(c.id, { canApproveTimesheets: e.target.checked })
                               }
+                            />
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="py-2">
+                          {selected ? (
+                            <input
+                              type="checkbox"
+                              checked={row?.clientWorkspaceAccess ?? false}
+                              onChange={(e) => patchRow(c.id, { clientWorkspaceAccess: e.target.checked })}
+                              aria-label={`Client workspace access for ${c.name}`}
                             />
                           ) : (
                             "—"

@@ -40,7 +40,6 @@ import {
   assertValidDaysOff,
   DAY_OFF_KINDS,
   dayOffDates,
-  formatIsoDayShort,
   type DayOff,
   isFirstOfMonthIso,
   isMonthKey,
@@ -49,7 +48,6 @@ import {
   monthKeyFromDate,
   normalizeDaysOff,
   projectMonthKeys,
-  type MonthCompletion,
 } from "../lib/timesheet-monthly";
 
 const router: IRouter = Router();
@@ -351,8 +349,9 @@ async function mapDetailWithActions(
     canApprove = ids.includes(row.projectClientContactId);
   }
   const detail = mapDetail(row);
-  const monthIncomplete = detail.completion !== null && !detail.completion.complete;
-  const canSubmit = row.memberUserId === actorId && row.status === "DRAFT" && !monthIncomplete;
+  // Members may submit part-months (e.g. they only worked a few days); an empty month can't be submitted.
+  const monthEmpty = detail.completion !== null && detail.completion.filledDays === 0;
+  const canSubmit = row.memberUserId === actorId && row.status === "DRAFT" && !monthEmpty;
   const canDelete =
     (roles.includes("admin") && (row.status === "DRAFT" || row.status === "SUBMITTED")) ||
     (row.memberUserId === actorId && row.status === "DRAFT");
@@ -362,17 +361,11 @@ async function mapDetailWithActions(
     canSubmit,
     canDelete,
     submitBlockedReason:
-      row.memberUserId === actorId && row.status === "DRAFT" && monthIncomplete
-        ? monthIncompleteMessage(detail.completion!)
-        : null,
+      row.memberUserId === actorId && row.status === "DRAFT" && monthEmpty ? MONTH_EMPTY_MESSAGE : null,
   };
 }
 
-function monthIncompleteMessage(completion: MonthCompletion): string {
-  const preview = completion.missingDays.slice(0, 5).map(formatIsoDayShort).join(", ");
-  const more = completion.missingDays.length > 5 ? ` and ${completion.missingDays.length - 5} more` : "";
-  return `Fill in every weekday of the month before submitting (${completion.filledDays} of ${completion.requiredDays} done). Missing: ${preview}${more}. Mark leave or public holidays as a day off.`;
-}
+const MONTH_EMPTY_MESSAGE = "Log hours on at least one day (or mark a day off) before submitting.";
 
 const TERMINAL_TICKET_STATUSES = ["RESOLVED", "CLOSED", "CANCELLED"] as const;
 
@@ -1586,12 +1579,12 @@ router.post("/submit", async (req: AuthRequest, res) => {
           : [(row.dailyHours ?? {}) as DailyHours],
         dayOffDates(normalizeDaysOff(row.daysOff)),
       );
-      if (!completion.complete) {
+      if (completion.filledDays === 0) {
         const month = row.startDate.toLocaleDateString("en-AU", { month: "long", year: "numeric", timeZone: "UTC" });
         return res.status(400).json({
-          error: `${month}: ${monthIncompleteMessage(completion)}`,
-          code: "MONTH_INCOMPLETE",
-          data: { id: row.id, missingDays: completion.missingDays },
+          error: `${month}: ${MONTH_EMPTY_MESSAGE}`,
+          code: "MONTH_EMPTY",
+          data: { id: row.id },
         });
       }
     }

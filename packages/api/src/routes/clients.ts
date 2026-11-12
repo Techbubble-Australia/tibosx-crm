@@ -273,7 +273,7 @@ router.get("/:id/support-available-contacts", async (req: AuthRequest, res) => {
     const contacts = await prisma.clientContact.findMany({
       where: { clientId },
       orderBy: { order: "asc" },
-      select: { id: true, name: true, email: true, position: true },
+      select: { id: true, name: true, email: true, position: true, clientWorkspaceAccess: true },
     });
     const [adminUsers, customerUsers] = await Promise.all([
       prisma.adminUser.findMany({

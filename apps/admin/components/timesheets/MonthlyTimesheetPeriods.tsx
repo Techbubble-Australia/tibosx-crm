@@ -69,7 +69,9 @@ export function MonthlyTimesheetPeriods({
   async function submit(row: MonthRow) {
     if (!row.timesheetId) return;
     const ok = await appConfirm(
-      `Submit your ${formatMonthLabel(row.month)} timesheet to ${row.approverLabel || "your approver"}? You won't be able to make further changes after submission.`,
+      `Submit your ${formatMonthLabel(row.month)} timesheet to ${row.approverLabel || "your approver"}?${
+        row.complete ? "" : ` It covers ${row.filledDays} of ${row.requiredDays} weekdays.`
+      } You won't be able to make further changes after submission.`,
       { title: "Submit for approval" },
     );
     if (!ok) return;
@@ -191,11 +193,11 @@ export function MonthlyTimesheetPeriods({
                         <button
                           type="button"
                           onClick={() => void submit(row)}
-                          disabled={busy !== null || !row.complete}
+                          disabled={busy !== null || row.filledDays === 0}
                           title={
-                            row.complete
+                            row.filledDays > 0
                               ? "Submit for approval"
-                              : `Fill in every weekday first (${row.filledDays} of ${row.requiredDays} done)`
+                              : "Log hours on at least one day (or mark a day off) first"
                           }
                           className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600"
                         >

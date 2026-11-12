@@ -30,7 +30,12 @@ export async function grantCustomerSupportRoleToProjectMembers(projectId: string
 export async function applyProjectCustomerSupportSettings(
   projectId: string,
   enabled: boolean,
-  contacts: Array<{ contactId: string; portalAccess: boolean; canApproveTimesheets: boolean }>,
+  contacts: Array<{
+    contactId: string;
+    portalAccess: boolean;
+    canApproveTimesheets: boolean;
+    clientWorkspaceAccess?: boolean;
+  }>,
   timesheetsOnly = false,
 ) {
   if (!enabled) {

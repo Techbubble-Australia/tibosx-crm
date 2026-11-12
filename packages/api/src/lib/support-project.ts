@@ -17,7 +17,13 @@ export async function ensureProjectSupportGroup(projectId: string) {
 
 export async function syncProjectClientContacts(
   projectId: string,
-  rows: Array<{ contactId: string; portalAccess: boolean; canApproveTimesheets: boolean }>,
+  rows: Array<{
+    contactId: string;
+    portalAccess: boolean;
+    canApproveTimesheets: boolean;
+    /** Contact-level "Client workspace" (invoices and payments); left unchanged when omitted. */
+    clientWorkspaceAccess?: boolean;
+  }>,
 ) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -55,6 +61,12 @@ export async function syncProjectClientContacts(
           canApproveTimesheets: row.canApproveTimesheets,
         },
       });
+      if (row.clientWorkspaceAccess !== undefined) {
+        await tx.clientContact.update({
+          where: { id: row.contactId },
+          data: { clientWorkspaceAccess: row.portalAccess && row.clientWorkspaceAccess },
+        });
+      }
     }
   });
 

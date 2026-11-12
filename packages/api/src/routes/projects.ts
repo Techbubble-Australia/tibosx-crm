@@ -101,6 +101,7 @@ const projectSchema = z.object({
         contactId: z.string().min(1),
         portalAccess: z.boolean(),
         canApproveTimesheets: z.boolean(),
+        clientWorkspaceAccess: z.boolean().optional(),
       }),
     )
     .optional(),
@@ -394,7 +395,7 @@ const detailInclude = {
   clientContacts: {
     orderBy: { createdAt: "asc" as const },
     include: {
-      contact: { select: { id: true, name: true, email: true, position: true } },
+      contact: { select: { id: true, name: true, email: true, position: true, clientWorkspaceAccess: true } },
       ticketingUser: { select: { id: true, email: true } },
     },
   },
@@ -463,7 +464,7 @@ function serializeProjectClientContact(row: {
   portalAccess: boolean;
   canApproveTimesheets: boolean;
   ticketingUserId: string | null;
-  contact: { id: string; name: string; email: string; position: string | null };
+  contact: { id: string; name: string; email: string; position: string | null; clientWorkspaceAccess?: boolean };
 }) {
   return {
     id: row.id,
@@ -473,6 +474,7 @@ function serializeProjectClientContact(row: {
     position: row.contact.position,
     portalAccess: row.portalAccess,
     canApproveTimesheets: row.canApproveTimesheets,
+    clientWorkspaceAccess: Boolean(row.contact.clientWorkspaceAccess),
     portalProvisioned: Boolean(row.ticketingUserId),
   };
 }
@@ -1864,6 +1866,7 @@ const supportClientContactsSchema = z.object({
       contactId: z.string().min(1),
       portalAccess: z.boolean(),
       canApproveTimesheets: z.boolean(),
+      clientWorkspaceAccess: z.boolean().optional(),
     }),
   ),
 });
@@ -1930,7 +1933,7 @@ router.get("/:id/support/available-contacts", async (req: AuthRequest, res) => {
     const contacts = await prisma.clientContact.findMany({
       where: { clientId: project.clientId },
       orderBy: { order: "asc" },
-      select: { id: true, name: true, email: true, position: true },
+      select: { id: true, name: true, email: true, position: true, clientWorkspaceAccess: true },
     });
     const [adminUsers, customerUsers] = await Promise.all([
       prisma.adminUser.findMany({

@@ -300,13 +300,15 @@ export function TimesheetForm({
     (monthTotal > 0 || daysOff.size > 0 || fileUrls.length > 0) &&
     tasksComplete &&
     !approverMissing;
+  // Part-months can be submitted (members may only work some days); an empty month can't.
   const canSubmit =
-    showSubmitForApproval && Boolean(defaults.id) && status === "DRAFT" && completion.complete && !dirty;
-  const submitHint = !completion.complete
-    ? `Fill in every weekday before submitting: ${completion.filledDays} of ${completion.requiredDays} done.`
-    : dirty
-      ? "Save your changes before submitting."
-      : null;
+    showSubmitForApproval && Boolean(defaults.id) && status === "DRAFT" && completion.filledDays > 0 && !dirty;
+  const submitHint =
+    completion.filledDays === 0
+      ? "Log hours on at least one day (or mark a day off) before submitting."
+      : dirty
+        ? "Save your changes before submitting."
+        : null;
 
   const monthIndex = months.indexOf(monthKey);
   const canPrev = allowMonthNavigation && monthIndex > 0;
