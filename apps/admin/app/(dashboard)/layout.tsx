@@ -114,7 +114,7 @@ const navGroups: NavGroup[] = [
     icon: ClipboardList,
     roles: ["admin", "customer_support", "client"],
     items: [
-      { href: "/workspace/client", label: "Client workspace", icon: Building2, roles: ["client", "admin"] },
+      { href: "/workspace/client", label: "Client workspace", icon: Building2, roles: ["client"] },
       { href: "/workspace/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["customer_support", "client"] },
       { href: "/workspace/tickets", label: "Tickets", icon: Ticket, roles: ["customer_support", "client"] },
       { href: "/workspace/timesheets", label: "Approve/Reject Timesheets", icon: ClipboardCheck, roles: ["client"] },
@@ -306,8 +306,8 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         return false;
       }
       if (item.href === "/workspace/client") {
-        // Admins preview any client's workspace; clients need "Access to client workspace" on their contact.
-        return hasAdmin || canAccessClientWorkspace;
+        // Admins reach it under Workspace; clients need "Access to client workspace" on their contact.
+        return canAccessClientWorkspace && !hasAdmin;
       }
       if (item.href.startsWith("/workspace/")) {
         if (hasAdmin) return false;
@@ -346,6 +346,15 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
   const showWorkspaceHome =
     !loading && role !== "client" && !isRestrictedToWorkspaceOnly(role, additionalRoles);
   const workspaceHomeActive = pathUnder("/my-workspace", pathname);
+  /** Admins get Workspace as a group: their home plus the Client workspace preview. */
+  const workspaceSubItems: NavItem[] = anyEffectiveRole(role, additionalRoles, ["admin"])
+    ? [
+        { href: "/my-workspace", label: "Home", icon: Home, roles: [] },
+        { href: "/workspace/client", label: "Client workspace", icon: Building2, roles: [] },
+      ]
+    : [];
+  const workspaceGroupActive = workspaceSubItems.some((item) => pathUnder(item.href, pathname));
+  const workspaceGroupOpen = openGroups["my-workspace"] ?? workspaceGroupActive;
 
   function toggleGroup(id: string) {
     setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -419,7 +428,69 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 space-y-1 px-2">
-          {showWorkspaceHome ? (
+          {showWorkspaceHome && workspaceSubItems.length && sidebarCollapsed ? (
+            <div className="mb-2 space-y-1">
+              {workspaceSubItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    title={item.label === "Home" ? workspaceNavItem.label : item.label}
+                    className={`flex items-center justify-center rounded-lg p-2.5 transition-colors ${
+                      pathUnder(item.href, pathname)
+                        ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100"
+                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                  </Link>
+                );
+              })}
+            </div>
+          ) : showWorkspaceHome && workspaceSubItems.length ? (
+            <div className="mb-2">
+              <button
+                type="button"
+                onClick={() => setOpenGroups((prev) => ({ ...prev, "my-workspace": !workspaceGroupOpen }))}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${
+                  workspaceGroupActive
+                    ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100"
+                    : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                }`}
+              >
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <Home className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{workspaceNavItem.label}</span>
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 transition-transform ${workspaceGroupOpen ? "rotate-180" : ""}`}
+                  aria-hidden
+                />
+              </button>
+              {workspaceGroupOpen ? (
+                <div className="mt-1 space-y-0.5 pl-2">
+                  {workspaceSubItems.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                          pathUnder(item.href, pathname)
+                            ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100"
+                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                        }`}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          ) : showWorkspaceHome ? (
             <Link
               href={workspaceNavItem.href}
               title={sidebarCollapsed ? workspaceNavItem.label : undefined}
