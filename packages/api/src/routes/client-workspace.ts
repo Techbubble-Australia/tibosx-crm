@@ -17,7 +17,12 @@ async function allowedClients(req: AuthRequest): Promise<AllowedClient[]> {
   if (!userId) return [];
   const roles = await effectiveRolesForUser(userId, req.user?.role ?? "");
   if (roles.includes("admin")) {
-    return prisma.client.findMany({ where: { status: "ACTIVE" }, select: { id: true, name: true }, orderBy: { name: "asc" } });
+    // Only clients that have had at least one invoice raised.
+    return prisma.client.findMany({
+      where: { contracts: { some: { invoices: { some: { status: { not: "CANCELED" } } } } } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
   }
   const access = await clientWorkspaceAccess(userId);
   const clientIds = [...new Set([...access.fullClientIds, ...access.linkedProjects.map((p) => p.clientId)])];

@@ -12,7 +12,7 @@ import {
   screenshotUrlFromTicket,
 } from "../lib/debug-media-url.js";
 import { ticketScreenshotUrls } from "../lib/debug-portal-user.js";
-import { AI_AGENT_ACTOR, logDebugTicket } from "../lib/debug-ticket-log.js";
+import { AI_AGENT_ACTOR, commentLogPreview, logDebugTicket } from "../lib/debug-ticket-log.js";
 import { notifyAsync } from "../lib/notifications/index.js";
 import { isDebugTicketStatus, listDebugTicketStatuses } from "../lib/debug-ticket-statuses.js";
 import type { Prisma } from "@techbubble/database";
@@ -378,6 +378,74 @@ router.patch("/tickets/:idOrTicketId/status", async (req, res) => {
     }
     console.error("debug portal agent patch status error:", error);
     res.status(500).json({ error: "Failed to update ticket status" });
+  }
+});
+
+const agentCommentSchema = z.object({ body: z.string().trim().min(1).max(5000) });
+
+/**
+ * POST /api/debug-portal/agent/tickets/:idOrTicketId/comments
+ * Body: { "body": "..." }. Header `X-Forwarded-User: <email>` names the author, who must be an
+ * active TIBOSX user. Development only, like the rest of the agent API, so no sign-in token is needed.
+ */
+router.post("/tickets/:idOrTicketId/comments", async (req, res) => {
+  try {
+    const { body } = agentCommentSchema.parse(req.body);
+    const headerValue = req.get("x-forwarded-user") ?? req.get("x-forwarded-email") ?? "";
+    const email = headerValue.trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({
+        error: "Send the author's email in the X-Forwarded-User header",
+        code: "AUTHOR_REQUIRED",
+      });
+    }
+    const author = await prisma.adminUser.findFirst({
+      where: { email: { equals: email, mode: "insensitive" }, active: true },
+      select: { id: true, email: true, name: true },
+    });
+    if (!author) {
+      return res.status(400).json({
+        error: `No active TIBOSX user with email ${email}`,
+        code: "AUTHOR_NOT_FOUND",
+      });
+    }
+    const ticket = await findTicketByIdOrTicketId(req.params.idOrTicketId!);
+    if (!ticket) return res.status(404).json({ error: "Ticket not found", code: "TICKET_NOT_FOUND" });
+
+    const comment = await prisma.$transaction(async (tx) => {
+      const created = await tx.debugCaptureTicketComment.create({
+        data: {
+          ticketId: ticket.id,
+          authorUserId: author.id,
+          authorEmail: author.email,
+          authorName: author.name || null,
+          body,
+          attachments: [],
+        },
+      });
+      await logDebugTicket(tx, ticket.id, { userId: author.id, email: author.email }, [
+        { action: "COMMENT_ADDED", newValue: commentLogPreview(body, 0) },
+      ]);
+      return created;
+    });
+
+    res.status(201).json({
+      schemaVersion: "1.1",
+      comment: {
+        id: comment.id,
+        ticketId: ticket.ticketId,
+        authorEmail: comment.authorEmail,
+        authorName: comment.authorName,
+        body: comment.body,
+        createdAt: comment.createdAt.toISOString(),
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("debug portal agent comment error:", error);
+    res.status(500).json({ error: "Failed to add comment" });
   }
 });
 

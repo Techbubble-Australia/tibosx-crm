@@ -11,7 +11,12 @@ import {
   ticketScreenshotUrls,
   type DebugPortalUser,
 } from "../lib/debug-portal-user.js";
-import { logDebugTicket, serializeDebugTicketLog, type DebugTicketActor } from "../lib/debug-ticket-log.js";
+import {
+  commentLogPreview,
+  logDebugTicket,
+  serializeDebugTicketLog,
+  type DebugTicketActor,
+} from "../lib/debug-ticket-log.js";
 import { isDebugTicketStatus, previousDebugTicketStatus } from "../lib/debug-ticket-statuses.js";
 import { activeDebugSprintId } from "../lib/debug-sprints.js";
 import { notifyAsync } from "../lib/notifications/index.js";
@@ -457,13 +462,6 @@ async function ticketDetail(id: string) {
     logs: row.logs.map(serializeDebugTicketLog),
     comments: row.comments.map(serializeComment),
   };
-}
-
-/** Short text for the activity log: the start of the comment, or the attachment count when there's no text. */
-function commentLogPreview(body: string, attachmentCount: number): string {
-  const text = body.replace(/\s+/g, " ").trim();
-  if (text) return text.length > 160 ? `${text.slice(0, 157)}…` : text;
-  return `${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`;
 }
 
 const commentSchema = z

@@ -57,3 +57,10 @@ export function serializeDebugTicketLog(row: {
     createdAt: row.createdAt.toISOString(),
   };
 }
+
+/** Short text for the activity log: the start of a comment, or the attachment count when there's no text. */
+export function commentLogPreview(body: string, attachmentCount: number): string {
+  const text = body.replace(/\s+/g, " ").trim();
+  if (text) return text.length > 160 ? `${text.slice(0, 157)}…` : text;
+  return `${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`;
+}
