@@ -2,8 +2,6 @@
 
 export type Overview = {
   client: { id: string; name: string };
-  /** "projects": no workspace access ticked, so only linked projects and timesheets (no invoices). */
-  scope: "full" | "projects";
   clients: Array<{ id: string; name: string }>;
   today: string;
   financialYearStart: string;

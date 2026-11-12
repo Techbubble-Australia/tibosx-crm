@@ -54,7 +54,6 @@ export default function ClientWorkspacePage() {
   if (!data) return null;
 
   const { kpis, currency } = data;
-  const full = data.scope === "full";
   const awaitingTimesheets = data.timesheets.filter((t) => t.status === "SUBMITTED");
   const approvedHours = data.timesheets.filter((t) => t.status === "APPROVED").reduce((h, t) => h + t.hours, 0);
 
@@ -64,27 +63,15 @@ export default function ClientWorkspacePage() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">TechBubble · Client workspace</p>
           <h1 className="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">{data.client.name}</h1>
-          {full ? (
-            <>
-              <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
-                You have {plural(kpis.projectsInProgress, "project")} in progress and{" "}
-                <strong>{money(kpis.awaitingPayment.amount, currency)}</strong> awaiting payment, with{" "}
-                {plural(kpis.overdue.count, "invoice")} overdue.
-              </p>
-              <p className="mt-1 text-xs text-gray-500">
-                Snapshot as of {day(data.today)}. Invoices shown are those issued since {day(data.financialYearStart)};
-                amounts are in {currency} and include GST.
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
-                You have {plural(kpis.projectsInProgress, "project")} in progress and{" "}
-                {plural(kpis.timesheetsAwaiting.count, "timesheet")} awaiting your approval.
-              </p>
-              <p className="mt-1 text-xs text-gray-500">Snapshot as of {day(data.today)}. Showing the projects you&apos;re assigned to.</p>
-            </>
-          )}
+          <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+            You have {plural(kpis.projectsInProgress, "project")} in progress and{" "}
+            <strong>{money(kpis.awaitingPayment.amount, currency)}</strong> awaiting payment, with{" "}
+            {plural(kpis.overdue.count, "invoice")} overdue.
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            Snapshot as of {day(data.today)}. Invoices shown are those issued since {day(data.financialYearStart)};
+            amounts are in {currency} and include GST.
+          </p>
         </div>
         {data.clients.length > 1 ? (
           <select
@@ -108,8 +95,6 @@ export default function ClientWorkspacePage() {
           hint={`${kpis.timesheetsAwaiting.hours} h to approve`}
           tone={kpis.timesheetsAwaiting.count ? "warn" : "default"}
         />
-        {full ? (
-          <>
         <Card
           label="Awaiting payment"
           value={money(kpis.awaitingPayment.amount, currency)}
@@ -131,11 +116,8 @@ export default function ClientWorkspacePage() {
           value={money(kpis.paidThisYear.amount, currency)}
           hint={`of ${money(kpis.paidThisYear.invoiced, currency)} invoiced`}
         />
-          </>
-        ) : null}
       </div>
 
-      {full ? (
       <Section title="Invoices" subtitle="Invoice status for the last 6 months">
         <div className="flex h-44 items-end gap-3 border-b border-gray-100 pb-1 dark:border-gray-800">
           {data.chart.map((m) => {
@@ -213,7 +195,6 @@ export default function ClientWorkspacePage() {
           <p className="mt-4 text-sm text-gray-500">No invoices issued yet this financial year.</p>
         )}
       </Section>
-      ) : null}
 
       <Section title="Projects" subtitle="Your TechBubble engagements, with how far through each one is today">
         <ProjectsTable projects={data.projects} />

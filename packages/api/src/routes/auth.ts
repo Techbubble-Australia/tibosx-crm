@@ -483,7 +483,7 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
     const timesheetAccess = await getTimesheetAccessForUser(customer.id, "client", []);
     const { clientWorkspaceAccess } = await import("../lib/client-workspace.js");
     const workspaceAccess = await clientWorkspaceAccess(customer.id);
-    const clientWorkspace = workspaceAccess.fullClientIds.length > 0 || workspaceAccess.linkedProjects.length > 0;
+    const clientWorkspace = workspaceAccess.linkedProjects.length > 0;
     const clientTickets = workspaceAccess.ticketAccess;
     let impersonation: { impersonatorId: string; impersonatorName: string } | null = null;
     if (u.impersonatorId) {
@@ -552,7 +552,7 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
   const agreementRecords = await buildAgreementRecordsForUser(user.id);
   const { clientWorkspaceAccess } = await import("../lib/client-workspace.js");
   const workspaceAccess = await clientWorkspaceAccess(user.id);
-  const clientWorkspace = workspaceAccess.fullClientIds.length > 0 || workspaceAccess.linkedProjects.length > 0;
+  const clientWorkspace = workspaceAccess.linkedProjects.length > 0;
   const clientTickets = workspaceAccess.ticketAccess;
 
   let impersonation: { impersonatorId: string; impersonatorName: string } | null = null;

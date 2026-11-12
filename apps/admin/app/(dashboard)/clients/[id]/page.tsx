@@ -60,7 +60,6 @@ export default function EditClientPage() {
             phoneCountryCode: contact.phoneCountryCode,
             phoneNumber: contact.phoneNumber,
             adminUserId: (contact as ClientContactInput).adminUserId ?? null,
-            clientWorkspaceAccess: Boolean((contact as ClientContactInput).clientWorkspaceAccess),
           })),
         );
       } catch (e) {

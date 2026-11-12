@@ -9,8 +9,8 @@ const router: IRouter = Router();
 type AllowedClient = { id: string; name: string; projectIds?: string[] };
 
 /**
- * Admins: every active client. Client users: full view for clients where their contact has
- * "Access to client workspace" ticked, otherwise just the projects they are linked to.
+ * Admins: every client with invoices (all projects). Client users: every client they are linked to,
+ * with projects and timesheets limited to their own projects (invoices and payments cover the client).
  */
 async function allowedClients(req: AuthRequest): Promise<AllowedClient[]> {
   const userId = req.user?.id;
@@ -25,18 +25,17 @@ async function allowedClients(req: AuthRequest): Promise<AllowedClient[]> {
     });
   }
   const access = await clientWorkspaceAccess(userId);
-  const clientIds = [...new Set([...access.fullClientIds, ...access.linkedProjects.map((p) => p.clientId)])];
+  const clientIds = [...new Set(access.linkedProjects.map((p) => p.clientId))];
   if (!clientIds.length) return [];
   const clients = await prisma.client.findMany({
     where: { id: { in: clientIds } },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
-  return clients.map((c) =>
-    access.fullClientIds.includes(c.id)
-      ? c
-      : { ...c, projectIds: access.linkedProjects.filter((p) => p.clientId === c.id).map((p) => p.id) },
-  );
+  return clients.map((c) => ({
+    ...c,
+    projectIds: access.linkedProjects.filter((p) => p.clientId === c.id).map((p) => p.id),
+  }));
 }
 
 router.get("/", async (req: AuthRequest, res) => {
