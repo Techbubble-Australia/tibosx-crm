@@ -1,11 +1,14 @@
 "use client";
 
 export type Overview = {
+  /** `id` is "all" when an admin views every client together. */
   client: { id: string; name: string };
   clients: Array<{ id: string; name: string }>;
+  allClientsOption?: boolean;
   today: string;
   financialYearStart: string;
   currency: string;
+  currencies?: string[];
   kpis: {
     projectsInProgress: number;
     projectsEnded: number;
@@ -20,6 +23,7 @@ export type Overview = {
     id: string;
     invoiceNumber: string;
     contractTitle: string;
+    clientName?: string;
     reference: string;
     issueDate: string;
     dueDate: string;

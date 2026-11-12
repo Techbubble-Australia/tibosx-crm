@@ -64,12 +64,13 @@ function round2(value: number): number {
 }
 
 /**
- * Everything shown on the Client workspace page for one client. Invoices and payments always cover
- * the whole client; with `projectIds` the projects and timesheets are limited to those projects.
+ * Everything shown on the Client workspace page for one or more clients. Invoices and payments always
+ * cover the whole client; with `projectIds` the projects and timesheets are limited to those projects.
+ * Totals use `currency` when the invoices include it, otherwise the most common invoice currency.
  */
 export async function buildClientWorkspaceOverview(
-  clientId: string,
-  options: { projectIds?: string[] } = {},
+  clientIds: string[],
+  options: { projectIds?: string[]; currency?: string } = {},
   now = new Date(),
 ) {
   const today = startOfUtcDay(now);
@@ -77,13 +78,10 @@ export async function buildClientWorkspaceOverview(
   const currentMonth = monthKey(today);
   const previousMonth = monthKey(new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1)));
 
-  const client = await prisma.client.findUnique({ where: { id: clientId }, select: { id: true, name: true } });
-  if (!client) return null;
-
   const [projects, invoices] = await Promise.all([
     prisma.project.findMany({
       where: {
-        clientId,
+        clientId: { in: clientIds },
         status: { in: ["ACTIVE", "ON_HOLD", "COMPLETED"] },
         ...(options.projectIds ? { id: { in: options.projectIds } } : {}),
       },
@@ -100,7 +98,7 @@ export async function buildClientWorkspaceOverview(
       },
     }),
     prisma.contractInvoice.findMany({
-      where: { contract: { clientId }, status: { not: "CANCELED" }, issueDate: { gte: fyStart } },
+      where: { contract: { clientId: { in: clientIds } }, status: { not: "CANCELED" }, issueDate: { gte: fyStart } },
       orderBy: [{ issueDate: "desc" }, { invoiceNumber: "desc" }],
       select: {
         id: true,
@@ -113,7 +111,7 @@ export async function buildClientWorkspaceOverview(
         totalAmount: true,
         fileUrl: true,
         fileUrls: true,
-        contract: { select: { title: true } },
+        contract: { select: { title: true, client: { select: { name: true } } } },
       },
     }),
   ]);
@@ -192,7 +190,9 @@ export async function buildClientWorkspaceOverview(
   // Invoices (issued this financial year; drafts only feed the chart)
   const currencyCount = new Map<string, number>();
   for (const inv of invoices) currencyCount.set(inv.currency, (currencyCount.get(inv.currency) ?? 0) + 1);
-  const currency = [...currencyCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "AUD";
+  const currencies = [...currencyCount.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c);
+  const currency =
+    options.currency && currencyCount.has(options.currency) ? options.currency : (currencies[0] ?? "AUD");
   const sent = invoices.filter((inv) => inv.status !== "DRAFT");
   const inCurrency = sent.filter((inv) => inv.currency === currency);
   const sum = (rows: typeof invoices) => round2(rows.reduce((total, inv) => total + toNumber(inv.totalAmount), 0));
@@ -219,10 +219,10 @@ export async function buildClientWorkspaceOverview(
   );
 
   return {
-    client,
     today: today.toISOString(),
     financialYearStart: fyStart.toISOString(),
     currency,
+    currencies,
     kpis: {
       projectsInProgress: inProgress,
       projectsEnded: ended,
@@ -237,6 +237,7 @@ export async function buildClientWorkspaceOverview(
       id: inv.id,
       invoiceNumber: inv.invoiceNumber,
       contractTitle: inv.contract.title,
+      clientName: inv.contract.client.name,
       reference: inv.reference,
       issueDate: inv.issueDate.toISOString(),
       dueDate: inv.dueDate.toISOString(),

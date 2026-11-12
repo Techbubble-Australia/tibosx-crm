@@ -18,6 +18,7 @@ import {
 
 export default function ClientWorkspacePage() {
   const [clientId, setClientId] = useState("");
+  const [currencyChoice, setCurrencyChoice] = useState("");
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -25,8 +26,11 @@ export default function ClientWorkspacePage() {
   useEffect(() => {
     setLoading(true);
     setError("");
-    const qs = clientId ? `?clientId=${encodeURIComponent(clientId)}` : "";
-    void adminFetch(`/api/admin/client-workspace${qs}`)
+    const params = new URLSearchParams();
+    if (clientId) params.set("clientId", clientId);
+    if (currencyChoice) params.set("currency", currencyChoice);
+    const qs = params.toString();
+    void adminFetch(`/api/admin/client-workspace${qs ? `?${qs}` : ""}`)
       .then(async (res) => {
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error((body as { error?: string }).error || "Failed to load the client workspace");
@@ -34,7 +38,7 @@ export default function ClientWorkspacePage() {
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load the client workspace"))
       .finally(() => setLoading(false));
-  }, [clientId]);
+  }, [clientId, currencyChoice]);
 
   const chartMax = useMemo(
     () => Math.max(1, ...(data?.chart ?? []).map((m) => m.paid + m.awaiting + m.draft)),
@@ -54,6 +58,8 @@ export default function ClientWorkspacePage() {
   if (!data) return null;
 
   const { kpis, currency } = data;
+  const allClients = data.client.id === "all";
+  const currencies = data.currencies ?? [];
   const awaitingTimesheets = data.timesheets.filter((t) => t.status === "SUBMITTED");
   const approvedHours = data.timesheets.filter((t) => t.status === "APPROVED").reduce((h, t) => h + t.hours, 0);
 
@@ -71,20 +77,37 @@ export default function ClientWorkspacePage() {
           <p className="mt-1 text-xs text-gray-500">
             Snapshot as of {day(data.today)}. Invoices shown are those issued since {day(data.financialYearStart)};
             amounts are in {currency} and include GST.
+            {currencies.length > 1 ? ` Totals only count ${currency} invoices; switch currency to see the others.` : ""}
           </p>
         </div>
-        {data.clients.length > 1 ? (
-          <select
-            value={data.client.id}
-            onChange={(e) => setClientId(e.target.value)}
-            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
-            aria-label="Choose client"
-          >
-            {data.clients.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {data.clients.length > 1 ? (
+            <select
+              value={data.client.id}
+              onChange={(e) => setClientId(e.target.value)}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
+              aria-label="Choose client"
+            >
+              {data.allClientsOption ? <option value="all">All</option> : null}
+              {data.clients.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          ) : null}
+          {currencies.length > 1 ? (
+            <select
+              value={currency}
+              onChange={(e) => setCurrencyChoice(e.target.value)}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
+              aria-label="Choose currency"
+              title="Totals and the chart are shown in one currency at a time"
+            >
+              {currencies.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          ) : null}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -150,6 +173,7 @@ export default function ClientWorkspacePage() {
               <thead>
                 <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
                   <th className="py-2 pr-3">Invoice</th>
+                  {allClients ? <th className="py-2 pr-3">Client</th> : null}
                   <th className="py-2 pr-3">Contract</th>
                   <th className="py-2 pr-3">Reference</th>
                   <th className="py-2 pr-3">Issued</th>
@@ -163,6 +187,7 @@ export default function ClientWorkspacePage() {
                 {data.invoices.map((inv) => (
                   <tr key={inv.id} className="border-b border-gray-50 dark:border-gray-800">
                     <td className="whitespace-nowrap py-2 pr-3 font-medium">{inv.invoiceNumber}</td>
+                    {allClients ? <td className="py-2 pr-3 text-gray-700 dark:text-gray-300">{inv.clientName}</td> : null}
                     <td className="py-2 pr-3 text-gray-700 dark:text-gray-300">{inv.contractTitle}</td>
                     <td className="py-2 pr-3 text-gray-700 dark:text-gray-300">{inv.reference || "—"}</td>
                     <td className="whitespace-nowrap py-2 pr-3">{day(inv.issueDate)}</td>
