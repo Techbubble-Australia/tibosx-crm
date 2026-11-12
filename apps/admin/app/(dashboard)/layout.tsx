@@ -270,6 +270,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
     canAccessProjectManagementTimesheets,
     canAccessWorkspaceTimesheets,
     canAccessClientWorkspace,
+    canAccessClientTickets,
   } = useAdminSession();
   const [impersonateOpen, setImpersonateOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
@@ -316,6 +317,14 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         // Admins reach it under Workspace; clients need "Access to client workspace" on their contact.
         return canAccessClientWorkspace && !hasAdmin;
       }
+      // Clients only linked to timesheet-only projects get no support dashboard or tickets.
+      const clientWithoutTickets =
+        anyEffectiveRole(role, additionalRoles, ["client"]) &&
+        !anyEffectiveRole(role, additionalRoles, ["customer_support"]) &&
+        !canAccessClientTickets;
+      if (clientWithoutTickets && (item.href === "/workspace/dashboard" || item.href === "/workspace/tickets")) {
+        return false;
+      }
       if (item.href.startsWith("/workspace/")) {
         if (hasAdmin) return false;
         if (item.href === "/workspace/timesheets") {
@@ -328,9 +337,15 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
       }
       return anyEffectiveRole(role, additionalRoles, item.roles);
     }
+    const clientWithoutTicketsMenu =
+      anyEffectiveRole(role, additionalRoles, ["client"]) &&
+      !anyEffectiveRole(role, additionalRoles, ["customer_support", "admin"]) &&
+      !canAccessClientTickets;
     return navGroups
       .map((group) => ({
         ...group,
+        // Without support tickets the group only holds the client's projects and timesheets.
+        label: group.id === "workspace" && clientWithoutTicketsMenu ? "Workspace" : group.label,
         items: group.items.filter(itemVisible),
       }))
       .filter((group) => {
@@ -346,6 +361,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         canAccessProjectManagementTimesheets,
         canAccessWorkspaceTimesheets,
         canAccessClientWorkspace,
+        canAccessClientTickets,
         impersonation,
         isDevAppEnv,
       ]);
@@ -356,8 +372,8 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
   /** Admins get Workspace as a group: their home plus the Client workspace preview. */
   const workspaceSubItems: NavItem[] = anyEffectiveRole(role, additionalRoles, ["admin"])
     ? [
-        { href: "/my-workspace", label: "Home", icon: Home, roles: [] },
-        { href: "/workspace/client", label: "Client workspace", icon: Building2, roles: [] },
+        { href: "/my-workspace", label: "Personal", icon: Home, roles: [] },
+        { href: "/workspace/client", label: "Client", icon: Building2, roles: [] },
       ]
     : [];
   const workspaceGroupActive = workspaceSubItems.some((item) => pathUnder(item.href, pathname));
@@ -443,7 +459,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
                   <Link
                     key={item.href}
                     href={item.href}
-                    title={item.label === "Home" ? workspaceNavItem.label : item.label}
+                    title={item.href === "/my-workspace" ? "Personal workspace" : "Client workspace"}
                     className={`flex items-center justify-center rounded-lg p-2.5 transition-colors ${
                       pathUnder(item.href, pathname)
                         ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100"

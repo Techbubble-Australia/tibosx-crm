@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Loader2 } from "lucide-react";
+import { Loader2, Paperclip } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { resolveDocumentHref } from "@/lib/media-url";
 
 type Overview = {
   client: { id: string; name: string };
+  /** "projects": no workspace access ticked, so only linked projects and timesheets (no invoices). */
+  scope: "full" | "projects";
   clients: Array<{ id: string; name: string }>;
   today: string;
   financialYearStart: string;
@@ -24,6 +26,7 @@ type Overview = {
   invoices: Array<{
     id: string;
     invoiceNumber: string;
+    contractTitle: string;
     reference: string;
     issueDate: string;
     dueDate: string;
@@ -32,6 +35,7 @@ type Overview = {
     balance: number;
     status: string;
     overdue: boolean;
+    files: Array<{ name: string; url: string }>;
   }>;
   projects: Array<{
     id: string;
@@ -53,7 +57,6 @@ type Overview = {
     hours: number;
     status: string;
   }>;
-  documents: Array<{ name: string; url: string; invoiceNumber: string }>;
 };
 
 function money(amount: number, currency: string, compact = false) {
@@ -157,6 +160,7 @@ export default function ClientWorkspacePage() {
   if (!data) return null;
 
   const { kpis, currency } = data;
+  const full = data.scope === "full";
   const awaitingTimesheets = data.timesheets.filter((t) => t.status === "SUBMITTED");
   const approvedHours = data.timesheets.filter((t) => t.status === "APPROVED").reduce((h, t) => h + t.hours, 0);
 
@@ -166,15 +170,27 @@ export default function ClientWorkspacePage() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">TechBubble · Client workspace</p>
           <h1 className="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">{data.client.name}</h1>
-          <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
-            You have {plural(kpis.projectsInProgress, "project")} in progress and{" "}
-            <strong>{money(kpis.awaitingPayment.amount, currency)}</strong> awaiting payment, with{" "}
-            {plural(kpis.overdue.count, "invoice")} overdue.
-          </p>
-          <p className="mt-1 text-xs text-gray-500">
-            Snapshot as of {day(data.today)}. Invoices shown are those issued since {day(data.financialYearStart)}; amounts
-            are in {currency} and include GST.
-          </p>
+          {full ? (
+            <>
+              <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+                You have {plural(kpis.projectsInProgress, "project")} in progress and{" "}
+                <strong>{money(kpis.awaitingPayment.amount, currency)}</strong> awaiting payment, with{" "}
+                {plural(kpis.overdue.count, "invoice")} overdue.
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                Snapshot as of {day(data.today)}. Invoices shown are those issued since {day(data.financialYearStart)};
+                amounts are in {currency} and include GST.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+                You have {plural(kpis.projectsInProgress, "project")} in progress and{" "}
+                {plural(kpis.timesheetsAwaiting.count, "timesheet")} awaiting your approval.
+              </p>
+              <p className="mt-1 text-xs text-gray-500">Snapshot as of {day(data.today)}. Showing the projects you're assigned to.</p>
+            </>
+          )}
         </div>
         {data.clients.length > 1 ? (
           <select
@@ -198,6 +214,8 @@ export default function ClientWorkspacePage() {
           hint={`${kpis.timesheetsAwaiting.hours} h to approve`}
           tone={kpis.timesheetsAwaiting.count ? "warn" : "default"}
         />
+        {full ? (
+          <>
         <Card
           label="Awaiting payment"
           value={money(kpis.awaitingPayment.amount, currency)}
@@ -219,8 +237,11 @@ export default function ClientWorkspacePage() {
           value={money(kpis.paidThisYear.amount, currency)}
           hint={`of ${money(kpis.paidThisYear.invoiced, currency)} invoiced`}
         />
+          </>
+        ) : null}
       </div>
 
+      {full ? (
       <Section title="Invoices" subtitle="Invoice status for the last 6 months">
         <div className="flex h-44 items-end gap-3 border-b border-gray-100 pb-1 dark:border-gray-800">
           {data.chart.map((m) => {
@@ -253,26 +274,42 @@ export default function ClientWorkspacePage() {
               <thead>
                 <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
                   <th className="py-2 pr-3">Invoice</th>
+                  <th className="py-2 pr-3">Contract</th>
                   <th className="py-2 pr-3">Reference</th>
                   <th className="py-2 pr-3">Issued</th>
                   <th className="py-2 pr-3">Due</th>
                   <th className="py-2 pr-3 text-right">Amount</th>
-                  <th className="py-2 pr-3 text-right">Balance</th>
-                  <th className="py-2">Status</th>
+                  <th className="py-2 pr-3">Status</th>
+                  <th className="py-2"><span className="sr-only">Invoice copy</span></th>
                 </tr>
               </thead>
               <tbody>
                 {data.invoices.map((inv) => (
                   <tr key={inv.id} className="border-b border-gray-50 dark:border-gray-800">
                     <td className="whitespace-nowrap py-2 pr-3 font-medium">{inv.invoiceNumber}</td>
+                    <td className="py-2 pr-3 text-gray-700 dark:text-gray-300">{inv.contractTitle}</td>
                     <td className="py-2 pr-3 text-gray-700 dark:text-gray-300">{inv.reference || "—"}</td>
                     <td className="whitespace-nowrap py-2 pr-3">{day(inv.issueDate)}</td>
                     <td className="whitespace-nowrap py-2 pr-3">{day(inv.dueDate)}</td>
                     <td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{money(inv.amount, inv.currency)}</td>
-                    <td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">
-                      {inv.balance ? money(inv.balance, inv.currency) : "—"}
+                    <td className="py-2 pr-3"><Pill status={inv.overdue ? "OVERDUE" : inv.status} /></td>
+                    <td className="py-2">
+                      <span className="flex items-center gap-1">
+                        {inv.files.map((file, i) => (
+                          <a
+                            key={`${file.url}-${i}`}
+                            href={resolveDocumentHref(file.url)}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={`Open ${file.name}`}
+                            aria-label={`Open ${file.name} for ${inv.invoiceNumber}`}
+                            className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800"
+                          >
+                            <Paperclip className="h-4 w-4" />
+                          </a>
+                        ))}
+                      </span>
                     </td>
-                    <td className="py-2"><Pill status={inv.overdue ? "OVERDUE" : inv.status} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -282,6 +319,7 @@ export default function ClientWorkspacePage() {
           <p className="mt-4 text-sm text-gray-500">No invoices issued yet this financial year.</p>
         )}
       </Section>
+      ) : null}
 
       <Section title="Projects" subtitle="Your TechBubble engagements, with how far through each one is today">
         {data.projects.length ? (
@@ -365,23 +403,6 @@ export default function ClientWorkspacePage() {
         ) : null}
       </Section>
 
-      <Section title="Documents" subtitle="Invoice copies and other files shared with you">
-        {data.documents.length ? (
-          <ul className="divide-y divide-gray-100 text-sm dark:divide-gray-800">
-            {data.documents.map((doc, i) => (
-              <li key={`${doc.url}-${i}`} className="flex items-center gap-2 py-2">
-                <FileText className="h-4 w-4 text-gray-400" aria-hidden />
-                <a href={resolveDocumentHref(doc.url)} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline dark:text-blue-400">
-                  {doc.name}
-                </a>
-                <span className="text-xs text-gray-500">· {doc.invoiceNumber}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-gray-500">No documents have been shared yet.</p>
-        )}
-      </Section>
     </div>
   );
 }

@@ -6,6 +6,43 @@ import { resolveLinkedTbosClientPortalIdentity } from "../ticketing/lib/client-p
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+export type ClientWorkspaceAccess = {
+  /** Clients with "Access to client workspace" ticked: full view incl. invoices and payments. */
+  fullClientIds: string[];
+  /** Projects the user is linked to as a client contact (portal access or timesheet approver). */
+  linkedProjects: Array<{ id: string; clientId: string }>;
+  /** Linked to at least one project that accepts client support tickets. */
+  ticketAccess: boolean;
+};
+
+export async function clientWorkspaceAccess(tbosUserId: string): Promise<ClientWorkspaceAccess> {
+  const identity = await resolveLinkedTbosClientPortalIdentity(tbosUserId);
+  if (!identity.contactIds.length && !identity.contactEmails.length) {
+    return { fullClientIds: [], linkedProjects: [], ticketAccess: false };
+  }
+  const contactWhere = {
+    OR: [
+      ...(identity.contactIds.length ? [{ id: { in: identity.contactIds } }] : []),
+      ...identity.contactEmails.map((email) => ({ email: { equals: email, mode: "insensitive" as const } })),
+    ],
+  };
+  const [fullClientIds, links] = await Promise.all([
+    clientWorkspaceClientIds(tbosUserId),
+    prisma.projectClientContact.findMany({
+      where: { contact: contactWhere, OR: [{ portalAccess: true }, { canApproveTimesheets: true }] },
+      select: {
+        portalAccess: true,
+        project: { select: { id: true, clientId: true, status: true, kind: true, clientTicketsEnabled: true } },
+      },
+    }),
+  ]);
+  const linkedProjects = [...new Map(links.map((l) => [l.project.id, { id: l.project.id, clientId: l.project.clientId }])).values()];
+  const ticketAccess = links.some(
+    (l) => l.portalAccess && l.project.status === "ACTIVE" && l.project.kind === "SUPPORT" && l.project.clientTicketsEnabled,
+  );
+  return { fullClientIds, linkedProjects, ticketAccess };
+}
+
 /** Clients whose workspace this TBOS client user may open ("Access to client workspace" on their contact). */
 export async function clientWorkspaceClientIds(tbosUserId: string): Promise<string[]> {
   const identity = await resolveLinkedTbosClientPortalIdentity(tbosUserId);
@@ -48,8 +85,16 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-/** Everything shown on the Client workspace page for one client. */
-export async function buildClientWorkspaceOverview(clientId: string, now = new Date()) {
+/**
+ * Everything shown on the Client workspace page for one client. With `projectIds` (no workspace
+ * access ticked) only those projects and their timesheets are shown, without invoices or payments.
+ */
+export async function buildClientWorkspaceOverview(
+  clientId: string,
+  options: { projectIds?: string[] } = {},
+  now = new Date(),
+) {
+  const financials = !options.projectIds;
   const today = startOfUtcDay(now);
   const fyStart = financialYearStart(today);
   const currentMonth = monthKey(today);
@@ -60,7 +105,11 @@ export async function buildClientWorkspaceOverview(clientId: string, now = new D
 
   const [projects, invoices] = await Promise.all([
     prisma.project.findMany({
-      where: { clientId, status: { in: ["ACTIVE", "ON_HOLD", "COMPLETED"] } },
+      where: {
+        clientId,
+        status: { in: ["ACTIVE", "ON_HOLD", "COMPLETED"] },
+        ...(options.projectIds ? { id: { in: options.projectIds } } : {}),
+      },
       select: {
         id: true,
         projectNumber: true,
@@ -74,7 +123,9 @@ export async function buildClientWorkspaceOverview(clientId: string, now = new D
       },
     }),
     prisma.contractInvoice.findMany({
-      where: { contract: { clientId }, status: { not: "CANCELED" }, issueDate: { gte: fyStart } },
+      where: financials
+        ? { contract: { clientId }, status: { not: "CANCELED" }, issueDate: { gte: fyStart } }
+        : { id: { in: [] } },
       orderBy: [{ issueDate: "desc" }, { invoiceNumber: "desc" }],
       select: {
         id: true,
@@ -87,6 +138,7 @@ export async function buildClientWorkspaceOverview(clientId: string, now = new D
         totalAmount: true,
         fileUrl: true,
         fileUrls: true,
+        contract: { select: { title: true } },
       },
     }),
   ]);
@@ -193,6 +245,7 @@ export async function buildClientWorkspaceOverview(clientId: string, now = new D
 
   return {
     client,
+    scope: financials ? ("full" as const) : ("projects" as const),
     today: today.toISOString(),
     financialYearStart: fyStart.toISOString(),
     currency,
@@ -209,6 +262,7 @@ export async function buildClientWorkspaceOverview(clientId: string, now = new D
     invoices: sent.map((inv) => ({
       id: inv.id,
       invoiceNumber: inv.invoiceNumber,
+      contractTitle: inv.contract.title,
       reference: inv.reference,
       issueDate: inv.issueDate.toISOString(),
       dueDate: inv.dueDate.toISOString(),
@@ -217,6 +271,7 @@ export async function buildClientWorkspaceOverview(clientId: string, now = new D
       balance: inv.status === "AWAITING_PAYMENT" ? toNumber(inv.totalAmount) : 0,
       status: inv.status,
       overdue: inv.status === "AWAITING_PAYMENT" && inv.dueDate < today,
+      files: invoiceFiles(inv),
     })),
     projects: projectRows,
     timesheets: [...awaiting, ...approvedRecent],
