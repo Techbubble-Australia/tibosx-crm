@@ -109,7 +109,15 @@ export function Card({ label, value, hint, tone = "default" }: { label: string; 
   );
 }
 
-export function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+export function Section({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
       <h3 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h3>

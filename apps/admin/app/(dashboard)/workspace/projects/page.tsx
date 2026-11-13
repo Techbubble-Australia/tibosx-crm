@@ -5,14 +5,14 @@ import { Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { ProjectsTable, Section, type Overview } from "@/components/client-workspace/shared";
 
-/** Client's projects (same data as the Client workspace), reached from Project Management → Projects. */
+/** Every project the client is linked to (Access or timesheet approver), from Project Management → Projects. */
 export default function ClientProjectsPage() {
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    void adminFetch("/api/admin/client-workspace")
+    void adminFetch("/api/admin/client-workspace?view=projects")
       .then(async (res) => {
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error((body as { error?: string }).error || "Failed to load projects");

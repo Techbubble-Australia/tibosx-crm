@@ -484,6 +484,7 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
     const { clientWorkspaceAccess } = await import("../lib/client-workspace.js");
     const workspaceAccess = await clientWorkspaceAccess(customer.id);
     const clientWorkspace = workspaceAccess.workspaceProjects.length > 0;
+    const clientProjects = workspaceAccess.linkedProjects.length > 0;
     const clientTickets = workspaceAccess.ticketAccess;
     let impersonation: { impersonatorId: string; impersonatorName: string } | null = null;
     if (u.impersonatorId) {
@@ -513,6 +514,7 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
           onboarding: null,
           timesheetAccess,
           clientWorkspace,
+          clientProjects,
           clientTickets,
           agreementRecords: [],
         },
@@ -553,6 +555,7 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
   const { clientWorkspaceAccess } = await import("../lib/client-workspace.js");
   const workspaceAccess = await clientWorkspaceAccess(user.id);
   const clientWorkspace = workspaceAccess.workspaceProjects.length > 0;
+  const clientProjects = workspaceAccess.linkedProjects.length > 0;
   const clientTickets = workspaceAccess.ticketAccess;
 
   let impersonation: { impersonatorId: string; impersonatorName: string } | null = null;
@@ -599,6 +602,7 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
         onboarding,
         timesheetAccess,
         clientWorkspace,
+        clientProjects,
         clientTickets,
         agreementRecords,
       },

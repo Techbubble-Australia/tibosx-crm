@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { SortableTh, toggleSortKey, type SortDir } from "@/components/ui/SortableTh";
 import { Loader2, Paperclip } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { resolveDocumentHref } from "@/lib/media-url";
@@ -16,9 +17,14 @@ import {
   type Overview,
 } from "@/components/client-workspace/shared";
 
+type InvoiceSortKey = "invoiceNumber" | "clientName" | "contractTitle" | "reference" | "issueDate" | "dueDate" | "amount" | "status";
+
+const invoiceStatusLabel = (inv: Overview["invoices"][number]) => (inv.overdue ? "OVERDUE" : inv.status);
+
 export default function ClientWorkspacePage() {
   const [clientId, setClientId] = useState("");
   const [currencyChoice, setCurrencyChoice] = useState("");
+  const [invoiceSort, setInvoiceSort] = useState<{ key: InvoiceSortKey; dir: SortDir }>({ key: "issueDate", dir: "desc" });
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -39,6 +45,22 @@ export default function ClientWorkspacePage() {
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load the client workspace"))
       .finally(() => setLoading(false));
   }, [clientId, currencyChoice]);
+
+  const sortedInvoices = useMemo(() => {
+    const rows = [...(data?.invoices ?? [])];
+    const { key, dir } = invoiceSort;
+    rows.sort((a, b) => {
+      let cmp: number;
+      if (key === "amount") cmp = a.amount - b.amount;
+      else if (key === "status") cmp = invoiceStatusLabel(a).localeCompare(invoiceStatusLabel(b));
+      else cmp = String(a[key] ?? "").localeCompare(String(b[key] ?? ""), undefined, { numeric: true, sensitivity: "base" });
+      if (cmp === 0) cmp = a.invoiceNumber.localeCompare(b.invoiceNumber, undefined, { numeric: true });
+      return dir === "asc" ? cmp : -cmp;
+    });
+    return rows;
+  }, [data, invoiceSort]);
+
+  const sortInvoices = (key: InvoiceSortKey) => setInvoiceSort((s) => toggleSortKey(key, s.key, s.dir));
 
   const chartMax = useMemo(
     () => Math.max(1, ...(data?.chart ?? []).map((m) => m.paid + m.awaiting + m.draft)),
@@ -172,19 +194,21 @@ export default function ClientWorkspacePage() {
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
-                  <th className="py-2 pr-3">Invoice</th>
-                  {allClients ? <th className="py-2 pr-3">Client</th> : null}
-                  <th className="py-2 pr-3">Contract</th>
-                  <th className="py-2 pr-3">Reference</th>
-                  <th className="py-2 pr-3">Issued</th>
-                  <th className="py-2 pr-3">Due</th>
-                  <th className="py-2 pr-3 text-right">Amount</th>
-                  <th className="py-2 pr-3">Status</th>
+                  <SortableTh label="Invoice" sortKey="invoiceNumber" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="py-2 pr-3" />
+                  {allClients ? (
+                    <SortableTh label="Client" sortKey="clientName" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="py-2 pr-3" />
+                  ) : null}
+                  <SortableTh label="Contract" sortKey="contractTitle" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="py-2 pr-3" />
+                  <SortableTh label="Reference" sortKey="reference" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="py-2 pr-3" />
+                  <SortableTh label="Issued" sortKey="issueDate" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="py-2 pr-3" />
+                  <SortableTh label="Due" sortKey="dueDate" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="py-2 pr-3" />
+                  <SortableTh label="Amount" sortKey="amount" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="py-2 pr-3 text-right" />
+                  <SortableTh label="Status" sortKey="status" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="py-2 pr-3" />
                   <th className="py-2"><span className="sr-only">Invoice copy</span></th>
                 </tr>
               </thead>
               <tbody>
-                {data.invoices.map((inv) => (
+                {sortedInvoices.map((inv) => (
                   <tr key={inv.id} className="border-b border-gray-50 dark:border-gray-800">
                     <td className="whitespace-nowrap py-2 pr-3 font-medium">{inv.invoiceNumber}</td>
                     {allClients ? <td className="py-2 pr-3 text-gray-700 dark:text-gray-300">{inv.clientName}</td> : null}
@@ -193,7 +217,7 @@ export default function ClientWorkspacePage() {
                     <td className="whitespace-nowrap py-2 pr-3">{day(inv.issueDate)}</td>
                     <td className="whitespace-nowrap py-2 pr-3">{day(inv.dueDate)}</td>
                     <td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{money(inv.amount, inv.currency)}</td>
-                    <td className="py-2 pr-3"><Pill status={inv.overdue ? "OVERDUE" : inv.status} /></td>
+                    <td className="py-2 pr-3"><Pill status={invoiceStatusLabel(inv)} /></td>
                     <td className="py-2">
                       <span className="flex items-center gap-1">
                         {inv.files.map((file, i) => (
@@ -227,7 +251,14 @@ export default function ClientWorkspacePage() {
 
       <Section
         title="Timesheets"
-        subtitle={`Monthly timesheets for your engagements: awaiting your approval, plus approved ones for this month and last month. Approved ${approvedHours} h · Awaiting approval ${kpis.timesheetsAwaiting.hours} h.`}
+        subtitle={
+          <>
+            Monthly timesheets for your engagements: awaiting your approval, plus approved ones for this month and last month.
+            <span className="mt-1 block">
+              Approved {approvedHours} h · Awaiting approval {kpis.timesheetsAwaiting.hours} h
+            </span>
+          </>
+        }
       >
         {data.timesheets.length ? (
           <div className="overflow-x-auto">

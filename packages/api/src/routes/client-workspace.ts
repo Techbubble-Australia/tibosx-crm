@@ -14,7 +14,8 @@ type AllowedClient = { id: string; name: string; projectIds?: string[] };
  * Admins: every client with invoices (all projects). Client users: every client they are linked to,
  * with projects and timesheets limited to their own projects (invoices and payments cover the client).
  */
-async function allowedClients(req: AuthRequest): Promise<{ admin: boolean; clients: AllowedClient[] }> {
+/** `allLinked`: every project the client is linked to (Projects page), not only Client workspace ones. */
+async function allowedClients(req: AuthRequest, allLinked = false): Promise<{ admin: boolean; clients: AllowedClient[] }> {
   const userId = req.user?.id;
   if (!userId) return { admin: false, clients: [] };
   const roles = await effectiveRolesForUser(userId, req.user?.role ?? "");
@@ -28,7 +29,8 @@ async function allowedClients(req: AuthRequest): Promise<{ admin: boolean; clien
     return { admin: true, clients };
   }
   const access = await clientWorkspaceAccess(userId);
-  const clientIds = [...new Set(access.workspaceProjects.map((p) => p.clientId))];
+  const projects = allLinked ? access.linkedProjects : access.workspaceProjects;
+  const clientIds = [...new Set(projects.map((p) => p.clientId))];
   if (!clientIds.length) return { admin: false, clients: [] };
   const clients = await prisma.client.findMany({
     where: { id: { in: clientIds } },
@@ -39,14 +41,14 @@ async function allowedClients(req: AuthRequest): Promise<{ admin: boolean; clien
     admin: false,
     clients: clients.map((c) => ({
       ...c,
-      projectIds: access.workspaceProjects.filter((p) => p.clientId === c.id).map((p) => p.id),
+      projectIds: projects.filter((p) => p.clientId === c.id).map((p) => p.id),
     })),
   };
 }
 
 router.get("/", async (req: AuthRequest, res) => {
   try {
-    const { admin, clients } = await allowedClients(req);
+    const { admin, clients } = await allowedClients(req, req.query.view === "projects");
     if (!clients.length) {
       return res.status(403).json({ error: "Your account doesn't have access to the client workspace." });
     }

@@ -271,6 +271,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
     canAccessProjectManagementTimesheets,
     canAccessWorkspaceTimesheets,
     canAccessClientWorkspace,
+    canAccessClientProjects,
     canAccessClientTickets,
   } = useAdminSession();
   const [impersonateOpen, setImpersonateOpen] = useState(false);
@@ -313,7 +314,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         return false;
       }
       if (item.href === "/workspace/projects") {
-        return canAccessClientWorkspace && !hasAdmin;
+        return canAccessClientProjects && !hasAdmin;
       }
       // Clients only linked to timesheet-only projects get no support dashboard or tickets.
       const clientWithoutTickets =
@@ -353,6 +354,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         canAccessProjectManagementTimesheets,
         canAccessWorkspaceTimesheets,
         canAccessClientWorkspace,
+        canAccessClientProjects,
         canAccessClientTickets,
         impersonation,
         isDevAppEnv,

@@ -7,6 +7,8 @@ import { resolveLinkedTbosClientPortalIdentity } from "../ticketing/lib/client-p
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type ClientWorkspaceAccess = {
+  /** Every project the user is linked to as a client contact (Access or timesheet approver). */
+  linkedProjects: Array<{ id: string; clientId: string }>;
   /** Projects where the user's contact link has "Client workspace" ticked. */
   workspaceProjects: Array<{ id: string; clientId: string }>;
   /** Linked to at least one project that accepts client support tickets. */
@@ -16,7 +18,7 @@ export type ClientWorkspaceAccess = {
 export async function clientWorkspaceAccess(tbosUserId: string): Promise<ClientWorkspaceAccess> {
   const identity = await resolveLinkedTbosClientPortalIdentity(tbosUserId);
   if (!identity.contactIds.length && !identity.contactEmails.length) {
-    return { workspaceProjects: [], ticketAccess: false };
+    return { linkedProjects: [], workspaceProjects: [], ticketAccess: false };
   }
   const contactWhere = {
     OR: [
@@ -32,17 +34,15 @@ export async function clientWorkspaceAccess(tbosUserId: string): Promise<ClientW
       project: { select: { id: true, clientId: true, status: true, kind: true, clientTicketsEnabled: true } },
     },
   });
-  const workspaceProjects = [
-    ...new Map(
-      links
-        .filter((l) => l.clientWorkspaceAccess)
-        .map((l) => [l.project.id, { id: l.project.id, clientId: l.project.clientId }]),
-    ).values(),
+  const uniqueProjects = (rows: typeof links) => [
+    ...new Map(rows.map((l) => [l.project.id, { id: l.project.id, clientId: l.project.clientId }])).values(),
   ];
+  const linkedProjects = uniqueProjects(links);
+  const workspaceProjects = uniqueProjects(links.filter((l) => l.clientWorkspaceAccess));
   const ticketAccess = links.some(
     (l) => l.portalAccess && l.project.status === "ACTIVE" && l.project.kind === "SUPPORT" && l.project.clientTicketsEnabled,
   );
-  return { workspaceProjects, ticketAccess };
+  return { linkedProjects, workspaceProjects, ticketAccess };
 }
 
 function startOfUtcDay(date: Date): Date {
