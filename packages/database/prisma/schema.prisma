@@ -562,8 +562,8 @@ model ClientContact {
   phoneCountryCode String
   phoneNumber      String
   order            Int           @default(0)
-  /// "Access to client workspace": this contact's portal account can open the client workspace overview.
-  clientWorkspaceAccess Boolean  @default(false)
+  /// "Client workspace": this contact can see the client's invoices and payments (on unless an admin unticks it).
+  clientWorkspaceAccess Boolean  @default(true)
   opportunities    Opportunity[]
   projectLinks     ProjectClientContact[]
   mappedAdminUser     AdminUser?     @relation("AdminUserMappedContact")

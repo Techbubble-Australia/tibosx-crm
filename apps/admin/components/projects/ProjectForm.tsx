@@ -194,10 +194,12 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
       contactId: string;
       portalAccess: boolean;
       canApproveTimesheets: boolean;
+      clientWorkspaceAccess?: boolean;
     }>) ?? []).map((c) => ({
       contactId: c.contactId,
       portalAccess: c.portalAccess,
       canApproveTimesheets: c.canApproveTimesheets,
+      clientWorkspaceAccess: c.clientWorkspaceAccess ?? true,
     })),
   );
   const [contractId, setContractId] = useState(defaults.contractId ?? "");

@@ -8,7 +8,7 @@ const router: IRouter = Router();
 
 const ALL_CLIENTS = "all";
 
-type AllowedClient = { id: string; name: string; projectIds?: string[] };
+type AllowedClient = { id: string; name: string; projectIds?: string[]; financials?: boolean };
 
 /**
  * Admins: every client with invoices (all projects). Client users: every client they are linked to,
@@ -40,6 +40,7 @@ async function allowedClients(req: AuthRequest): Promise<{ admin: boolean; clien
     clients: clients.map((c) => ({
       ...c,
       projectIds: access.linkedProjects.filter((p) => p.clientId === c.id).map((p) => p.id),
+      financials: access.paymentClientIds.includes(c.id),
     })),
   };
 }
@@ -59,6 +60,7 @@ router.get("/", async (req: AuthRequest, res) => {
       : (clients.find((c) => c.id === requested) ?? clients[0]!);
     const overview = await buildClientWorkspaceOverview(showAll ? clients.map((c) => c.id) : [client.id], {
       projectIds: "projectIds" in client ? client.projectIds : undefined,
+      financials: "financials" in client ? client.financials : true,
       currency,
     });
     res.json({
