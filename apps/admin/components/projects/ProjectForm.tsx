@@ -197,7 +197,8 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
       clientWorkspaceAccess?: boolean;
     }>) ?? []).map((c) => ({
       contactId: c.contactId,
-      portalAccess: c.portalAccess,
+      // A listed contact is shown with Access ticked; older timesheet-only links stored it as false.
+      portalAccess: true,
       canApproveTimesheets: c.canApproveTimesheets,
       clientWorkspaceAccess: c.clientWorkspaceAccess ?? true,
     })),

@@ -97,8 +97,6 @@ export function ProjectCustomerSupportSettings({
     }
     onEnabledChange(true);
     onModeChange(next);
-    // Older timesheet-only setups stored approvers without Access; give them Access back.
-    if (rows.some((r) => !r.portalAccess)) onRowsChange(rows.map((r) => ({ ...r, portalAccess: true })));
   }
 
   function patchRow(contactId: string, patch: Partial<SupportClientContactRow>) {
