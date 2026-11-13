@@ -3,8 +3,6 @@
 export type Overview = {
   /** `id` is "all" when an admin views every client together. */
   client: { id: string; name: string };
-  /** "projects": "Client workspace" unticked for this contact, so no invoices or payments. */
-  scope: "full" | "projects";
   clients: Array<{ id: string; name: string }>;
   allClientsOption?: boolean;
   today: string;

@@ -8,7 +8,7 @@ const router: IRouter = Router();
 
 const ALL_CLIENTS = "all";
 
-type AllowedClient = { id: string; name: string; projectIds?: string[]; financials?: boolean };
+type AllowedClient = { id: string; name: string; projectIds?: string[] };
 
 /**
  * Admins: every client with invoices (all projects). Client users: every client they are linked to,
@@ -28,7 +28,7 @@ async function allowedClients(req: AuthRequest): Promise<{ admin: boolean; clien
     return { admin: true, clients };
   }
   const access = await clientWorkspaceAccess(userId);
-  const clientIds = [...new Set(access.linkedProjects.map((p) => p.clientId))];
+  const clientIds = [...new Set(access.workspaceProjects.map((p) => p.clientId))];
   if (!clientIds.length) return { admin: false, clients: [] };
   const clients = await prisma.client.findMany({
     where: { id: { in: clientIds } },
@@ -39,8 +39,7 @@ async function allowedClients(req: AuthRequest): Promise<{ admin: boolean; clien
     admin: false,
     clients: clients.map((c) => ({
       ...c,
-      projectIds: access.linkedProjects.filter((p) => p.clientId === c.id).map((p) => p.id),
-      financials: access.paymentClientIds.includes(c.id),
+      projectIds: access.workspaceProjects.filter((p) => p.clientId === c.id).map((p) => p.id),
     })),
   };
 }
@@ -60,7 +59,6 @@ router.get("/", async (req: AuthRequest, res) => {
       : (clients.find((c) => c.id === requested) ?? clients[0]!);
     const overview = await buildClientWorkspaceOverview(showAll ? clients.map((c) => c.id) : [client.id], {
       projectIds: "projectIds" in client ? client.projectIds : undefined,
-      financials: "financials" in client ? client.financials : true,
       currency,
     });
     res.json({

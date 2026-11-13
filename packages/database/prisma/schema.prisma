@@ -562,8 +562,6 @@ model ClientContact {
   phoneCountryCode String
   phoneNumber      String
   order            Int           @default(0)
-  /// "Client workspace": this contact can see the client's invoices and payments (on unless an admin unticks it).
-  clientWorkspaceAccess Boolean  @default(true)
   opportunities    Opportunity[]
   projectLinks     ProjectClientContact[]
   mappedAdminUser     AdminUser?     @relation("AdminUserMappedContact")
@@ -812,6 +810,8 @@ model ProjectClientContact {
   contact              ClientContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
   portalAccess         Boolean       @default(true)
   canApproveTimesheets Boolean       @default(false)
+  /// "Client workspace": the contact sees this project, its timesheets and invoices in the Client workspace.
+  clientWorkspaceAccess Boolean      @default(true)
   /// One portal login can be the client contact on several projects.
   ticketingUserId      String?
   ticketingUser        TicketingUser? @relation("ProjectClientPortalUser", fields: [ticketingUserId], references: [id], onDelete: SetNull)

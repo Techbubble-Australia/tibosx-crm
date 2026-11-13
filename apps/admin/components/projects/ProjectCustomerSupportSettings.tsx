@@ -9,7 +9,7 @@ export type SupportClientContactRow = {
   contactId: string;
   portalAccess: boolean;
   canApproveTimesheets: boolean;
-  /** Contact can see invoices and payments in the Client workspace (applies across this client; on by default). */
+  /** Contact sees this project, its timesheets and invoices in the Client workspace (on by default). */
   clientWorkspaceAccess?: boolean;
 };
 
@@ -18,7 +18,6 @@ type AvailableContact = {
   name: string;
   email: string;
   position: string | null;
-  clientWorkspaceAccess?: boolean;
   userRecord: { id: string; email: string } | null;
 };
 
@@ -75,16 +74,7 @@ export function ProjectCustomerSupportSettings({
       onRowsChange(rows.filter((r) => r.contactId !== contactId));
       return;
     }
-    const contact = available.find((c) => c.id === contactId);
-    onRowsChange([
-      ...rows,
-      {
-        contactId,
-        portalAccess: true,
-        canApproveTimesheets: false,
-        clientWorkspaceAccess: contact?.clientWorkspaceAccess ?? true,
-      },
-    ]);
+    onRowsChange([...rows, { contactId, portalAccess: true, canApproveTimesheets: false, clientWorkspaceAccess: true }]);
   }
 
   const timesheetsOnly = mode === "TIMESHEETS_ONLY";
@@ -190,8 +180,8 @@ export function ProjectCustomerSupportSettings({
           <div>
           <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200">Client access</h4>
           <p className="mb-2 text-xs text-gray-500">
-            Client workspace lets the contact see this client&apos;s invoices and payments when they sign in. It is ticked
-            by default; untick it to keep payment details private.
+            Client workspace shows this project, its timesheets and its invoices to the contact when they sign in. It is
+            ticked by default; untick it to keep this project out of their Client workspace.
           </p>
           {!clientId ? (
             <p className="text-sm text-gray-500">Select a client to configure client access.</p>

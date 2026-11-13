@@ -21,7 +21,7 @@ export async function syncProjectClientContacts(
     contactId: string;
     portalAccess: boolean;
     canApproveTimesheets: boolean;
-    /** Contact-level "Client workspace" (invoices and payments); left unchanged when omitted. */
+    /** "Client workspace" for this project; left unchanged when omitted (new links default to on). */
     clientWorkspaceAccess?: boolean;
   }>,
 ) {
@@ -55,18 +55,14 @@ export async function syncProjectClientContacts(
           contactId: row.contactId,
           portalAccess: row.portalAccess,
           canApproveTimesheets: row.canApproveTimesheets,
+          clientWorkspaceAccess: row.clientWorkspaceAccess ?? true,
         },
         update: {
           portalAccess: row.portalAccess,
           canApproveTimesheets: row.canApproveTimesheets,
+          ...(row.clientWorkspaceAccess !== undefined ? { clientWorkspaceAccess: row.clientWorkspaceAccess } : {}),
         },
       });
-      if (row.clientWorkspaceAccess !== undefined) {
-        await tx.clientContact.update({
-          where: { id: row.contactId },
-          data: { clientWorkspaceAccess: row.clientWorkspaceAccess },
-        });
-      }
     }
   });
 

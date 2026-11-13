@@ -7,18 +7,16 @@ import { resolveLinkedTbosClientPortalIdentity } from "../ticketing/lib/client-p
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type ClientWorkspaceAccess = {
-  /** Projects the user is linked to as a client contact (portal access or timesheet approver). */
-  linkedProjects: Array<{ id: string; clientId: string }>;
+  /** Projects where the user's contact link has "Client workspace" ticked. */
+  workspaceProjects: Array<{ id: string; clientId: string }>;
   /** Linked to at least one project that accepts client support tickets. */
   ticketAccess: boolean;
-  /** Clients whose invoices and payments the user may see ("Client workspace" ticked on their contact). */
-  paymentClientIds: string[];
 };
 
 export async function clientWorkspaceAccess(tbosUserId: string): Promise<ClientWorkspaceAccess> {
   const identity = await resolveLinkedTbosClientPortalIdentity(tbosUserId);
   if (!identity.contactIds.length && !identity.contactEmails.length) {
-    return { linkedProjects: [], ticketAccess: false, paymentClientIds: [] };
+    return { workspaceProjects: [], ticketAccess: false };
   }
   const contactWhere = {
     OR: [
@@ -26,24 +24,25 @@ export async function clientWorkspaceAccess(tbosUserId: string): Promise<ClientW
       ...identity.contactEmails.map((email) => ({ email: { equals: email, mode: "insensitive" as const } })),
     ],
   };
-  const [links, paymentContacts] = await Promise.all([
-    prisma.projectClientContact.findMany({
-      where: { contact: contactWhere, OR: [{ portalAccess: true }, { canApproveTimesheets: true }] },
-      select: {
-        portalAccess: true,
-        project: { select: { id: true, clientId: true, status: true, kind: true, clientTicketsEnabled: true } },
-      },
-    }),
-    prisma.clientContact.findMany({
-      where: { ...contactWhere, clientWorkspaceAccess: true },
-      select: { clientId: true },
-    }),
-  ]);
-  const linkedProjects = [...new Map(links.map((l) => [l.project.id, { id: l.project.id, clientId: l.project.clientId }])).values()];
+  const links = await prisma.projectClientContact.findMany({
+    where: { contact: contactWhere, OR: [{ portalAccess: true }, { canApproveTimesheets: true }] },
+    select: {
+      portalAccess: true,
+      clientWorkspaceAccess: true,
+      project: { select: { id: true, clientId: true, status: true, kind: true, clientTicketsEnabled: true } },
+    },
+  });
+  const workspaceProjects = [
+    ...new Map(
+      links
+        .filter((l) => l.clientWorkspaceAccess)
+        .map((l) => [l.project.id, { id: l.project.id, clientId: l.project.clientId }]),
+    ).values(),
+  ];
   const ticketAccess = links.some(
     (l) => l.portalAccess && l.project.status === "ACTIVE" && l.project.kind === "SUPPORT" && l.project.clientTicketsEnabled,
   );
-  return { linkedProjects, ticketAccess, paymentClientIds: [...new Set(paymentContacts.map((c) => c.clientId))] };
+  return { workspaceProjects, ticketAccess };
 }
 
 function startOfUtcDay(date: Date): Date {
@@ -72,16 +71,15 @@ function round2(value: number): number {
 }
 
 /**
- * Everything shown on the Client workspace page for one or more clients. Invoices and payments cover the
- * whole client unless `financials` is false; with `projectIds` the projects and timesheets are limited to
- * those projects. Totals use `currency` when the invoices include it, otherwise the most common one.
+ * Everything shown on the Client workspace page for one or more clients. With `projectIds` the projects,
+ * timesheets and invoices (via the projects' contracts) are limited to those projects. Totals use
+ * `currency` when the invoices include it, otherwise the most common one.
  */
 export async function buildClientWorkspaceOverview(
   clientIds: string[],
-  options: { projectIds?: string[]; currency?: string; financials?: boolean } = {},
+  options: { projectIds?: string[]; currency?: string } = {},
   now = new Date(),
 ) {
-  const financials = options.financials ?? true;
   const today = startOfUtcDay(now);
   const fyStart = financialYearStart(today);
   const currentMonth = monthKey(today);
@@ -107,9 +105,14 @@ export async function buildClientWorkspaceOverview(
       },
     }),
     prisma.contractInvoice.findMany({
-      where: financials
-        ? { contract: { clientId: { in: clientIds } }, status: { not: "CANCELED" }, issueDate: { gte: fyStart } }
-        : { id: { in: [] } },
+      where: {
+        contract: {
+          clientId: { in: clientIds },
+          ...(options.projectIds ? { projects: { some: { id: { in: options.projectIds } } } } : {}),
+        },
+        status: { not: "CANCELED" },
+        issueDate: { gte: fyStart },
+      },
       orderBy: [{ issueDate: "desc" }, { invoiceNumber: "desc" }],
       select: {
         id: true,
@@ -230,7 +233,6 @@ export async function buildClientWorkspaceOverview(
   );
 
   return {
-    scope: financials ? ("full" as const) : ("projects" as const),
     today: today.toISOString(),
     financialYearStart: fyStart.toISOString(),
     currency,

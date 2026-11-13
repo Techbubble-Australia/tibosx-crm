@@ -12,8 +12,6 @@ export type ClientContactInput = {
   phoneCountryCode: string;
   phoneNumber: string;
   adminUserId?: string | null;
-  /** Contact can see this client's invoices and payments in the Client workspace (on by default). */
-  clientWorkspaceAccess?: boolean;
 };
 
 type ClientContactsFieldProps = {
@@ -179,21 +177,6 @@ export function ClientContactsField({
                     />
                   </div>
                 </div>
-                <label className="flex items-start gap-2 text-sm text-gray-800 dark:text-gray-200">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5"
-                    checked={contact.clientWorkspaceAccess ?? true}
-                    onChange={(e) => updateContact(index, { clientWorkspaceAccess: e.target.checked })}
-                  />
-                  <span>
-                    <span className="font-medium">Client workspace access</span>
-                    <span className="block text-xs text-gray-500 dark:text-gray-400">
-                      Lets this contact see this client&apos;s invoices and payments in the Client workspace. Untick to keep
-                      payment details private; they still see their own projects and timesheets.
-                    </span>
-                  </span>
-                </label>
               </div>
             </li>
           ))}
