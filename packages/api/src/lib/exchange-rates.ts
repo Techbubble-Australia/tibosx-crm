@@ -15,13 +15,14 @@ export const PROJECT_COST_CURRENCIES = [
   "CAD",
 ] as const;
 
-/** 1 AUD = X target (fallback when API unavailable). */
+/** 1 AUD = X target (fallback when live APIs are unavailable). */
 const FALLBACK_RATES_FROM_AUD: Record<string, number> = {
   AUD: 1,
   USD: 0.65,
   GBP: 0.5,
   EUR: 0.6,
-  INR: 54,
+  /** Approximate market rate; live APIs override this when available. */
+  INR: 63,
   PHP: 38,
   AED: 2.4,
   NZD: 1.1,
@@ -29,8 +30,11 @@ const FALLBACK_RATES_FROM_AUD: Record<string, number> = {
   CAD: 0.9,
 };
 
-/** Frankfurter (ECB) set — INR/PHP/AED are filled from the fallback table when missing. */
+/** Frankfurter (ECB) set — does not include INR/PHP/AED. */
 const FRANKFURTER_TARGETS = ["USD", "GBP", "EUR", "NZD", "SGD", "CAD"] as const;
+
+/** Currencies fetched from open.er-api.com because Frankfurter/ECB does not publish them. */
+const OPEN_ER_TARGETS = ["INR", "PHP", "AED"] as const;
 
 type RateCache = {
   base: string;
@@ -77,10 +81,29 @@ export async function getExchangeRatesFromBase(base: string): Promise<Record<str
           .join(",");
 
   try {
-    const res = await fetch(`https://api.frankfurter.app/latest?from=${normalized}&to=${targets}`);
-    if (!res.ok) throw new Error("Rate fetch failed");
-    const data = (await res.json()) as { rates?: Record<string, number> };
-    const rates: Record<string, number> = { ...fallback, [normalized]: 1, ...(data.rates ?? {}) };
+    const [frankfurterRes, openErRes] = await Promise.all([
+      fetch(`https://api.frankfurter.app/latest?from=${normalized}&to=${targets}`),
+      // open.er-api.com covers INR/PHP/AED which ECB/Frankfurter omit.
+      fetch(`https://open.er-api.com/v6/latest/${normalized}`),
+    ]);
+
+    const rates: Record<string, number> = { ...fallback, [normalized]: 1 };
+
+    if (frankfurterRes.ok) {
+      const data = (await frankfurterRes.json()) as { rates?: Record<string, number> };
+      Object.assign(rates, data.rates ?? {});
+    }
+
+    if (openErRes.ok) {
+      const data = (await openErRes.json()) as { result?: string; rates?: Record<string, number> };
+      if (data.result === "success" && data.rates) {
+        for (const code of OPEN_ER_TARGETS) {
+          const value = data.rates[code];
+          if (typeof value === "number" && value > 0) rates[code] = value;
+        }
+      }
+    }
+
     cache = { base: normalized, rates, fetchedAt: Date.now() };
     return rates;
   } catch {
