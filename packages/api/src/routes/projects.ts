@@ -1299,6 +1299,23 @@ async function canRemoveProjectMember(req: AuthRequest, projectId: string): Prom
   return project?.projectManagerId === actorId;
 }
 
+const runEstimatesBodySchema = z
+  .object({
+    reset: z.boolean().optional(),
+    estimates: z
+      .array(
+        z.object({
+          year: z.number().int(),
+          month: z.number().int().min(0).max(11),
+          qty: z.number(),
+          estimatedCost: z.number(),
+          costType: z.string().optional(),
+        }),
+      )
+      .optional(),
+  })
+  .optional();
+
 router.post("/:id/run-estimates", async (req: AuthRequest, res) => {
   try {
     const projectId = req.params.id;
@@ -1307,11 +1324,16 @@ router.post("/:id/run-estimates", async (req: AuthRequest, res) => {
     if (!canManageProjects(role) && !isProjectManagerRole(role)) {
       return res.status(403).json({ error: "Forbidden" });
     }
-    const count = await runProjectEstimates(projectId);
+    const body = runEstimatesBodySchema.parse(req.body ?? {});
+    const reset = body?.reset === true;
+    const count = await runProjectEstimates(projectId, {
+      preserveExisting: !reset,
+      draftEstimates: reset ? undefined : body?.estimates,
+    });
     await prisma.projectActivityLog.create({
       data: {
         projectId,
-        action: "ESTIMATES_RUN",
+        action: reset ? "ESTIMATES_RESET" : "ESTIMATES_RUN",
         newValue: `${count} personnel estimate row(s)`,
         performedById: getActorId(req) || null,
       },

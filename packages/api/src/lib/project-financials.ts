@@ -117,11 +117,25 @@ async function projectMonthDays(project: {
   });
 }
 
+type EstimateDraftRow = {
+  year: number;
+  month: number;
+  qty: number;
+  estimatedCost: number;
+  costType?: string;
+};
+
 /**
  * Replaces personnel estimates with contract/project days × each member's daily-equivalent rate.
  * Member rates in other currencies are converted to AUD first, so the dashboard totals stay comparable.
+ * When `preserveExisting` is true, months that already have a personnel estimate keep their Qty and cost
+ * (including unsaved drafts from the UI); only missing months are filled in.
  */
-export async function runProjectEstimates(projectId: string) {
+export async function runProjectEstimates(
+  projectId: string,
+  options?: { preserveExisting?: boolean; draftEstimates?: EstimateDraftRow[] },
+) {
+  const preserveExisting = options?.preserveExisting === true;
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: {
@@ -131,6 +145,10 @@ export async function runProjectEstimates(projectId: string) {
       contractId: true,
       contractVariationId: true,
       members: { select: { rate: true, rateFrequency: true, rateCurrency: true } },
+      estimates: {
+        where: { costType: "personnel" },
+        select: { year: true, month: true, qty: true, estimatedCost: true },
+      },
     },
   });
   if (!project) throw new Error("NOT_FOUND");
@@ -145,9 +163,42 @@ export async function runProjectEstimates(projectId: string) {
     rateCurrency: PROJECT_COST_CURRENCY,
   }));
 
+  const preservedByKey = new Map<string, { qty: number; estimatedCost: number }>();
+  if (preserveExisting) {
+    // Prefer the UI's current personnel rows when provided (includes unsaved Qty edits).
+    const draftRows = options?.draftEstimates;
+    if (draftRows) {
+      for (const row of draftRows) {
+        if (row.costType && row.costType !== "personnel") continue;
+        preservedByKey.set(`${row.year}-${row.month}`, {
+          qty: row.qty,
+          estimatedCost: row.estimatedCost,
+        });
+      }
+    } else {
+      for (const row of project.estimates) {
+        preservedByKey.set(`${row.year}-${row.month}`, {
+          qty: toNumber(row.qty),
+          estimatedCost: toNumber(row.estimatedCost),
+        });
+      }
+    }
+  }
+
   const months = await projectMonthDays(project);
   const rows: Array<{ year: number; month: number; qty: number; currency: string; estimatedCost: number }> = [];
   for (const { year, month, days, shared } of months) {
+    const preserved = preservedByKey.get(`${year}-${month}`);
+    if (preserved) {
+      rows.push({
+        year,
+        month,
+        qty: round2(preserved.qty),
+        currency: PROJECT_COST_CURRENCY,
+        estimatedCost: round2(preserved.estimatedCost),
+      });
+      continue;
+    }
     // Contract days are split evenly across members; otherwise every member works every day.
     const memberDays = shared ? days / membersAud.length : days;
     let qty = 0;

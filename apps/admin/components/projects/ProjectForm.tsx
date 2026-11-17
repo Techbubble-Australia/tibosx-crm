@@ -213,6 +213,8 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
   const [budgetCurrency, setBudgetCurrency] = useState(defaults.budgetCurrency ?? "AUD");
   const [runningEstimates, setRunningEstimates] = useState(false);
   const [savingMemberId, setSavingMemberId] = useState<string | null>(null);
+  /** Keeps Qty editable as free text so clearing does not force a leading 0. */
+  const [estimateQtyDrafts, setEstimateQtyDrafts] = useState<Record<number, string>>({});
 
   const savedRatesRef = useRef<Record<string, number | null>>({});
 
@@ -269,12 +271,17 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
   }
 
   function updateEstimateQty(index: number, raw: string) {
+    setEstimateQtyDrafts((prev) => ({ ...prev, [index]: raw }));
+    if (raw.trim() === "") {
+      setEstimates((prev) => prev.map((row, i) => (i === index ? { ...row, qty: 0, estimatedCost: 0 } : row)));
+      return;
+    }
+    if (!/^\d*\.?\d*$/.test(raw)) return;
+    const qty = Number(raw);
+    if (!Number.isFinite(qty) || qty < 0) return;
     setEstimates((prev) =>
       prev.map((row, i) => {
         if (i !== index) return row;
-        if (raw.trim() === "") return { ...row, qty: 0, estimatedCost: 0 };
-        const qty = Number(raw);
-        if (!Number.isFinite(qty) || qty < 0) return row;
         const prevQty = row.qty;
         let estimatedCost = row.estimatedCost;
         if (prevQty > 0) {
@@ -285,6 +292,15 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
         return { ...row, qty, estimatedCost };
       }),
     );
+  }
+
+  function commitEstimateQty(index: number) {
+    setEstimateQtyDrafts((prev) => {
+      if (prev[index] === undefined) return prev;
+      const next = { ...prev };
+      delete next[index];
+      return next;
+    });
   }
 
   function estimateMonthInputValue(row: ProjectEstimateRow) {
@@ -319,28 +335,62 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
 
   function removeEstimateRow(index: number) {
     setEstimates((prev) => prev.filter((_, i) => i !== index));
+    setEstimateQtyDrafts((prev) => {
+      const next: Record<number, string> = {};
+      for (const [key, value] of Object.entries(prev)) {
+        const i = Number(key);
+        if (i < index) next[i] = value;
+        else if (i > index) next[i - 1] = value;
+      }
+      return next;
+    });
   }
 
   function updateActual(index: number, patch: Partial<ProjectActualRow>) {
     setActuals((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
-  async function runEstimates() {
+  async function runEstimates(options?: { reset?: boolean }) {
     if (!defaults.id) return;
+    const reset = options?.reset === true;
     const ok = await appConfirm(
-      "Recalculate personnel estimates from the contract's monthly days × member rates? Rates in other currencies are converted to AUD first. Existing personnel estimate rows will be replaced.",
-      { title: "Run estimates", confirmLabel: "Run estimates" },
+      reset
+        ? "Replace all personnel estimate rows with the calculated days from the project dates (or contract months) × member rates? Your Qty edits on personnel rows will be lost. Other and one-time rows are kept. Rates in other currencies are converted to AUD."
+        : "Fill in any missing estimate months through the project end date from member rates. Months you already edited keep their Qty and estimated cost. Rates in other currencies are converted to AUD for new months.",
+      {
+        title: reset ? "Reset estimates" : "Run estimates",
+        confirmLabel: reset ? "Reset estimates" : "Run estimates",
+      },
     );
     if (!ok) return;
     setRunningEstimates(true);
     try {
-      const res = await adminFetch(`/api/admin/projects/${defaults.id}/run-estimates`, { method: "POST" });
+      const res = await adminFetch(`/api/admin/projects/${defaults.id}/run-estimates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          reset
+            ? { reset: true }
+            : {
+                estimates: estimates.map((row) => ({
+                  year: row.year,
+                  month: row.month,
+                  qty: row.qty,
+                  estimatedCost: row.estimatedCost,
+                  costType: row.costType,
+                })),
+              },
+        ),
+      });
       const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to run estimates");
+      if (!res.ok) {
+        throw new Error((data as { error?: string }).error || (reset ? "Failed to reset estimates" : "Failed to run estimates"));
+      }
       const detail = data.data as ProjectFormValues | null;
       setEstimates(detail?.estimates ?? []);
+      setEstimateQtyDrafts({});
     } catch (err) {
-      appAlert(err instanceof Error ? err.message : "Failed to run estimates");
+      appAlert(err instanceof Error ? err.message : reset ? "Failed to reset estimates" : "Failed to run estimates");
     } finally {
       setRunningEstimates(false);
     }
@@ -614,6 +664,14 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                 </button>
                 <button
                   type="button"
+                  onClick={() => void runEstimates({ reset: true })}
+                  disabled={runningEstimates}
+                  className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium disabled:opacity-50 dark:border-gray-600"
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
                   onClick={addEstimateRow}
                   className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium dark:border-gray-600"
                 >
@@ -624,7 +682,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
           </div>
           {canEditEstimates ? (
             <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-              Edit Qty to recalculate estimated cost. Use the trash icon to remove a row. Add row creates an Other cost you can keep after Run Estimates. Save the project to keep manual changes.
+              Edit Qty to recalculate estimated cost. Run Estimates keeps your edits and only adds missing months. Reset rebuilds personnel Qty from project dates and member rates. Add row creates an Other cost. Save the project to keep manual changes.
             </p>
           ) : null}
           {estimates.length === 0 ? (
@@ -667,12 +725,12 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                       <td className="py-2 pr-3">
                         {canEditEstimates ? (
                           <input
-                            type="number"
-                            min={0}
-                            step="0.01"
+                            type="text"
+                            inputMode="decimal"
                             className={`${inputClass} w-28 tabular-nums`}
-                            value={row.qty}
+                            value={estimateQtyDrafts[index] ?? String(row.qty)}
                             onChange={(e) => updateEstimateQty(index, e.target.value)}
+                            onBlur={() => commitEstimateQty(index)}
                             aria-label="Estimate quantity in days"
                           />
                         ) : (
