@@ -18,12 +18,14 @@ import {
 } from "@/components/client-workspace/shared";
 
 type InvoiceSortKey = "invoiceNumber" | "clientName" | "contractTitle" | "reference" | "issueDate" | "dueDate" | "amount" | "status";
+type InvoiceStatusFilter = "" | "DRAFT" | "AWAITING_PAYMENT" | "PAID" | "OVERDUE";
 
 const invoiceStatusLabel = (inv: Overview["invoices"][number]) => (inv.overdue ? "OVERDUE" : inv.status);
 
 export default function ClientWorkspacePage() {
   const [clientId, setClientId] = useState("");
   const [currencyChoice, setCurrencyChoice] = useState("");
+  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<InvoiceStatusFilter>("");
   const [invoiceSort, setInvoiceSort] = useState<{ key: InvoiceSortKey; dir: SortDir }>({ key: "issueDate", dir: "desc" });
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState("");
@@ -47,7 +49,10 @@ export default function ClientWorkspacePage() {
   }, [clientId, currencyChoice]);
 
   const sortedInvoices = useMemo(() => {
-    const rows = [...(data?.invoices ?? [])];
+    const rows = (data?.invoices ?? []).filter((inv) => {
+      if (!invoiceStatusFilter) return true;
+      return invoiceStatusLabel(inv) === invoiceStatusFilter;
+    });
     const { key, dir } = invoiceSort;
     rows.sort((a, b) => {
       let cmp: number;
@@ -58,7 +63,7 @@ export default function ClientWorkspacePage() {
       return dir === "asc" ? cmp : -cmp;
     });
     return rows;
-  }, [data, invoiceSort]);
+  }, [data, invoiceSort, invoiceStatusFilter]);
 
   const sortInvoices = (key: InvoiceSortKey) => setInvoiceSort((s) => toggleSortKey(key, s.key, s.dir));
 
@@ -190,7 +195,30 @@ export default function ClientWorkspacePage() {
           <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-gray-300" /> Draft (being prepared)</span>
         </div>
         {data.invoices.length ? (
-          <div className="mt-6 overflow-x-auto">
+          <div className="mt-6">
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                Status
+                <select
+                  value={invoiceStatusFilter}
+                  onChange={(e) => setInvoiceStatusFilter(e.target.value as InvoiceStatusFilter)}
+                  className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
+                  aria-label="Filter invoices by status"
+                >
+                  <option value="">All statuses</option>
+                  <option value="DRAFT">Draft</option>
+                  <option value="AWAITING_PAYMENT">Awaiting payment</option>
+                  <option value="OVERDUE">Overdue</option>
+                  <option value="PAID">Paid</option>
+                </select>
+              </label>
+              {invoiceStatusFilter ? (
+                <span className="text-xs text-gray-500">
+                  Showing {sortedInvoices.length} of {data.invoices.length}
+                </span>
+              ) : null}
+            </div>
+            <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
@@ -208,6 +236,13 @@ export default function ClientWorkspacePage() {
                 </tr>
               </thead>
               <tbody>
+                {sortedInvoices.length === 0 ? (
+                  <tr>
+                    <td colSpan={allClients ? 9 : 8} className="py-4 text-sm text-gray-400">
+                      No invoices match this status.
+                    </td>
+                  </tr>
+                ) : null}
                 {sortedInvoices.map((inv) => (
                   <tr key={inv.id} className="border-b border-gray-50 dark:border-gray-800">
                     <td className="whitespace-nowrap py-2 pr-3 font-medium">{inv.invoiceNumber}</td>
@@ -239,6 +274,7 @@ export default function ClientWorkspacePage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         ) : (
           <p className="mt-4 text-sm text-gray-500">No invoices issued yet this financial year.</p>

@@ -2,7 +2,7 @@
 import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
@@ -13,6 +13,12 @@ import { ProjectForm, type ProjectFormValues } from "@/components/projects/Proje
 export default function EditProjectPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = (() => {
+    const raw = searchParams.get("return");
+    if (!raw) return "/projects";
+    return raw.startsWith("/projects") ? raw : "/projects";
+  })();
   const { isProjectMember, loading: sessionLoading } = useAdminSession();
   const [project, setProject] = useState<ProjectFormValues | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -43,7 +49,7 @@ export default function EditProjectPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to save project");
-      router.push("/projects");
+      router.push(returnTo);
     } catch (error) {
       appAlert(error instanceof Error ? error.message : "Failed to save project");
     } finally {
@@ -54,7 +60,7 @@ export default function EditProjectPage() {
   return (
     <ProjectManagementGuard requireManageProjects>
       <div>
-        <Link href="/projects" className="mb-4 inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100">
+        <Link href={returnTo} className="mb-4 inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100">
           <ArrowLeft className="h-4 w-4" /> Back to projects
         </Link>
         <h2 className="mb-6 text-lg font-semibold text-gray-900 dark:text-gray-100">

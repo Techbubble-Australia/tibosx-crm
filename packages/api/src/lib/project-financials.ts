@@ -128,8 +128,9 @@ type EstimateDraftRow = {
 /**
  * Replaces personnel estimates with contract/project days × each member's daily-equivalent rate.
  * Member rates in other currencies are converted to AUD first, so the dashboard totals stay comparable.
- * When `preserveExisting` is true, months that already have a personnel estimate keep their Qty and cost
- * (including unsaved drafts from the UI); only missing months are filled in.
+ * When `preserveExisting` is true, months that already have a personnel estimate keep their Qty
+ * (including unsaved drafts from the UI) and estimated cost is recalculated from current rates;
+ * only missing months are filled in with both Qty and cost.
  */
 export async function runProjectEstimates(
   projectId: string,
@@ -199,15 +200,9 @@ export async function runProjectEstimates(
     const preserved = preservedByKey.get(`${year}-${month}`);
     if (preserved) {
       const qty = round2(preserved.qty);
-      let estimatedCost = round2(preserved.estimatedCost);
       const calcUnit = calcQty > 0 ? calcCost / calcQty : 0;
-      const preservedUnit = qty > 0 ? estimatedCost / qty : 0;
-      // Fill missing cost, or replace a clearly wrong unit cost (e.g. raw foreign monthly rate).
-      const needsRateCost =
-        qty > 0 &&
-        (estimatedCost <= 0 ||
-          (calcUnit > 0 && (preservedUnit / calcUnit > 2.5 || calcUnit / preservedUnit > 2.5)));
-      if (needsRateCost) {
+      let estimatedCost = 0;
+      if (qty > 0) {
         if (calcUnit > 0) {
           estimatedCost = round2(calcUnit * qty);
         } else {

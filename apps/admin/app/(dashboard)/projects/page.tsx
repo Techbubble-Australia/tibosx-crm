@@ -3,6 +3,7 @@ import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { ProjectManagementGuard } from "@/components/ProjectManagementGuard";
@@ -28,12 +29,15 @@ function formatDate(value: string) {
 }
 
 export default function ProjectsPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { canManageProjects, isProjectMember } = useAdminSession();
   const [rows, setRows] = useState<ProjectRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [clientFilter, setClientFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [clientFilter, setClientFilter] = useState(() => searchParams.get("client") ?? "");
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get("status") ?? "");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [sortKey, setSortKey] = useState<
     "projectNumber" | "title" | "clientName" | "status" | "projectManagerName" | "startDate"
@@ -41,6 +45,32 @@ export default function ProjectsPage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+
+  useEffect(() => {
+    setClientFilter(searchParams.get("client") ?? "");
+    setStatusFilter(searchParams.get("status") ?? "");
+  }, [searchParams]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (clientFilter) params.set("client", clientFilter);
+    if (statusFilter) params.set("status", statusFilter);
+    const qs = params.toString();
+    if (qs === searchParams.toString()) return;
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+  }, [clientFilter, statusFilter, pathname, router, searchParams]);
+
+  const listReturnHref = useMemo(() => {
+    const params = new URLSearchParams();
+    if (clientFilter) params.set("client", clientFilter);
+    if (statusFilter) params.set("status", statusFilter);
+    const qs = params.toString();
+    return qs ? `${pathname}?${qs}` : pathname;
+  }, [clientFilter, statusFilter, pathname]);
+
+  function projectHref(id: string) {
+    return `/projects/${id}?return=${encodeURIComponent(listReturnHref)}`;
+  }
 
   useEffect(() => {
     void adminFetch("/api/admin/projects")
@@ -194,7 +224,7 @@ export default function ProjectsPage() {
                   {projects.map((row) => (
                     <Link
                       key={row.id}
-                      href={canManageProjects ? `/projects/${row.id}` : "#"}
+                      href={canManageProjects ? projectHref(row.id) : "#"}
                       className={`block rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 ${
                         canManageProjects ? "hover:border-sky-300 hover:shadow-sm" : ""
                       }`}
@@ -233,7 +263,7 @@ export default function ProjectsPage() {
                     <tr key={row.id} className="border-b border-gray-50 dark:border-gray-800">
                       <td className="px-4 py-3 font-mono">
                         {canManageProjects ? (
-                          <Link href={`/projects/${row.id}`} className="text-blue-600 hover:underline dark:text-blue-400">
+                          <Link href={projectHref(row.id)} className="text-blue-600 hover:underline dark:text-blue-400">
                             {row.projectNumber}
                           </Link>
                         ) : (
@@ -242,7 +272,7 @@ export default function ProjectsPage() {
                       </td>
                       <td className="px-4 py-3">
                         {canManageProjects ? (
-                          <Link href={`/projects/${row.id}`} className="font-medium text-blue-600 hover:underline dark:text-blue-400">
+                          <Link href={projectHref(row.id)} className="font-medium text-blue-600 hover:underline dark:text-blue-400">
                             {row.title}
                           </Link>
                         ) : (

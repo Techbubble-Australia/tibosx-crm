@@ -312,6 +312,30 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
     return total / rated.length;
   }
 
+  function estimateCostForQty(index: number, qty: number, rows: ProjectEstimateRow[]): number {
+    if (qty <= 0) return 0;
+    const row = rows[index];
+    if (!row) return 0;
+    const siblingUnit = personnelUnitCost(index, rows);
+    const prevQty = row.qty;
+    let unitCost: number | null = null;
+    if (prevQty > 0 && row.estimatedCost > 0) {
+      const currentUnit = row.estimatedCost / prevQty;
+      if (
+        siblingUnit != null &&
+        siblingUnit > 0 &&
+        (currentUnit / siblingUnit > 2.5 || siblingUnit / currentUnit > 2.5)
+      ) {
+        unitCost = siblingUnit;
+      } else {
+        unitCost = currentUnit;
+      }
+    } else {
+      unitCost = siblingUnit ?? audDailyRateForMonth(row.year, row.month);
+    }
+    return Math.round((unitCost || 0) * qty * 100) / 100;
+  }
+
   function updateEstimateQty(index: number, raw: string) {
     setEstimateQtyDrafts((prev) => ({ ...prev, [index]: raw }));
     if (raw.trim() === "") {
@@ -324,33 +348,20 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
     setEstimates((prev) =>
       prev.map((row, i) => {
         if (i !== index) return row;
-        if (qty === 0) return { ...row, qty: 0, estimatedCost: 0 };
-
-        const siblingUnit = personnelUnitCost(index, prev);
-        const prevQty = row.qty;
-        let unitCost: number | null = null;
-        if (prevQty > 0 && row.estimatedCost > 0) {
-          const currentUnit = row.estimatedCost / prevQty;
-          // Drop a bad unit cost (e.g. raw foreign monthly rate) when other months look normal.
-          if (
-            siblingUnit != null &&
-            siblingUnit > 0 &&
-            (currentUnit / siblingUnit > 2.5 || siblingUnit / currentUnit > 2.5)
-          ) {
-            unitCost = siblingUnit;
-          } else {
-            unitCost = currentUnit;
-          }
-        } else {
-          unitCost = siblingUnit ?? audDailyRateForMonth(row.year, row.month);
-        }
-        const estimatedCost = Math.round((unitCost || 0) * qty * 100) / 100;
-        return { ...row, qty, estimatedCost };
+        return { ...row, qty, estimatedCost: estimateCostForQty(index, qty, prev) };
       }),
     );
   }
 
   function commitEstimateQty(index: number) {
+    setEstimates((prev) => {
+      const row = prev[index];
+      if (!row || row.qty <= 0) return prev;
+      if (row.estimatedCost > 0) return prev;
+      const estimatedCost = estimateCostForQty(index, row.qty, prev);
+      if (estimatedCost <= 0) return prev;
+      return prev.map((item, i) => (i === index ? { ...item, estimatedCost } : item));
+    });
     setEstimateQtyDrafts((prev) => {
       if (prev[index] === undefined) return prev;
       const next = { ...prev };
@@ -412,7 +423,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
     const ok = await appConfirm(
       reset
         ? "Replace all personnel estimate rows with the calculated days from the project dates (or contract months) × member rates? Your Qty edits on personnel rows will be lost. Other and one-time rows are kept. Rates in other currencies are converted to AUD."
-        : "Fill in any missing estimate months through the project end date from member rates. Months you already edited keep their Qty and estimated cost. Rates in other currencies are converted to AUD for new months.",
+        : "Keep your Qty edits, recalculate estimated cost from member rates, and add any missing months through the project end date. Rates in other currencies are converted to AUD.",
       {
         title: reset ? "Reset estimates" : "Run estimates",
         confirmLabel: reset ? "Reset estimates" : "Run estimates",
@@ -738,7 +749,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
           </div>
           {canEditEstimates ? (
             <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-              Edit Qty to recalculate estimated cost. Run Estimates keeps your edits and only adds missing months. Reset rebuilds personnel Qty from project dates and member rates. Add row creates an Other cost. Save the project to keep manual changes.
+              Edit Qty to recalculate estimated cost. Run Estimates keeps your Qty, refreshes estimated cost from rates, and adds missing months. Reset rebuilds personnel Qty from project dates and member rates. Add row creates an Other cost. Save the project to keep manual changes.
             </p>
           ) : null}
           {estimates.length === 0 ? (
@@ -753,9 +764,9 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
                     <th className="py-2 pr-3">Month</th>
-                    <th className="py-2 pr-3">Qty (days)</th>
+                    <th className="py-2 pr-3 text-right">Qty (days)</th>
                     <th className="py-2 pr-3">Currency</th>
-                    <th className="py-2 pr-3">Estimated cost</th>
+                    <th className="py-2 pr-3 text-right">Estimated cost</th>
                     <th className="py-2 pr-3">Cost type</th>
                     {canEditEstimates ? <th className="py-2 w-10" /> : null}
                   </tr>
@@ -778,19 +789,19 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                           formatProjectMonth(row.year, row.month)
                         )}
                       </td>
-                      <td className="py-2 pr-3">
+                      <td className="py-2 pr-3 text-right">
                         {canEditEstimates ? (
                           <input
                             type="text"
                             inputMode="decimal"
-                            className={`${inputClass} w-28 tabular-nums`}
+                            className={`${inputClass} ml-auto w-28 text-right tabular-nums`}
                             value={estimateQtyDrafts[index] ?? String(row.qty)}
                             onChange={(e) => updateEstimateQty(index, e.target.value)}
                             onBlur={() => commitEstimateQty(index)}
                             aria-label="Estimate quantity in days"
                           />
                         ) : (
-                          row.qty
+                          <span className="tabular-nums">{row.qty}</span>
                         )}
                       </td>
                       <td className="py-2 pr-3">
@@ -798,9 +809,9 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                           {SALES_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
                         </select>
                       </td>
-                      <td className="py-2 pr-3">
+                      <td className="py-2 pr-3 text-right">
                         <CurrencyInput
-                          className={`${inputClass} tabular-nums`}
+                          className={`${inputClass} text-right tabular-nums`}
                           value={row.estimatedCost}
                           onChange={(n) => updateEstimate(index, { estimatedCost: n ?? 0 })}
                           aria-label="Estimated cost"
@@ -839,9 +850,9 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
                     <th className="py-2 pr-3">Month</th>
-                    <th className="py-2 pr-3">Qty</th>
+                    <th className="py-2 pr-3 text-right">Qty</th>
                     <th className="py-2 pr-3">Currency</th>
-                    <th className="py-2 pr-3">Actual cost</th>
+                    <th className="py-2 pr-3 text-right">Actual cost</th>
                     <th className="py-2">Cost type</th>
                   </tr>
                 </thead>
@@ -860,24 +871,24 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                         </td>
                         {fromTimesheets ? (
                           <>
-                            <td className="py-2 pr-3">{row.qty} day{row.qty === 1 ? "" : "s"}</td>
+                            <td className="py-2 pr-3 text-right tabular-nums">{row.qty} day{row.qty === 1 ? "" : "s"}</td>
                             <td className="py-2 pr-3">{row.currency}</td>
-                            <td className="py-2 pr-3 tabular-nums">{formatAmount(row.actualCost)}</td>
+                            <td className="py-2 pr-3 text-right tabular-nums">{formatAmount(row.actualCost)}</td>
                             <td className="py-2">{PROJECT_COST_TYPE_LABELS[row.costType] ?? row.costType}</td>
                           </>
                         ) : (
                           <>
-                            <td className="py-2 pr-3">
-                              <input type="number" min={0} step="0.01" className={inputClass} value={row.qty} onChange={(e) => updateActual(index, { qty: Number(e.target.value) })} />
+                            <td className="py-2 pr-3 text-right">
+                              <input type="number" min={0} step="0.01" className={`${inputClass} text-right tabular-nums`} value={row.qty} onChange={(e) => updateActual(index, { qty: Number(e.target.value) })} />
                             </td>
                             <td className="py-2 pr-3">
                               <select className={inputClass} value={row.currency} onChange={(e) => updateActual(index, { currency: e.target.value })}>
                                 {SALES_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
                               </select>
                             </td>
-                            <td className="py-2 pr-3">
+                            <td className="py-2 pr-3 text-right">
                               <CurrencyInput
-                                className={`${inputClass} tabular-nums`}
+                                className={`${inputClass} text-right tabular-nums`}
                                 value={row.actualCost}
                                 onChange={(n) => updateActual(index, { actualCost: n ?? 0 })}
                                 aria-label="Actual cost"
