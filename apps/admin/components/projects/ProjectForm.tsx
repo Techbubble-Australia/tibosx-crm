@@ -205,7 +205,8 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
   );
   const [contractId, setContractId] = useState(defaults.contractId ?? "");
   const [startDate, setStartDate] = useState(toDateInput(defaults.startDate) || new Date().toISOString().slice(0, 10));
-  const [endDate, setEndDate] = useState(toDateInput(defaults.endDate) || new Date().toISOString().slice(0, 10));  const [estimates, setEstimates] = useState<ProjectEstimateRow[]>(defaults.estimates ?? []);
+  const [endDate, setEndDate] = useState(toDateInput(defaults.endDate) || new Date().toISOString().slice(0, 10));
+  const [estimates, setEstimates] = useState<ProjectEstimateRow[]>(defaults.estimates ?? []);
   const [actuals, setActuals] = useState<ProjectActualRow[]>(defaults.actuals ?? []);
   const [members, setMembers] = useState<ProjectMemberRow[]>(defaults.members ?? []);
   const [budget, setBudget] = useState(defaults.budget != null ? String(defaults.budget) : "");
@@ -267,6 +268,25 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
     setEstimates((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
+  function updateEstimateQty(index: number, raw: string) {
+    setEstimates((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+        if (raw.trim() === "") return { ...row, qty: 0, estimatedCost: 0 };
+        const qty = Number(raw);
+        if (!Number.isFinite(qty) || qty < 0) return row;
+        const prevQty = row.qty;
+        let estimatedCost = row.estimatedCost;
+        if (prevQty > 0) {
+          estimatedCost = Math.round((row.estimatedCost / prevQty) * qty * 100) / 100;
+        } else if (qty === 0) {
+          estimatedCost = 0;
+        }
+        return { ...row, qty, estimatedCost };
+      }),
+    );
+  }
+
   function estimateMonthInputValue(row: ProjectEstimateRow) {
     const m = String(row.month + 1).padStart(2, "0");
     return `${row.year}-${m}`;
@@ -291,7 +311,8 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
         qty: 0,
         currency: prev[0]?.currency ?? "AUD",
         estimatedCost: 0,
-        costType: prev[0]?.costType ?? "personnel",
+        // Manual rows default to Other so Run Estimates does not wipe them.
+        costType: "other",
       },
     ]);
   }
@@ -350,6 +371,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
       const refreshed = await adminFetch(`/api/admin/projects/${defaults.id}`).then((r) => r.json());
       const detail = refreshed.data as ProjectFormValues | undefined;
       if (detail?.actuals) setActuals(detail.actuals);
+      onMembersRefresh?.();
     } catch (err) {
       appAlert(err instanceof Error ? err.message : "Failed to update member rate");
     } finally {
@@ -600,6 +622,11 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
               </div>
             ) : null}
           </div>
+          {canEditEstimates ? (
+            <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+              Edit Qty to recalculate estimated cost. Use the trash icon to remove a row. Add row creates an Other cost you can keep after Run Estimates. Save the project to keep manual changes.
+            </p>
+          ) : null}
           {estimates.length === 0 ? (
             <p className="mb-4 text-sm text-gray-400">
               {defaults.id
@@ -612,7 +639,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
                     <th className="py-2 pr-3">Month</th>
-                    <th className="py-2 pr-3">Qty</th>
+                    <th className="py-2 pr-3">Qty (days)</th>
                     <th className="py-2 pr-3">Currency</th>
                     <th className="py-2 pr-3">Estimated cost</th>
                     <th className="py-2 pr-3">Cost type</th>
@@ -643,9 +670,10 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
                             type="number"
                             min={0}
                             step="0.01"
-                            className={inputClass}
+                            className={`${inputClass} w-28 tabular-nums`}
                             value={row.qty}
-                            onChange={(e) => updateEstimate(index, { qty: Number(e.target.value) })}
+                            onChange={(e) => updateEstimateQty(index, e.target.value)}
+                            aria-label="Estimate quantity in days"
                           />
                         ) : (
                           row.qty

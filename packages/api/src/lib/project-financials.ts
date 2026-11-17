@@ -72,44 +72,49 @@ async function projectMonthDays(project: {
   endDate: Date;
   contractId: string | null;
   contractVariationId: string | null;
-}): Promise<{ shared: boolean; months: Array<{ year: number; month: number; days: number }> }> {
-  if (project.contractId) {
-    const contract = await prisma.contract.findUnique({
-      where: { id: project.contractId },
-      select: {
-        unit: true,
-        workUnitMonths: { orderBy: [{ year: "asc" }, { month: "asc" }] },
-        variations: { select: { id: true, unit: true } },
-      },
-    });
-    if (contract) {
-      const segmentKey = project.contractVariationId ?? "base";
-      const variation = project.contractVariationId
-        ? contract.variations.find((row) => row.id === project.contractVariationId)
-        : null;
-      const unit = variation?.unit ?? contract.unit;
-      const rows = contract.workUnitMonths
-        .filter((row) => row.segmentKey === segmentKey)
-        .map((row) => {
-          const units = toNumber(row.workUnits);
-          return {
-            year: row.year,
-            month: row.month,
-            days: unit === "HOUR" ? units / HOURS_PER_DAY : units,
-          };
-        })
-        .filter((row) => row.days > 0);
-      if (rows.length) return { shared: true, months: rows };
-    }
-  }
-  return {
+}): Promise<Array<{ year: number; month: number; days: number; shared: boolean }>> {
+  const projectMonths = generateProjectMonths(project.startDate, project.endDate, "T_AND_M", "DAY").map((row) => ({
+    year: row.year,
+    month: row.month,
+    days: row.qty,
     shared: false,
-    months: generateProjectMonths(project.startDate, project.endDate, "T_AND_M", "DAY").map((row) => ({
-      year: row.year,
-      month: row.month,
-      days: row.qty,
-    })),
-  };
+  }));
+
+  if (!project.contractId) return projectMonths;
+
+  const contract = await prisma.contract.findUnique({
+    where: { id: project.contractId },
+    select: {
+      unit: true,
+      workUnitMonths: { orderBy: [{ year: "asc" }, { month: "asc" }] },
+      variations: { select: { id: true, unit: true } },
+    },
+  });
+  if (!contract) return projectMonths;
+
+  const segmentKey = project.contractVariationId ?? "base";
+  const variation = project.contractVariationId
+    ? contract.variations.find((row) => row.id === project.contractVariationId)
+    : null;
+  const unit = variation?.unit ?? contract.unit;
+  const contractByKey = new Map(
+    contract.workUnitMonths
+      .filter((row) => row.segmentKey === segmentKey)
+      .map((row) => {
+        const units = toNumber(row.workUnits);
+        const days = unit === "HOUR" ? units / HOURS_PER_DAY : units;
+        return [`${row.year}-${row.month}`, days] as const;
+      })
+      .filter(([, days]) => days > 0),
+  );
+  if (!contractByKey.size) return projectMonths;
+
+  // Prefer contract work units where present; pad remaining months through the project end date.
+  return projectMonths.map((row) => {
+    const contractDays = contractByKey.get(`${row.year}-${row.month}`);
+    if (contractDays == null) return row;
+    return { ...row, days: contractDays, shared: true };
+  });
 }
 
 /**
@@ -140,9 +145,9 @@ export async function runProjectEstimates(projectId: string) {
     rateCurrency: PROJECT_COST_CURRENCY,
   }));
 
-  const { shared, months } = await projectMonthDays(project);
+  const months = await projectMonthDays(project);
   const rows: Array<{ year: number; month: number; qty: number; currency: string; estimatedCost: number }> = [];
-  for (const { year, month, days } of months) {
+  for (const { year, month, days, shared } of months) {
     // Contract days are split evenly across members; otherwise every member works every day.
     const memberDays = shared ? days / membersAud.length : days;
     let qty = 0;

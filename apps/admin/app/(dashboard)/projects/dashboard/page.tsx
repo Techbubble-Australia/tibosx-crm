@@ -865,28 +865,39 @@ export default function ProjectManagerDashboardPage() {
                 <p className="text-sm text-gray-400">No projects match this status.</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
+                  <table className="w-full min-w-[56rem] table-fixed text-sm">
+                    <colgroup>
+                      <col className="w-[28%]" />
+                      <col className="w-[11%]" />
+                      <col className="w-[11%]" />
+                      <col className="w-[12%]" />
+                      <col className="w-[12%]" />
+                      <col className="w-[14%]" />
+                      <col className="w-[7%]" />
+                      <col className="w-[5%]" />
+                    </colgroup>
                     <thead>
                       <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
-                        <th className="py-2 pr-3">Project</th>
-                        <th className="py-2 pr-3 text-right">Estimate</th>
-                        <th className="py-2 pr-3 text-right">Actual</th>
-                        <th className="py-2 pr-3">Dates</th>
+                        <th className="py-2 pr-4">Project</th>
+                        <th className="py-2 px-3 text-right">Estimate</th>
+                        <th className="py-2 px-3 text-right">Actual</th>
+                        <th className="border-l border-gray-100 py-2 pl-4 pr-3 dark:border-gray-800">Start</th>
+                        <th className="py-2 pr-3">End</th>
                         <th className="py-2 pr-3">Progress</th>
-                        <th className="py-2 pr-3">Remaining</th>
+                        <th className="py-2 pr-3">Left</th>
                         <th className="py-2">Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredProjects.map((project) => (
                         <tr key={project.id} className="border-b border-gray-50 dark:border-gray-800">
-                          <td className="py-2 pr-3">
-                            <Link href={`/projects/${project.id}`} className="text-blue-600 hover:underline dark:text-blue-400">
+                          <td className="truncate py-2 pr-4">
+                            <Link href={`/projects/${project.id}`} className="text-blue-600 hover:underline dark:text-blue-400" title={`${project.projectNumber} · ${project.title}`}>
                               {project.projectNumber} · {project.title}
                             </Link>
                           </td>
                           <td
-                            className="whitespace-nowrap py-2 pr-3 text-right tabular-nums"
+                            className="whitespace-nowrap py-2 px-3 text-right tabular-nums"
                             title={
                               currency !== "AUD" && project.estimatedCostAud
                                 ? formatMoney(project.estimatedCostAud, "AUD")
@@ -896,7 +907,7 @@ export default function ProjectManagerDashboardPage() {
                             {project.estimatedCost ? formatMoney(project.estimatedCost, currency) : "—"}
                           </td>
                           <td
-                            className="whitespace-nowrap py-2 pr-3 text-right tabular-nums"
+                            className="whitespace-nowrap py-2 px-3 text-right tabular-nums"
                             title={
                               currency !== "AUD" && project.actualCostAud
                                 ? formatMoney(project.actualCostAud, "AUD")
@@ -905,20 +916,23 @@ export default function ProjectManagerDashboardPage() {
                           >
                             {project.actualCost ? formatMoney(project.actualCost, currency) : "—"}
                           </td>
-                          <td className="whitespace-nowrap py-2 pr-3">{formatRange(project.startDate, project.endDate)}</td>
+                          <td className="whitespace-nowrap border-l border-gray-100 py-2 pl-4 pr-3 tabular-nums dark:border-gray-800">
+                            {formatDay(project.startDate, true)}
+                          </td>
+                          <td className="whitespace-nowrap py-2 pr-3 tabular-nums">{formatDay(project.endDate, true)}</td>
                           <td className="py-2 pr-3">
                             <div className="flex items-center gap-2">
-                              <div className="h-2 w-24 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                              <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
                                 <div
                                   className={`h-full rounded-full ${project.ended ? "bg-gray-400" : "bg-black dark:bg-white"}`}
                                   style={{ width: `${project.progress}%` }}
                                 />
                               </div>
-                              <span className="tabular-nums text-gray-600 dark:text-gray-400">{project.progress}%</span>
+                              <span className="w-8 shrink-0 text-right tabular-nums text-gray-600 dark:text-gray-400">{project.progress}%</span>
                             </div>
                           </td>
                           <td className="whitespace-nowrap py-2 pr-3 tabular-nums">
-                            {project.ended ? "Ended" : `${project.remainingDays} days`}
+                            {project.ended ? "Ended" : `${project.remainingDays}d`}
                           </td>
                           <td className="py-2">
                             <div className="flex flex-wrap gap-1">

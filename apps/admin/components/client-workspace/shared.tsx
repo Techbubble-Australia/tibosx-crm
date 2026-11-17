@@ -86,6 +86,7 @@ export const STATUS_PILL: Record<string, { label: string; className: string }> =
   PAID: { label: "Paid", className: "bg-green-100 text-green-800" },
   AWAITING_PAYMENT: { label: "Awaiting payment", className: "bg-amber-100 text-amber-900" },
   OVERDUE: { label: "Overdue", className: "bg-red-100 text-red-800" },
+  DRAFT: { label: "Draft", className: "bg-gray-100 text-gray-700" },
   SUBMITTED: { label: "Submitted – awaiting approval", className: "bg-amber-100 text-amber-900" },
   APPROVED: { label: "Approved", className: "bg-green-100 text-green-800" },
   IN_PROGRESS: { label: "In progress", className: "bg-sky-100 text-sky-800" },

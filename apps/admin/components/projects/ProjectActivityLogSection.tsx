@@ -57,6 +57,8 @@ function formatAction(log: ActivityLog): string {
       return log.newValue ? `Member added (${log.newValue})` : "Member added";
     case "MEMBER_REMOVED":
       return "Member removed";
+    case "MEMBER_RATE_UPDATED":
+      return log.fieldName ? `Member rate updated (${log.fieldName})` : "Member rate updated";
     case "CREDENTIALS_GENERATED":
       return `Credentials generated for ${log.newValue ?? "member"}`;
     case "ESTIMATES_RUN":

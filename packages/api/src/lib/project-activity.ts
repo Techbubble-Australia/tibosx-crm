@@ -12,6 +12,8 @@ export const PROJECT_FIELD_LABELS: Record<string, string> = {
   contractId: "Contract",
   startDate: "Start date",
   endDate: "End date",
+  budget: "Budget",
+  budgetCurrency: "Budget currency",
 };
 
 const TRACKED_FIELDS = [
@@ -25,6 +27,8 @@ const TRACKED_FIELDS = [
   "contractId",
   "startDate",
   "endDate",
+  "budget",
+  "budgetCurrency",
 ] as const;
 
 type TrackedField = (typeof TRACKED_FIELDS)[number];
@@ -40,6 +44,8 @@ export type ProjectSnapshot = {
   contractId: string | null;
   startDate: Date;
   endDate: Date;
+  budget: number | null;
+  budgetCurrency: string | null;
 };
 
 type ActivityContext = {
@@ -70,6 +76,8 @@ function formatFieldValue(field: TrackedField, value: unknown, context: Activity
     case "startDate":
     case "endDate":
       return formatDate(value as Date);
+    case "budget":
+      return typeof value === "number" ? value.toLocaleString("en-AU") : String(value);
     default:
       return String(value);
   }

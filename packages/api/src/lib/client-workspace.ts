@@ -201,7 +201,7 @@ export async function buildClientWorkspaceOverview(
     (t) => t.status === "APPROVED" && (t.month === currentMonth || t.month === previousMonth),
   );
 
-  // Invoices (issued this financial year; drafts only feed the chart)
+  // Invoices issued this financial year (drafts appear in the list and chart; money KPIs use sent only)
   const currencyCount = new Map<string, number>();
   for (const inv of invoices) currencyCount.set(inv.currency, (currencyCount.get(inv.currency) ?? 0) + 1);
   const currencies = [...currencyCount.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c);
@@ -247,7 +247,7 @@ export async function buildClientWorkspaceOverview(
       paidThisYear: { amount: sum(paid), invoiced: sum(inCurrency) },
     },
     chart,
-    invoices: sent.map((inv) => ({
+    invoices: invoices.map((inv) => ({
       id: inv.id,
       invoiceNumber: inv.invoiceNumber,
       contractTitle: inv.contract.title,

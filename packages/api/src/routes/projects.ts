@@ -979,6 +979,8 @@ router.put("/:id", async (req: AuthRequest, res) => {
       contractId: existing.contractId,
       startDate: existing.startDate,
       endDate: existing.endDate,
+      budget: existing.budget != null ? toNumber(existing.budget) : null,
+      budgetCurrency: existing.budgetCurrency ?? null,
     };
     const afterSnapshot: ProjectSnapshot = {
       title: data.title.trim(),
@@ -996,6 +998,18 @@ router.put("/:id", async (req: AuthRequest, res) => {
       contractId: data.contractId ?? null,
       startDate: data.startDate,
       endDate: data.endDate,
+      budget:
+        data.contractId || existing.contractId
+          ? beforeSnapshot.budget
+          : data.budget !== undefined
+            ? data.budget
+            : beforeSnapshot.budget,
+      budgetCurrency:
+        data.contractId || existing.contractId
+          ? beforeSnapshot.budgetCurrency
+          : data.budgetCurrency !== undefined
+            ? data.budgetCurrency
+            : beforeSnapshot.budgetCurrency,
     };
 
     await prisma.$transaction(async (tx) => {
@@ -1331,8 +1345,8 @@ router.patch("/:id/members/:memberId", async (req: AuthRequest, res) => {
     const member = await prisma.projectMember.findFirst({
       where: { id: memberId, projectId },
       include: {
-        adminUser: { select: { mappedProfile: { select: { currency: true } } } },
-        profile: { select: { currency: true } },
+        adminUser: { select: { email: true, mappedProfile: { select: { currency: true } } } },
+        profile: { select: { currency: true, email: true, firstName: true, lastName: true } },
       },
     });
     if (!member) return res.status(404).json({ error: "Member not found" });
@@ -1356,6 +1370,20 @@ router.patch("/:id/members/:memberId", async (req: AuthRequest, res) => {
       rateCurrency = profileCurrency;
     }
 
+    const previousRate = member.rate != null ? toNumber(member.rate) : null;
+    const nextRate = body.rate !== undefined ? body.rate : previousRate;
+    const nextFrequency = body.rateFrequency ?? member.rateFrequency;
+    const nextCurrency = (rateCurrency ?? member.rateCurrency ?? "AUD").toUpperCase();
+    const memberLabel =
+      member.profile.email ||
+      [member.profile.firstName, member.profile.lastName].filter(Boolean).join(" ") ||
+      member.adminUser?.email ||
+      memberId;
+    const formatRate = (rate: number | null, currency: string, frequency: string) =>
+      rate == null ? "—" : `${currency} ${rate}/${frequency.toLowerCase()}`;
+    const oldValue = formatRate(previousRate, member.rateCurrency || "AUD", member.rateFrequency);
+    const newValue = formatRate(nextRate == null ? null : Number(nextRate), nextCurrency, nextFrequency);
+
     const updated = await prisma.projectMember.update({
       where: { id: memberId },
       data: {
@@ -1370,6 +1398,18 @@ router.patch("/:id/members/:memberId", async (req: AuthRequest, res) => {
         adminUser: { select: { id: true, email: true, name: true } },
       },
     });
+    if (oldValue !== newValue) {
+      await prisma.projectActivityLog.create({
+        data: {
+          projectId,
+          action: "MEMBER_RATE_UPDATED",
+          fieldName: memberLabel,
+          oldValue,
+          newValue,
+          performedById: getActorId(req) || null,
+        },
+      });
+    }
     await syncProjectActualsFromTimesheets(projectId);
     res.json({ data: serializeMember(updated) });
   } catch (error) {
