@@ -536,6 +536,23 @@ export default function ProjectManagerDashboardPage() {
     () => (data?.projects ?? []).filter((project) => matchesStatusFilter(project, projectStatusFilter)),
     [data, projectStatusFilter],
   );
+  const memberRateRows = useMemo(
+    () =>
+      filteredProjects.flatMap((project) =>
+        (project.memberRates ?? []).map((rate) => ({
+          key: `${project.id}-${rate.name}-${rate.rateCurrency}-${rate.rateFrequency}`,
+          projectId: project.id,
+          projectNumber: project.projectNumber,
+          name: rate.name,
+          rate: rate.rate,
+          rateCurrency: rate.rateCurrency,
+          rateFrequencyLabel: rate.rateFrequencyLabel,
+          unitsPerAud: rate.unitsPerAud,
+          rateInAud: rate.rateInAud,
+        })),
+      ),
+    [filteredProjects],
+  );
   const timelineProjects = useMemo(
     () => (data?.projects ?? []).filter((project) => matchesStatusFilter(project, "OPEN")),
     [data],
@@ -830,7 +847,7 @@ export default function ProjectManagerDashboardPage() {
 
             <Section
               title="All projects"
-              subtitle="Time elapsed to today for each project, with member rate currency, conversion rate, and AUD"
+              subtitle="Time elapsed to today for each project"
               actions={
                 <select
                   value={projectStatusFilter}
@@ -854,7 +871,6 @@ export default function ProjectManagerDashboardPage() {
                         <th className="py-2 pr-3">Project</th>
                         <th className="py-2 pr-3 text-right">Estimate</th>
                         <th className="py-2 pr-3 text-right">Actual</th>
-                        <th className="py-2 pr-3">Member rates</th>
                         <th className="py-2 pr-3">Dates</th>
                         <th className="py-2 pr-3">Progress</th>
                         <th className="py-2 pr-3">Remaining</th>
@@ -869,48 +885,25 @@ export default function ProjectManagerDashboardPage() {
                               {project.projectNumber} · {project.title}
                             </Link>
                           </td>
-                          <td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">
-                            {project.estimatedCost ? (
-                              <div>
-                                <div>{formatMoney(project.estimatedCost, currency)}</div>
-                                {currency !== "AUD" && project.estimatedCostAud ? (
-                                  <div className="text-xs text-gray-500">{formatMoney(project.estimatedCostAud, "AUD")}</div>
-                                ) : null}
-                              </div>
-                            ) : "—"}
+                          <td
+                            className="whitespace-nowrap py-2 pr-3 text-right tabular-nums"
+                            title={
+                              currency !== "AUD" && project.estimatedCostAud
+                                ? formatMoney(project.estimatedCostAud, "AUD")
+                                : undefined
+                            }
+                          >
+                            {project.estimatedCost ? formatMoney(project.estimatedCost, currency) : "—"}
                           </td>
-                          <td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">
-                            {project.actualCost ? (
-                              <div>
-                                <div>{formatMoney(project.actualCost, currency)}</div>
-                                {currency !== "AUD" && project.actualCostAud ? (
-                                  <div className="text-xs text-gray-500">{formatMoney(project.actualCostAud, "AUD")}</div>
-                                ) : null}
-                              </div>
-                            ) : "—"}
-                          </td>
-                          <td className="py-2 pr-3">
-                            {(project.memberRates?.length ?? 0) === 0 ? (
-                              <span className="text-gray-400">—</span>
-                            ) : (
-                              <ul className="space-y-1.5">
-                                {project.memberRates!.map((rate) => (
-                                  <li key={`${project.id}-${rate.name}-${rate.rateCurrency}`} className="text-xs leading-snug text-gray-600 dark:text-gray-400">
-                                    <span className="font-medium text-gray-800 dark:text-gray-200">{rate.name}</span>
-                                    {" · "}
-                                    {formatRateMoney(rate.rate, rate.rateCurrency)}/{rate.rateFrequencyLabel}
-                                    {rate.rateCurrency !== "AUD" ? (
-                                      <>
-                                        {" · "}
-                                        1 AUD = {rate.unitsPerAud} {rate.rateCurrency}
-                                        {" · "}
-                                        {formatRateMoney(rate.rateInAud, "AUD")}/{rate.rateFrequencyLabel}
-                                      </>
-                                    ) : null}
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
+                          <td
+                            className="whitespace-nowrap py-2 pr-3 text-right tabular-nums"
+                            title={
+                              currency !== "AUD" && project.actualCostAud
+                                ? formatMoney(project.actualCostAud, "AUD")
+                                : undefined
+                            }
+                          >
+                            {project.actualCost ? formatMoney(project.actualCost, currency) : "—"}
                           </td>
                           <td className="whitespace-nowrap py-2 pr-3">{formatRange(project.startDate, project.endDate)}</td>
                           <td className="py-2 pr-3">
@@ -936,6 +929,50 @@ export default function ProjectManagerDashboardPage() {
                                 <Pill className="bg-orange-100 text-orange-900 ring-orange-200">Ended</Pill>
                               ) : null}
                             </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Section>
+
+            <Section
+              title="Member rates"
+              subtitle="User currency, current conversion rate, and AUD equivalent"
+            >
+              {memberRateRows.length === 0 ? (
+                <p className="text-sm text-gray-400">No member rates on these projects.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
+                        <th className="py-2 pr-3">Project</th>
+                        <th className="py-2 pr-3">Member</th>
+                        <th className="py-2 pr-3 text-right">Rate</th>
+                        <th className="py-2 pr-3 text-right">Conversion</th>
+                        <th className="py-2 text-right">AUD</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {memberRateRows.map((row) => (
+                        <tr key={row.key} className="border-b border-gray-50 dark:border-gray-800">
+                          <td className="py-2 pr-3">
+                            <Link href={`/projects/${row.projectId}`} className="text-blue-600 hover:underline dark:text-blue-400">
+                              {row.projectNumber}
+                            </Link>
+                          </td>
+                          <td className="py-2 pr-3">{row.name}</td>
+                          <td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">
+                            {formatRateMoney(row.rate, row.rateCurrency)}/{row.rateFrequencyLabel}
+                          </td>
+                          <td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums text-gray-500 dark:text-gray-400">
+                            {row.rateCurrency === "AUD" ? "—" : `1 AUD = ${row.unitsPerAud} ${row.rateCurrency}`}
+                          </td>
+                          <td className="whitespace-nowrap py-2 text-right tabular-nums">
+                            {formatRateMoney(row.rateInAud, "AUD")}/{row.rateFrequencyLabel}
                           </td>
                         </tr>
                       ))}
