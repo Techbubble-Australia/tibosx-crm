@@ -270,18 +270,30 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
     setEstimates((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
-  function averageDailyRateForMonth(year: number, month: number): number {
-    const rated = members.filter((member) => (member.rate ?? 0) > 0);
+  /** Prefer $/day from other personnel rows so foreign monthly rates are not treated as AUD. */
+  function personnelUnitCost(excludeIndex: number, rows: ProjectEstimateRow[]): number | null {
+    let totalQty = 0;
+    let totalCost = 0;
+    rows.forEach((row, i) => {
+      if (i === excludeIndex || row.costType !== "personnel") return;
+      if (row.qty <= 0 || row.estimatedCost <= 0) return;
+      totalQty += row.qty;
+      totalCost += row.estimatedCost;
+    });
+    return totalQty > 0 ? totalCost / totalQty : null;
+  }
+
+  function audDailyRateForMonth(year: number, month: number): number {
+    const rated = members.filter(
+      (member) => (member.rate ?? 0) > 0 && (member.rateCurrency || "AUD").toUpperCase() === "AUD",
+    );
     if (!rated.length) return 0;
-    const weekdays = (() => {
-      const last = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-      let count = 0;
-      for (let day = 1; day <= last; day += 1) {
-        const dow = new Date(Date.UTC(year, month, day)).getUTCDay();
-        if (dow !== 0 && dow !== 6) count += 1;
-      }
-      return count;
-    })();
+    const last = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    let weekdays = 0;
+    for (let day = 1; day <= last; day += 1) {
+      const dow = new Date(Date.UTC(year, month, day)).getUTCDay();
+      if (dow !== 0 && dow !== 6) weekdays += 1;
+    }
     const total = rated.reduce((sum, member) => {
       const rate = member.rate ?? 0;
       switch (member.rateFrequency ?? "DAILY") {
@@ -312,15 +324,27 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
     setEstimates((prev) =>
       prev.map((row, i) => {
         if (i !== index) return row;
+        if (qty === 0) return { ...row, qty: 0, estimatedCost: 0 };
+
+        const siblingUnit = personnelUnitCost(index, prev);
         const prevQty = row.qty;
-        let estimatedCost = row.estimatedCost;
+        let unitCost: number | null = null;
         if (prevQty > 0 && row.estimatedCost > 0) {
-          estimatedCost = Math.round((row.estimatedCost / prevQty) * qty * 100) / 100;
-        } else if (qty === 0) {
-          estimatedCost = 0;
+          const currentUnit = row.estimatedCost / prevQty;
+          // Drop a bad unit cost (e.g. raw foreign monthly rate) when other months look normal.
+          if (
+            siblingUnit != null &&
+            siblingUnit > 0 &&
+            (currentUnit / siblingUnit > 2.5 || siblingUnit / currentUnit > 2.5)
+          ) {
+            unitCost = siblingUnit;
+          } else {
+            unitCost = currentUnit;
+          }
         } else {
-          estimatedCost = Math.round(qty * averageDailyRateForMonth(row.year, row.month) * 100) / 100;
+          unitCost = siblingUnit ?? audDailyRateForMonth(row.year, row.month);
         }
+        const estimatedCost = Math.round((unitCost || 0) * qty * 100) / 100;
         return { ...row, qty, estimatedCost };
       }),
     );

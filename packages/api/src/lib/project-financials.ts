@@ -200,10 +200,16 @@ export async function runProjectEstimates(
     if (preserved) {
       const qty = round2(preserved.qty);
       let estimatedCost = round2(preserved.estimatedCost);
-      // Qty edits from a blank/zero cost row need cost filled from current rates.
-      if (qty > 0 && estimatedCost <= 0) {
-        if (calcQty > 0) {
-          estimatedCost = round2(calcCost * (qty / calcQty));
+      const calcUnit = calcQty > 0 ? calcCost / calcQty : 0;
+      const preservedUnit = qty > 0 ? estimatedCost / qty : 0;
+      // Fill missing cost, or replace a clearly wrong unit cost (e.g. raw foreign monthly rate).
+      const needsRateCost =
+        qty > 0 &&
+        (estimatedCost <= 0 ||
+          (calcUnit > 0 && (preservedUnit / calcUnit > 2.5 || calcUnit / preservedUnit > 2.5)));
+      if (needsRateCost) {
+        if (calcUnit > 0) {
+          estimatedCost = round2(calcUnit * qty);
         } else {
           const avgDaily =
             membersAud.reduce((sum, member) => sum + dailyRateFor(member.rate, member.rateFrequency, year, month), 0) /
