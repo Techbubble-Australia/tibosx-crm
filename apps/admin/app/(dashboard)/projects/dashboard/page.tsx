@@ -10,8 +10,8 @@ import { useDismissedToday } from "@/hooks/useDismissedToday";
 import { TimesheetStatusBadge } from "@/lib/timesheet-status-styles";
 import { PROJECT_STATUS_LABELS, formatProjectMonth, type ProjectStatus } from "@/lib/project-types";
 
-/** Costs are filtered to one currency (as recorded on estimates and actuals), not converted. */
-const CURRENCIES = ["AUD", "USD", "GBP", "EUR", "INR"] as const;
+/** Costs are stored in AUD; the currency filter converts for display. */
+const CURRENCIES = ["AUD", "USD", "GBP", "EUR", "INR", "PHP"] as const;
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 type AttentionKind = "MISSING" | "AWAITING_APPROVAL" | "DRAFT_NOT_SUBMITTED" | "PAST_END_DATE";
@@ -26,6 +26,16 @@ type MonthTimesheetRow = {
   status: WeekRowStatus;
   hours: number | null;
   timesheetId: string | null;
+};
+
+type MemberRateRow = {
+  name: string;
+  rateCurrency: string;
+  rate: number;
+  rateFrequency: string;
+  rateFrequencyLabel: string;
+  unitsPerAud: number;
+  rateInAud: number;
 };
 
 function currentMonthInput(): string {
@@ -43,14 +53,16 @@ type DashboardData = {
   today: string;
   currency?: string;
   baseCurrency: string;
+  costCurrency?: string;
+  exchangeRates?: Array<{ currency: string; unitsPerAud: number; label: string }>;
   scope: "all" | "mine";
   kpis: {
     awaitingApproval: { count: number; hours: number };
     overdueDrafts: { count: number; hours: number };
     missingTimesheets: { count: number };
     activeProjects: { count: number; pastEndDate: number };
-    estimatedCost: { total: number; beforeThisMonth: number };
-    actualCost: { total: number; months: number };
+    estimatedCost: { total: number; beforeThisMonth: number; totalAud?: number; beforeThisMonthAud?: number };
+    actualCost: { total: number; months: number; totalAud?: number };
   };
   attention: Array<{
     kind: AttentionKind;
@@ -85,7 +97,10 @@ type DashboardData = {
     remainingDays: number;
     ended: boolean;
     estimatedCost?: number;
+    estimatedCostAud?: number;
     actualCost?: number;
+    actualCostAud?: number;
+    memberRates?: MemberRateRow[];
   }>;
 };
 
@@ -95,6 +110,14 @@ function formatMoney(value: number, currency: string, compact = false) {
     currency,
     maximumFractionDigits: compact && value >= 1000 ? 1 : 0,
     notation: compact && value >= 1000 ? "compact" : "standard",
+  }).format(value);
+}
+
+function formatRateMoney(value: number, currency: string) {
+  return new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: value >= 100 ? 0 : 2,
   }).format(value);
 }
 
@@ -547,12 +570,12 @@ export default function ProjectManagerDashboardPage() {
               <option value="mine">Managed by me</option>
             </select>
             <label className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              Currency
+              Display currency
               <select
                 value={baseCurrency}
                 onChange={(e) => setBaseCurrency(e.target.value)}
                 className={selectClass}
-                aria-label="Show costs recorded in this currency"
+                aria-label="Convert costs into this currency for display"
               >
                 {CURRENCIES.map((code) => <option key={code} value={code}>{code}</option>)}
               </select>
@@ -579,6 +602,14 @@ export default function ProjectManagerDashboardPage() {
           </div>
         ) : data && kpis ? (
           <>
+            {(data.exchangeRates?.length ?? 0) > 0 ? (
+              <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                <span className="font-medium text-gray-900 dark:text-gray-100">Current conversion rates</span>
+                <span className="mx-2 text-gray-300 dark:text-gray-600">·</span>
+                Costs are calculated in {data.costCurrency ?? "AUD"}.{" "}
+                {data.exchangeRates!.map((rate) => rate.label).join(" · ")}
+              </div>
+            ) : null}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <KpiCard
                 label="Awaiting approval"
@@ -610,12 +641,22 @@ export default function ProjectManagerDashboardPage() {
               <KpiCard
                 label="Estimated cost"
                 value={formatMoney(kpis.estimatedCost.total, currency)}
-                hint={`${formatMoney(kpis.estimatedCost.beforeThisMonth, currency)} before this month`}
+                hint={[
+                  `${formatMoney(kpis.estimatedCost.beforeThisMonth, currency)} before this month`,
+                  currency !== "AUD" && kpis.estimatedCost.totalAud != null
+                    ? `= ${formatMoney(kpis.estimatedCost.totalAud, "AUD")}`
+                    : null,
+                ].filter(Boolean).join(" · ")}
               />
               <KpiCard
                 label="Actual cost"
                 value={formatMoney(kpis.actualCost.total, currency)}
-                hint={kpis.actualCost.months ? `across ${kpis.actualCost.months} month(s)` : "none recorded yet"}
+                hint={[
+                  kpis.actualCost.months ? `across ${kpis.actualCost.months} month(s)` : "none recorded yet",
+                  currency !== "AUD" && kpis.actualCost.totalAud != null
+                    ? `= ${formatMoney(kpis.actualCost.totalAud, "AUD")}`
+                    : null,
+                ].filter(Boolean).join(" · ")}
               />
             </div>
 
@@ -770,7 +811,7 @@ export default function ProjectManagerDashboardPage() {
 
             <Section
               title="Estimated vs Actual costs by month"
-              subtitle="Project estimates and actuals for the selected currency. Hover a month to see both figures."
+              subtitle={`Project estimates and actuals in ${currency}${currency !== "AUD" ? " (converted from AUD)" : ""}. Hover a month to see both figures.`}
               actions={
                 <select
                   value={selectedCostYear ?? ""}
@@ -789,7 +830,7 @@ export default function ProjectManagerDashboardPage() {
 
             <Section
               title="All projects"
-              subtitle="Time elapsed to today for each project"
+              subtitle="Time elapsed to today for each project, with member rate currency, conversion rate, and AUD"
               actions={
                 <select
                   value={projectStatusFilter}
@@ -813,6 +854,7 @@ export default function ProjectManagerDashboardPage() {
                         <th className="py-2 pr-3">Project</th>
                         <th className="py-2 pr-3 text-right">Estimate</th>
                         <th className="py-2 pr-3 text-right">Actual</th>
+                        <th className="py-2 pr-3">Member rates</th>
                         <th className="py-2 pr-3">Dates</th>
                         <th className="py-2 pr-3">Progress</th>
                         <th className="py-2 pr-3">Remaining</th>
@@ -828,10 +870,47 @@ export default function ProjectManagerDashboardPage() {
                             </Link>
                           </td>
                           <td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">
-                            {project.estimatedCost ? formatMoney(project.estimatedCost, currency) : "—"}
+                            {project.estimatedCost ? (
+                              <div>
+                                <div>{formatMoney(project.estimatedCost, currency)}</div>
+                                {currency !== "AUD" && project.estimatedCostAud ? (
+                                  <div className="text-xs text-gray-500">{formatMoney(project.estimatedCostAud, "AUD")}</div>
+                                ) : null}
+                              </div>
+                            ) : "—"}
                           </td>
                           <td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">
-                            {project.actualCost ? formatMoney(project.actualCost, currency) : "—"}
+                            {project.actualCost ? (
+                              <div>
+                                <div>{formatMoney(project.actualCost, currency)}</div>
+                                {currency !== "AUD" && project.actualCostAud ? (
+                                  <div className="text-xs text-gray-500">{formatMoney(project.actualCostAud, "AUD")}</div>
+                                ) : null}
+                              </div>
+                            ) : "—"}
+                          </td>
+                          <td className="py-2 pr-3">
+                            {(project.memberRates?.length ?? 0) === 0 ? (
+                              <span className="text-gray-400">—</span>
+                            ) : (
+                              <ul className="space-y-1.5">
+                                {project.memberRates!.map((rate) => (
+                                  <li key={`${project.id}-${rate.name}-${rate.rateCurrency}`} className="text-xs leading-snug text-gray-600 dark:text-gray-400">
+                                    <span className="font-medium text-gray-800 dark:text-gray-200">{rate.name}</span>
+                                    {" · "}
+                                    {formatRateMoney(rate.rate, rate.rateCurrency)}/{rate.rateFrequencyLabel}
+                                    {rate.rateCurrency !== "AUD" ? (
+                                      <>
+                                        {" · "}
+                                        1 AUD = {rate.unitsPerAud} {rate.rateCurrency}
+                                        {" · "}
+                                        {formatRateMoney(rate.rateInAud, "AUD")}/{rate.rateFrequencyLabel}
+                                      </>
+                                    ) : null}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
                           </td>
                           <td className="whitespace-nowrap py-2 pr-3">{formatRange(project.startDate, project.endDate)}</td>
                           <td className="py-2 pr-3">

@@ -307,7 +307,7 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
   async function runEstimates() {
     if (!defaults.id) return;
     const ok = await appConfirm(
-      "Recalculate personnel estimates from the contract's monthly days × member rates? Existing personnel estimate rows will be replaced.",
+      "Recalculate personnel estimates from the contract's monthly days × member rates? Rates in other currencies are converted to AUD first. Existing personnel estimate rows will be replaced.",
       { title: "Run estimates", confirmLabel: "Run estimates" },
     );
     if (!ok) return;

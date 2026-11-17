@@ -3,11 +3,13 @@ import { prisma, type Prisma } from "@techbubble/database";
 import type { AuthRequest } from "../middleware/auth";
 import { canManageProjects, getActorId } from "../lib/project-access";
 import { effectiveRolesForUser } from "../lib/admin-roles";
-import { toNumber } from "../lib/decimal";
+import { toNumber, toNumberOrNull } from "../lib/decimal";
 import { startOfUtcDay } from "../lib/project-types";
 import { sumDailyHours, type DailyHours } from "../lib/timesheet-entries";
-/** Costs are shown for one currency at a time (no conversion), as recorded on estimates and actuals. */
-const DASHBOARD_CURRENCIES = ["AUD", "USD", "GBP", "EUR", "INR"] as const;
+import { convertCurrency, getExchangeRatesFromBase } from "../lib/exchange-rates";
+import { PROJECT_COST_CURRENCY } from "../lib/project-financials";
+/** Personnel costs are stored in AUD after FX conversion; the currency filter only changes display. */
+const DASHBOARD_CURRENCIES = ["AUD", "USD", "GBP", "EUR", "INR", "PHP"] as const;
 type DashboardCurrency = (typeof DASHBOARD_CURRENCIES)[number];
 
 const router: IRouter = Router();
@@ -242,10 +244,10 @@ router.get("/", async (req: AuthRequest, res) => {
     const mine = req.query.scope === "mine";
     // `baseCurrency` is the older name of this parameter.
     const currency = parseCurrency(req.query.currency ?? req.query.baseCurrency);
-    const inCurrency = (code: string | null | undefined) => (code || "AUD").toUpperCase() === currency;
 
     const today = startOfUtcDay(new Date());
     const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+    const fxRates = await getExchangeRatesFromBase(PROJECT_COST_CURRENCY);
 
     const projects = await prisma.project.findMany({
       where: scopeWhere(mine, actorId),
@@ -260,7 +262,17 @@ router.get("/", async (req: AuthRequest, res) => {
         client: { select: { name: true } },
         projectManager: { select: { name: true, email: true } },
         timesheetApprover: { select: { name: true, email: true } },
-        members: weekProjectMembersSelect,
+        members: {
+          orderBy: { createdAt: "asc" as const },
+          select: {
+            adminUserId: true,
+            rate: true,
+            rateFrequency: true,
+            rateCurrency: true,
+            profile: { select: { firstName: true } },
+            adminUser: { select: { name: true, email: true } },
+          },
+        },
         estimates: { select: { year: true, month: true, qty: true, currency: true, estimatedCost: true, costType: true } },
         actuals: { select: { year: true, month: true, qty: true, currency: true, actualCost: true, costType: true } },
       },
@@ -378,7 +390,7 @@ router.get("/", async (req: AuthRequest, res) => {
       })),
     ];
 
-    // Financials: only estimates/actuals recorded in the selected currency.
+    // Financials: personnel estimates/actuals are stored in AUD; convert to the selected display currency.
     const currentYm = today.getUTCFullYear() * 12 + today.getUTCMonth();
     const monthMap = new Map<
       number,
@@ -394,43 +406,60 @@ router.get("/", async (req: AuthRequest, res) => {
       return bucket;
     };
 
-    let estimatedTotal = 0;
-    let estimatedBeforeThisMonth = 0;
-    let actualTotal = 0;
+    const toAud = (amount: number, fromCurrency: string | null | undefined) =>
+      convertCurrency(
+        amount,
+        (fromCurrency || PROJECT_COST_CURRENCY).toUpperCase(),
+        PROJECT_COST_CURRENCY,
+        PROJECT_COST_CURRENCY,
+        fxRates,
+      );
+    const toDisplay = (amountAud: number) =>
+      convertCurrency(amountAud, PROJECT_COST_CURRENCY, currency, PROJECT_COST_CURRENCY, fxRates);
+
+    let estimatedTotalAud = 0;
+    let estimatedBeforeThisMonthAud = 0;
+    let actualTotalAud = 0;
     const actualMonths = new Set<number>();
-    const projectTotals = new Map<string, { estimated: number; actual: number }>();
+    const projectTotals = new Map<string, { estimatedAud: number; actualAud: number }>();
+
     for (const project of projects) {
-      const totals = { estimated: 0, actual: 0 };
+      const totals = { estimatedAud: 0, actualAud: 0 };
       projectTotals.set(project.id, totals);
       for (const row of project.estimates) {
-        if (!inCurrency(row.currency)) continue;
-        const amount = toNumber(row.estimatedCost);
-        totals.estimated += amount;
+        totals.estimatedAud += toAud(toNumber(row.estimatedCost), row.currency);
       }
       for (const row of project.actuals) {
-        if (inCurrency(row.currency)) totals.actual += toNumber(row.actualCost);
+        totals.actualAud += toAud(toNumber(row.actualCost), row.currency);
       }
       if (project.status === "CANCELLED") continue;
       for (const row of project.estimates) {
-        if (!inCurrency(row.currency)) continue;
-        const amount = toNumber(row.estimatedCost);
-        estimatedTotal += amount;
-        if (row.year * 12 + row.month < currentYm) estimatedBeforeThisMonth += amount;
+        const amountAud = toAud(toNumber(row.estimatedCost), row.currency);
+        estimatedTotalAud += amountAud;
+        if (row.year * 12 + row.month < currentYm) estimatedBeforeThisMonthAud += amountAud;
         const bucket = monthBucket(row.year, row.month);
-        bucket.estimated += amount;
+        bucket.estimated += toDisplay(amountAud);
         if (row.costType === "personnel") bucket.days += toNumber(row.qty);
         bucket.costTypes.add(row.costType);
       }
       for (const row of project.actuals) {
-        if (!inCurrency(row.currency)) continue;
-        const amount = toNumber(row.actualCost);
-        actualTotal += amount;
+        const amountAud = toAud(toNumber(row.actualCost), row.currency);
+        actualTotalAud += amountAud;
         actualMonths.add(row.year * 12 + row.month);
         const bucket = monthBucket(row.year, row.month);
-        bucket.actual += amount;
+        bucket.actual += toDisplay(amountAud);
         bucket.costTypes.add(row.costType);
       }
     }
+
+    const rateLabels: Record<string, string> = {
+      HOURLY: "hour",
+      DAILY: "day",
+      WEEKLY: "week",
+      FORTNIGHTLY: "fortnight",
+      MONTHLY: "month",
+    };
+
     const costByMonth = [...monthMap.entries()]
       .sort(([a], [b]) => a - b)
       .map(([, row]) => ({
@@ -442,11 +471,35 @@ router.get("/", async (req: AuthRequest, res) => {
         costTypes: [...row.costTypes],
       }));
 
+    const usedRateCurrencies = new Set<string>();
     const projectRows = projects.map((project) => {
       const totalMs = Math.max(project.endDate.getTime() - project.startDate.getTime(), DAY_MS);
       const elapsedMs = today.getTime() - project.startDate.getTime();
       const progress = Math.min(100, Math.max(0, Math.round((elapsedMs / totalMs) * 100)));
       const remainingDays = Math.ceil((startOfUtcDay(project.endDate).getTime() - today.getTime()) / DAY_MS);
+      const estimatedAud = projectTotals.get(project.id)?.estimatedAud ?? 0;
+      const actualAud = projectTotals.get(project.id)?.actualAud ?? 0;
+      const memberRates = project.members
+        .map((m) => {
+          const rate = toNumberOrNull(m.rate);
+          if (rate == null || rate <= 0) return null;
+          const rateCurrency = (m.rateCurrency || PROJECT_COST_CURRENCY).toUpperCase();
+          usedRateCurrencies.add(rateCurrency);
+          const rateInAud = toAud(rate, rateCurrency);
+          const unitsPerAud = rateCurrency === PROJECT_COST_CURRENCY ? 1 : (fxRates[rateCurrency] ?? 1);
+          return {
+            name: m.adminUser?.name?.trim() || m.profile.firstName || m.adminUser?.email || "Member",
+            rateCurrency,
+            rate,
+            rateFrequency: m.rateFrequency,
+            rateFrequencyLabel: rateLabels[m.rateFrequency] ?? m.rateFrequency.toLowerCase(),
+            /** Foreign units per 1 AUD (e.g. 54 means 1 AUD = 54 INR). */
+            unitsPerAud: Math.round(unitsPerAud * 10000) / 10000,
+            rateInAud: Math.round(rateInAud * 100) / 100,
+          };
+        })
+        .filter((row): row is NonNullable<typeof row> => row != null);
+
       return {
         id: project.id,
         projectNumber: project.projectNumber,
@@ -461,16 +514,30 @@ router.get("/", async (req: AuthRequest, res) => {
         progress,
         remainingDays,
         ended: project.endDate < today,
-        estimatedCost: Math.round((projectTotals.get(project.id)?.estimated ?? 0) * 100) / 100,
-        actualCost: Math.round((projectTotals.get(project.id)?.actual ?? 0) * 100) / 100,
+        estimatedCost: Math.round(toDisplay(estimatedAud) * 100) / 100,
+        estimatedCostAud: Math.round(estimatedAud * 100) / 100,
+        actualCost: Math.round(toDisplay(actualAud) * 100) / 100,
+        actualCostAud: Math.round(actualAud * 100) / 100,
+        memberRates,
       };
     });
+
+    const exchangeRates = [...usedRateCurrencies]
+      .filter((code) => code !== PROJECT_COST_CURRENCY)
+      .sort()
+      .map((code) => ({
+        currency: code,
+        unitsPerAud: Math.round((fxRates[code] ?? 1) * 10000) / 10000,
+        label: `1 AUD = ${Math.round((fxRates[code] ?? 1) * 10000) / 10000} ${code}`,
+      }));
 
     res.json({
       data: {
         today: today.toISOString(),
         currency,
         baseCurrency: currency,
+        costCurrency: PROJECT_COST_CURRENCY,
+        exchangeRates,
         scope: mine ? "mine" : "all",
         kpis: {
           awaitingApproval: {
@@ -484,10 +551,16 @@ router.get("/", async (req: AuthRequest, res) => {
           missingTimesheets: { count: missingLastMonth.length },
           activeProjects: { count: activeProjects.length, pastEndDate: pastEnd.length },
           estimatedCost: {
-            total: Math.round(estimatedTotal),
-            beforeThisMonth: Math.round(estimatedBeforeThisMonth),
+            total: Math.round(toDisplay(estimatedTotalAud)),
+            beforeThisMonth: Math.round(toDisplay(estimatedBeforeThisMonthAud)),
+            totalAud: Math.round(estimatedTotalAud),
+            beforeThisMonthAud: Math.round(estimatedBeforeThisMonthAud),
           },
-          actualCost: { total: Math.round(actualTotal), months: actualMonths.size },
+          actualCost: {
+            total: Math.round(toDisplay(actualTotalAud)),
+            months: actualMonths.size,
+            totalAud: Math.round(actualTotalAud),
+          },
         },
         attention,
         costByMonth,

@@ -1,7 +1,11 @@
 import { prisma } from "@techbubble/database";
 import { toNumber, toNumberOrNull } from "./decimal";
+import { convertCurrency, getExchangeRatesFromBase } from "./exchange-rates";
 import { generateProjectMonths } from "./project-types";
 import { totalHoursByIsoDay, type DailyHours } from "./timesheet-entries";
+
+/** Personnel estimates and timesheet actuals are stored in AUD after converting member rates. */
+export const PROJECT_COST_CURRENCY = "AUD";
 
 export const MEMBER_RATE_FREQUENCIES = ["HOURLY", "DAILY", "WEEKLY", "FORTNIGHTLY", "MONTHLY"] as const;
 export type MemberRateFrequency = (typeof MEMBER_RATE_FREQUENCIES)[number];
@@ -108,7 +112,10 @@ async function projectMonthDays(project: {
   };
 }
 
-/** Replaces personnel estimates with monthly contract days × each member's daily rate. */
+/**
+ * Replaces personnel estimates with contract/project days × each member's daily-equivalent rate.
+ * Member rates in other currencies are converted to AUD first, so the dashboard totals stay comparable.
+ */
 export async function runProjectEstimates(projectId: string) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -126,21 +133,31 @@ export async function runProjectEstimates(projectId: string) {
   const members = ratedMembers(project.members);
   if (!members.length) throw new Error("NO_MEMBER_RATES");
 
+  const fx = await getExchangeRatesFromBase(PROJECT_COST_CURRENCY);
+  const membersAud = members.map((member) => ({
+    ...member,
+    rate: convertCurrency(member.rate, member.rateCurrency, PROJECT_COST_CURRENCY, PROJECT_COST_CURRENCY, fx),
+    rateCurrency: PROJECT_COST_CURRENCY,
+  }));
+
   const { shared, months } = await projectMonthDays(project);
   const rows: Array<{ year: number; month: number; qty: number; currency: string; estimatedCost: number }> = [];
   for (const { year, month, days } of months) {
     // Contract days are split evenly across members; otherwise every member works every day.
-    const memberDays = shared ? days / members.length : days;
-    const byCurrency = new Map<string, { days: number; cost: number }>();
-    for (const member of members) {
-      const bucket = byCurrency.get(member.rateCurrency) ?? { days: 0, cost: 0 };
-      bucket.days += memberDays;
-      bucket.cost += memberDays * dailyRateFor(member.rate, member.rateFrequency, year, month);
-      byCurrency.set(member.rateCurrency, bucket);
+    const memberDays = shared ? days / membersAud.length : days;
+    let qty = 0;
+    let cost = 0;
+    for (const member of membersAud) {
+      qty += memberDays;
+      cost += memberDays * dailyRateFor(member.rate, member.rateFrequency, year, month);
     }
-    for (const [currency, bucket] of byCurrency) {
-      rows.push({ year, month, qty: round2(bucket.days), currency, estimatedCost: round2(bucket.cost) });
-    }
+    rows.push({
+      year,
+      month,
+      qty: round2(qty),
+      currency: PROJECT_COST_CURRENCY,
+      estimatedCost: round2(cost),
+    });
   }
 
   await prisma.$transaction(async (tx) => {
@@ -182,12 +199,20 @@ export async function syncProjectActualsFromTimesheets(projectId: string) {
   ]);
 
   const memberByUser = new Map(members.map((row) => [row.adminUserId!, row]));
+  const fx = await getExchangeRatesFromBase(PROJECT_COST_CURRENCY);
   const totals = new Map<string, { year: number; month: number; currency: string; days: number; cost: number }>();
 
   for (const sheet of timesheets) {
     const member = memberByUser.get(sheet.memberUserId);
-    const rate = toNumberOrNull(member?.rate ?? null) ?? 0;
-    if (!member || rate <= 0) continue;
+    const rawRate = toNumberOrNull(member?.rate ?? null) ?? 0;
+    if (!member || rawRate <= 0) continue;
+    const rate = convertCurrency(
+      rawRate,
+      member.rateCurrency || "AUD",
+      PROJECT_COST_CURRENCY,
+      PROJECT_COST_CURRENCY,
+      fx,
+    );
 
     const hourSources: DailyHours[] = sheet.entries.length
       ? sheet.entries.map((row) => (row.dailyHours ?? {}) as DailyHours)
@@ -198,9 +223,8 @@ export async function syncProjectActualsFromTimesheets(projectId: string) {
       const date = new Date(`${iso}T00:00:00.000Z`);
       const year = date.getUTCFullYear();
       const month = date.getUTCMonth();
-      const currency = member.rateCurrency || "AUD";
-      const bucketKey = `${year}-${month}-${currency}`;
-      const bucket = totals.get(bucketKey) ?? { year, month, currency, days: 0, cost: 0 };
+      const bucketKey = `${year}-${month}-${PROJECT_COST_CURRENCY}`;
+      const bucket = totals.get(bucketKey) ?? { year, month, currency: PROJECT_COST_CURRENCY, days: 0, cost: 0 };
       const dayFraction = Math.min(hours / HOURS_PER_DAY, 1);
       bucket.days += member.rateFrequency === "HOURLY" ? hours / HOURS_PER_DAY : dayFraction;
       bucket.cost +=
@@ -228,4 +252,38 @@ export async function syncProjectActualsFromTimesheets(projectId: string) {
       });
     }
   });
+}
+
+
+/** Rebuilds personnel estimates in AUD after deploy; safe with several API instances. */
+export async function rebuildPersonnelEstimatesOnStartup() {
+  const rows = await prisma.$queryRawUnsafe<Array<{ locked: boolean }>>(
+    `SELECT pg_try_advisory_lock(hashtext('project-estimates-to-aud-v1')) AS locked`,
+  );
+  if (!rows[0]?.locked) {
+    console.log("⏭️  Skipping estimate rebuild (another instance holds the lock)");
+    return;
+  }
+
+  try {
+    const projects = await prisma.project.findMany({
+      where: { members: { some: { rate: { not: null } } } },
+      select: { id: true, projectNumber: true },
+      orderBy: { projectNumber: "asc" },
+    });
+    let ok = 0;
+    for (const project of projects) {
+      try {
+        await runProjectEstimates(project.id);
+        await syncProjectActualsFromTimesheets(project.id);
+        ok += 1;
+      } catch (error) {
+        if (error instanceof Error && (error.message === "NO_MEMBER_RATES" || error.message === "NOT_FOUND")) continue;
+        console.error(`Estimate rebuild failed for ${project.projectNumber}:`, error);
+      }
+    }
+    console.log(`💱 Rebuilt AUD personnel estimates for ${ok} project(s)`);
+  } finally {
+    await prisma.$queryRawUnsafe(`SELECT pg_advisory_unlock(hashtext('project-estimates-to-aud-v1'))`);
+  }
 }

@@ -51,4 +51,5 @@ export const SALES_CURRENCIES = [
   { code: "GBP", label: "GBP" },
   { code: "EUR", label: "EUR" },
   { code: "INR", label: "INR" },
+  { code: "PHP", label: "PHP" },
 ] as const;

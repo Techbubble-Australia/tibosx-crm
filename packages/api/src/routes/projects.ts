@@ -1328,13 +1328,38 @@ router.patch("/:id/members/:memberId", async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
     const body = memberRateSchema.parse(req.body);
-    const member = await prisma.projectMember.findFirst({ where: { id: memberId, projectId } });
+    const member = await prisma.projectMember.findFirst({
+      where: { id: memberId, projectId },
+      include: {
+        adminUser: { select: { mappedProfile: { select: { currency: true } } } },
+        profile: { select: { currency: true } },
+      },
+    });
     if (!member) return res.status(404).json({ error: "Member not found" });
+
+    // First time a rate is set, prefer the profile currency over the AUD schema default.
+    const profileCurrency = (
+      member.adminUser?.mappedProfile?.currency ||
+      member.profile.currency ||
+      ""
+    )
+      .trim()
+      .toUpperCase();
+    let rateCurrency = body.rateCurrency?.toUpperCase();
+    if (
+      rateCurrency === undefined &&
+      body.rate != null &&
+      member.rate == null &&
+      profileCurrency &&
+      member.rateCurrency === "AUD"
+    ) {
+      rateCurrency = profileCurrency;
+    }
 
     const updated = await prisma.projectMember.update({
       where: { id: memberId },
       data: {
-        ...(body.rateCurrency !== undefined ? { rateCurrency: body.rateCurrency.toUpperCase() } : {}),
+        ...(rateCurrency !== undefined ? { rateCurrency } : {}),
         ...(body.rate !== undefined ? { rate: body.rate } : {}),
         ...(body.rateFrequency !== undefined ? { rateFrequency: body.rateFrequency } : {}),
       },
