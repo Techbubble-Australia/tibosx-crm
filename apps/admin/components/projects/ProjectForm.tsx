@@ -270,6 +270,36 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
     setEstimates((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
+  function averageDailyRateForMonth(year: number, month: number): number {
+    const rated = members.filter((member) => (member.rate ?? 0) > 0);
+    if (!rated.length) return 0;
+    const weekdays = (() => {
+      const last = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+      let count = 0;
+      for (let day = 1; day <= last; day += 1) {
+        const dow = new Date(Date.UTC(year, month, day)).getUTCDay();
+        if (dow !== 0 && dow !== 6) count += 1;
+      }
+      return count;
+    })();
+    const total = rated.reduce((sum, member) => {
+      const rate = member.rate ?? 0;
+      switch (member.rateFrequency ?? "DAILY") {
+        case "HOURLY":
+          return sum + rate * 8;
+        case "WEEKLY":
+          return sum + rate / 5;
+        case "FORTNIGHTLY":
+          return sum + rate / 10;
+        case "MONTHLY":
+          return sum + (weekdays > 0 ? rate / weekdays : 0);
+        default:
+          return sum + rate;
+      }
+    }, 0);
+    return total / rated.length;
+  }
+
   function updateEstimateQty(index: number, raw: string) {
     setEstimateQtyDrafts((prev) => ({ ...prev, [index]: raw }));
     if (raw.trim() === "") {
@@ -284,10 +314,12 @@ export function ProjectForm({ defaults, defaultProjectManagerId, onSubmit, isSav
         if (i !== index) return row;
         const prevQty = row.qty;
         let estimatedCost = row.estimatedCost;
-        if (prevQty > 0) {
+        if (prevQty > 0 && row.estimatedCost > 0) {
           estimatedCost = Math.round((row.estimatedCost / prevQty) * qty * 100) / 100;
         } else if (qty === 0) {
           estimatedCost = 0;
+        } else {
+          estimatedCost = Math.round(qty * averageDailyRateForMonth(row.year, row.month) * 100) / 100;
         }
         return { ...row, qty, estimatedCost };
       }),

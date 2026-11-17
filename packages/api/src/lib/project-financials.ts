@@ -188,31 +188,44 @@ export async function runProjectEstimates(
   const months = await projectMonthDays(project);
   const rows: Array<{ year: number; month: number; qty: number; currency: string; estimatedCost: number }> = [];
   for (const { year, month, days, shared } of months) {
+    // Contract days are split evenly across members; otherwise every member works every day.
+    const memberDays = shared ? days / membersAud.length : days;
+    let calcQty = 0;
+    let calcCost = 0;
+    for (const member of membersAud) {
+      calcQty += memberDays;
+      calcCost += memberDays * dailyRateFor(member.rate, member.rateFrequency, year, month);
+    }
     const preserved = preservedByKey.get(`${year}-${month}`);
     if (preserved) {
+      const qty = round2(preserved.qty);
+      let estimatedCost = round2(preserved.estimatedCost);
+      // Qty edits from a blank/zero cost row need cost filled from current rates.
+      if (qty > 0 && estimatedCost <= 0) {
+        if (calcQty > 0) {
+          estimatedCost = round2(calcCost * (qty / calcQty));
+        } else {
+          const avgDaily =
+            membersAud.reduce((sum, member) => sum + dailyRateFor(member.rate, member.rateFrequency, year, month), 0) /
+            membersAud.length;
+          estimatedCost = round2(qty * avgDaily);
+        }
+      }
       rows.push({
         year,
         month,
-        qty: round2(preserved.qty),
+        qty,
         currency: PROJECT_COST_CURRENCY,
-        estimatedCost: round2(preserved.estimatedCost),
+        estimatedCost,
       });
       continue;
-    }
-    // Contract days are split evenly across members; otherwise every member works every day.
-    const memberDays = shared ? days / membersAud.length : days;
-    let qty = 0;
-    let cost = 0;
-    for (const member of membersAud) {
-      qty += memberDays;
-      cost += memberDays * dailyRateFor(member.rate, member.rateFrequency, year, month);
     }
     rows.push({
       year,
       month,
-      qty: round2(qty),
+      qty: round2(calcQty),
       currency: PROJECT_COST_CURRENCY,
-      estimatedCost: round2(cost),
+      estimatedCost: round2(calcCost),
     });
   }
 
