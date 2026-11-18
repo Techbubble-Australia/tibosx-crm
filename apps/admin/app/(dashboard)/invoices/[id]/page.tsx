@@ -23,6 +23,8 @@ import {
   invoiceLinesSubtotal,
   type InvoiceLineDraft,
 } from "@/components/invoices/InvoiceLineItemsEditor";
+import { InvoiceActivityLogSection } from "@/components/invoices/InvoiceActivityLogSection";
+import type { InvoiceActivityLogEntry } from "@/lib/invoice-activity";
 
 type InvoiceDetail = {
   id: string;
@@ -48,6 +50,7 @@ type InvoiceDetail = {
   lineItems?: Array<{ description: string; qty: number; rate: number }>;
   files?: UserFileRow[];
   defaultCurrency: string;
+  activityLogs?: InvoiceActivityLogEntry[];
 };
 
 const inputClass =
@@ -163,7 +166,13 @@ export default function InvoiceDetailPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update invoice");
       appAlert("Invoice saved.");
-      router.push("/invoices");
+      const refreshed = await adminFetch(`/api/admin/invoices/${row.id}`).then((r) => r.json());
+      if (refreshed.data) {
+        const detail = refreshed.data as InvoiceDetail;
+        setRow(detail);
+        setStatus(detail.status);
+        setFiles(detail.files ?? []);
+      }
     } catch (error) {
       appAlert(error instanceof Error ? error.message : "Failed to update invoice");
     } finally {
@@ -286,6 +295,9 @@ export default function InvoiceDetailPage() {
             </Link>
           </div>
         </form>
+        <div className="mt-6">
+          <InvoiceActivityLogSection logs={row.activityLogs ?? []} />
+        </div>
       </div>
     </ClientsOnlyGuard>
   );

@@ -34,6 +34,7 @@ import {
   ClipboardCheck,
   Ticket,
   Bug,
+  Database,
   Home,
 } from "lucide-react";
 import { UserAccountMenu } from "@/components/UserAccountMenu";
@@ -171,6 +172,7 @@ const navGroups: NavGroup[] = [
       { href: "/settings/notifications", label: "Email notifications", icon: Mail, roles: ["admin"] },
       { href: "/settings/groups", label: "Groups", icon: Users, roles: ["admin"] },
       { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin"] },
+      { href: "/settings/database", label: "Database clone", icon: Database, roles: ["admin"] },
       { href: "/users/active", label: "Internal users", icon: UserCircle, roles: ["admin"] },
       { href: "/customer-users/active", label: "Customer users", icon: UserCircle, roles: ["admin"] },
       { href: "/debug-capture", label: "Debug captures", icon: Bug, roles: ["admin"] },
@@ -310,7 +312,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         // Contacts with Access see their projects' timesheets; approvers also approve them.
         return canAccessWorkspaceTimesheets || canAccessClientWorkspace;
       }
-      if (item.href === "/debug-capture" && !isDevAppEnv) {
+      if ((item.href === "/debug-capture" || item.href === "/settings/database") && !isDevAppEnv) {
         return false;
       }
       if (item.href === "/workspace/projects") {

@@ -51,7 +51,12 @@ export default function ClientWorkspacePage() {
   const sortedInvoices = useMemo(() => {
     const rows = (data?.invoices ?? []).filter((inv) => {
       if (!invoiceStatusFilter) return true;
-      return invoiceStatusLabel(inv) === invoiceStatusFilter;
+      const status = invoiceStatusLabel(inv);
+      // Overdue invoices are still awaiting payment.
+      if (invoiceStatusFilter === "AWAITING_PAYMENT") {
+        return status === "AWAITING_PAYMENT" || status === "OVERDUE";
+      }
+      return status === invoiceStatusFilter;
     });
     const { key, dir } = invoiceSort;
     rows.sort((a, b) => {

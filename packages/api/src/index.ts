@@ -40,6 +40,7 @@ import { authMiddleware } from "./middleware/auth";
 import { requireMfaEnrolled } from "./middleware/requireMfaEnrolled";
 import { requireRole, requireModule, requireAnyModule, blockModuleMutations } from "./middleware/requireRole";
 import { assertDevEnvMiddleware } from "./middleware/assertDevEnv.js";
+import { devDatabaseRoutes } from "./routes/dev-database.js";
 import { dashboardRoutes } from "./routes/dashboard";
 import { salesDashboardRoutes } from "./routes/sales-dashboard";
 import { projectDashboardRoutes } from "./routes/project-dashboard";
@@ -166,6 +167,14 @@ app.use(
   requireMfaEnrolled,
   assertDevEnvMiddleware,
   debugCaptureTicketRoutes,
+);
+app.use(
+  "/api/admin/dev-database",
+  authMiddleware,
+  requireMfaEnrolled,
+  requireRole("admin"),
+  assertDevEnvMiddleware,
+  devDatabaseRoutes,
 );
 app.use("/api/debug-portal/auth", debugPortalAuthRoutes);
 // Any TBOS account (internal or customer) may use the debug portal; routes enforce per-ticket access.

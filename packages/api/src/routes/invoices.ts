@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { prisma, type Prisma } from "@techbubble/database";
 import { CONTRACT_INVOICE_STATUSES } from "../lib/contract-invoice-status";
+import { serializeInvoiceActivityLog } from "../lib/invoice-activity";
 import { invoiceFiles, invoiceLineItems } from "../lib/invoice-lines";
 
 const router: IRouter = Router();
@@ -129,6 +130,10 @@ router.get("/:id", async (req, res) => {
             client: { select: { id: true, name: true } },
           },
         },
+        activityLogs: {
+          orderBy: { createdAt: "desc" },
+          include: { performedBy: { select: { name: true, email: true } } },
+        },
       },
     });
     if (!row) return res.status(404).json({ error: "Invoice not found" });
@@ -159,6 +164,7 @@ router.get("/:id", async (req, res) => {
         lineItems: invoiceLineItems(row),
         files: invoiceFiles(row),
         defaultCurrency: row.contract.currency,
+        activityLogs: row.activityLogs.map(serializeInvoiceActivityLog),
       },
     });
   } catch (error) {

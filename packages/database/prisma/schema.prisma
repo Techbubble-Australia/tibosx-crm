@@ -547,9 +547,27 @@ model ContractInvoice {
   fileUrls      Json?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  activityLogs  ContractInvoiceActivityLog[]
 
   @@index([contractId])
   @@index([status])
+}
+
+model ContractInvoiceActivityLog {
+  id            String          @id @default(cuid())
+  invoiceId     String
+  invoice       ContractInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  /// CREATED | FIELD_UPDATED
+  action        String
+  fieldName     String?
+  oldValue      String?         @db.Text
+  newValue      String?         @db.Text
+  performedById String?
+  performedBy   AdminUser?      @relation("InvoiceActivityPerformer", fields: [performedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime        @default(now())
+
+  @@index([invoiceId])
+  @@index([createdAt])
 }
 
 model ClientContact {
@@ -1040,6 +1058,7 @@ model AdminUser {
   ownedContracts Contract[] @relation("ContractOwner")
   ownedOpportunities Opportunity[] @relation("OpportunityOwner")
   contractActivities ContractActivityLog[] @relation("ContractActivityPerformer")
+  invoiceActivities ContractInvoiceActivityLog[] @relation("InvoiceActivityPerformer")
   managedProjects Project[] @relation("ProjectManager")
   timesheetApproverProjects Project[] @relation("ProjectTimesheetApprover")
   projectMemberships ProjectMember[] @relation("ProjectMemberUser")

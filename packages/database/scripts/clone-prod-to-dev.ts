@@ -1,5 +1,5 @@
 /**
- * Copy production PostgreSQL to development with email/phone anonymization.
+ * Copy production PostgreSQL to development with optional anonymization and debug-portal preserve.
  *
  * Requires: pg_dump, pg_restore, psql on PATH.
  *
@@ -7,26 +7,40 @@
  *   PROD_DATABASE_URL="postgresql://..." DEV_DATABASE_URL="postgresql://..." \
  *     pnpm --filter @techbubble/database db:clone-prod-to-dev
  *
- * If dump/restore already succeeded and only anonymization failed:
- *   SKIP_DUMP=1 DEV_DATABASE_URL="postgresql://..." PROD_DATABASE_URL=x \
- *     pnpm --filter @techbubble/database db:clone-prod-to-dev
- * Whitelisted emails are left unchanged (see ANONYMIZE_EMAIL_ALLOWLIST).
- *
- * MFA: production authenticator secrets are never kept on development. Existing dev enrollments are
- * restored after the copy; every other account must set up MFA again on dev (DEV.TIBOSX.AI entry).
+ * Options (env):
+ *   SKIP_DUMP=1                         — anonymize only (no dump/restore)
+ *   CLONE_PRESERVE_DEBUG=1              — keep DEV debug portal tickets (default: 1)
+ *   CLONE_ANONYMIZE_EMAILS=1            — overwrite emails/phones except allowlist (default: 1)
+ *   CLONE_EMAIL_ALLOWLIST=a@x,b@y       — emails to keep (default: Jeet, Herbert, Dhruv)
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
 
 const POSTGRES_CLI = ["pg_dump", "pg_restore"] as const;
 
-const ANONYMIZE_EMAIL_ALLOWLIST = new Set(
-  ["jeet@techbubble.com.au", "dhruv@techbubble.com.au"].map((e) => e.toLowerCase()),
-);
+const DEFAULT_EMAIL_ALLOWLIST = [
+  "jeet@techbubble.com.au",
+  "herbert.a@proprly.tech",
+  "dhruv@techbubble.com.au",
+];
+
+function envFlag(name: string, defaultValue: boolean): boolean {
+  const raw = process.env[name]?.trim().toLowerCase();
+  if (raw == null || raw === "") return defaultValue;
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
+function parseAllowlist(): Set<string> {
+  const raw = process.env.CLONE_EMAIL_ALLOWLIST?.trim();
+  const emails = raw
+    ? raw.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean)
+    : DEFAULT_EMAIL_ALLOWLIST;
+  return new Set(emails);
+}
 
 function requireEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -35,6 +49,14 @@ function requireEnv(name: string): string {
     process.exit(1);
   }
   return value;
+}
+
+function assertNotProdTarget(devUrl: string) {
+  const lower = devUrl.toLowerCase();
+  if (lower.includes("shortline.proxy.rlwy.net") || lower.includes("production")) {
+    console.error("Refusing to restore: DEV_DATABASE_URL looks like production.");
+    process.exit(1);
+  }
 }
 
 function assertPostgresCliOnPath() {
@@ -52,11 +74,7 @@ function assertPostgresCliOnPath() {
       "",
       "On macOS (Homebrew):",
       "  brew install libpq",
-      '  export PATH="/opt/homebrew/opt/libpq/bin:$PATH"   # Apple Silicon',
-      '  export PATH="/usr/local/opt/libpq/bin:$PATH"     # Intel Mac',
-      "",
-      "Then re-run:",
-      "  PROD_DATABASE_URL=... DEV_DATABASE_URL=... pnpm --filter @techbubble/database db:clone-prod-to-dev",
+      '  export PATH="/opt/homebrew/opt/libpq/bin:$PATH"',
     ].join("\n"),
   );
   process.exit(1);
@@ -87,9 +105,9 @@ function anonymizedPhone(original: string, table: string, id: string): string {
   return `+61400${digits.slice(0, 6)}`;
 }
 
-function keepEmail(email: string | null | undefined): boolean {
+function keepEmail(email: string | null | undefined, allowlist: Set<string>): boolean {
   if (!email) return false;
-  return ANONYMIZE_EMAIL_ALLOWLIST.has(email.trim().toLowerCase());
+  return allowlist.has(email.trim().toLowerCase());
 }
 
 type DevMfaEnrollment = { totpSecretEnc: string; mfaEnrolledAt: Date | null; mfaEnabled: boolean };
@@ -97,7 +115,6 @@ type DevMfaSnapshot = { admin: Map<string, DevMfaEnrollment>; customer: Map<stri
 
 const MFA_RESET = { mfaEnabled: true, totpSecretEnc: null, mfaEnrolledAt: null } as const;
 
-/** Dev authenticator enrollments (by user id) to put back after the production copy. */
 async function snapshotDevMfa(devUrl: string): Promise<DevMfaSnapshot> {
   const prisma = new PrismaClient({ datasources: { db: { url: devUrl } } });
   const toMap = (rows: Array<{ id: string; totpSecretEnc: string | null; mfaEnrolledAt: Date | null; mfaEnabled: boolean }>) =>
@@ -114,14 +131,13 @@ async function snapshotDevMfa(devUrl: string): Promise<DevMfaSnapshot> {
     ]);
     return { admin: toMap(admins), customer: toMap(customers) };
   } catch (error) {
-    console.warn("Could not read dev MFA enrollments (empty or new dev DB?) — all users will re-enroll.", error);
+    console.warn("Could not read dev MFA enrollments — all users will re-enroll.", error);
     return { admin: new Map(), customer: new Map() };
   } finally {
     await prisma.$disconnect();
   }
 }
 
-/** Replace copied production MFA secrets with dev enrollments, or clear them so users re-enroll on dev. */
 async function applyDevMfa(devUrl: string, snapshot: DevMfaSnapshot) {
   const prisma = new PrismaClient({ datasources: { db: { url: devUrl } } });
   try {
@@ -141,12 +157,74 @@ async function applyDevMfa(devUrl: string, snapshot: DevMfaSnapshot) {
   }
 }
 
-async function anonymizeDevDatabase(devUrl: string) {
+type DebugSnapshot = {
+  sprints: unknown[];
+  statuses: unknown[];
+  tickets: unknown[];
+  comments: unknown[];
+  logs: unknown[];
+};
+
+async function snapshotDebugPortal(devUrl: string): Promise<DebugSnapshot | null> {
+  const prisma = new PrismaClient({ datasources: { db: { url: devUrl } } });
+  try {
+    const [sprints, statuses, tickets, comments, logs] = await Promise.all([
+      prisma.debugSprint.findMany(),
+      prisma.debugTicketStatus.findMany(),
+      prisma.debugCaptureTicket.findMany(),
+      prisma.debugCaptureTicketComment.findMany(),
+      prisma.debugCaptureTicketLog.findMany(),
+    ]);
+    console.log(
+      `Debug portal snapshot: ${tickets.length} ticket(s), ${comments.length} comment(s), ${sprints.length} sprint(s).`,
+    );
+    return { sprints, statuses, tickets, comments, logs };
+  } catch (error) {
+    console.warn("Could not snapshot debug portal data — it will be replaced from production.", error);
+    return null;
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+async function restoreDebugPortal(devUrl: string, snapshot: DebugSnapshot) {
+  const prisma = new PrismaClient({ datasources: { db: { url: devUrl } } });
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.debugCaptureTicketLog.deleteMany();
+      await tx.debugCaptureTicketComment.deleteMany();
+      await tx.debugCaptureTicket.deleteMany();
+      await tx.debugSprint.deleteMany();
+      await tx.debugTicketStatus.deleteMany();
+
+      if (snapshot.statuses.length) {
+        await tx.debugTicketStatus.createMany({ data: snapshot.statuses as never[], skipDuplicates: true });
+      }
+      if (snapshot.sprints.length) {
+        await tx.debugSprint.createMany({ data: snapshot.sprints as never[], skipDuplicates: true });
+      }
+      if (snapshot.tickets.length) {
+        await tx.debugCaptureTicket.createMany({ data: snapshot.tickets as never[], skipDuplicates: true });
+      }
+      if (snapshot.comments.length) {
+        await tx.debugCaptureTicketComment.createMany({ data: snapshot.comments as never[], skipDuplicates: true });
+      }
+      if (snapshot.logs.length) {
+        await tx.debugCaptureTicketLog.createMany({ data: snapshot.logs as never[], skipDuplicates: true });
+      }
+    });
+    console.log(`Debug portal restored (${snapshot.tickets.length} ticket(s) kept on development).`);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+async function anonymizeDevDatabase(devUrl: string, allowlist: Set<string>) {
   const prisma = new PrismaClient({ datasources: { db: { url: devUrl } } });
   try {
     const adminUsers = await prisma.adminUser.findMany({ select: { id: true, email: true, phone: true } });
     for (const row of adminUsers) {
-      if (keepEmail(row.email)) continue;
+      if (keepEmail(row.email, allowlist)) continue;
       await prisma.adminUser.update({
         where: { id: row.id },
         data: {
@@ -158,7 +236,7 @@ async function anonymizeDevDatabase(devUrl: string) {
 
     const ticketingUsers = await prisma.ticketingUser.findMany({ select: { id: true, email: true } });
     for (const row of ticketingUsers) {
-      if (keepEmail(row.email)) continue;
+      if (keepEmail(row.email, allowlist)) continue;
       await prisma.ticketingUser.update({
         where: { id: row.id },
         data: { email: anonymizedEmail(row.email, "TicketingUser", row.id) },
@@ -169,7 +247,7 @@ async function anonymizeDevDatabase(devUrl: string) {
       select: { id: true, email: true, phone: true },
     });
     for (const row of customerUsers) {
-      if (keepEmail(row.email)) continue;
+      if (keepEmail(row.email, allowlist)) continue;
       await prisma.customerUser.update({
         where: { id: row.id },
         data: {
@@ -183,7 +261,7 @@ async function anonymizeDevDatabase(devUrl: string) {
       select: { id: true, email: true, phoneCountryCode: true, phoneNumber: true },
     });
     for (const row of contacts) {
-      if (keepEmail(row.email)) continue;
+      if (keepEmail(row.email, allowlist)) continue;
       const fakePhone = anonymizedPhone(row.phoneNumber, "ClientContact", row.id);
       await prisma.clientContact.update({
         where: { id: row.id },
@@ -199,7 +277,7 @@ async function anonymizeDevDatabase(devUrl: string) {
       select: { id: true, email: true, phone: true },
     });
     for (const row of profiles) {
-      if (keepEmail(row.email)) continue;
+      if (keepEmail(row.email, allowlist)) continue;
       await prisma.candidateProfile.update({
         where: { id: row.id },
         data: {
@@ -213,7 +291,7 @@ async function anonymizeDevDatabase(devUrl: string) {
       select: { id: true, email: true, phone: true },
     });
     for (const row of applications) {
-      if (keepEmail(row.email)) continue;
+      if (keepEmail(row.email, allowlist)) continue;
       await prisma.careerApplication.update({
         where: { id: row.id },
         data: {
@@ -223,20 +301,30 @@ async function anonymizeDevDatabase(devUrl: string) {
       });
     }
 
-    console.log("Anonymization complete (allowlisted emails unchanged).");
+    console.log(`Anonymization complete (kept ${allowlist.size} allowlisted email(s)).`);
   } finally {
     await prisma.$disconnect();
   }
 }
 
 async function main() {
-  const skipDump = process.env.SKIP_DUMP === "1" || process.env.SKIP_DUMP === "true";
+  const skipDump = envFlag("SKIP_DUMP", false);
+  const preserveDebug = envFlag("CLONE_PRESERVE_DEBUG", true);
+  const anonymizeEmails = envFlag("CLONE_ANONYMIZE_EMAILS", true);
+  const allowlist = parseAllowlist();
   const devUrl = requireEnv("DEV_DATABASE_URL");
+  assertNotProdTarget(devUrl);
+
+  console.log(
+    [
+      `Options: preserveDebug=${preserveDebug} anonymizeEmails=${anonymizeEmails}`,
+      `Allowlist: ${[...allowlist].join(", ") || "(none)"}`,
+    ].join("\n"),
+  );
 
   if (skipDump) {
     console.log("SKIP_DUMP set — anonymizing development only (no dump/restore).");
-    await anonymizeDevDatabase(devUrl);
-    // Dev was already overwritten, so its own enrollments are gone; clear the copied prod secrets.
+    if (anonymizeEmails) await anonymizeDevDatabase(devUrl, allowlist);
     await applyDevMfa(devUrl, { admin: new Map(), customer: new Map() });
     console.log("Done.");
     return;
@@ -247,9 +335,17 @@ async function main() {
   const prodUrl = requireEnv("PROD_DATABASE_URL");
   const workDir = mkdtempSync(join(tmpdir(), "tbos-prod-clone-"));
   const dumpPath = join(workDir, "prod.dump");
+  const debugPath = join(workDir, "debug-snapshot.json");
 
   console.log("Saving development MFA enrollments…");
   const devMfa = await snapshotDevMfa(devUrl);
+
+  let debugSnapshot: DebugSnapshot | null = null;
+  if (preserveDebug) {
+    console.log("Saving development debug portal tickets…");
+    debugSnapshot = await snapshotDebugPortal(devUrl);
+    if (debugSnapshot) writeFileSync(debugPath, JSON.stringify(debugSnapshot));
+  }
 
   console.log("Dumping production database…");
   run("pg_dump", ["--format=custom", "--no-owner", "--no-acl", `--file=${dumpPath}`, prodUrl]);
@@ -257,14 +353,23 @@ async function main() {
   console.log("Restoring into development (this replaces dev data)…");
   run("pg_restore", ["--clean", "--if-exists", "--no-owner", "--no-acl", `--dbname=${devUrl}`, dumpPath]);
 
-  console.log("Masking personal email and phone fields on development…");
-  await anonymizeDevDatabase(devUrl);
+  if (anonymizeEmails) {
+    console.log("Masking personal email and phone fields on development…");
+    await anonymizeDevDatabase(devUrl, allowlist);
+  } else {
+    console.log("Skipping email/phone overwrite (CLONE_ANONYMIZE_EMAILS=0).");
+  }
 
   console.log("Replacing production MFA secrets with development enrollments…");
   await applyDevMfa(devUrl, devMfa);
 
+  if (preserveDebug && debugSnapshot) {
+    console.log("Restoring development debug portal tickets…");
+    await restoreDebugPortal(devUrl, debugSnapshot);
+  }
+
   rmSync(workDir, { recursive: true, force: true });
-  console.log("Done. Development database now mirrors production with anonymized contact details.");
+  console.log("Done. Development database now mirrors production with the selected options.");
 }
 
 main().catch((error) => {

@@ -22,6 +22,11 @@ import {
   logContractVariationChange,
 } from "../lib/contract-activity";
 import { CONTRACT_INVOICE_STATUSES } from "../lib/contract-invoice-status";
+import {
+  invoiceSnapshotFromRow,
+  logInvoiceCreated,
+  logInvoiceFieldChanges,
+} from "../lib/invoice-activity";
 import { expirePastDueContracts } from "../lib/contract-expiry";
 import { isDateInMonth, resolveContractExpiryDate as resolveExpiryForForecast } from "../lib/sales-forecast";
 import {
@@ -1982,7 +1987,7 @@ router.patch("/:id/end-date", async (req: AuthRequest, res) => {
   }
 });
 
-router.post("/:id/invoices", async (req, res) => {
+router.post("/:id/invoices", async (req: AuthRequest, res) => {
   try {
     const input = invoiceSchema.parse(req.body);
     const contract = await prisma.contract.findUnique({ where: { id: req.params.id } });
@@ -2017,6 +2022,7 @@ router.post("/:id/invoices", async (req, res) => {
           ...(input.fileUrls ? { fileUrls: input.fileUrls } : {}),
         },
       });
+      await logInvoiceCreated(tx, created.id, req.user?.id);
       await syncContractConsumed(tx, contract.id);
       return created;
     });
@@ -2031,13 +2037,17 @@ router.post("/:id/invoices", async (req, res) => {
   }
 });
 
-router.patch("/:id/invoices/:invoiceId", async (req, res) => {
+router.patch("/:id/invoices/:invoiceId", async (req: AuthRequest, res) => {
   try {
-    const contract = await ensureInvoiceableContract(req.params.id);
+    const contractId = req.params.id;
+    const invoiceId = req.params.invoiceId;
+    if (!contractId || !invoiceId) return res.status(400).json({ error: "Invalid id" });
+    const contract = await ensureInvoiceableContract(contractId);
     const invoice = await prisma.contractInvoice.findFirst({
-      where: { id: req.params.invoiceId, contractId: contract.id },
+      where: { id: invoiceId, contractId: contract.id },
     });
     if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+    const before = invoiceSnapshotFromRow(invoice);
 
     const body = invoiceUpdateSchema.parse(req.body);
     const revertingToDraft = body.status === "DRAFT" && invoice.status !== "DRAFT";
@@ -2054,13 +2064,17 @@ router.patch("/:id/invoices/:invoiceId", async (req, res) => {
     }
 
     if (invoice.status !== "DRAFT" && !revertingToDraft) {
-      const row = await prisma.contractInvoice.update({
-        where: { id: invoice.id },
-        data: {
-          ...(body.status !== undefined ? { status: body.status } : {}),
-          ...(body.dueDate !== undefined ? { dueDate: body.dueDate } : {}),
-          ...(body.fileUrls !== undefined ? { fileUrls: body.fileUrls } : {}),
-        },
+      const row = await prisma.$transaction(async (tx) => {
+        const updated = await tx.contractInvoice.update({
+          where: { id: invoice.id },
+          data: {
+            ...(body.status !== undefined ? { status: body.status } : {}),
+            ...(body.dueDate !== undefined ? { dueDate: body.dueDate } : {}),
+            ...(body.fileUrls !== undefined ? { fileUrls: body.fileUrls } : {}),
+          },
+        });
+        await logInvoiceFieldChanges(tx, invoice.id, before, invoiceSnapshotFromRow(updated), req.user?.id);
+        return updated;
       });
       return res.json({ data: serializeInvoice(row) });
     }
@@ -2103,6 +2117,7 @@ router.patch("/:id/invoices/:invoiceId", async (req, res) => {
           ...(body.fileUrls !== undefined ? { fileUrls: body.fileUrls } : {}),
         },
       });
+      await logInvoiceFieldChanges(tx, invoice.id, before, invoiceSnapshotFromRow(updated), req.user?.id);
       await syncContractConsumed(tx, contract.id);
       return updated;
     });
