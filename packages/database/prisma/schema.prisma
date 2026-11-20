@@ -228,6 +228,8 @@ model CandidateProfile {
   relevantExperience  Int                @default(0)
   /// Whether the candidate is available for new roles.
   available           Boolean            @default(true)
+  /// Date from which the candidate becomes available (optional).
+  availableFrom       DateTime?
   /// Admin user who sourced this candidate (recruiter/admin).
   sourcedById         String?
   sourcedBy           AdminUser?         @relation("ProfileSourcedBy", fields: [sourcedById], references: [id], onDelete: SetNull)

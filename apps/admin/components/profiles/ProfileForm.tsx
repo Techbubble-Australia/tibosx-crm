@@ -44,6 +44,7 @@ export type ProfileFormValues = {
   level?: string;
   relevantExperience?: number;
   available?: boolean;
+  availableFrom?: string | null;
   isDuplicate?: boolean;
   duplicateCount?: number;
   duplicateMatchReason?: string | null;
@@ -131,6 +132,12 @@ export function ProfileForm({
   const [visaStatus, setVisaStatus] = useState(defaults.visaStatus ?? "");
   const [sourcedById, setSourcedById] = useState(defaults.sourcedById ?? "");
   const [available, setAvailable] = useState(defaults.available !== false);
+  const [availableFrom, setAvailableFrom] = useState(() => {
+    if (!defaults.availableFrom) return "";
+    const parsed = new Date(defaults.availableFrom);
+    if (Number.isNaN(parsed.getTime())) return "";
+    return parsed.toISOString().slice(0, 10);
+  });
   const [jobListingId, setJobListingId] = useState(defaults.jobListingId ?? "");
   const [sourcers, setSourcers] = useState<SourcerOption[]>([]);
   const [jobOptions, setJobOptions] = useState<JobOption[]>([]);
@@ -344,6 +351,7 @@ export function ProfileForm({
         careerApplicationId: defaults.careerApplicationId ?? null,
         sourcedById: sourcedById || null,
         available,
+        availableFrom: availableFrom.trim() || null,
         jobListingId: jobListingId || null,
         ...(pendingResumeText ? { resumeText: pendingResumeText } : {}),
       });
@@ -602,6 +610,18 @@ export function ProfileForm({
                 aria-hidden
               />
             </div>
+          </div>
+          <div>
+            <label className={labelClass}>Available from</label>
+            <input
+              type="date"
+              value={availableFrom}
+              onChange={(e) => setAvailableFrom(e.target.value)}
+              className={inputClass}
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Optional date when this person becomes available.
+            </p>
           </div>
           <div>
             <label className={labelClass}>Add to job</label>

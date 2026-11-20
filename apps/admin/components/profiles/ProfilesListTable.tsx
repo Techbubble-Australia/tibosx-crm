@@ -26,6 +26,7 @@ export type ProfileListRow = {
   sourcedById?: string | null;
   sourcedByName?: string | null;
   available?: boolean;
+  availableFrom?: string | null;
   isCitizen?: boolean;
   comments?: string | null;
   documentUrls?: string[];
@@ -192,6 +193,9 @@ export function ProfilesListTable({
           {isColumnVisible("available") ? (
             <th className="px-3 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Available?</th>
           ) : null}
+          {isColumnVisible("availableFrom") ? (
+            <th className="px-3 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Available from</th>
+          ) : null}
           {isColumnVisible("citizen") ? (
             <th className="px-3 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Citizen</th>
           ) : null}
@@ -286,6 +290,17 @@ export function ProfilesListTable({
                     />
                     {row.available !== false ? "Yes" : "No"}
                   </span>
+                </td>
+              ) : null}
+              {isColumnVisible("availableFrom") ? (
+                <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
+                  {row.availableFrom
+                    ? new Date(row.availableFrom).toLocaleDateString("en-AU", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })
+                    : "—"}
                 </td>
               ) : null}
               {isColumnVisible("citizen") ? (

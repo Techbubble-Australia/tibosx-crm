@@ -21,6 +21,7 @@ import { PROFILE_LEVELS } from "@/lib/profile-levels";
 const PROFILE_LIST_COLUMNS: ListColumnDef[] = [
   { id: "name", label: "Name" },
   { id: "available", label: "Available?" },
+  { id: "availableFrom", label: "Available from" },
   { id: "citizen", label: "Citizen" },
   { id: "city", label: "City" },
   { id: "country", label: "Country" },

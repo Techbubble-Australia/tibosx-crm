@@ -42,6 +42,13 @@ const profileSchema = z.object({
   level: z.string().min(1).max(120).default("Developer"),
   relevantExperience: z.coerce.number().int().min(0).max(80),
   available: z.boolean().default(true),
+  availableFrom: z
+    .preprocess(
+      (val) => (val === "" || val === null || val === undefined ? null : val),
+      z.union([z.coerce.date(), z.null()]),
+    )
+    .optional()
+    .nullable(),
 }).superRefine((data, ctx) => {
   if (!data.isCitizen && !data.visaStatus?.trim()) {
     ctx.addIssue({
@@ -166,6 +173,7 @@ function serializeProfile(row: {
   level: string;
   relevantExperience: number;
   available: boolean;
+  availableFrom: Date | null;
   isDuplicate?: boolean;
   duplicateCount?: number;
   duplicateMatchReason?: string | null;
@@ -219,6 +227,7 @@ function serializeProfile(row: {
     level: row.level ?? "Developer",
     relevantExperience: row.relevantExperience ?? 0,
     available: row.available ?? true,
+    availableFrom: row.availableFrom ? row.availableFrom.toISOString() : null,
     isDuplicate: row.isDuplicate ?? false,
     duplicateCount: row.duplicateCount ?? 0,
     duplicateMatchReason: row.duplicateMatchReason ?? null,
@@ -399,6 +408,7 @@ router.post("/", async (req: AuthRequest, res) => {
         level: data.level,
         relevantExperience: data.relevantExperience,
         available: data.available,
+        availableFrom: data.availableFrom ?? null,
       },
     });
 
@@ -452,6 +462,13 @@ router.patch("/:id", async (req: AuthRequest, res) => {
       relevantExperience: z.coerce.number().int().min(0).max(80).optional(),
       sourcedById: z.string().nullable().optional(),
       available: z.boolean().optional(),
+      availableFrom: z
+        .preprocess(
+          (val) => (val === "" || val === null || val === undefined ? null : val),
+          z.union([z.coerce.date(), z.null()]),
+        )
+        .optional()
+        .nullable(),
     });
 
     const data = patchSchema.parse(req.body);
@@ -475,6 +492,7 @@ router.patch("/:id", async (req: AuthRequest, res) => {
         ...(data.relevantExperience !== undefined ? { relevantExperience: data.relevantExperience } : {}),
         ...(sourcedById !== undefined ? { sourcedById } : {}),
         ...(data.available !== undefined ? { available: data.available } : {}),
+        ...(data.availableFrom !== undefined ? { availableFrom: data.availableFrom } : {}),
       },
       include: { sourcedBy: { select: { name: true, email: true } } },
     });
@@ -554,6 +572,7 @@ router.put("/:id", async (req: AuthRequest, res) => {
         level: data.level,
         relevantExperience: data.relevantExperience,
         available: data.available,
+        availableFrom: data.availableFrom ?? null,
       },
     });
 
