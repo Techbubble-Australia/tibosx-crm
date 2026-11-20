@@ -162,64 +162,80 @@ function sumWorkUnitsForPeriod(
     .reduce((sum, row) => sum + row.workUnits, 0);
 }
 
-function forecastTmFromWorkUnits(
+function workingDaysForPeriodSlice(
+  periodStart: Date,
+  periodEnd: Date,
+  year: number,
+  month: number | undefined,
+  country: string,
+): number {
+  if (month === undefined) {
+    const clipped = clipRangeToYear(periodStart, periodEnd, year);
+    if (!clipped) return 0;
+    return workingDaysInRange(clipped.start, clipped.end, country);
+  }
+  return workingDaysInMonth(year, month, periodStart, periodEnd, country);
+}
+
+/**
+ * Prefer stored work units per segment; fall back to calendar working days for
+ * any segment that has no work-unit rows (so variation WU alone does not drop the base period).
+ */
+function forecastTmHybrid(
   contract: ForecastContract,
   year: number,
   month?: number,
 ): number {
   let total = 0;
+  const country = contract.clientCountry || "Australia";
+
   if (contract.workUnitMonths.length > 0) {
     total += contract.rate * sumWorkUnitsForPeriod(contract.workUnitMonths, year, month);
-  }
-  for (const variation of contract.variations) {
-    if (!variation.workUnitMonths?.length) continue;
-    const rate = variation.rate ?? contract.rate;
-    total += rate * sumWorkUnitsForPeriod(variation.workUnitMonths, year, month);
-  }
-  return total;
-}
-
-function tmWorkingDaysInYear(
-  contract: ForecastContract,
-  year: number,
-  month?: number,
-): number {
-  const periods = forecastPeriods(contract.startDate, contract.endDate, contract.variations);
-  const country = contract.clientCountry || "Australia";
-  let total = 0;
-  for (const period of periods) {
-    if (month === undefined) {
-      const clipped = clipRangeToYear(period.start, period.end, year);
-      if (!clipped) continue;
-      total += workingDaysInRange(clipped.start, clipped.end, country);
-    } else {
-      total += workingDaysInMonth(year, month, period.start, period.end, country);
+  } else if (isValidEndDate(contract.endDate)) {
+    const baseStart = startOfUtcDay(contract.startDate);
+    const baseEnd = startOfUtcDay(contract.endDate!);
+    if (baseEnd >= baseStart) {
+      const days = workingDaysForPeriodSlice(baseStart, baseEnd, year, month, country);
+      total += tmMonthlyAmount(contract.rate, contract.unit, days);
     }
   }
-  return total;
-}
 
-function hasStoredWorkUnits(contract: ForecastContract): boolean {
-  if (contract.workUnitMonths.length > 0) return true;
-  return contract.variations.some((row) => (row.workUnitMonths?.length ?? 0) > 0);
+  const sorted = [...contract.variations]
+    .filter((row) => row.variationEndDate && isValidEndDate(row.variationEndDate))
+    .sort((a, b) => a.variationDate.getTime() - b.variationDate.getTime());
+
+  let previousEnd = isValidEndDate(contract.endDate) ? startOfUtcDay(contract.endDate!) : null;
+
+  for (const variation of sorted) {
+    const rate = variation.rate ?? contract.rate;
+    const variationEnd = startOfUtcDay(variation.variationEndDate!);
+
+    if (variation.workUnitMonths?.length) {
+      total += rate * sumWorkUnitsForPeriod(variation.workUnitMonths, year, month);
+      previousEnd = variationEnd;
+      continue;
+    }
+
+    const variationStart = startOfUtcDay(variation.variationDate);
+    const extensionStart = previousEnd ? addUtcDays(previousEnd, 1) : variationStart;
+    if (variationEnd >= extensionStart) {
+      const days = workingDaysForPeriodSlice(extensionStart, variationEnd, year, month, country);
+      total += tmMonthlyAmount(rate, contract.unit, days);
+      previousEnd = variationEnd;
+    }
+  }
+
+  return total;
 }
 
 export function forecastTmRevenueForMonth(contract: ForecastContract, year: number, month: number): number {
   if (contract.type !== "T_AND_M" || contract.status !== "ACTIVE") return 0;
-  if (hasStoredWorkUnits(contract)) {
-    return forecastTmFromWorkUnits(contract, year, month);
-  }
-  const days = tmWorkingDaysInYear(contract, year, month);
-  return tmMonthlyAmount(contract.rate, contract.unit, days);
+  return forecastTmHybrid(contract, year, month);
 }
 
 export function forecastTmRevenueForYear(contract: ForecastContract, year: number): number {
   if (contract.type !== "T_AND_M" || contract.status !== "ACTIVE") return 0;
-  if (hasStoredWorkUnits(contract)) {
-    return forecastTmFromWorkUnits(contract, year);
-  }
-  const days = tmWorkingDaysInYear(contract, year);
-  return tmMonthlyAmount(contract.rate, contract.unit, days);
+  return forecastTmHybrid(contract, year);
 }
 
 export function forecastMilestoneRevenueForYear(contract: ForecastContract, year: number): number {
@@ -252,13 +268,17 @@ function forecastRevenueForMonth(contracts: ForecastContract[], year: number, mo
   }, 0);
 }
 
+function isCountableActualInvoice(status: string): boolean {
+  return status !== "CANCELED" && status !== "DRAFT";
+}
+
 export function actualRevenueForMonth(invoices: ForecastInvoice[], year: number, month: number): number {
   return invoices
     .filter(
       (row) =>
-        row.status !== "CANCELED" &&
-        row.dueDate.getUTCFullYear() === year &&
-        row.dueDate.getUTCMonth() === month,
+        isCountableActualInvoice(row.status) &&
+        row.issueDate.getUTCFullYear() === year &&
+        row.issueDate.getUTCMonth() === month,
     )
     .reduce((sum, row) => sum + row.amount, 0);
 }
@@ -308,7 +328,7 @@ export function forecastRevenueByClientForYear(
 
 export function actualRevenueForYear(invoices: ForecastInvoice[], year: number): number {
   return invoices
-    .filter((row) => row.status !== "CANCELED" && row.dueDate.getUTCFullYear() === year)
+    .filter((row) => isCountableActualInvoice(row.status) && row.issueDate.getUTCFullYear() === year)
     .reduce((sum, row) => sum + row.amount, 0);
 }
 
@@ -318,7 +338,7 @@ export function actualRevenueByClientForYear(
 ): Array<{ clientId: string; clientName: string; actual: number }> {
   const map = new Map<string, { clientId: string; clientName: string; actual: number }>();
   for (const invoice of invoices) {
-    if (invoice.status === "CANCELED" || invoice.dueDate.getUTCFullYear() !== year) continue;
+    if (!isCountableActualInvoice(invoice.status) || invoice.issueDate.getUTCFullYear() !== year) continue;
     const existing = map.get(invoice.clientId);
     if (existing) {
       existing.actual += invoice.amount;

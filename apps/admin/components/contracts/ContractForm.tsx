@@ -1117,7 +1117,14 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
             <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Contract number</label>
             <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{defaults.contractNumber}</p>
           </div>
-          {status === "ACTIVE" && !baseProject ? (
+          {baseProject ? (
+            <Link
+              href={`/projects/${baseProject.id}`}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-gray-50 hover:underline dark:border-gray-600 dark:text-blue-400 dark:hover:bg-gray-800"
+            >
+              {baseProject.projectNumber}
+            </Link>
+          ) : status === "ACTIVE" ? (
             <button
               type="button"
               onClick={() => void createProject()}

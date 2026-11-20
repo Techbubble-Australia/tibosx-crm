@@ -15,6 +15,7 @@ const BASE_CURRENCIES = ["AUD", "USD", "INR"] as const;
 type SalesDashboardStats = {
   year: number;
   baseCurrency: string;
+  forecastScope?: "ytd" | "full_year";
   actuals: {
     activeOpportunities: number;
     activeContracts: number;
@@ -172,7 +173,7 @@ function MonthlyForecastChart({
       <div className="mb-6">
         <h3 className="font-semibold text-gray-900 dark:text-gray-100">Forecast vs actual by month</h3>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Monthly breakdown for {year} — forecast (amber) vs actual (green).
+          Monthly breakdown for {year} — planned work (amber) vs invoices by issue date (green).
         </p>
       </div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
@@ -340,24 +341,30 @@ export default function SalesDashboardPage() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
                   <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Forecasted revenue ({year})
+                    {stats?.forecastScope === "ytd"
+                      ? `Forecasted revenue (YTD ${year})`
+                      : `Forecasted revenue (${year})`}
                   </p>
                   <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
                     {formatAmount(stats?.forecast.forecastedRevenueThisYear ?? 0, displayCurrency)}
                   </p>
                   <p className="mt-1 text-xs text-gray-500">
-                    Converted to {displayCurrency} at current exchange rates
+                    {stats?.forecastScope === "ytd"
+                      ? `Planned work through this month, converted to ${displayCurrency}`
+                      : `Converted to ${displayCurrency} at current exchange rates`}
                   </p>
                 </div>
                 <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
                   <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Actual revenue ({year})
+                    {stats?.forecastScope === "ytd"
+                      ? `Actual revenue (YTD ${year})`
+                      : `Actual revenue (${year})`}
                   </p>
                   <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
                     {formatAmount(stats?.forecast.actualRevenueThisYear ?? 0, displayCurrency)}
                   </p>
                   <p className="mt-1 text-xs text-gray-500">
-                    Invoice amounts (excl. tax) in {displayCurrency} by due date
+                    Invoice amounts (excl. tax) in {displayCurrency} by issue date
                   </p>
                 </div>
               </div>
@@ -367,8 +374,16 @@ export default function SalesDashboardPage() {
                 currency={displayCurrency}
               />
               <DualBarChart
-                title={`Forecast vs actual (${year})`}
-                subtitle={`Grouped by client in ${displayCurrency} — forecast (amber) vs actual (green).`}
+                title={
+                  stats?.forecastScope === "ytd"
+                    ? `Forecast vs actual (YTD ${year})`
+                    : `Forecast vs actual (${year})`
+                }
+                subtitle={
+                  stats?.forecastScope === "ytd"
+                    ? `Grouped by client in ${displayCurrency} — planned work through this month (amber) vs invoices by issue date (green).`
+                    : `Grouped by client in ${displayCurrency} — forecast (amber) vs actual by issue date (green).`
+                }
                 items={stats?.forecast.forecastVsActualByClient ?? []}
                 currency={displayCurrency}
               />

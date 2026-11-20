@@ -980,6 +980,7 @@ router.get("/", async (req, res) => {
     const tab = typeof req.query.tab === "string" ? req.query.tab.trim() : "";
     const expiring = typeof req.query.expiring === "string" ? req.query.expiring.trim() : "";
     const type = typeof req.query.type === "string" ? req.query.type.trim() : "";
+    const status = typeof req.query.status === "string" ? req.query.status.trim() : "";
     const startDateFrom = parseDateQuery(req.query.startDateFrom);
     const startDateTo = parseDateQuery(req.query.startDateTo);
     const endDateFrom = parseDateQuery(req.query.endDateFrom);
@@ -1001,10 +1002,16 @@ router.get("/", async (req, res) => {
         ...(endDateTo ? { lte: endDateTo } : {}),
       };
     }
-    if (tab === "active") {
-      where.status = { in: [...CONTRACT_ACTIVE_STATUSES] };
-    } else if (tab === "inactive") {
-      where.status = { in: [...CONTRACT_INACTIVE_STATUSES] };
+    const tabStatuses =
+      tab === "active"
+        ? ([...CONTRACT_ACTIVE_STATUSES] as string[])
+        : tab === "inactive"
+          ? ([...CONTRACT_INACTIVE_STATUSES] as string[])
+          : null;
+    if (status && tabStatuses?.includes(status)) {
+      where.status = status;
+    } else if (tabStatuses) {
+      where.status = { in: tabStatuses };
     }
     if (expiring) {
       where.status = "ACTIVE";

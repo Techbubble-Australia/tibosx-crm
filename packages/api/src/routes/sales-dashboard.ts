@@ -209,9 +209,28 @@ router.get("/stats", async (req, res) => {
       currency: row.currency,
     }));
 
+    // For the current year, compare forecast through the current month (YTD) with
+    // invoices issued so far — not full-year planned capacity vs partial actuals.
+    const isCurrentYear = year === now.getUTCFullYear();
+    const forecastMonthEnd = isCurrentYear ? thisMonth : 11;
+
+    function forecastThroughMonth(contract: ForecastContract): number {
+      let total = 0;
+      for (let month = 0; month <= forecastMonthEnd; month += 1) {
+        total += forecastContractForMonth(contract, year, month, baseCurrency, rates);
+      }
+      return total;
+    }
+
+    function isCountableActual(status: string): boolean {
+      return status !== "CANCELED" && status !== "DRAFT";
+    }
+
     const forecastByClientMap = new Map<string, { clientId: string; clientName: string; forecast: number }>();
     for (const contract of forecastContracts) {
-      const value = forecastContractForYear(contract, year, baseCurrency, rates);
+      const value = isCurrentYear
+        ? forecastThroughMonth(contract)
+        : forecastContractForYear(contract, year, baseCurrency, rates);
       if (value <= 0) continue;
       const existing = forecastByClientMap.get(contract.clientId);
       if (existing) {
@@ -227,7 +246,8 @@ router.get("/stats", async (req, res) => {
 
     const actualByClientMap = new Map<string, { clientId: string; clientName: string; actual: number }>();
     for (const invoice of forecastInvoices) {
-      if (invoice.status === "CANCELED" || invoice.issueDate.getUTCFullYear() !== year) continue;
+      if (!isCountableActual(invoice.status) || invoice.issueDate.getUTCFullYear() !== year) continue;
+      if (isCurrentYear && invoice.issueDate.getUTCMonth() > thisMonth) continue;
       const value = toBase(invoice.amount, invoice.currency, baseCurrency, rates);
       const existing = actualByClientMap.get(invoice.clientId);
       if (existing) {
@@ -256,12 +276,20 @@ router.get("/stats", async (req, res) => {
       .sort((a, b) => b.forecast + b.actual - (a.forecast + a.actual));
 
     const forecastedRevenueThisYear = forecastContracts.reduce(
-      (sum, contract) => sum + forecastContractForYear(contract, year, baseCurrency, rates),
+      (sum, contract) =>
+        sum +
+        (isCurrentYear
+          ? forecastThroughMonth(contract)
+          : forecastContractForYear(contract, year, baseCurrency, rates)),
       0,
     );
 
     const actualRevenueThisYear = forecastInvoices
-      .filter((row) => row.status !== "CANCELED" && row.issueDate.getUTCFullYear() === year)
+      .filter((row) => {
+        if (!isCountableActual(row.status) || row.issueDate.getUTCFullYear() !== year) return false;
+        if (isCurrentYear && row.issueDate.getUTCMonth() > thisMonth) return false;
+        return true;
+      })
       .reduce((sum, row) => sum + toBase(row.amount, row.currency, baseCurrency, rates), 0);
 
     const forecastByMonth = MONTH_LABELS.map((label, month) => ({
@@ -274,7 +302,7 @@ router.get("/stats", async (req, res) => {
       actual: forecastInvoices
         .filter(
           (row) =>
-            row.status !== "CANCELED" &&
+            isCountableActual(row.status) &&
             row.issueDate.getUTCFullYear() === year &&
             row.issueDate.getUTCMonth() === month,
         )
@@ -285,6 +313,7 @@ router.get("/stats", async (req, res) => {
       data: {
         year,
         baseCurrency,
+        forecastScope: isCurrentYear ? "ytd" : "full_year",
         actuals: {
           activeOpportunities,
           activeContracts,

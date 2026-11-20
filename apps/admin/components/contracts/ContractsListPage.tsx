@@ -16,6 +16,7 @@ import {
   CONTRACT_STATUS_LABELS,
   type ContractStatus,
 } from "@/lib/contract-status";
+import { CONTRACT_ACTIVE_STATUSES, CONTRACT_INACTIVE_STATUSES } from "@/lib/contract-groups";
 import { CONTRACT_TYPES, CONTRACT_TYPE_LABELS, type ContractType } from "@/lib/contract-types";
 
 const filterInputClass =
@@ -94,20 +95,12 @@ export function ContractsListPage({ activeFilter }: Props) {
   const searchParams = useSearchParams();
   const clientIdFilter = searchParams.get("clientId")?.trim() ?? "";
   const typeFilter = searchParams.get("type")?.trim() ?? "";
-  const startDateFromFilter = searchParams.get("startDateFrom")?.trim() ?? "";
-  const startDateToFilter = searchParams.get("startDateTo")?.trim() ?? "";
-  const endDateFromFilter = searchParams.get("endDateFrom")?.trim() ?? "";
-  const endDateToFilter = searchParams.get("endDateTo")?.trim() ?? "";
+  const statusFilter = searchParams.get("status")?.trim() ?? "";
   const expiringFilter = searchParams.get("expiring")?.trim() ?? "";
   const listTab = activeFilter ? "active" : "inactive";
+  const statusOptions = activeFilter ? CONTRACT_ACTIVE_STATUSES : CONTRACT_INACTIVE_STATUSES;
   const [rows, setRows] = useState<ContractRow[]>([]);
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
-  const [filterClientId, setFilterClientId] = useState(clientIdFilter);
-  const [filterType, setFilterType] = useState(typeFilter);
-  const [filterStartDateFrom, setFilterStartDateFrom] = useState(startDateFromFilter);
-  const [filterStartDateTo, setFilterStartDateTo] = useState(startDateToFilter);
-  const [filterEndDateFrom, setFilterEndDateFrom] = useState(endDateFromFilter);
-  const [filterEndDateTo, setFilterEndDateTo] = useState(endDateToFilter);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
@@ -201,52 +194,26 @@ export function ContractsListPage({ activeFilter }: Props) {
   }, []);
 
   useEffect(() => {
-    setFilterClientId(clientIdFilter);
-    setFilterType(typeFilter);
-    setFilterStartDateFrom(startDateFromFilter);
-    setFilterStartDateTo(startDateToFilter);
-    setFilterEndDateFrom(endDateFromFilter);
-    setFilterEndDateTo(endDateToFilter);
-  }, [
-    clientIdFilter,
-    typeFilter,
-    startDateFromFilter,
-    startDateToFilter,
-    endDateFromFilter,
-    endDateToFilter,
-  ]);
-
-  useEffect(() => {
     void fetchRows();
-  }, [
-    activeFilter,
-    clientIdFilter,
-    typeFilter,
-    startDateFromFilter,
-    startDateToFilter,
-    endDateFromFilter,
-    endDateToFilter,
-    expiringFilter,
-  ]);
+  }, [activeFilter, clientIdFilter, typeFilter, statusFilter, expiringFilter]);
 
-  function applyFilters() {
+  function updateFilters(next: { clientId?: string; type?: string; status?: string }) {
     const params = new URLSearchParams(searchParams.toString());
     const setOrDelete = (key: string, value: string) => {
       if (value) params.set(key, value);
       else params.delete(key);
     };
-    setOrDelete("clientId", filterClientId);
-    setOrDelete("type", filterType);
-    setOrDelete("startDateFrom", filterStartDateFrom);
-    setOrDelete("startDateTo", filterStartDateTo);
-    setOrDelete("endDateFrom", filterEndDateFrom);
-    setOrDelete("endDateTo", filterEndDateTo);
+    if (next.clientId !== undefined) setOrDelete("clientId", next.clientId);
+    if (next.type !== undefined) setOrDelete("type", next.type);
+    if (next.status !== undefined) setOrDelete("status", next.status);
+    // Drop legacy date filters if still present in the URL.
+    ["startDateFrom", "startDateTo", "endDateFrom", "endDateTo"].forEach((key) => params.delete(key));
     router.push(`?${params.toString()}`);
   }
 
   function clearFilters() {
     const params = new URLSearchParams(searchParams.toString());
-    ["clientId", "type", "startDateFrom", "startDateTo", "endDateFrom", "endDateTo"].forEach((key) =>
+    ["clientId", "type", "status", "startDateFrom", "startDateTo", "endDateFrom", "endDateTo"].forEach((key) =>
       params.delete(key),
     );
     router.push(`?${params.toString()}`);
@@ -259,10 +226,7 @@ export function ContractsListPage({ activeFilter }: Props) {
       params.set("tab", listTab);
       if (clientIdFilter) params.set("clientId", clientIdFilter);
       if (typeFilter) params.set("type", typeFilter);
-      if (startDateFromFilter) params.set("startDateFrom", startDateFromFilter);
-      if (startDateToFilter) params.set("startDateTo", startDateToFilter);
-      if (endDateFromFilter) params.set("endDateFrom", endDateFromFilter);
-      if (endDateToFilter) params.set("endDateTo", endDateToFilter);
+      if (statusFilter) params.set("status", statusFilter);
       if (expiringFilter) params.set("expiring", expiringFilter);
       const res = await adminFetch(`/api/admin/contracts?${params.toString()}`);
       const data = await res.json();
@@ -385,10 +349,14 @@ export function ContractsListPage({ activeFilter }: Props) {
             Clear all
           </button>
         </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Client</label>
-            <select value={filterClientId} onChange={(e) => setFilterClientId(e.target.value)} className={filterInputClass}>
+            <select
+              value={clientIdFilter}
+              onChange={(e) => updateFilters({ clientId: e.target.value })}
+              className={filterInputClass}
+            >
               <option value="">All clients</option>
               {clients.map((client) => (
                 <option key={client.id} value={client.id}>{client.name}</option>
@@ -397,7 +365,11 @@ export function ContractsListPage({ activeFilter }: Props) {
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Type</label>
-            <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className={filterInputClass}>
+            <select
+              value={typeFilter}
+              onChange={(e) => updateFilters({ type: e.target.value })}
+              className={filterInputClass}
+            >
               <option value="">All types</option>
               {CONTRACT_TYPES.map((type) => (
                 <option key={type} value={type}>{CONTRACT_TYPE_LABELS[type]}</option>
@@ -405,30 +377,20 @@ export function ContractsListPage({ activeFilter }: Props) {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Start date from</label>
-            <input type="date" value={filterStartDateFrom} onChange={(e) => setFilterStartDateFrom(e.target.value)} className={filterInputClass} />
+            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => updateFilters({ status: e.target.value })}
+              className={filterInputClass}
+            >
+              <option value="">All statuses</option>
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {CONTRACT_STATUS_LABELS[status]}
+                </option>
+              ))}
+            </select>
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Start date to</label>
-            <input type="date" value={filterStartDateTo} onChange={(e) => setFilterStartDateTo(e.target.value)} className={filterInputClass} />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">End date from</label>
-            <input type="date" value={filterEndDateFrom} onChange={(e) => setFilterEndDateFrom(e.target.value)} className={filterInputClass} />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">End date to</label>
-            <input type="date" value={filterEndDateTo} onChange={(e) => setFilterEndDateTo(e.target.value)} className={filterInputClass} />
-          </div>
-        </div>
-        <div className="mt-3">
-          <button
-            type="button"
-            onClick={applyFilters}
-            className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
-          >
-            Apply filters
-          </button>
         </div>
       </section>
 
