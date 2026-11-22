@@ -15,6 +15,8 @@ type ProfileForMatch = {
   level: string;
   comments: string | null;
   resumeText: string | null;
+  available: boolean;
+  availableFrom: Date | null;
 };
 
 export type ProfileMatchResult = {
@@ -28,6 +30,8 @@ export type ProfileMatchResult = {
   matchCount: number;
   matchedTags: string[];
   countryMatch: boolean;
+  available: boolean;
+  availableFrom: string | null;
 };
 
 function normalizeTag(value: string): string {
@@ -114,6 +118,8 @@ export function matchProfilesToJob(
       matchCount,
       matchedTags,
       countryMatch: Boolean(countryMatch),
+      available: profile.available !== false,
+      availableFrom: profile.availableFrom ? profile.availableFrom.toISOString() : null,
     };
   });
 

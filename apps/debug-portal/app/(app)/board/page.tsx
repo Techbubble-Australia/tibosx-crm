@@ -182,8 +182,8 @@ export default function BoardPage() {
   /** `silent` refreshes in the background (auto-refresh) without the loading state or clearing errors. */
   const load = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
     if (sprintFilter === null) return;
-    // Switching sprints quickly must not let a slower, older response overwrite the newer board.
-    const seq = ++loadSeq.current;
+    // Silent refreshes must not bump loadSeq — otherwise they can strand a non-silent load with loading stuck true.
+    const seq = silent ? loadSeq.current : ++loadSeq.current;
     if (!silent) {
       setLoading(true);
       setError("");
@@ -208,7 +208,7 @@ export default function BoardPage() {
   }, [reporterFilter, sprintFilter]);
 
   useAutoRefresh(() => void load({ silent: true }), {
-    paused: Boolean(draggingId || savingId || openTicket || editingColumn || adding || statusSaving),
+    paused: Boolean(draggingId || savingId || openTicket || editingColumn || adding || statusSaving || loading),
   });
 
   async function deleteSprint() {

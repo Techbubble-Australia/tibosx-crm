@@ -55,11 +55,19 @@ import {
 
 const router: IRouter = Router();
 
+/** Avoid running the full expiry sweep on every contracts request (list navigations pile up). */
+let lastExpireAttemptMs = 0;
+const EXPIRE_THROTTLE_MS = 60_000;
+
 router.use(async (_req, _res, next) => {
-  try {
-    await expirePastDueContracts();
-  } catch (error) {
-    console.error("Error expiring past-due contracts:", error);
+  const now = Date.now();
+  if (now - lastExpireAttemptMs >= EXPIRE_THROTTLE_MS) {
+    lastExpireAttemptMs = now;
+    try {
+      await expirePastDueContracts();
+    } catch (error) {
+      console.error("Error expiring past-due contracts:", error);
+    }
   }
   next();
 });

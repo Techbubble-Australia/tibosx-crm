@@ -546,6 +546,8 @@ router.get("/admin/:id/matching-profiles", async (req, res) => {
         level: true,
         comments: true,
         resumeText: true,
+        available: true,
+        availableFrom: true,
       },
     });
     const matches = matchProfilesToJob(

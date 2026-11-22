@@ -23,12 +23,12 @@ export function useAutoRefresh(refresh: () => void, { intervalMs = AUTO_REFRESH_
     const onVisible = () => {
       if (document.visibilityState === "visible") run();
     };
+    // Prefer visibilitychange over window focus — focus fires when closing modals
+    // and can race a non-silent reload into a stuck loading state.
     document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("focus", run);
     return () => {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("focus", run);
     };
   }, [intervalMs]);
 }

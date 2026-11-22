@@ -16,6 +16,8 @@ type MatchRow = {
   matchCount: number;
   matchedTags: string[];
   countryMatch: boolean;
+  available?: boolean;
+  availableFrom?: string | null;
 };
 
 type Props = {
@@ -102,6 +104,8 @@ export function JobAiInsightsPanel({ jobId, metaTags = [] }: Props) {
                 <th className="py-2 pr-3">Name</th>
                 <th className="py-2 pr-3">Country</th>
                 <th className="py-2 pr-3">Category / Tech</th>
+                <th className="py-2 pr-3">Available?</th>
+                <th className="py-2 pr-3">Available from</th>
                 <th className="py-2 pr-3">Matched tags</th>
                 <th className="py-2 pr-3">Score</th>
                 <th className="py-2">Add</th>
@@ -127,6 +131,24 @@ export function JobAiInsightsPanel({ jobId, metaTags = [] }: Props) {
                     </td>
                     <td className="py-2 pr-3 text-gray-600 dark:text-gray-400">
                       {row.category} · {row.technology}
+                    </td>
+                    <td className="py-2 pr-3">
+                      <span className="inline-flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                        <span
+                          className={`inline-block h-2.5 w-2.5 rounded-full ${row.available !== false ? "bg-green-500" : "bg-red-500"}`}
+                          aria-hidden
+                        />
+                        {row.available !== false ? "Yes" : "No"}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-3 text-gray-600 dark:text-gray-400">
+                      {row.availableFrom
+                        ? new Date(row.availableFrom).toLocaleDateString("en-AU", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })
+                        : "—"}
                     </td>
                     <td className="py-2 pr-3 text-gray-600 dark:text-gray-400">
                       {row.matchedTags.length ? row.matchedTags.join(", ") : "—"}

@@ -76,10 +76,10 @@ type NavGroup = {
   items: NavItem[];
 };
 
-/** Personal home for every non-client user; client/support-portal-only users land on their portal dashboard. */
+/** Home entry: Personal and/or Client workspace, depending on role. */
 const workspaceNavItem: NavItem = {
   href: "/my-workspace",
-  label: "Workspace",
+  label: "Home",
   icon: Home,
   roles: [],
 };
@@ -362,22 +362,25 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         isDevAppEnv,
       ]);
 
-  /** Clients' Workspace home is their Client workspace; everyone else's is /my-workspace. */
+  /** Clients with Client workspace access land on Client Home. */
   const clientHome =
     anyEffectiveRole(role, additionalRoles, ["client"]) &&
     !anyEffectiveRole(role, additionalRoles, ["admin", "customer_support"]) &&
     canAccessClientWorkspace;
-  const workspaceHomeHref = clientHome ? "/workspace/client" : workspaceNavItem.href;
+  const isAdminHome = anyEffectiveRole(role, additionalRoles, ["admin"]);
+  /** Admins default to Client; non-admin internals to Personal; clients to Client. */
+  const workspaceHomeHref = clientHome || isAdminHome ? "/workspace/client" : workspaceNavItem.href;
   const showWorkspaceHome =
     !loading && (clientHome || (role !== "client" && !isRestrictedToWorkspaceOnly(role, additionalRoles)));
   const workspaceHomeActive = pathUnder(workspaceHomeHref, pathname);
-  /** Admins get Workspace as a group: their home plus the Client workspace preview. */
-  const workspaceSubItems: NavItem[] = anyEffectiveRole(role, additionalRoles, ["admin"])
-    ? [
-        { href: "/my-workspace", label: "Personal", icon: Home, roles: [] },
-        { href: "/workspace/client", label: "Client", icon: Building2, roles: [] },
-      ]
-    : [];
+  /** Internal users switch Personal vs Client under Home. */
+  const workspaceSubItems: NavItem[] =
+    showWorkspaceHome && !clientHome
+      ? [
+          { href: "/my-workspace", label: "Personal", icon: Home, roles: [] },
+          { href: "/workspace/client", label: "Client", icon: Building2, roles: [] },
+        ]
+      : [];
   const workspaceGroupActive = workspaceSubItems.some((item) => pathUnder(item.href, pathname));
   const workspaceGroupOpen = openGroups["my-workspace"] ?? workspaceGroupActive;
 

@@ -29,7 +29,7 @@ export default function DashboardPage() {
   // Clients on timesheet-only projects have no support tickets; send them to their projects instead.
   useEffect(() => {
     if (!sessionLoaded || !clientWithoutTickets) return;
-    router.replace(canAccessClientWorkspace ? "/workspace/client" : "/workspace/timesheets/submitted");
+    router.replace(canAccessClientWorkspace ? "/workspace/client" : "/workspace/projects");
   }, [sessionLoaded, clientWithoutTickets, canAccessClientWorkspace, router]);
 
   const loadTickets = useCallback(async () => {

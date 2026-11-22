@@ -3,6 +3,7 @@ import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useState } from "react";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { defaultLandingPath } from "@/lib/admin-roles";
 
 export function ImpersonationBanner() {
   const { impersonation, refreshSession } = useAdminSession();
@@ -18,7 +19,7 @@ export function ImpersonationBanner() {
         throw new Error((data as { error?: string }).error || "Failed");
       }
       await refreshSession();
-      window.location.href = "/my-workspace";
+      window.location.href = defaultLandingPath("admin");
     } catch (e) {
       appAlert(e instanceof Error ? e.message : "Could not end impersonation");
     } finally {

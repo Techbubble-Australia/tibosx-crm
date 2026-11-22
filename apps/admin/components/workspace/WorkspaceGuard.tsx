@@ -2,26 +2,30 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { anyEffectiveRole, defaultLandingPath } from "@/lib/admin-roles";
+import { anyEffectiveRole, defaultLandingPath, isRestrictedToWorkspaceOnly } from "@/lib/admin-roles";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 
-/** Admins may preview any client's Client workspace; the rest of /workspace is the client/support portal. */
-const ADMIN_PREVIEW_PATHS = ["/workspace/client"];
+/** Internal users (and admins) may open Client workspace from Home; other /workspace routes stay portal-only. */
+const CLIENT_WORKSPACE_PREVIEW_PATHS = ["/workspace/client"];
 
 export function WorkspaceGuard({ children }: { children: React.ReactNode }) {
   const { role, additionalRoles, loading, sessionLoaded } = useAdminSession();
   const router = useRouter();
   const pathname = usePathname() ?? "";
-  const adminPreview =
-    anyEffectiveRole(role, additionalRoles, ["admin"]) &&
-    ADMIN_PREVIEW_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
-  const allowed = adminPreview || anyEffectiveRole(role, additionalRoles, ["client", "customer_support"]);
+  const onClientWorkspacePreview = CLIENT_WORKSPACE_PREVIEW_PATHS.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  );
+  const internalPreview =
+    onClientWorkspacePreview &&
+    !anyEffectiveRole(role, additionalRoles, ["client", "customer_support"]) &&
+    !isRestrictedToWorkspaceOnly(role, additionalRoles);
+  const allowed = internalPreview || anyEffectiveRole(role, additionalRoles, ["client", "customer_support"]);
 
   useEffect(() => {
     if (sessionLoaded && !loading && !allowed) {
-      router.replace(defaultLandingPath(role));
+      router.replace(defaultLandingPath(role, additionalRoles));
     }
-  }, [allowed, loading, sessionLoaded, role, router]);
+  }, [allowed, loading, sessionLoaded, role, additionalRoles, router]);
 
   if (loading || !sessionLoaded) {
     return (

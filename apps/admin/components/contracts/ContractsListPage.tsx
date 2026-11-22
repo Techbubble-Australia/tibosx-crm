@@ -102,6 +102,7 @@ export function ContractsListPage({ activeFilter }: Props) {
   const [rows, setRows] = useState<ContractRow[]>([]);
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("contractNumber");
@@ -221,6 +222,7 @@ export function ContractsListPage({ activeFilter }: Props) {
 
   async function fetchRows() {
     setIsLoading(true);
+    setLoadError("");
     try {
       const params = new URLSearchParams();
       params.set("tab", listTab);
@@ -229,10 +231,15 @@ export function ContractsListPage({ activeFilter }: Props) {
       if (statusFilter) params.set("status", statusFilter);
       if (expiringFilter) params.set("expiring", expiringFilter);
       const res = await adminFetch(`/api/admin/contracts?${params.toString()}`);
-      const data = await res.json();
-      setRows((data.data ?? []) as ContractRow[]);
+      const data = (await res.json().catch(() => ({}))) as { data?: ContractRow[]; error?: string };
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to load contracts");
+      }
+      setRows(Array.isArray(data.data) ? data.data : []);
     } catch (error) {
       console.error("Error fetching contracts:", error);
+      setLoadError(error instanceof Error ? error.message : "Failed to load contracts");
+      setRows([]);
     } finally {
       setIsLoading(false);
     }
@@ -305,7 +312,7 @@ export function ContractsListPage({ activeFilter }: Props) {
     );
   }
 
-  if (isLoading) {
+  if (isLoading && rows.length === 0 && !loadError) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-black border-t-transparent dark:border-white" />
@@ -315,6 +322,19 @@ export function ContractsListPage({ activeFilter }: Props) {
 
   return (
     <div>
+      {loadError ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+          <p>{loadError}</p>
+          <button
+            type="button"
+            onClick={() => void fetchRows()}
+            disabled={isLoading}
+            className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:hover:bg-red-900/40"
+          >
+            {isLoading ? "Retrying…" : "Retry"}
+          </button>
+        </div>
+      ) : null}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">

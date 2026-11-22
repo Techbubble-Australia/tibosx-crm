@@ -140,7 +140,8 @@ function TicketsListInner() {
   /** `silent` refreshes in the background (auto-refresh) without the loading state. */
   const load = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
     if (!filtersReady || sprintFilter === null) return;
-    const seq = ++loadSeq.current;
+    // Silent refreshes must not bump loadSeq — otherwise they can strand a non-silent load with loading stuck true.
+    const seq = silent ? loadSeq.current : ++loadSeq.current;
     if (!silent) setLoading(true);
     try {
       const qs = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(page * PAGE_SIZE) });
@@ -162,7 +163,7 @@ function TicketsListInner() {
     }
   }, [filtersReady, reporterFilter, statusFilter, sprintFilter, page]);
 
-  useAutoRefresh(() => void load({ silent: true }), { paused: Boolean(openTicket || bulkSaving) });
+  useAutoRefresh(() => void load({ silent: true }), { paused: Boolean(openTicket || bulkSaving || loading) });
 
   useEffect(() => {
     void load();

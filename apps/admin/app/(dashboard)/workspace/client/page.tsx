@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { SortableTh, toggleSortKey, type SortDir } from "@/components/ui/SortableTh";
 import { Loader2, Paperclip } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { resolveDocumentHref } from "@/lib/media-url";
+import { anyEffectiveRole } from "@/lib/admin-roles";
+import { useAdminSession } from "@/contexts/AdminSessionContext";
 import {
   Card,
   Pill,
@@ -23,6 +26,14 @@ type InvoiceStatusFilter = "" | "DRAFT" | "AWAITING_PAYMENT" | "PAID" | "OVERDUE
 const invoiceStatusLabel = (inv: Overview["invoices"][number]) => (inv.overdue ? "OVERDUE" : inv.status);
 
 export default function ClientWorkspacePage() {
+  const router = useRouter();
+  const {
+    role,
+    additionalRoles,
+    sessionLoaded,
+    canAccessClientWorkspace,
+    canAccessClientProjects,
+  } = useAdminSession();
   const [clientId, setClientId] = useState("");
   const [currencyChoice, setCurrencyChoice] = useState("");
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<InvoiceStatusFilter>("");
@@ -31,7 +42,24 @@ export default function ClientWorkspacePage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
+  const isClientUser =
+    anyEffectiveRole(role, additionalRoles, ["client"]) &&
+    !anyEffectiveRole(role, additionalRoles, ["admin"]);
+
   useEffect(() => {
+    if (!sessionLoaded || !isClientUser) return;
+    if (canAccessClientWorkspace) return;
+    router.replace(canAccessClientProjects ? "/workspace/projects" : "/workspace/timesheets/submitted");
+  }, [
+    sessionLoaded,
+    isClientUser,
+    canAccessClientWorkspace,
+    canAccessClientProjects,
+    router,
+  ]);
+
+  useEffect(() => {
+    if (isClientUser && sessionLoaded && !canAccessClientWorkspace) return;
     setLoading(true);
     setError("");
     const params = new URLSearchParams();
@@ -46,7 +74,7 @@ export default function ClientWorkspacePage() {
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load the client workspace"))
       .finally(() => setLoading(false));
-  }, [clientId, currencyChoice]);
+  }, [clientId, currencyChoice, isClientUser, sessionLoaded, canAccessClientWorkspace]);
 
   const sortedInvoices = useMemo(() => {
     const rows = (data?.invoices ?? []).filter((inv) => {
@@ -76,6 +104,14 @@ export default function ClientWorkspacePage() {
     () => Math.max(1, ...(data?.chart ?? []).map((m) => m.paid + m.awaiting + m.draft)),
     [data],
   );
+
+  if (isClientUser && sessionLoaded && !canAccessClientWorkspace) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      </div>
+    );
+  }
 
   if (loading && !data) {
     return (
