@@ -28,6 +28,16 @@ export function defaultStatusForFamily(family: BoardFamily): string {
   return family === "STRATEGY" ? "PLANNED" : "PENDING";
 }
 
+/** First column on the board (falls back to the built-in default key). */
+export async function firstStatusKeyForFamily(family: BoardFamily): Promise<string> {
+  const first = await prisma.debugTicketStatus.findFirst({
+    where: { boardFamily: family },
+    orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+    select: { key: true },
+  });
+  return first?.key ?? defaultStatusForFamily(family);
+}
+
 export async function listDebugTicketStatuses(family: BoardFamily = "WORK") {
   return prisma.debugTicketStatus.findMany({
     where: { boardFamily: family },

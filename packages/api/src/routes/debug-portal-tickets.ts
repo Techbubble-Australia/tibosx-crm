@@ -19,7 +19,7 @@ import {
 } from "../lib/debug-ticket-log.js";
 import {
   boardFamilyForHierarchyLevel,
-  defaultStatusForFamily,
+  firstStatusKeyForFamily,
   isDebugTicketStatus,
   previousDebugTicketStatus,
 } from "../lib/debug-ticket-statuses.js";
@@ -375,7 +375,7 @@ router.post("/", async (req: PortalRequest, res) => {
     const initialStatus =
       adminUser.isAdmin && input.status && (await isDebugTicketStatus(input.status, family))
         ? input.status
-        : defaultStatusForFamily(family);
+        : await firstStatusKeyForFamily(family);
     let attemptId = ticketId;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -933,7 +933,7 @@ router.patch("/:id", async (req: PortalRequest, res) => {
       const nextFamily = boardFamilyForHierarchyLevel(hierarchy.hierarchyLevel);
       const currentFamily = boardFamilyForHierarchyLevel(row.hierarchyLevel);
       if (nextFamily !== currentFamily && body.status === undefined) {
-        const remapped = defaultStatusForFamily(nextFamily);
+        const remapped = await firstStatusKeyForFamily(nextFamily);
         if (remapped !== row.status) {
           data.status = remapped;
           entries.push({

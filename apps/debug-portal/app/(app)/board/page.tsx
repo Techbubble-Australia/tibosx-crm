@@ -825,18 +825,19 @@ function BoardPageInner() {
                       <button type="button" onClick={() => setEditingColumn(null)} className="dp-btn-ghost py-1.5 text-xs">
                         Cancel
                       </button>
-                      {status.isSystem ? (
-                        <span className="text-[11px] text-slate-400">Built-in status</span>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={statusSaving}
-                          onClick={() => void deleteColumn(status)}
-                          className="dp-btn-ghost ml-auto py-1.5 text-xs text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" aria-hidden /> Delete
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        disabled={statusSaving || statuses.length <= 1}
+                        title={
+                          statuses.length <= 1
+                            ? "Keep at least one status column on this board"
+                            : "Delete this status column"
+                        }
+                        onClick={() => void deleteColumn(status)}
+                        className="dp-btn-ghost ml-auto py-1.5 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden /> Delete
+                      </button>
                     </div>
                   </div>
                 ) : null}

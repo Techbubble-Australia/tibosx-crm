@@ -170,8 +170,9 @@ router.delete("/:key", async (req: AuthRequest, res) => {
       where: { boardFamily_key: { boardFamily: family, key: req.params.key } },
     });
     if (!row) return res.status(404).json({ error: "Status not found" });
-    if (row.isSystem) {
-      return res.status(400).json({ error: "Built-in statuses can be renamed but not deleted" });
+    const familyCount = await prisma.debugTicketStatus.count({ where: { boardFamily: family } });
+    if (familyCount <= 1) {
+      return res.status(400).json({ error: "Keep at least one status column on this board." });
     }
     const inUse = await prisma.debugCaptureTicket.count({
       where: {
