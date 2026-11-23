@@ -140,6 +140,22 @@ export function ProfilesListTable({
     setOriginal(null);
   }
 
+  async function patchField(row: ProfileListRow, patch: Record<string, unknown>) {
+    try {
+      const res = await adminFetch(`/api/admin/profiles/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        onRowUpdated(data.data as ProfileListRow);
+      }
+    } catch (error) {
+      console.error("Error updating profile:", error);
+    }
+  }
+
   async function saveDraft() {
     if (!draft || !original || !hasChanges) {
       cancelEdit();
@@ -321,28 +337,22 @@ export function ProfilesListTable({
                 </td>
               ) : null}
               {isColumnVisible("availableFrom") ? (
-                <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
-                  {isEditing ? (
-                    <input
-                      type="date"
-                      value={availableFromDay(view.availableFrom)}
-                      onChange={(e) =>
-                        setDraft((prev) =>
-                          prev ? { ...prev, availableFrom: e.target.value || null } : prev,
-                        )
+                <td className="px-3 py-2">
+                  <input
+                    type="date"
+                    value={availableFromDay(view.availableFrom)}
+                    onChange={(e) => {
+                      const next = e.target.value || null;
+                      if (isEditing) {
+                        setDraft((prev) => (prev ? { ...prev, availableFrom: next } : prev));
+                        return;
                       }
-                      className={inlineSelectClass}
-                      aria-label={`Available from for ${row.firstName}`}
-                    />
-                  ) : row.availableFrom ? (
-                    new Date(row.availableFrom).toLocaleDateString("en-AU", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })
-                  ) : (
-                    "—"
-                  )}
+                      onRowUpdated({ ...row, availableFrom: next });
+                      void patchField(row, { availableFrom: next });
+                    }}
+                    className={`${inlineInputClass} min-w-[9.5rem]`}
+                    aria-label={`Available from for ${row.firstName}`}
+                  />
                 </td>
               ) : null}
               {isColumnVisible("citizen") ? (
