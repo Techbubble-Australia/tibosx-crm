@@ -322,11 +322,11 @@ export function isRestrictedToWorkspaceOnly(primary: string, additional?: string
 /** Post-login landing route (relative TBOS path). */
 export function defaultLandingPath(role: string, additional?: string[] | null): string {
   if (anyEffectiveRole(role, additional, ["admin"])) return "/workspace/client";
-  if (isRestrictedToWorkspaceOnly(role, additional)) return "/workspace/dashboard";
+  // Clients prefer Client Home; the page redirects to Projects when they lack access.
   if (role === "client" || anyEffectiveRole(role, additional, ["client"])) {
-    // Prefer Client workspace Home; the page redirects to Projects when the user has no access.
     return "/workspace/client";
   }
+  if (isRestrictedToWorkspaceOnly(role, additional)) return "/workspace/dashboard";
   return "/my-workspace";
 }
 

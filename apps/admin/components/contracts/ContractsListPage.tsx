@@ -114,28 +114,28 @@ export function ContractsListPage({ activeFilter }: Props) {
       let cmp = 0;
       switch (sortKey) {
         case "contractNumber":
-          cmp = a.contractNumber.localeCompare(b.contractNumber);
+          cmp = (a.contractNumber ?? "").localeCompare(b.contractNumber ?? "");
           break;
         case "title":
-          cmp = a.title.localeCompare(b.title);
+          cmp = (a.title ?? "").localeCompare(b.title ?? "");
           break;
         case "clientName":
-          cmp = a.clientName.localeCompare(b.clientName);
+          cmp = (a.clientName ?? "").localeCompare(b.clientName ?? "");
           break;
         case "type":
-          cmp = a.typeLabel.localeCompare(b.typeLabel);
+          cmp = (a.typeLabel ?? "").localeCompare(b.typeLabel ?? "");
           break;
         case "status":
-          cmp = a.status.localeCompare(b.status);
+          cmp = (a.status ?? "").localeCompare(b.status ?? "");
           break;
         case "contractValue":
-          cmp = a.contractValue - b.contractValue;
+          cmp = (a.contractValue ?? 0) - (b.contractValue ?? 0);
           break;
         case "ownerName":
-          cmp = a.ownerName.localeCompare(b.ownerName);
+          cmp = (a.ownerName ?? "").localeCompare(b.ownerName ?? "");
           break;
       }
-      if (cmp === 0) cmp = a.contractNumber.localeCompare(b.contractNumber);
+      if (cmp === 0) cmp = (a.contractNumber ?? "").localeCompare(b.contractNumber ?? "");
       return sortDir === "asc" ? cmp : -cmp;
     });
     return list;

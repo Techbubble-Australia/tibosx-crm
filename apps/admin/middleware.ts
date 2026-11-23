@@ -98,7 +98,8 @@ export async function middleware(request: NextRequest) {
           return redirectTo(request, MFA_SETUP_PATH);
         }
         const role = typeof payload.role === "string" ? payload.role : "website";
-        return redirectTo(request, defaultLandingPath(role));
+        const additionalRoles = parseAdditionalRoles(payload as Record<string, unknown>);
+        return redirectTo(request, defaultLandingPath(role, additionalRoles));
       }
 
       if (pathname.startsWith(MFA_SETUP_PATH)) {
@@ -163,7 +164,7 @@ export async function middleware(request: NextRequest) {
       !pathname.startsWith("/settings/profile") &&
       role !== "admin"
     ) {
-      return redirectTo(request, defaultLandingPath(role));
+      return redirectTo(request, defaultLandingPath(role, additionalRoles));
     }
 
     return NextResponse.next();

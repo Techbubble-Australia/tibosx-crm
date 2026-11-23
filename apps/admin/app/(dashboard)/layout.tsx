@@ -57,6 +57,7 @@ import { AppAlertProvider } from "@/components/ui/AppAlertProvider";
 import { TechBubbleLogo } from "@/components/TechBubbleLogo";
 import { InactivityLogout } from "@/components/InactivityLogout";
 import { TicketPortalLink } from "@/components/TicketPortalLink";
+import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
 import { isCareerApplicationsPath, isJobListingsPath } from "@/lib/job-routes";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { useIsDevelopmentAppEnv } from "@/lib/use-is-development-app-env";
@@ -373,16 +374,20 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
   const showWorkspaceHome =
     !loading && (clientHome || (role !== "client" && !isRestrictedToWorkspaceOnly(role, additionalRoles)));
   const workspaceHomeActive = pathUnder(workspaceHomeHref, pathname);
-  /** Internal users switch Personal vs Client under Home. */
+  /** Internal users switch Personal vs Client under Home (Client only when they have access). */
   const workspaceSubItems: NavItem[] =
     showWorkspaceHome && !clientHome
       ? [
           { href: "/my-workspace", label: "Personal", icon: Home, roles: [] },
-          { href: "/workspace/client", label: "Client", icon: Building2, roles: [] },
+          ...(isAdminHome || canAccessClientWorkspace
+            ? [{ href: "/workspace/client", label: "Client", icon: Building2, roles: [] } satisfies NavItem]
+            : []),
         ]
       : [];
   const workspaceGroupActive = workspaceSubItems.some((item) => pathUnder(item.href, pathname));
   const workspaceGroupOpen = openGroups["my-workspace"] ?? workspaceGroupActive;
+  const showHeaderWorkspaceSwitcher =
+    !loading && showWorkspaceHome && !clientHome && workspaceSubItems.length > 1;
 
   function toggleGroup(id: string) {
     setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -633,6 +638,9 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         <ImpersonationBanner />
         <header className="flex flex-wrap items-center justify-end gap-3 border-b border-gray-200 bg-white px-6 py-4 dark:border-gray-700 dark:bg-gray-900 lg:px-8">
           <div className="flex items-center gap-3">
+            {showHeaderWorkspaceSwitcher ? (
+              <WorkspaceSwitcher showPersonal showClient={isAdminHome || canAccessClientWorkspace} />
+            ) : null}
             <TicketPortalLink />
             {!loading && email ? <HelpSupportHeaderButton /> : null}
             {!loading && email ? (

@@ -75,9 +75,15 @@ function firstDocumentUrl(row: ProfileListRow): string | null {
   return docs.length > 0 ? (docs[0] ?? null) : null;
 }
 
+function availableFromDay(value: string | null | undefined): string {
+  return value ? value.slice(0, 10) : "";
+}
+
 function rowsEqual(a: ProfileListRow, b: ProfileListRow): boolean {
   return (
     a.isCitizen === b.isCitizen &&
+    (a.available !== false) === (b.available !== false) &&
+    availableFromDay(a.availableFrom) === availableFromDay(b.availableFrom) &&
     (a.city ?? "") === (b.city ?? "") &&
     a.country === b.country &&
     a.technology === b.technology &&
@@ -143,6 +149,12 @@ export function ProfilesListTable({
 
     const patch: Record<string, unknown> = {};
     if (draft.isCitizen !== original.isCitizen) patch.isCitizen = draft.isCitizen;
+    if ((draft.available !== false) !== (original.available !== false)) {
+      patch.available = draft.available !== false;
+    }
+    if (availableFromDay(draft.availableFrom) !== availableFromDay(original.availableFrom)) {
+      patch.availableFrom = availableFromDay(draft.availableFrom) || null;
+    }
     if ((draft.city ?? "") !== (original.city ?? "")) patch.city = draft.city?.trim() || null;
     if (draft.country !== original.country) patch.country = draft.country;
     if (draft.technology !== original.technology) patch.technology = draft.technology;
@@ -283,24 +295,54 @@ export function ProfilesListTable({
               ) : null}
               {isColumnVisible("available") ? (
                 <td className="px-3 py-2">
-                  <span className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                    <span
-                      className={`inline-block h-2.5 w-2.5 rounded-full ${row.available !== false ? "bg-green-500" : "bg-red-500"}`}
-                      aria-hidden
-                    />
-                    {row.available !== false ? "Yes" : "No"}
-                  </span>
+                  {isEditing ? (
+                    <select
+                      value={view.available !== false ? "yes" : "no"}
+                      onChange={(e) =>
+                        setDraft((prev) =>
+                          prev ? { ...prev, available: e.target.value === "yes" } : prev,
+                        )
+                      }
+                      className={inlineSelectClass}
+                      aria-label={`Available for ${row.firstName}`}
+                    >
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
+                  ) : (
+                    <span className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                      <span
+                        className={`inline-block h-2.5 w-2.5 rounded-full ${row.available !== false ? "bg-green-500" : "bg-red-500"}`}
+                        aria-hidden
+                      />
+                      {row.available !== false ? "Yes" : "No"}
+                    </span>
+                  )}
                 </td>
               ) : null}
               {isColumnVisible("availableFrom") ? (
                 <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
-                  {row.availableFrom
-                    ? new Date(row.availableFrom).toLocaleDateString("en-AU", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })
-                    : "—"}
+                  {isEditing ? (
+                    <input
+                      type="date"
+                      value={availableFromDay(view.availableFrom)}
+                      onChange={(e) =>
+                        setDraft((prev) =>
+                          prev ? { ...prev, availableFrom: e.target.value || null } : prev,
+                        )
+                      }
+                      className={inlineSelectClass}
+                      aria-label={`Available from for ${row.firstName}`}
+                    />
+                  ) : row.availableFrom ? (
+                    new Date(row.availableFrom).toLocaleDateString("en-AU", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  ) : (
+                    "—"
+                  )}
                 </td>
               ) : null}
               {isColumnVisible("citizen") ? (

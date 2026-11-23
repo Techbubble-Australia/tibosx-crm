@@ -66,7 +66,9 @@ export default function LoginPage() {
         return;
       }
 
-      goAfterAuth(defaultLandingPath(data?.user?.role ?? "website"));
+      goAfterAuth(
+        defaultLandingPath(data?.user?.role ?? "website", data?.user?.additionalRoles ?? null),
+      );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -104,7 +106,9 @@ export default function LoginPage() {
         goAfterAuth("/mfa-setup");
         return;
       }
-      goAfterAuth(defaultLandingPath(data?.user?.role ?? "website"));
+      goAfterAuth(
+        defaultLandingPath(data?.user?.role ?? "website", data?.user?.additionalRoles ?? null),
+      );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "MFA verification failed");
     } finally {

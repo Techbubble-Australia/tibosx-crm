@@ -59,15 +59,14 @@ const router: IRouter = Router();
 let lastExpireAttemptMs = 0;
 const EXPIRE_THROTTLE_MS = 60_000;
 
-router.use(async (_req, _res, next) => {
+router.use((_req, _res, next) => {
   const now = Date.now();
   if (now - lastExpireAttemptMs >= EXPIRE_THROTTLE_MS) {
     lastExpireAttemptMs = now;
-    try {
-      await expirePastDueContracts();
-    } catch (error) {
+    // Do not block list navigation on the expiry sweep.
+    void expirePastDueContracts().catch((error) => {
       console.error("Error expiring past-due contracts:", error);
-    }
+    });
   }
   next();
 });

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ChunkLoadRecovery } from "@/components/ChunkLoadRecovery";
 import { DevelopmentModeBanner } from "@/components/DevelopmentModeBanner";
 import "./globals.css";
 
@@ -15,6 +16,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
+        <ChunkLoadRecovery />
         <DevelopmentModeBanner />
         {children}
       </body>

@@ -49,6 +49,7 @@ export default function ClientWorkspacePage() {
   useEffect(() => {
     if (!sessionLoaded || !isClientUser) return;
     if (canAccessClientWorkspace) return;
+    // Clients without Client workspace access land on Projects (or timesheets as last resort).
     router.replace(canAccessClientProjects ? "/workspace/projects" : "/workspace/timesheets/submitted");
   }, [
     sessionLoaded,
