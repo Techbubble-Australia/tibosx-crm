@@ -66,20 +66,28 @@ export async function statusKeyFromLabel(label: string, family: BoardFamily): Pr
   return key;
 }
 
+const STRATEGY_KEYS = new Set(["PLANNED", "ACTIVE", "DONE"]);
+
 export function serializeDebugTicketStatus(row: {
   key: string;
   label: string;
   color: string;
   position: number;
   isSystem: boolean;
-  boardFamily?: BoardFamily;
+  boardFamily?: BoardFamily | string | null;
 }) {
+  const family: BoardFamily =
+    row.boardFamily === "STRATEGY" || row.boardFamily === "WORK"
+      ? row.boardFamily
+      : STRATEGY_KEYS.has(row.key)
+        ? "STRATEGY"
+        : "WORK";
   return {
     key: row.key,
     label: row.label,
     color: row.color,
     position: row.position,
     isSystem: row.isSystem,
-    boardFamily: row.boardFamily ?? "WORK",
+    boardFamily: family,
   };
 }

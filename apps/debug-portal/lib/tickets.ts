@@ -98,8 +98,18 @@ export function defaultsForFamily(family: BoardFamily): StatusOption[] {
   return family === "STRATEGY" ? DEFAULT_STRATEGY_STATUSES : DEFAULT_WORK_STATUSES;
 }
 
+/** Built-in strategy keys — never show these columns on Work items / Subtasks. */
+export const STRATEGY_STATUS_KEYS = new Set(["PLANNED", "ACTIVE", "DONE"]);
+
+export function resolveStatusBoardFamily(status: Pick<StatusOption, "key" | "boardFamily">): BoardFamily {
+  if (status.boardFamily === "STRATEGY" || status.boardFamily === "WORK") return status.boardFamily;
+  return STRATEGY_STATUS_KEYS.has(status.key) ? "STRATEGY" : "WORK";
+}
+
 export function statusesForFamily(all: StatusOption[], family: BoardFamily): StatusOption[] {
-  const scoped = all.filter((s) => (s.boardFamily ?? "WORK") === family);
+  const scoped = all
+    .map((s) => ({ ...s, boardFamily: resolveStatusBoardFamily(s) }))
+    .filter((s) => s.boardFamily === family);
   return scoped.length ? scoped : defaultsForFamily(family);
 }
 

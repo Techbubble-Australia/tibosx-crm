@@ -4,11 +4,21 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import {
   DEFAULT_STATUSES,
   DEFAULT_STRATEGY_STATUSES,
+  resolveStatusBoardFamily,
   statusColorClasses,
   statusesForFamily,
   type BoardFamily,
   type StatusOption,
 } from "@/lib/tickets";
+
+function normalizeStatuses(rows: StatusOption[]): StatusOption[] {
+  return sortStatuses(
+    rows.map((s) => ({
+      ...s,
+      boardFamily: resolveStatusBoardFamily(s),
+    })),
+  );
+}
 
 type TicketStatusesValue = {
   /** All statuses across WORK + STRATEGY (for badges on mixed lists). */
@@ -51,7 +61,7 @@ export function TicketStatusesProvider({ children }: { children: ReactNode }) {
       const res = await fetch("/api/debug-portal/statuses?all=1", { credentials: "include" });
       const json = await res.json().catch(() => ({}));
       if (res.ok && Array.isArray(json?.data) && json.data.length) {
-        setAllStatuses(sortStatuses(json.data as StatusOption[]));
+        setAllStatuses(normalizeStatuses(json.data as StatusOption[]));
       }
     } finally {
       setLoading(false);
@@ -77,19 +87,19 @@ export function TicketStatusesProvider({ children }: { children: ReactNode }) {
       reload,
       setStatusesForFamily: (family, rows) => {
         setAllStatuses((prev) => {
-          const others = prev.filter((s) => (s.boardFamily ?? "WORK") !== family);
-          return sortStatuses([
+          const others = prev.filter((s) => resolveStatusBoardFamily(s) !== family);
+          return normalizeStatuses([
             ...others,
-            ...rows.map((r) => ({ ...r, boardFamily: r.boardFamily ?? family })),
+            ...rows.map((r) => ({ ...r, boardFamily: family })),
           ]);
         });
       },
       setStatuses: (rows) => {
         setAllStatuses((prev) => {
-          const others = prev.filter((s) => (s.boardFamily ?? "WORK") !== "WORK");
-          return sortStatuses([
+          const others = prev.filter((s) => resolveStatusBoardFamily(s) !== "WORK");
+          return normalizeStatuses([
             ...others,
-            ...rows.map((r) => ({ ...r, boardFamily: r.boardFamily ?? ("WORK" as const) })),
+            ...rows.map((r) => ({ ...r, boardFamily: "WORK" as const })),
           ]);
         });
       },
