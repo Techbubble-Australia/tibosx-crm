@@ -14,7 +14,11 @@ import {
 import { ticketScreenshotUrls } from "../lib/debug-portal-user.js";
 import { AI_AGENT_ACTOR, commentLogPreview, logDebugTicket } from "../lib/debug-ticket-log.js";
 import { notifyAsync } from "../lib/notifications/index.js";
-import { isDebugTicketStatus, listDebugTicketStatuses } from "../lib/debug-ticket-statuses.js";
+import {
+  boardFamilyForHierarchyLevel,
+  isDebugTicketStatus,
+  listDebugTicketStatuses,
+} from "../lib/debug-ticket-statuses.js";
 import type { Prisma } from "@techbubble/database";
 
 const router: IRouter = Router();
@@ -343,13 +347,14 @@ router.get("/tickets/in-progress", async (req, res) => {
 router.patch("/tickets/:idOrTicketId/status", async (req, res) => {
   try {
     const { status } = patchStatusBodySchema.parse(req.body);
-    if (!(await isDebugTicketStatus(status))) {
-      const allowed = (await listDebugTicketStatuses()).map((s) => s.key);
-      return res.status(400).json({ error: "Unknown status", code: "UNKNOWN_STATUS", allowedStatuses: allowed });
-    }
     const existing = await findTicketByIdOrTicketId(req.params.idOrTicketId!);
     if (!existing) {
       return res.status(404).json({ error: "Ticket not found", code: "TICKET_NOT_FOUND" });
+    }
+    const family = boardFamilyForHierarchyLevel(existing.hierarchyLevel ?? 0);
+    if (!(await isDebugTicketStatus(status, family))) {
+      const allowed = (await listDebugTicketStatuses(family)).map((s) => s.key);
+      return res.status(400).json({ error: "Unknown status", code: "UNKNOWN_STATUS", allowedStatuses: allowed });
     }
     const sprint = serializeSprint(existing.sprint);
     if (existing.sprint?.status === "COMPLETED") {

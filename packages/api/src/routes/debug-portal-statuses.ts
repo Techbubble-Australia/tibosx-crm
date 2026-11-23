@@ -134,6 +134,8 @@ router.put("/order", async (req: AuthRequest, res) => {
 router.patch("/:key", async (req: AuthRequest, res) => {
   try {
     if (!(await requireAdmin(req, res))) return;
+    const key = String(req.params.key ?? "");
+    if (!key) return res.status(400).json({ error: "Status key required" });
     const body = updateSchema.parse(req.body);
     const family = parseBoardFamily(
       typeof req.query.boardFamily === "string"
@@ -143,7 +145,7 @@ router.patch("/:key", async (req: AuthRequest, res) => {
           : "WORK",
     );
     const row = await prisma.debugTicketStatus.findUnique({
-      where: { boardFamily_key: { boardFamily: family, key: req.params.key } },
+      where: { boardFamily_key: { boardFamily: family, key } },
     });
     if (!row) return res.status(404).json({ error: "Status not found" });
     await prisma.debugTicketStatus.update({
@@ -163,11 +165,13 @@ router.patch("/:key", async (req: AuthRequest, res) => {
 router.delete("/:key", async (req: AuthRequest, res) => {
   try {
     if (!(await requireAdmin(req, res))) return;
+    const key = String(req.params.key ?? "");
+    if (!key) return res.status(400).json({ error: "Status key required" });
     const family = parseBoardFamily(
       typeof req.query.boardFamily === "string" ? req.query.boardFamily : "WORK",
     );
     const row = await prisma.debugTicketStatus.findUnique({
-      where: { boardFamily_key: { boardFamily: family, key: req.params.key } },
+      where: { boardFamily_key: { boardFamily: family, key } },
     });
     if (!row) return res.status(404).json({ error: "Status not found" });
     const familyCount = await prisma.debugTicketStatus.count({ where: { boardFamily: family } });
