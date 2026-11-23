@@ -273,7 +273,7 @@ export function DebugTicketModal() {
           ) : (
             <>
               <div className="flex flex-wrap gap-2">
-                {(["BUG", "ENHANCEMENT"] as DebugCaptureType[]).map((t) => (
+                {(["BUG", "STORY", "TASK"] as DebugCaptureType[]).map((t) => (
                   <button
                     key={t}
                     type="button"
@@ -284,7 +284,7 @@ export function DebugTicketModal() {
                         : "border-gray-200 dark:border-gray-600"
                     }`}
                   >
-                    {t === "BUG" ? "Bug 🐛" : "Enhancement 💡"}
+                    {t === "BUG" ? "Bug" : t === "STORY" ? "Story" : "Task"}
                   </button>
                 ))}
               </div>

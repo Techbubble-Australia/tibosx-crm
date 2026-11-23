@@ -1,6 +1,6 @@
 "use client";
 
-import { Bug, Sparkles } from "lucide-react";
+import { Bug, Layers, ListTree, Milestone, Sparkles, Target } from "lucide-react";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
 import { formatTicketType, typeBadgeClass } from "@/lib/tickets";
 
@@ -24,14 +24,30 @@ export function StatusBadge({ status, size = "md" }: { status: string; size?: Si
   );
 }
 
-/** Bug = red, Enhancement = indigo. */
+function TypeIcon({ type, className }: { type: string; className?: string }) {
+  switch (type) {
+    case "INITIATIVE":
+      return <Milestone className={className} aria-hidden />;
+    case "EPIC":
+      return <Layers className={className} aria-hidden />;
+    case "STORY":
+      return <Sparkles className={className} aria-hidden />;
+    case "TASK":
+      return <Target className={className} aria-hidden />;
+    case "SUBTASK":
+      return <ListTree className={className} aria-hidden />;
+    default:
+      return <Bug className={className} aria-hidden />;
+  }
+}
+
+/** Issue-type badge with an icon matched to the hierarchy type. */
 export function TypeBadge({ type, size = "md" }: { type: string; size?: Size }) {
-  const Icon = type === "ENHANCEMENT" ? Sparkles : Bug;
   return (
     <span
       className={`inline-flex items-center whitespace-nowrap rounded-md font-semibold ${SIZE_CLASSES[size]} ${typeBadgeClass(type)}`}
     >
-      <Icon className={size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} aria-hidden />
+      <TypeIcon type={type} className={size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} />
       {formatTicketType(type)}
     </span>
   );

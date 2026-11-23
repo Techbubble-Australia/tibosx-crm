@@ -24,7 +24,8 @@ import { useIsDevelopmentAppEnv } from "@/lib/use-is-development-app-env";
 
 const DEBUG_STORAGE_KEY = "tbos-debug-mode-active";
 
-export type DebugCaptureType = "BUG" | "ENHANCEMENT";
+/** Level-0 capture types from TBOS (Story replaces legacy Enhancement). */
+export type DebugCaptureType = "BUG" | "STORY" | "TASK";
 /** Environments we expose in the UI (DB may still store legacy `staging`). */
 export type ReportedEnvironment = "development" | "production";
 

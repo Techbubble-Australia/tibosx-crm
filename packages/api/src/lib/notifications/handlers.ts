@@ -273,7 +273,7 @@ export const notificationHandlers: {
     const statusLabel = await debugStatusLabel(ticket.status);
     const link = debugTicketUrl(ticket.id);
     const summary = ticket.userDescription.length > 400 ? `${ticket.userDescription.slice(0, 400)}…` : ticket.userDescription;
-    const kind = ticket.type === "ENHANCEMENT" ? "enhancement" : "bug";
+    const kind = ticket.type.toLowerCase().replace(/_/g, " ");
     const title = ticket.title?.trim() ?? "";
     const body = [
       `${ticket.reporterEmail} reported a new ${kind}: ${ticket.ticketId} (${statusLabel}).`,

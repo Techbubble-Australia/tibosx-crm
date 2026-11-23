@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FileText, Loader2, Upload, X } from "lucide-react";
 import { ChevronSelect } from "@/components/ChevronSelect";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -16,15 +16,27 @@ import { useSprints } from "@/lib/sprints";
 import { usePortalUser } from "@/lib/use-portal-user";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
 import { StatusBadge } from "@/components/TicketBadges";
-import { TICKET_TITLE_MAX } from "@/lib/tickets";
+import {
+  TICKET_TITLE_MAX,
+  defaultTypeForLevel,
+  formatTicketType,
+  parseHierarchyLevel,
+  typesForLevel,
+  type DebugIssueType,
+  type HierarchyLevel,
+} from "@/lib/tickets";
 
-type TicketType = "BUG" | "ENHANCEMENT";
 type ReportedEnvironment = "development" | "production";
 type PendingShot = { file: File; previewUrl: string };
+type ParentOption = { id: string; ticketId: string; type: string; title: string | null };
 
 export default function NewTicketPage() {
   const router = useRouter();
-  const [type, setType] = useState<TicketType>("BUG");
+  const [boardLevel, setBoardLevel] = useState<HierarchyLevel>(0);
+  const levelTypes = useMemo(() => typesForLevel(boardLevel), [boardLevel]);
+  const [type, setType] = useState<DebugIssueType>("TASK");
+  const [parentId, setParentId] = useState("");
+  const [parentOptions, setParentOptions] = useState<ParentOption[]>([]);
   const [reportedEnvironment, setReportedEnvironment] = useState<ReportedEnvironment>("development");
   const [currentUrl, setCurrentUrl] = useState("");
   const [title, setTitle] = useState("");
@@ -37,12 +49,42 @@ export default function NewTicketPage() {
   const activeSprint = sprints.find((s) => s.status === "ACTIVE") ?? null;
   const { isAdmin } = usePortalUser();
   const { labelOf } = useTicketStatuses();
-  /** Set by the "+" on a board column; only admins can start a ticket in a later column. */
   const [startStatus, setStartStatus] = useState<string | null>(null);
+
   useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get("status");
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get("status");
     if (requested) setStartStatus(requested);
+    const level = parseHierarchyLevel(params.get("level"));
+    setBoardLevel(level);
+    setType(defaultTypeForLevel(level));
+    const parent = params.get("parentId");
+    if (parent) setParentId(parent);
   }, []);
+
+  useEffect(() => {
+    if (!levelTypes.includes(type)) setType(defaultTypeForLevel(boardLevel));
+  }, [boardLevel, levelTypes, type]);
+
+  const needsParent = type === "SUBTASK";
+  const parentLevel = boardLevel === -1 ? 0 : boardLevel + 1;
+  const canHaveParent = boardLevel < 2;
+
+  useEffect(() => {
+    if (!canHaveParent) {
+      setParentOptions([]);
+      return;
+    }
+    const qs = new URLSearchParams({ limit: "200", hierarchyLevel: String(parentLevel) });
+    void fetch(`/api/debug-portal/tickets?${qs}`, { credentials: "include", cache: "no-store" })
+      .then((r) => r.json())
+      .then((json) => {
+        const rows = Array.isArray(json?.data) ? (json.data as ParentOption[]) : [];
+        setParentOptions(rows);
+      })
+      .catch(() => setParentOptions([]));
+  }, [canHaveParent, parentLevel]);
+
   const effectiveStatus = startStatus && (isAdmin || startStatus === "PENDING") ? startStatus : null;
 
   const addFiles = useCallback((incoming: File[]) => {
@@ -65,7 +107,6 @@ export default function NewTicketPage() {
     if (files?.length) addFiles(Array.from(files));
   }
 
-  /** Paste screenshots straight from the clipboard (e.g. after Print Screen / Cmd+Shift+Ctrl+4). */
   useEffect(() => {
     function onPaste(e: ClipboardEvent) {
       const files = Array.from(e.clipboardData?.files ?? []);
@@ -102,6 +143,10 @@ export default function NewTicketPage() {
       setError("Please add a description so others can understand the issue.");
       return;
     }
+    if (needsParent && !parentId) {
+      setError("Subtasks require a parent story, task, or bug.");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -113,6 +158,7 @@ export default function NewTicketPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type,
+          parentId: parentId || null,
           reportedEnvironment,
           title: title.trim(),
           userDescription: userDescription.trim(),
@@ -130,7 +176,7 @@ export default function NewTicketPage() {
         router.push(`/tickets/${id}`);
         return;
       }
-      router.push("/tickets");
+      router.push(`/board?level=${boardLevel}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create ticket");
     } finally {
@@ -141,10 +187,10 @@ export default function NewTicketPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
-        backHref="/board"
+        backHref={`/board?level=${boardLevel}`}
         backLabel="Board"
         title="New ticket"
-        description="Report a bug or enhancement that is not tied to a TBOS screen capture (API, infra, process, etc.)."
+        description="Create an initiative, epic, work item, or subtask for the debug portal board."
       />
       {effectiveStatus ? (
         <p className="flex items-center gap-2 text-sm text-slate-600">
@@ -162,7 +208,7 @@ export default function NewTicketPage() {
         <fieldset>
           <legend className="dp-label">Type</legend>
           <div className="mt-2 flex flex-wrap gap-2">
-            {(["BUG", "ENHANCEMENT"] as TicketType[]).map((t) => (
+            {levelTypes.map((t) => (
               <button
                 key={t}
                 type="button"
@@ -173,11 +219,38 @@ export default function NewTicketPage() {
                     : "border-slate-300 bg-white text-slate-700 hover:border-slate-400"
                 }`}
               >
-                {t === "BUG" ? "Bug" : "Enhancement"}
+                {formatTicketType(t)}
               </button>
             ))}
           </div>
+          <p className="mt-2 text-xs text-slate-500">
+            Types on this form match the board level you came from
+            {boardLevel === 0 ? " (stories, tasks, and bugs share the work items board)" : ""}.
+          </p>
         </fieldset>
+
+        {canHaveParent ? (
+          <div>
+            <label htmlFor="parent" className="dp-label">
+              Parent {needsParent ? <span className="text-red-600">*</span> : <span className="font-normal text-slate-500">(optional)</span>}
+            </label>
+            <ChevronSelect
+              id="parent"
+              value={parentId}
+              onChange={setParentId}
+              className="block w-full"
+              aria-label="Parent ticket"
+            >
+              <option value="">{needsParent ? "Select a parent…" : "No parent"}</option>
+              {parentOptions.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.ticketId}
+                  {row.title ? ` — ${row.title}` : ""} ({formatTicketType(row.type)})
+                </option>
+              ))}
+            </ChevronSelect>
+          </div>
+        ) : null}
 
         <div>
           <label htmlFor="env" className="dp-label">
@@ -201,7 +274,6 @@ export default function NewTicketPage() {
           </label>
           <input
             id="related-url"
-            type="url"
             value={currentUrl}
             onChange={(e) => setCurrentUrl(e.target.value)}
             placeholder="https://…"
@@ -211,125 +283,91 @@ export default function NewTicketPage() {
 
         <div>
           <label htmlFor="title" className="dp-label">
-            Title <span className="text-red-600">*</span>
+            Title
           </label>
           <input
             id="title"
-            type="text"
-            required
-            maxLength={TICKET_TITLE_MAX}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Short summary, e.g. Export button does nothing on the timesheets page"
+            maxLength={TICKET_TITLE_MAX}
+            required
             className="dp-input"
+            placeholder="Short summary"
           />
         </div>
 
         <div>
           <label htmlFor="description" className="dp-label">
-            Description <span className="text-red-600">*</span>
+            Description
           </label>
           <textarea
             id="description"
-            required
-            rows={6}
             value={userDescription}
             onChange={(e) => setUserDescription(e.target.value)}
-            placeholder="What happened, what you expected, steps to reproduce, logs, etc."
-            className="dp-input min-h-[8rem] resize-y"
+            required
+            rows={6}
+            className="dp-input"
+            placeholder="What needs to happen, and how to verify it…"
           />
         </div>
 
-        <div
-          onDragOver={(e) => {
-            if (!Array.from(e.dataTransfer.types).includes("Files")) return;
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragOver(false);
-            addFiles(Array.from(e.dataTransfer.files));
-          }}
-          className={`rounded-lg border-2 border-dashed p-4 transition-colors ${
-            dragOver ? "border-sky-400 bg-sky-50/60" : "border-slate-200"
-          }`}
-        >
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <span className="dp-label mb-0">
-              Screenshots & files <span className="font-normal text-slate-500">(optional)</span>
-            </span>
-            {shots.length ? (
-              <span className="text-xs text-slate-500">
-                {shots.length} / {MAX_TICKET_SCREENSHOTS}
-              </span>
-            ) : null}
+        <div>
+          <p className="dp-label">Attachments</p>
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              addFiles(Array.from(e.dataTransfer.files));
+            }}
+            className={`mt-2 rounded-xl border border-dashed px-4 py-6 text-center ${
+              dragOver ? "border-sky-500 bg-sky-50" : "border-slate-300 bg-slate-50"
+            }`}
+          >
+            <Upload className="mx-auto h-6 w-6 text-slate-400" aria-hidden />
+            <p className="mt-2 text-sm text-slate-600">Drop files here, paste, or browse</p>
+            <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              <FileText className="h-4 w-4" aria-hidden />
+              Choose files
+              <input
+                type="file"
+                accept={TICKET_ATTACHMENT_ACCEPT}
+                multiple
+                className="hidden"
+                onChange={(e) => onPickScreenshots(e.target.files)}
+              />
+            </label>
           </div>
           {shots.length ? (
-            <ul className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <ul className="mt-3 space-y-2">
               {shots.map((shot, index) => (
-                <li key={shot.previewUrl} className="relative rounded-lg border border-slate-200 bg-slate-50 p-1">
-                  {isPdfFile(shot.file) ? (
-                    <div className="flex h-28 w-full flex-col items-center justify-center gap-1 rounded bg-white text-red-600">
-                      <FileText className="h-8 w-8" aria-hidden />
-                      <span className="text-xs font-semibold">PDF</span>
-                    </div>
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={shot.previewUrl} alt={`Screenshot ${index + 1}`} className="h-28 w-full rounded object-contain" />
-                  )}
-                  <p className="mt-1 truncate px-1 text-[11px] text-slate-500" title={shot.file.name}>
-                    {shot.file.name}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => removeShot(index)}
-                    className="absolute right-1.5 top-1.5 rounded-full bg-white/90 p-1 text-slate-600 shadow hover:text-red-600"
-                    aria-label={`Remove ${shot.file.name}`}
-                  >
-                    <X className="h-3.5 w-3.5" />
+                <li key={shot.previewUrl} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                  <span className="truncate">{shot.file.name}</span>
+                  <button type="button" onClick={() => removeShot(index)} className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                    <X className="h-4 w-4" aria-hidden />
                   </button>
                 </li>
               ))}
             </ul>
           ) : null}
-          {shots.length < MAX_TICKET_SCREENSHOTS ? (
-            <label className="dp-btn-secondary inline-flex cursor-pointer">
-              <Upload className="h-4 w-4" aria-hidden />
-              {shots.length ? "Add more files" : "Choose images or PDFs"}
-              <input
-                type="file"
-                multiple
-                accept={TICKET_ATTACHMENT_ACCEPT}
-                className="sr-only"
-                onChange={(e) => {
-                  onPickScreenshots(e.target.files);
-                  e.target.value = "";
-                }}
-              />
-            </label>
-          ) : null}
-          <p className="mt-2 text-xs text-slate-500">
-            Choose several at once, drag files here, or paste with Ctrl/Cmd+V. PNG, JPEG, GIF, WebP or PDF · max 10
-            MB each · up to {MAX_TICKET_SCREENSHOTS} files
-          </p>
         </div>
 
-        {!sprintsLoading ? (
+        {!sprintsLoading && activeSprint ? (
           <p className="text-xs text-slate-500">
-            {activeSprint
-              ? `This ticket will be added to the active sprint, ${activeSprint.name}.`
-              : "There is no active sprint, so this ticket will be saved to the Backlog."}
+            New tickets are added to the active sprint: <strong>{activeSprint.name}</strong>.
           </p>
         ) : null}
 
-        <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-4">
+        <div className="flex flex-wrap gap-3">
           <button type="submit" disabled={submitting} className="dp-btn-primary">
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-            Create ticket
+            {submitting ? "Creating…" : "Create ticket"}
           </button>
-          <Link href="/tickets" className="dp-btn-secondary">
+          <Link href={`/board?level=${boardLevel}`} className="dp-btn-secondary">
             Cancel
           </Link>
         </div>

@@ -11,6 +11,60 @@ export type StatusOption = {
   isSystem: boolean;
 };
 
+export const DEBUG_ISSUE_TYPES = [
+  "INITIATIVE",
+  "EPIC",
+  "STORY",
+  "TASK",
+  "BUG",
+  "SUBTASK",
+] as const;
+
+export type DebugIssueType = (typeof DEBUG_ISSUE_TYPES)[number];
+
+export const HIERARCHY_LEVELS = [2, 1, 0, -1] as const;
+export type HierarchyLevel = (typeof HIERARCHY_LEVELS)[number];
+
+export const HIERARCHY_LEVEL_BY_TYPE: Record<DebugIssueType, HierarchyLevel> = {
+  INITIATIVE: 2,
+  EPIC: 1,
+  STORY: 0,
+  TASK: 0,
+  BUG: 0,
+  SUBTASK: -1,
+};
+
+export const ISSUE_TYPES_BY_LEVEL: Record<HierarchyLevel, DebugIssueType[]> = {
+  2: ["INITIATIVE"],
+  1: ["EPIC"],
+  0: ["STORY", "TASK", "BUG"],
+  [-1]: ["SUBTASK"],
+};
+
+export const BOARD_LEVEL_TABS: Array<{ level: HierarchyLevel; label: string; description: string }> = [
+  { level: 2, label: "Initiatives", description: "Top-level initiatives" },
+  { level: 1, label: "Epics", description: "Feature containers" },
+  { level: 0, label: "Work items", description: "Stories, tasks, and bugs" },
+  { level: -1, label: "Subtasks", description: "Steps under a work item" },
+];
+
+export function isDebugIssueType(value: string): value is DebugIssueType {
+  return (DEBUG_ISSUE_TYPES as readonly string[]).includes(value);
+}
+
+export function parseHierarchyLevel(raw: string | null | undefined): HierarchyLevel {
+  const n = Number.parseInt(String(raw ?? ""), 10);
+  return (HIERARCHY_LEVELS as readonly number[]).includes(n) ? (n as HierarchyLevel) : 0;
+}
+
+export function defaultTypeForLevel(level: HierarchyLevel): DebugIssueType {
+  return ISSUE_TYPES_BY_LEVEL[level][0]!;
+}
+
+export function typesForLevel(level: HierarchyLevel): DebugIssueType[] {
+  return ISSUE_TYPES_BY_LEVEL[level];
+}
+
 /** Used until the board's statuses load (and if the statuses API is unavailable). */
 export const DEFAULT_STATUSES: StatusOption[] = [
   { key: "PENDING", label: "Pending", color: "amber", position: 0, isSystem: true },
@@ -50,16 +104,57 @@ export function statusColorClasses(color: string | undefined) {
   return STATUS_COLOR_CLASSES[color ?? ""] ?? STATUS_COLOR_CLASSES.slate!;
 }
 
+const TYPE_BADGE_CLASSES: Record<string, string> = {
+  INITIATIVE: "bg-purple-100 text-purple-900 ring-1 ring-purple-300/80",
+  EPIC: "bg-violet-100 text-violet-900 ring-1 ring-violet-300/80",
+  STORY: "bg-indigo-100 text-indigo-800 ring-1 ring-indigo-300/80",
+  TASK: "bg-sky-100 text-sky-900 ring-1 ring-sky-300/80",
+  BUG: "bg-red-100 text-red-800 ring-1 ring-red-300/80",
+  SUBTASK: "bg-slate-100 text-slate-800 ring-1 ring-slate-300/80",
+};
+
 export function typeBadgeClass(type: string): string {
-  return type === "ENHANCEMENT"
-    ? "bg-indigo-100 text-indigo-800 ring-1 ring-indigo-300/80"
-    : "bg-red-100 text-red-800 ring-1 ring-red-300/80";
+  return TYPE_BADGE_CLASSES[type] ?? "bg-slate-100 text-slate-800 ring-1 ring-slate-300/80";
 }
 
 export const TICKET_TITLE_MAX = 200;
 
 export function formatTicketType(type: string): string {
-  return type === "ENHANCEMENT" ? "Enhancement" : type === "BUG" ? "Bug" : type;
+  switch (type) {
+    case "INITIATIVE":
+      return "Initiative";
+    case "EPIC":
+      return "Epic";
+    case "STORY":
+      return "Story";
+    case "TASK":
+      return "Task";
+    case "BUG":
+      return "Bug";
+    case "SUBTASK":
+      return "Subtask";
+    case "ENHANCEMENT":
+      return "Story";
+    default:
+      return type;
+  }
+}
+
+export function typeBorderClass(type: string): string {
+  switch (type) {
+    case "INITIATIVE":
+      return "border-l-purple-400";
+    case "EPIC":
+      return "border-l-violet-400";
+    case "STORY":
+      return "border-l-indigo-400";
+    case "TASK":
+      return "border-l-sky-400";
+    case "SUBTASK":
+      return "border-l-slate-400";
+    default:
+      return "border-l-red-400";
+  }
 }
 
 export function formatEnvironment(env: string): string {

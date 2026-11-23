@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarRange,
@@ -40,11 +41,17 @@ import {
   type Sprint,
 } from "@/lib/sprints";
 import {
+  BOARD_LEVEL_TABS,
   STATUS_COLORS,
   canMoveStatus,
   formatEnvironment,
+  formatTicketType,
   memberStatusTarget,
+  parseHierarchyLevel,
   statusColorClasses,
+  typeBorderClass,
+  typesForLevel,
+  type HierarchyLevel,
   type StatusOption,
   type TicketStatus,
 } from "@/lib/tickets";
@@ -54,6 +61,8 @@ type BoardTicket = {
   id: string;
   ticketId: string;
   type: string;
+  hierarchyLevel?: number;
+  parentId?: string | null;
   status: TicketStatus;
   reportedEnvironment: string;
   title?: string | null;
@@ -65,6 +74,7 @@ type BoardTicket = {
   sprintId?: string | null;
   sprintName?: string | null;
   sprintStatus?: string | null;
+  childCount?: number;
 };
 
 const BOARD_LIMIT = 500;
@@ -106,6 +116,10 @@ function ColorSwatches({ value, onChange }: { value: string; onChange: (color: s
 export default function BoardPage() {
   const { isAdmin } = usePortalUser();
   const confirm = useConfirm();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const boardLevel = parseHierarchyLevel(searchParams.get("level"));
+  const levelTypes = typesForLevel(boardLevel);
   const { statuses, setStatuses } = useTicketStatuses();
   const [tickets, setTickets] = useState<BoardTicket[]>([]);
   const [total, setTotal] = useState(0);
@@ -114,6 +128,15 @@ export default function BoardPage() {
   const [reporterFilter, setReporterFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [search, setSearch] = useState("");
+
+  function setBoardLevel(level: HierarchyLevel) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (level === 0) params.delete("level");
+    else params.set("level", String(level));
+    const qs = params.toString();
+    router.push(qs ? `/board?${qs}` : "/board");
+    setTypeFilter("");
+  }
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [openTicket, setOpenTicket] = useState<BoardTicket | null>(null);
   const [dropTarget, setDropTarget] = useState<TicketStatus | null>(null);
@@ -190,8 +213,10 @@ export default function BoardPage() {
     }
     try {
       const qs = new URLSearchParams({ limit: String(BOARD_LIMIT) });
+      qs.set("hierarchyLevel", String(boardLevel));
       if (reporterFilter) qs.set("reporterUserId", reporterFilter);
       if (sprintFilter) qs.set("sprintId", sprintFilter);
+      if (typeFilter) qs.set("type", typeFilter);
       const res = await fetch(`/api/debug-portal/tickets?${qs}`, { credentials: "include", cache: "no-store" });
       const data = await res.json();
       if (seq !== loadSeq.current) return;
@@ -205,7 +230,7 @@ export default function BoardPage() {
     } finally {
       if (seq === loadSeq.current && !silent) setLoading(false);
     }
-  }, [reporterFilter, sprintFilter]);
+  }, [reporterFilter, sprintFilter, boardLevel, typeFilter]);
 
   useAutoRefresh(() => void load({ silent: true }), {
     paused: Boolean(draggingId || savingId || openTicket || editingColumn || adding || statusSaving || loading),
@@ -391,10 +416,33 @@ export default function BoardPage() {
         title="Board"
         description={
           isAdmin
-            ? "Drag tickets between columns to change their status. Drag a column by its handle to reorder, or use its settings to rename, recolour, or delete it."
-            : "Your tickets by status. Drag a For review ticket to Completed once it's fixed, or a Completed ticket back to Pending to reopen it."
+            ? "Each hierarchy level has its own board. Drag tickets between columns to change status."
+            : "Each hierarchy level has its own board. Drag a For review ticket to Completed once it's fixed, or reopen from Completed."
         }
       />
+
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Hierarchy level">
+        {BOARD_LEVEL_TABS.map((tab) => {
+          const active = tab.level === boardLevel;
+          return (
+            <button
+              key={tab.level}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setBoardLevel(tab.level)}
+              className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                active
+                  ? "border-sky-600 bg-sky-50 text-sky-900 ring-2 ring-sky-500/20"
+                  : "border-slate-300 bg-white text-slate-700 hover:border-slate-400"
+              }`}
+              title={tab.description}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
       <div className="dp-card space-y-4 p-4 sm:p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
@@ -537,13 +585,18 @@ export default function BoardPage() {
             </ChevronSelect>
           </FilterField>
         ) : null}
-        <FilterField label="Type" htmlFor="board-type">
-          <ChevronSelect id="board-type" value={typeFilter} onChange={setTypeFilter} className="block w-full min-w-0">
-            <option value="">All types</option>
-            <option value="BUG">Bug</option>
-            <option value="ENHANCEMENT">Enhancement</option>
-          </ChevronSelect>
-        </FilterField>
+        {levelTypes.length > 1 ? (
+          <FilterField label="Type" htmlFor="board-type">
+            <ChevronSelect id="board-type" value={typeFilter} onChange={setTypeFilter} className="block w-full min-w-0">
+              <option value="">All types on this board</option>
+              {levelTypes.map((t) => (
+                <option key={t} value={t}>
+                  {formatTicketType(t)}
+                </option>
+              ))}
+            </ChevronSelect>
+          </FilterField>
+        ) : null}
         <FilterField label="Search" htmlFor="board-search" className="sm:min-w-[16rem] sm:flex-1">
           <input
             id="board-search"
@@ -669,7 +722,7 @@ export default function BoardPage() {
                     </span>
                     {isAdmin || status.key === "PENDING" ? (
                       <Link
-                        href={`/tickets/new?status=${encodeURIComponent(status.key)}`}
+                        href={`/tickets/new?status=${encodeURIComponent(status.key)}&level=${boardLevel}`}
                         className="rounded p-1 text-slate-400 hover:bg-slate-200/70 hover:text-slate-700"
                         aria-label={`Add a ticket to ${status.label}`}
                         title={`Add a ticket to ${status.label}`}
@@ -758,9 +811,9 @@ export default function BoardPage() {
                           setDraggingId(null);
                           setDropTarget(null);
                         }}
-                        className={`relative rounded-lg border border-l-4 border-slate-200 bg-white p-3 shadow-sm transition hover:border-slate-300 hover:shadow ${
-                          ticket.type === "ENHANCEMENT" ? "border-l-indigo-400" : "border-l-red-400"
-                        } ${canDrag(ticket) ? "cursor-grab active:cursor-grabbing" : ""} ${
+                        className={`relative rounded-lg border border-l-4 border-slate-200 bg-white p-3 shadow-sm transition hover:border-slate-300 hover:shadow ${typeBorderClass(
+                          ticket.type,
+                        )} ${canDrag(ticket) ? "cursor-grab active:cursor-grabbing" : ""} ${
                           draggingId === ticket.id ? "opacity-50" : ""
                         }`}
                       >

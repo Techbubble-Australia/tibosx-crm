@@ -20,8 +20,21 @@ import {
 import { isDebugTicketStatus, previousDebugTicketStatus } from "../lib/debug-ticket-statuses.js";
 import { activeDebugSprintId } from "../lib/debug-sprints.js";
 import { notifyAsync } from "../lib/notifications/index.js";
+import {
+  DEBUG_ISSUE_TYPES,
+  DEBUG_LINK_TYPES,
+  HierarchyValidationError,
+  assertCanDeleteTicket,
+  hierarchyLevelForType,
+  isDebugIssueType,
+  resolveHierarchyFields,
+  type DebugIssueType,
+} from "../lib/debug-ticket-hierarchy.js";
 
 const router: IRouter = Router();
+
+const issueTypeSchema = z.enum(DEBUG_ISSUE_TYPES);
+const linkTypeSchema = z.enum(DEBUG_LINK_TYPES);
 
 function actorOf(user: DebugPortalUser): DebugTicketActor {
   return { userId: user.id, email: user.email };
@@ -68,7 +81,9 @@ const statusSchema = z.string().trim().min(1).max(60);
 const patchSchema = z
   .object({
     status: statusSchema.optional(),
-    type: z.enum(["BUG", "ENHANCEMENT"]).optional(),
+    type: issueTypeSchema.optional(),
+    parentId: z.string().trim().min(1).nullable().optional(),
+    rankOrder: z.coerce.number().optional(),
     reportedEnvironment: z.enum(["development", "staging", "production"]).optional(),
     title: z.string().trim().min(1, "Title is required").max(TICKET_TITLE_MAX).optional(),
     userDescription: z.string().trim().min(1).max(20_000).optional(),
@@ -81,7 +96,7 @@ const patchSchema = z
   });
 
 /** Ticket details only the creator may change (status and sprint follow their own rules). */
-const EDITABLE_FIELDS = ["type", "reportedEnvironment", "title", "userDescription", "currentUrl"] as const;
+const EDITABLE_FIELDS = ["reportedEnvironment", "title", "userDescription", "currentUrl"] as const;
 
 const ONLY_CREATOR_ERROR = "Only the person who created this ticket can edit or delete it.";
 
@@ -95,7 +110,8 @@ const bulkStatusSchema = z.object({
 });
 
 const portalCreateSchema = z.object({
-  type: z.enum(["BUG", "ENHANCEMENT"]),
+  type: issueTypeSchema.default("TASK"),
+  parentId: z.string().trim().min(1).nullable().optional(),
   reportedEnvironment: z.enum(["development", "staging", "production"]).default("development"),
   title: z.string().trim().min(1, "Title is required").max(TICKET_TITLE_MAX),
   userDescription: z.string().min(1).max(20_000),
@@ -104,6 +120,11 @@ const portalCreateSchema = z.object({
   screenshotUrls: z.array(screenshotUrlSchema).max(MAX_TICKET_SCREENSHOTS).optional(),
   /** Board "+" on a column: admins may start the ticket in that column; others always start in PENDING. */
   status: z.string().trim().min(1).max(60).optional(),
+});
+
+const createLinkSchema = z.object({
+  targetTicketId: z.string().trim().min(1),
+  linkType: linkTypeSchema,
 });
 
 const addScreenshotsSchema = z.object({
@@ -148,10 +169,88 @@ async function lockedForUser(user: DebugPortalUser, sprintId: string | null): Pr
   return sprint?.status === "COMPLETED";
 }
 
+const PARENT_SELECT = {
+  id: true,
+  ticketId: true,
+  type: true,
+  title: true,
+  hierarchyLevel: true,
+  status: true,
+} as const;
+
+const CHILD_SELECT = {
+  id: true,
+  ticketId: true,
+  type: true,
+  title: true,
+  hierarchyLevel: true,
+  status: true,
+  createdAt: true,
+} as const;
+
+function serializeHierarchyRef(row: {
+  id: string;
+  ticketId: string;
+  type: string;
+  title: string | null;
+  hierarchyLevel: number;
+  status: string;
+  createdAt?: Date;
+}) {
+  return {
+    id: row.id,
+    ticketId: row.ticketId,
+    type: row.type,
+    title: row.title ?? null,
+    hierarchyLevel: row.hierarchyLevel,
+    status: row.status,
+    ...(row.createdAt ? { createdAt: row.createdAt.toISOString() } : {}),
+  };
+}
+
+function serializeLink(row: {
+  id: string;
+  linkType: string;
+  sourceTicketId: string;
+  targetTicketId: string;
+  sourceTicket?: { id: string; ticketId: string; type: string; title: string | null; status: string };
+  targetTicket?: { id: string; ticketId: string; type: string; title: string | null; status: string };
+  createdAt: Date;
+}) {
+  return {
+    id: row.id,
+    linkType: row.linkType,
+    sourceTicketId: row.sourceTicketId,
+    targetTicketId: row.targetTicketId,
+    sourceTicket: row.sourceTicket
+      ? {
+          id: row.sourceTicket.id,
+          ticketId: row.sourceTicket.ticketId,
+          type: row.sourceTicket.type,
+          title: row.sourceTicket.title ?? null,
+          status: row.sourceTicket.status,
+        }
+      : undefined,
+    targetTicket: row.targetTicket
+      ? {
+          id: row.targetTicket.id,
+          ticketId: row.targetTicket.ticketId,
+          type: row.targetTicket.type,
+          title: row.targetTicket.title ?? null,
+          status: row.targetTicket.status,
+        }
+      : undefined,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
 function serializeRow(row: {
   id: string;
   ticketId: string;
   type: string;
+  hierarchyLevel?: number;
+  parentId?: string | null;
+  rankOrder?: number;
   status: string;
   reportedEnvironment: string;
   title: string | null;
@@ -169,8 +268,29 @@ function serializeRow(row: {
   createdAt: Date;
   sprintId?: string | null;
   sprint?: { id: string; name: string; status: string } | null;
+  parent?: {
+    id: string;
+    ticketId: string;
+    type: string;
+    title: string | null;
+    hierarchyLevel: number;
+    status: string;
+  } | null;
+  children?: Array<{
+    id: string;
+    ticketId: string;
+    type: string;
+    title: string | null;
+    hierarchyLevel: number;
+    status: string;
+    createdAt: Date;
+  }>;
+  _count?: { children?: number };
 }) {
   const screenshotUrls = ticketScreenshotUrls(row);
+  const hierarchyLevel =
+    row.hierarchyLevel ??
+    (isDebugIssueType(row.type) ? hierarchyLevelForType(row.type) : 0);
   return {
     sprintId: row.sprintId ?? null,
     sprintName: row.sprint?.name ?? null,
@@ -178,6 +298,12 @@ function serializeRow(row: {
     id: row.id,
     ticketId: row.ticketId,
     type: row.type,
+    hierarchyLevel,
+    parentId: row.parentId ?? null,
+    rankOrder: row.rankOrder ?? 0,
+    parent: row.parent ? serializeHierarchyRef(row.parent) : null,
+    children: (row.children ?? []).map(serializeHierarchyRef),
+    childCount: row._count?.children ?? row.children?.length ?? 0,
     status: row.status,
     reportedEnvironment: row.reportedEnvironment,
     title: row.title ?? null,
@@ -201,6 +327,10 @@ router.post("/", async (req: PortalRequest, res) => {
     const adminUser = req.portalUser!;
     const input = portalCreateSchema.parse(req.body);
     const screenshots = screenshotFieldsFromInput(input);
+    const hierarchy = await resolveHierarchyFields({
+      type: input.type,
+      parentId: input.parentId ?? null,
+    });
 
     const userAgent =
       typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : "debug-portal";
@@ -213,7 +343,9 @@ router.post("/", async (req: PortalRequest, res) => {
       source: "debug_portal_manual",
       ticketId,
       timestamp: new Date().toISOString(),
-      type: input.type,
+      type: hierarchy.type,
+      hierarchyLevel: hierarchy.hierarchyLevel,
+      parentId: hierarchy.parentId,
       reportedEnvironment: input.reportedEnvironment,
       title: input.title,
       userDescription: input.userDescription,
@@ -240,7 +372,9 @@ router.post("/", async (req: PortalRequest, res) => {
         const row = await prisma.debugCaptureTicket.create({
           data: {
             ticketId: attemptId,
-            type: input.type,
+            type: hierarchy.type,
+            hierarchyLevel: hierarchy.hierarchyLevel,
+            parentId: hierarchy.parentId,
             status: initialStatus,
             reportedEnvironment: input.reportedEnvironment,
             title: input.title,
@@ -257,7 +391,11 @@ router.post("/", async (req: PortalRequest, res) => {
             fullPayload: asInputJson(fullPayload),
             sprintId,
           },
-          include: { sprint: { select: SPRINT_SELECT } },
+          include: {
+            sprint: { select: SPRINT_SELECT },
+            parent: { select: PARENT_SELECT },
+            _count: { select: { children: true } },
+          },
         });
         await logDebugTicket(prisma, row.id, actorOf(adminUser), [{ action: "CREATED" }]);
         notifyAsync("debug_ticket.created", { ticketId: row.id });
@@ -273,6 +411,9 @@ router.post("/", async (req: PortalRequest, res) => {
     }
     return res.status(500).json({ error: "Failed to create ticket" });
   } catch (error) {
+    if (error instanceof HierarchyValidationError) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
     }
@@ -293,19 +434,34 @@ router.get("/", async (req: PortalRequest, res) => {
     const reporterUserId = req.portalUser!.isAdmin ? requestedReporter : req.portalUser!.id;
     // sprintId: "" = every ticket, "none" = backlog (no sprint), otherwise one sprint.
     const sprintParam = typeof req.query.sprintId === "string" ? req.query.sprintId.trim() : "";
+    const typeParam = typeof req.query.type === "string" ? req.query.type.trim().toUpperCase() : "";
+    const parentParam = typeof req.query.parentId === "string" ? req.query.parentId.trim() : "";
+    const levelRaw = typeof req.query.hierarchyLevel === "string" ? req.query.hierarchyLevel.trim() : "";
+    const levelParsed = levelRaw === "" ? null : Number.parseInt(levelRaw, 10);
+    const hierarchyLevel =
+      levelParsed != null && Number.isFinite(levelParsed) && [-1, 0, 1, 2].includes(levelParsed)
+        ? levelParsed
+        : null;
     const where: Prisma.DebugCaptureTicketWhereInput = {
       ...(statusFilter?.success ? { status: statusFilter.data } : {}),
       ...(reporterUserId ? { reporterUserId } : {}),
       ...(sprintParam === "none" ? { sprintId: null } : sprintParam ? { sprintId: sprintParam } : {}),
+      ...(typeParam && isDebugIssueType(typeParam) ? { type: typeParam } : {}),
+      ...(parentParam === "none" ? { parentId: null } : parentParam ? { parentId: parentParam } : {}),
+      ...(hierarchyLevel != null ? { hierarchyLevel } : {}),
     };
 
     const [rows, total] = await Promise.all([
       prisma.debugCaptureTicket.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ rankOrder: "asc" }, { createdAt: "desc" }],
         take,
         skip,
-        include: { sprint: { select: SPRINT_SELECT } },
+        include: {
+          sprint: { select: SPRINT_SELECT },
+          parent: { select: PARENT_SELECT },
+          _count: { select: { children: true } },
+        },
       }),
       prisma.debugCaptureTicket.count({ where }),
     ]);
@@ -446,6 +602,14 @@ function serializeComment(row: {
   };
 }
 
+const LINK_TICKET_SELECT = {
+  id: true,
+  ticketId: true,
+  type: true,
+  title: true,
+  status: true,
+} as const;
+
 /** Ticket detail plus its activity log (newest first) and comments (oldest first). */
 async function ticketDetail(id: string) {
   const row = await prisma.debugCaptureTicket.findUnique({
@@ -454,11 +618,26 @@ async function ticketDetail(id: string) {
       logs: { orderBy: { createdAt: "desc" } },
       comments: { orderBy: { createdAt: "asc" } },
       sprint: { select: SPRINT_SELECT },
+      parent: { select: PARENT_SELECT },
+      children: { select: CHILD_SELECT, orderBy: [{ rankOrder: "asc" }, { createdAt: "asc" }] },
+      linksFrom: {
+        include: { targetTicket: { select: LINK_TICKET_SELECT } },
+        orderBy: { createdAt: "asc" },
+      },
+      linksTo: {
+        include: { sourceTicket: { select: LINK_TICKET_SELECT } },
+        orderBy: { createdAt: "asc" },
+      },
+      _count: { select: { children: true } },
     },
   });
   if (!row) return null;
   return {
     ...serializeRow(row),
+    links: [
+      ...row.linksFrom.map((link) => serializeLink(link)),
+      ...row.linksTo.map((link) => serializeLink(link)),
+    ],
     logs: row.logs.map(serializeDebugTicketLog),
     comments: row.comments.map(serializeComment),
   };
@@ -690,6 +869,56 @@ router.patch("/:id", async (req: PortalRequest, res) => {
       entries.push({ action: "UPDATED", field, oldValue: String(row[field] ?? ""), newValue: String(value) });
     }
 
+    if (body.type !== undefined || body.parentId !== undefined) {
+      if (row.reporterUserId !== user.id && !user.isAdmin) {
+        return res.status(403).json({ error: ONLY_CREATOR_ERROR });
+      }
+      const nextType = (body.type ?? row.type) as DebugIssueType;
+      const nextParentId = body.parentId !== undefined ? body.parentId : row.parentId;
+      const hierarchy = await resolveHierarchyFields({
+        ticketId: row.id,
+        type: nextType,
+        parentId: nextParentId,
+      });
+      if (hierarchy.type !== row.type) {
+        data.type = hierarchy.type;
+        entries.push({ action: "UPDATED", field: "type", oldValue: row.type, newValue: hierarchy.type });
+      }
+      if (hierarchy.hierarchyLevel !== row.hierarchyLevel) {
+        data.hierarchyLevel = hierarchy.hierarchyLevel;
+        entries.push({
+          action: "UPDATED",
+          field: "hierarchyLevel",
+          oldValue: String(row.hierarchyLevel),
+          newValue: String(hierarchy.hierarchyLevel),
+        });
+      }
+      if (hierarchy.parentId !== row.parentId) {
+        data.parent = hierarchy.parentId
+          ? { connect: { id: hierarchy.parentId } }
+          : { disconnect: true };
+        entries.push({
+          action: "UPDATED",
+          field: "parentId",
+          oldValue: row.parentId ?? "",
+          newValue: hierarchy.parentId ?? "",
+        });
+      }
+    }
+
+    if (body.rankOrder !== undefined && body.rankOrder !== row.rankOrder) {
+      if (row.reporterUserId !== user.id && !user.isAdmin) {
+        return res.status(403).json({ error: ONLY_CREATOR_ERROR });
+      }
+      data.rankOrder = body.rankOrder;
+      entries.push({
+        action: "UPDATED",
+        field: "rankOrder",
+        oldValue: String(row.rankOrder),
+        newValue: String(body.rankOrder),
+      });
+    }
+
     if (body.sprintId !== undefined && body.sprintId !== row.sprintId) {
       if (!user.isAdmin) return res.status(403).json({ error: "Only admins can change a ticket's sprint" });
       const [fromSprint, toSprint] = await Promise.all([
@@ -722,6 +951,9 @@ router.patch("/:id", async (req: PortalRequest, res) => {
     }
     res.json({ data: await ticketDetail(row.id) });
   } catch (error) {
+    if (error instanceof HierarchyValidationError) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
     }
@@ -730,7 +962,95 @@ router.patch("/:id", async (req: PortalRequest, res) => {
   }
 });
 
-/** Only the ticket's creator can delete it (not while its sprint is completed). Logs and comments cascade. */
+/** Link another ticket laterally (blocks / blocked by / relates to). */
+router.post("/:id/links", async (req: PortalRequest, res) => {
+  try {
+    const user = req.portalUser!;
+    const { targetTicketId, linkType } = createLinkSchema.parse(req.body);
+    const source = await prisma.debugCaptureTicket.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, reporterUserId: true, sprintId: true },
+    });
+    if (!source || !canViewTicket(user, source)) return res.status(404).json({ error: "Not found" });
+    if (await lockedForUser(user, source.sprintId)) return res.status(403).json({ error: LOCKED_SPRINT_ERROR });
+    if (source.reporterUserId !== user.id && !user.isAdmin) {
+      return res.status(403).json({ error: ONLY_CREATOR_ERROR });
+    }
+    if (targetTicketId === source.id) {
+      return res.status(400).json({ error: "A ticket cannot link to itself." });
+    }
+    const target =
+      (await prisma.debugCaptureTicket.findUnique({
+        where: { id: targetTicketId },
+        select: { id: true, reporterUserId: true },
+      })) ??
+      (await prisma.debugCaptureTicket.findUnique({
+        where: { ticketId: targetTicketId },
+        select: { id: true, reporterUserId: true },
+      }));
+    if (!target || !canViewTicket(user, target)) {
+      return res.status(404).json({ error: "Target ticket not found" });
+    }
+    const created = await prisma.debugCaptureTicketLink.create({
+      data: {
+        sourceTicketId: source.id,
+        targetTicketId: target.id,
+        linkType,
+      },
+      include: {
+        sourceTicket: { select: LINK_TICKET_SELECT },
+        targetTicket: { select: LINK_TICKET_SELECT },
+      },
+    });
+    await logDebugTicket(prisma, source.id, actorOf(user), [
+      { action: "UPDATED", field: "link", newValue: `${linkType} → ${target.id}` },
+    ]);
+    res.status(201).json({ data: serializeLink(created) });
+  } catch (error) {
+    const code = (error as { code?: string })?.code;
+    if (code === "P2002") {
+      return res.status(409).json({ error: "That link already exists." });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    console.error("debug portal link create error:", error);
+    res.status(500).json({ error: "Failed to create link" });
+  }
+});
+
+router.delete("/:id/links/:linkId", async (req: PortalRequest, res) => {
+  try {
+    const user = req.portalUser!;
+    const link = await prisma.debugCaptureTicketLink.findFirst({
+      where: {
+        id: req.params.linkId,
+        OR: [{ sourceTicketId: req.params.id }, { targetTicketId: req.params.id }],
+      },
+      include: {
+        sourceTicket: { select: { id: true, reporterUserId: true, sprintId: true } },
+      },
+    });
+    if (!link) return res.status(404).json({ error: "Not found" });
+    if (!canViewTicket(user, link.sourceTicket)) return res.status(404).json({ error: "Not found" });
+    if (await lockedForUser(user, link.sourceTicket.sprintId)) {
+      return res.status(403).json({ error: LOCKED_SPRINT_ERROR });
+    }
+    if (link.sourceTicket.reporterUserId !== user.id && !user.isAdmin) {
+      return res.status(403).json({ error: ONLY_CREATOR_ERROR });
+    }
+    await prisma.debugCaptureTicketLink.delete({ where: { id: link.id } });
+    await logDebugTicket(prisma, link.sourceTicketId, actorOf(user), [
+      { action: "UPDATED", field: "link", oldValue: `${link.linkType} → ${link.targetTicketId}` },
+    ]);
+    res.json({ data: { id: link.id } });
+  } catch (error) {
+    console.error("debug portal link delete error:", error);
+    res.status(500).json({ error: "Failed to delete link" });
+  }
+});
+
+/** Only the ticket's creator can delete it (not while its sprint is completed). Blocks if children exist. */
 router.delete("/:id", async (req: PortalRequest, res) => {
   try {
     const user = req.portalUser!;
@@ -741,9 +1061,13 @@ router.delete("/:id", async (req: PortalRequest, res) => {
     if (!row || !canViewTicket(user, row)) return res.status(404).json({ error: "Not found" });
     if (row.reporterUserId !== user.id) return res.status(403).json({ error: ONLY_CREATOR_ERROR });
     if (await lockedForUser(user, row.sprintId)) return res.status(403).json({ error: LOCKED_SPRINT_ERROR });
+    await assertCanDeleteTicket(row.id);
     await prisma.debugCaptureTicket.delete({ where: { id: row.id } });
     res.json({ data: { id: row.id, ticketId: row.ticketId } });
   } catch (error) {
+    if (error instanceof HierarchyValidationError) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error("debug portal delete error:", error);
     res.status(500).json({ error: "Failed to delete ticket" });
   }

@@ -93,6 +93,8 @@ type DbRow = {
   id: string;
   ticketId: string;
   type: string;
+  hierarchyLevel?: number;
+  parentId?: string | null;
   status: string;
   reportedEnvironment: string;
   title: string | null;
@@ -192,6 +194,8 @@ function serializeForAgent(row: DbRow, includeFullPayload: boolean) {
     ticketId: row.ticketId,
     status: row.status,
     type: row.type,
+    hierarchyLevel: row.hierarchyLevel ?? 0,
+    parentId: row.parentId ?? null,
     reportedEnvironment: row.reportedEnvironment,
     createdAt: row.createdAt.toISOString(),
     sprint: serializeSprint(row.sprint),

@@ -19,15 +19,49 @@ import { usePortalUser } from "@/lib/use-portal-user";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
 import { SprintSelect } from "@/components/SprintSelect";
 import { BACKLOG, SPRINT_STATUS_LABELS, isSprintLocked, useSprints, type SprintStatus } from "@/lib/sprints";
-import { TICKET_TITLE_MAX, formatEnvironment, memberStatusTarget, type TicketStatus } from "@/lib/tickets";
+import {
+  DEBUG_ISSUE_TYPES,
+  TICKET_TITLE_MAX,
+  formatEnvironment,
+  formatTicketType,
+  isDebugIssueType,
+  memberStatusTarget,
+  type DebugIssueType,
+  type TicketStatus,
+} from "@/lib/tickets";
 import { StatusBadge, TypeBadge } from "@/components/TicketBadges";
 import { TicketComments, type TicketComment } from "@/components/TicketComments";
 import { useConfirm } from "@/components/ConfirmDialog";
+import Link from "next/link";
+
+export type TicketHierarchyRef = {
+  id: string;
+  ticketId: string;
+  type: string;
+  title?: string | null;
+  hierarchyLevel: number;
+  status: string;
+};
+
+export type TicketLinkRow = {
+  id: string;
+  linkType: string;
+  sourceTicketId: string;
+  targetTicketId: string;
+  sourceTicket?: { id: string; ticketId: string; type: string; title: string | null; status: string };
+  targetTicket?: { id: string; ticketId: string; type: string; title: string | null; status: string };
+};
 
 export type TicketDetail = {
   id: string;
   ticketId: string;
   type: string;
+  hierarchyLevel?: number;
+  parentId?: string | null;
+  parent?: TicketHierarchyRef | null;
+  children?: TicketHierarchyRef[];
+  childCount?: number;
+  links?: TicketLinkRow[];
   status: TicketStatus;
   reportedEnvironment: string;
   title?: string | null;
@@ -51,7 +85,8 @@ export type TicketDetail = {
 };
 
 type EditDraft = {
-  type: "BUG" | "ENHANCEMENT";
+  type: DebugIssueType;
+  parentId: string;
   reportedEnvironment: string;
   title: string;
   userDescription: string;
@@ -122,11 +157,16 @@ export function TicketDetailView({
   const [savingEdit, setSavingEdit] = useState(false);
   const [editDraft, setEditDraft] = useState<EditDraft>({
     type: "BUG",
+    parentId: "",
     reportedEnvironment: "development",
     title: "",
     userDescription: "",
     currentUrl: "",
   });
+  const [parentOptions, setParentOptions] = useState<TicketHierarchyRef[]>([]);
+  const [linkTargetId, setLinkTargetId] = useState("");
+  const [linkType, setLinkType] = useState("RELATES_TO");
+  const [linkSaving, setLinkSaving] = useState(false);
   const { user, isAdmin } = usePortalUser();
   const { labelOf } = useTicketStatuses();
   const { sprints, reload: reloadSprints } = useSprints();
@@ -136,6 +176,10 @@ export function TicketDetailView({
 
   async function deleteTicket() {
     if (!row) return;
+    if ((row.childCount ?? row.children?.length ?? 0) > 0) {
+      setError("This ticket still has child tickets. Reparent or delete them first.");
+      return;
+    }
     const ok = await confirm({
       title: `Delete ${row.ticketId}?`,
       message: "Its screenshots, comments and activity log are removed too. This can't be undone.",
@@ -186,8 +230,10 @@ export function TicketDetailView({
 
   function startEdit() {
     if (!row) return;
+    const nextType = isDebugIssueType(row.type) ? row.type : "TASK";
     setEditDraft({
-      type: row.type === "ENHANCEMENT" ? "ENHANCEMENT" : "BUG",
+      type: nextType,
+      parentId: row.parentId ?? "",
       reportedEnvironment: row.reportedEnvironment,
       title: row.title ?? "",
       userDescription: row.userDescription,
@@ -196,6 +242,30 @@ export function TicketDetailView({
     setEditing(true);
   }
 
+  useEffect(() => {
+    if (!editing) return;
+    const level =
+      editDraft.type === "INITIATIVE"
+        ? null
+        : editDraft.type === "EPIC"
+          ? 2
+          : editDraft.type === "SUBTASK"
+            ? 0
+            : 1;
+    if (level == null) {
+      setParentOptions([]);
+      return;
+    }
+    const qs = new URLSearchParams({ limit: "200", hierarchyLevel: String(level) });
+    void fetch(`/api/debug-portal/tickets?${qs}`, { credentials: "include", cache: "no-store" })
+      .then((r) => r.json())
+      .then((json) => {
+        const rows = Array.isArray(json?.data) ? (json.data as TicketHierarchyRef[]) : [];
+        setParentOptions(rows.filter((r) => r.id !== id));
+      })
+      .catch(() => setParentOptions([]));
+  }, [editing, editDraft.type, id]);
+
   async function saveEdit() {
     if (!editDraft.title.trim()) {
       setError("Title is required.");
@@ -203,6 +273,10 @@ export function TicketDetailView({
     }
     if (!editDraft.userDescription.trim()) {
       setError("Description is required.");
+      return;
+    }
+    if (editDraft.type === "SUBTASK" && !editDraft.parentId) {
+      setError("Subtasks require a parent story, task, or bug.");
       return;
     }
     setSavingEdit(true);
@@ -214,6 +288,7 @@ export function TicketDetailView({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: editDraft.type,
+          parentId: editDraft.type === "INITIATIVE" ? null : editDraft.parentId || null,
           reportedEnvironment: editDraft.reportedEnvironment,
           title: editDraft.title.trim(),
           userDescription: editDraft.userDescription.trim(),
@@ -286,6 +361,54 @@ export function TicketDetailView({
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function addLink() {
+    if (!linkTargetId.trim()) return;
+    setLinkSaving(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/debug-portal/tickets/${id}/links`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetTicketId: linkTargetId.trim(),
+          linkType,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Could not add link");
+      setLinkTargetId("");
+      setLinkType("RELATES_TO");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not add link");
+    } finally {
+      setLinkSaving(false);
+    }
+  }
+
+  async function removeLink(linkId: string) {
+    const ok = await confirm({
+      title: "Remove this link?",
+      message: "The tickets will no longer be linked.",
+      confirmLabel: "Remove link",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setError("");
+    try {
+      const res = await fetch(`/api/debug-portal/tickets/${id}/links/${linkId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Could not remove link");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove link");
+    }
+  }
 
   /** Re-reads only the activity log (e.g. after a comment change) without a loading state. */
   const refreshLogs = useCallback(async () => {
@@ -563,7 +686,12 @@ export function TicketDetailView({
             <button
               type="button"
               onClick={() => void deleteTicket()}
-              disabled={deleting}
+              disabled={deleting || (row.childCount ?? row.children?.length ?? 0) > 0}
+              title={
+                (row.childCount ?? row.children?.length ?? 0) > 0
+                  ? "Reparent or delete child tickets first"
+                  : undefined
+              }
               className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {deleting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Trash2 className="h-4 w-4" aria-hidden />}
@@ -599,13 +727,43 @@ export function TicketDetailView({
                 <ChevronSelect
                   id="edit-type"
                   value={editDraft.type}
-                  onChange={(v) => setEditDraft((d) => ({ ...d, type: v as EditDraft["type"] }))}
+                  onChange={(v) =>
+                    setEditDraft((d) => ({
+                      ...d,
+                      type: v as DebugIssueType,
+                      parentId: v === "INITIATIVE" ? "" : d.parentId,
+                    }))
+                  }
                   className="block w-44"
                 >
-                  <option value="BUG">Bug</option>
-                  <option value="ENHANCEMENT">Enhancement</option>
+                  {DEBUG_ISSUE_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {formatTicketType(t)}
+                    </option>
+                  ))}
                 </ChevronSelect>
               </div>
+              {editDraft.type !== "INITIATIVE" ? (
+                <div>
+                  <label htmlFor="edit-parent" className="dp-label">
+                    Parent {editDraft.type === "SUBTASK" ? <span className="text-red-600">*</span> : null}
+                  </label>
+                  <ChevronSelect
+                    id="edit-parent"
+                    value={editDraft.parentId}
+                    onChange={(v) => setEditDraft((d) => ({ ...d, parentId: v }))}
+                    className="block min-w-[16rem]"
+                  >
+                    <option value="">{editDraft.type === "SUBTASK" ? "Select a parent…" : "No parent"}</option>
+                    {parentOptions.map((opt) => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.ticketId}
+                        {opt.title ? ` — ${opt.title}` : ""} ({formatTicketType(opt.type)})
+                      </option>
+                    ))}
+                  </ChevronSelect>
+                </div>
+              ) : null}
               <div>
                 <label htmlFor="edit-env" className="dp-label">
                   Environment
@@ -681,6 +839,118 @@ export function TicketDetailView({
           <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
             {row.userDescription.trim() || "No description provided."}
           </p>
+        </SectionCard>
+        <SectionCard title="Hierarchy">
+          <dl className="space-y-3">
+            <DetailRow label="Type">
+              <TypeBadge type={row.type} />
+            </DetailRow>
+            <DetailRow label="Parent">
+              {row.parent ? (
+                <Link href={`/tickets/${row.parent.id}`} className="font-medium text-sky-700 hover:underline">
+                  {row.parent.ticketId}
+                  {row.parent.title ? ` — ${row.parent.title}` : ""}
+                </Link>
+              ) : (
+                <span className="text-slate-500">None</span>
+              )}
+            </DetailRow>
+            <DetailRow label="Children">
+              {(row.children ?? []).length === 0 ? (
+                <span className="text-slate-500">None</span>
+              ) : (
+                <ul className="space-y-1">
+                  {(row.children ?? []).map((child) => (
+                    <li key={child.id}>
+                      <Link href={`/tickets/${child.id}`} className="font-medium text-sky-700 hover:underline">
+                        {child.ticketId}
+                        {child.title ? ` — ${child.title}` : ""}
+                      </Link>{" "}
+                      <TypeBadge type={child.type} size="sm" />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </DetailRow>
+          </dl>
+          {row.type !== "SUBTASK" ? (
+            <div className="mt-4 border-t border-slate-100 pt-3">
+              <Link
+                href={`/tickets/new?level=${(row.hierarchyLevel ?? 0) - 1}&parentId=${row.id}`}
+                className="text-sm font-medium text-sky-700 hover:underline"
+              >
+                Add child ticket
+              </Link>
+            </div>
+          ) : null}
+        </SectionCard>
+        <SectionCard title="Linked issues">
+          {(row.links ?? []).length === 0 ? (
+            <p className="text-sm text-slate-500">No linked issues yet.</p>
+          ) : (
+            <ul className="mb-4 space-y-2">
+              {(row.links ?? []).map((link) => {
+                const other =
+                  link.sourceTicketId === row.id ? link.targetTicket : link.sourceTicket;
+                if (!other) return null;
+                return (
+                  <li key={link.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <span>
+                      <span className="font-medium text-slate-700">{link.linkType.replace(/_/g, " ")}</span>{" "}
+                      <Link href={`/tickets/${other.id}`} className="text-sky-700 hover:underline">
+                        {other.ticketId}
+                        {other.title ? ` — ${other.title}` : ""}
+                      </Link>
+                    </span>
+                    {!locked ? (
+                      <button
+                        type="button"
+                        className="text-xs text-red-700 hover:underline"
+                        onClick={() => void removeLink(link.id)}
+                      >
+                        Remove
+                      </button>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {!locked && isCreator ? (
+            <div className="flex flex-wrap items-end gap-2 border-t border-slate-100 pt-3">
+              <div>
+                <label htmlFor="link-type" className="dp-label">
+                  Link type
+                </label>
+                <ChevronSelect id="link-type" value={linkType} onChange={setLinkType} className="block w-40">
+                  <option value="RELATES_TO">Relates to</option>
+                  <option value="BLOCKS">Blocks</option>
+                  <option value="BLOCKED_BY">Blocked by</option>
+                </ChevronSelect>
+              </div>
+              <div className="min-w-[12rem] flex-1">
+                <label htmlFor="link-target" className="dp-label">
+                  Target ticket id
+                </label>
+                <input
+                  id="link-target"
+                  value={linkTargetId}
+                  onChange={(e) => setLinkTargetId(e.target.value)}
+                  placeholder="TICK-… or ticket id"
+                  className="dp-input"
+                />
+              </div>
+              <button
+                type="button"
+                disabled={linkSaving || !linkTargetId.trim()}
+                onClick={() => void addLink()}
+                className="dp-btn-secondary"
+              >
+                {linkSaving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+                Add link
+              </button>
+            </div>
+          ) : null}
         </SectionCard>
         </>
       )}

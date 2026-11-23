@@ -13,6 +13,7 @@ import {
 import { logDebugTicket } from "../lib/debug-ticket-log.js";
 import { activeDebugSprintId } from "../lib/debug-sprints.js";
 import { notifyAsync } from "../lib/notifications/index.js";
+import { hierarchyLevelForType, type DebugIssueType } from "../lib/debug-ticket-hierarchy.js";
 
 const router: IRouter = Router();
 
@@ -47,7 +48,8 @@ const apiPrerequisiteSchema = z
 
 const createSchema = z.object({
   ticketId: z.string().min(1).max(80),
-  type: z.enum(["BUG", "ENHANCEMENT"]),
+  /** Capture widget only creates Level 0 work items. */
+  type: z.enum(["BUG", "STORY", "TASK"]),
   reportedEnvironment: z.enum(["development", "staging", "production"]).default("development"),
   title: z.string().trim().min(1, "Title is required").max(TICKET_TITLE_MAX),
   userDescription: z.string().min(1).max(20_000),
@@ -97,6 +99,8 @@ function serializeRow(row: {
   id: string;
   ticketId: string;
   type: string;
+  hierarchyLevel?: number;
+  parentId?: string | null;
   status: string;
   reportedEnvironment: string;
   title: string | null;
@@ -118,6 +122,8 @@ function serializeRow(row: {
     id: row.id,
     ticketId: row.ticketId,
     type: row.type,
+    hierarchyLevel: row.hierarchyLevel ?? 0,
+    parentId: row.parentId ?? null,
     status: row.status,
     reportedEnvironment: row.reportedEnvironment,
     title: row.title ?? null,
@@ -174,10 +180,13 @@ router.post("/", async (req: AuthRequest, res) => {
     let ticketId = input.ticketId;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
+        const issueType = input.type as DebugIssueType;
         const row = await prisma.debugCaptureTicket.create({
           data: {
             ticketId,
-            type: input.type,
+            type: issueType,
+            hierarchyLevel: hierarchyLevelForType(issueType),
+            parentId: null,
             reportedEnvironment: input.reportedEnvironment,
             title: input.title,
             userDescription: input.userDescription,

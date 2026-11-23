@@ -13,12 +13,20 @@ import { StatusBadge, TypeBadge } from "@/components/TicketBadges";
 import { TicketModal } from "@/components/TicketModal";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { ALL_SPRINTS, defaultSprintSelection, useSprints } from "@/lib/sprints";
-import { formatEnvironment, nextStatusInOrder, type TicketStatus } from "@/lib/tickets";
+import {
+  BOARD_LEVEL_TABS,
+  DEBUG_ISSUE_TYPES,
+  formatEnvironment,
+  formatTicketType,
+  nextStatusInOrder,
+  type TicketStatus,
+} from "@/lib/tickets";
 
 type TicketRow = {
   id: string;
   ticketId: string;
   type: string;
+  hierarchyLevel?: number;
   status: TicketStatus;
   reportedEnvironment: string;
   title?: string | null;
@@ -46,6 +54,8 @@ function TicketsListInner() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [typeFilter, setTypeFilter] = useState<string>("");
+  const [levelFilter, setLevelFilter] = useState<string>("");
   /** null until sprints load and the default (active, else latest) sprint is chosen. */
   const [sprintFilter, setSprintFilter] = useState<string | null>(null);
   const { sprints, loading: sprintsLoading } = useSprints();
@@ -81,7 +91,7 @@ function TicketsListInner() {
     setSelectedIds(new Set());
     setBulkError("");
     setPage(0);
-  }, [statusFilter, reporterFilter, sprintFilter]);
+  }, [statusFilter, reporterFilter, sprintFilter, typeFilter, levelFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,6 +158,8 @@ function TicketsListInner() {
       if (statusFilter) qs.set("status", statusFilter);
       if (reporterFilter) qs.set("reporterUserId", reporterFilter);
       if (sprintFilter) qs.set("sprintId", sprintFilter);
+      if (typeFilter) qs.set("type", typeFilter);
+      if (levelFilter !== "") qs.set("hierarchyLevel", levelFilter);
       const res = await fetch(`/api/debug-portal/tickets?${qs}`, { credentials: "include", cache: "no-store" });
       const data = await res.json();
       if (seq !== loadSeq.current) return;
@@ -161,7 +173,7 @@ function TicketsListInner() {
     } finally {
       if (seq === loadSeq.current && !silent) setLoading(false);
     }
-  }, [filtersReady, reporterFilter, statusFilter, sprintFilter, page]);
+  }, [filtersReady, reporterFilter, statusFilter, sprintFilter, typeFilter, levelFilter, page]);
 
   useAutoRefresh(() => void load({ silent: true }), { paused: Boolean(openTicket || bulkSaving || loading) });
 
@@ -285,6 +297,44 @@ function TicketsListInner() {
               ))}
             </ChevronSelect>
           </FilterField>
+          <FilterField label="Type" htmlFor="type-filter">
+            <ChevronSelect
+              id="type-filter"
+              value={typeFilter}
+              onChange={(v) => {
+                setTypeFilter(v);
+                if (v) setLevelFilter("");
+              }}
+              className="block w-full min-w-0"
+              aria-label="Filter by type"
+            >
+              <option value="">All types</option>
+              {DEBUG_ISSUE_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {formatTicketType(t)}
+                </option>
+              ))}
+            </ChevronSelect>
+          </FilterField>
+          <FilterField label="Level" htmlFor="level-filter">
+            <ChevronSelect
+              id="level-filter"
+              value={levelFilter}
+              onChange={(v) => {
+                setLevelFilter(v);
+                if (v !== "") setTypeFilter("");
+              }}
+              className="block w-full min-w-0"
+              aria-label="Filter by hierarchy level"
+            >
+              <option value="">All levels</option>
+              {BOARD_LEVEL_TABS.map((tab) => (
+                <option key={tab.level} value={String(tab.level)}>
+                  {tab.label}
+                </option>
+              ))}
+            </ChevronSelect>
+          </FilterField>
           <FilterField label="Sprint" htmlFor="sprint-filter" className="sm:max-w-[20rem]">
             <SprintSelect
               id="sprint-filter"
@@ -402,7 +452,15 @@ function TicketsListInner() {
                       <StatusBadge status={row.status} />
                     </td>
                     <td className="dp-table-cell">
-                      <TypeBadge type={row.type} />
+                      <div className="flex flex-col items-start gap-1">
+                        <TypeBadge type={row.type} />
+                        {typeof row.hierarchyLevel === "number" ? (
+                          <span className="text-[11px] text-slate-500">
+                            {BOARD_LEVEL_TABS.find((t) => t.level === row.hierarchyLevel)?.label ??
+                              `Level ${row.hierarchyLevel}`}
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="dp-table-cell whitespace-nowrap">
                       {formatEnvironment(row.reportedEnvironment)}

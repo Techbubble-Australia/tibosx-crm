@@ -1337,8 +1337,18 @@ model TicketAuditLog {
 }
 
 enum DebugCaptureTicketType {
+  INITIATIVE
+  EPIC
+  STORY
+  TASK
   BUG
-  ENHANCEMENT
+  SUBTASK
+}
+
+enum DebugCaptureTicketLinkType {
+  BLOCKS
+  BLOCKED_BY
+  RELATES_TO
 }
 
 enum DebugReportedEnvironment {
@@ -1383,6 +1393,14 @@ model DebugCaptureTicket {
   id                   String                   @id @default(cuid())
   ticketId             String                   @unique
   type                 DebugCaptureTicketType
+  /// Denormalized from type: INITIATIVE=2, EPIC=1, STORY/TASK/BUG=0, SUBTASK=-1.
+  hierarchyLevel       Int                      @default(0)
+  /// Self-referencing parent; RESTRICT so parents with children cannot be deleted.
+  parentId             String?
+  parent               DebugCaptureTicket?      @relation("DebugTicketHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children             DebugCaptureTicket[]     @relation("DebugTicketHierarchy")
+  /// Within-column / sibling ordering (lexorank-style float).
+  rankOrder            Float                    @default(0)
   /// Key of a DebugTicketStatus row.
   status               String                   @default("PENDING")
   /// Null = backlog (not planned into a sprint).
@@ -1405,12 +1423,32 @@ model DebugCaptureTicket {
   fullPayload          Json
   logs                 DebugCaptureTicketLog[]
   comments             DebugCaptureTicketComment[]
+  linksFrom            DebugCaptureTicketLink[] @relation("DebugTicketLinkSource")
+  linksTo              DebugCaptureTicketLink[] @relation("DebugTicketLinkTarget")
   createdAt            DateTime                 @default(now())
 
   @@index([createdAt])
   @@index([reporterUserId])
   @@index([status])
   @@index([sprintId])
+  @@index([parentId])
+  @@index([hierarchyLevel])
+  @@index([status, hierarchyLevel])
+}
+
+/// Lateral (non-hierarchical) relationships between debug tickets.
+model DebugCaptureTicketLink {
+  id             String                     @id @default(cuid())
+  sourceTicketId String
+  sourceTicket   DebugCaptureTicket         @relation("DebugTicketLinkSource", fields: [sourceTicketId], references: [id], onDelete: Cascade)
+  targetTicketId String
+  targetTicket   DebugCaptureTicket         @relation("DebugTicketLinkTarget", fields: [targetTicketId], references: [id], onDelete: Cascade)
+  linkType       DebugCaptureTicketLinkType
+  createdAt      DateTime                   @default(now())
+
+  @@unique([sourceTicketId, targetTicketId, linkType])
+  @@index([sourceTicketId])
+  @@index([targetTicketId])
 }
 
 /// Discussion on a debug ticket; anyone who can open the ticket can read and post.
