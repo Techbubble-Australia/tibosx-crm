@@ -94,8 +94,8 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/sales/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "sales"] },
       { href: "/clients/active", label: "Clients", icon: Handshake, roles: ["admin", "sales"] },
-      { href: "/opportunities", label: "Opportunities", icon: CircleDollarSign, roles: ["admin", "sales"] },
-      { href: "/contracts", label: "Contracts", icon: ScrollText, roles: ["admin", "sales"] },
+      { href: "/opportunities/active", label: "Opportunities", icon: CircleDollarSign, roles: ["admin", "sales"] },
+      { href: "/contracts/active", label: "Contracts", icon: ScrollText, roles: ["admin", "sales"] },
       { href: "/invoices", label: "Invoices", icon: FileText, roles: ["admin", "sales"] },
     ],
   },
@@ -230,10 +230,10 @@ function navItemIsActive(item: NavItem, pathname: string): boolean {
   if (item.href === "/clients/active") {
     return pathname.startsWith("/clients");
   }
-  if (item.href === "/opportunities") {
+  if (item.href === "/opportunities/active") {
     return pathname === "/opportunities" || pathname.startsWith("/opportunities/");
   }
-  if (item.href === "/contracts") {
+  if (item.href === "/contracts/active") {
     return pathname === "/contracts" || pathname.startsWith("/contracts/");
   }
   if (item.href === "/timesheets") {

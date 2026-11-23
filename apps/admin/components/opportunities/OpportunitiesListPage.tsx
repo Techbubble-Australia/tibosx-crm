@@ -144,6 +144,11 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
   const [statusDrafts, setStatusDrafts] = useState<Record<string, string>>({});
   const [contactsByClient, setContactsByClient] = useState<Record<string, ContactOption[]>>({});
 
+  // Effects first so a throw in a later memo can't change the hook count (React #310).
+  useEffect(() => {
+    void fetchRows();
+  }, [clientIdFilter, activeFilter]);
+
   const filteredByClient = useMemo(() => {
     const list = [...(clientIdFilter ? rows.filter((row) => row.clientId === clientIdFilter) : rows)];
     list.sort((a, b) => {
@@ -153,28 +158,28 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
           cmp = (a.order ?? 0) - (b.order ?? 0);
           break;
         case "name":
-          cmp = a.name.localeCompare(b.name);
+          cmp = (a.name ?? "").localeCompare(b.name ?? "");
           break;
         case "clientName":
-          cmp = a.clientName.localeCompare(b.clientName);
+          cmp = (a.clientName ?? "").localeCompare(b.clientName ?? "");
           break;
         case "location":
-          cmp = a.location.localeCompare(b.location);
+          cmp = (a.location ?? "").localeCompare(b.location ?? "");
           break;
         case "type":
-          cmp = a.typeLabel.localeCompare(b.typeLabel);
+          cmp = (a.typeLabel ?? "").localeCompare(b.typeLabel ?? "");
           break;
         case "amount":
-          cmp = a.amount - b.amount;
+          cmp = (a.amount ?? 0) - (b.amount ?? 0);
           break;
         case "status":
-          cmp = a.status.localeCompare(b.status);
+          cmp = (a.status ?? "").localeCompare(b.status ?? "");
           break;
         case "ownerName":
-          cmp = a.ownerName.localeCompare(b.ownerName);
+          cmp = (a.ownerName ?? "").localeCompare(b.ownerName ?? "");
           break;
       }
-      if (cmp === 0) cmp = a.name.localeCompare(b.name);
+      if (cmp === 0) cmp = (a.name ?? "").localeCompare(b.name ?? "");
       return sortDir === "asc" ? cmp : -cmp;
     });
     return list;
@@ -182,7 +187,7 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
 
   const cardScopeRows = useMemo(() => {
     if (!selectedClient) return filteredByClient;
-    return filteredByClient.filter((row) => row.clientName === selectedClient);
+    return filteredByClient.filter((row) => (row.clientName ?? "") === selectedClient);
   }, [filteredByClient, selectedClient]);
 
   function handleSort(key: OpportunitySortKey) {
@@ -222,16 +227,6 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
     { initialPageSize: 100, pageSizeOptions: [25, 50, 100, 200] },
   );
 
-  const groupedByClient = useMemo(() => {
-    const map = new Map<string, OpportunityRow[]>();
-    for (const row of filteredByClient) {
-      const list = map.get(row.clientName) ?? [];
-      list.push(row);
-      map.set(row.clientName, list);
-    }
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [filteredByClient]);
-
   useEffect(() => {
     setSelectedClient(null);
   }, [search, viewMode, activeFilter, clientIdFilter]);
@@ -242,9 +237,16 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
     }
   }, [clientIdFilter, clientName]);
 
-  useEffect(() => {
-    void fetchRows();
-  }, [clientIdFilter, activeFilter]);
+  const groupedByClient = useMemo(() => {
+    const map = new Map<string, OpportunityRow[]>();
+    for (const row of filteredByClient) {
+      const key = row.clientName?.trim() || "Unknown client";
+      const list = map.get(key) ?? [];
+      list.push(row);
+      map.set(key, list);
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [filteredByClient]);
 
   async function loadContactsForClient(clientId: string) {
     if (contactsByClient[clientId]) return contactsByClient[clientId];

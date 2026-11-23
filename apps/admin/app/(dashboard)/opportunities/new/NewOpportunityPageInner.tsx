@@ -42,7 +42,7 @@ export default function NewOpportunityPageInner() {
   return (
     <div className="max-w-2xl">
       <div className="mb-6 flex items-center gap-3">
-        <Link href="/opportunities" className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
+        <Link href="/opportunities/active" className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">New Opportunity</h2>

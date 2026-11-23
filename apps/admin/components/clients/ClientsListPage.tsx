@@ -68,25 +68,30 @@ export function ClientsListPage({ statusFilter, heading, description }: Props) {
   const [sortKey, setSortKey] = useState<ClientSortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
+  // Fetch before sort memos so a throw mid-sort can't skip later hooks (React #310).
+  useEffect(() => {
+    void fetchRows();
+  }, [statusFilter]);
+
   const statusFiltered = useMemo(() => {
     const list = rows.filter((row) => row.status === statusFilter);
     list.sort((a, b) => {
       let cmp = 0;
       switch (sortKey) {
         case "name":
-          cmp = a.name.localeCompare(b.name);
+          cmp = (a.name ?? "").localeCompare(b.name ?? "");
           break;
         case "country":
-          cmp = a.country.localeCompare(b.country);
+          cmp = (a.country ?? "").localeCompare(b.country ?? "");
           break;
         case "opportunityCount":
           cmp = (a.opportunityCount ?? 0) - (b.opportunityCount ?? 0);
           break;
         case "status":
-          cmp = a.status.localeCompare(b.status);
+          cmp = (a.status ?? "").localeCompare(b.status ?? "");
           break;
       }
-      if (cmp === 0) cmp = a.name.localeCompare(b.name);
+      if (cmp === 0) cmp = (a.name ?? "").localeCompare(b.name ?? "");
       return sortDir === "asc" ? cmp : -cmp;
     });
     return list;
@@ -128,10 +133,6 @@ export function ClientsListPage({ statusFilter, heading, description }: Props) {
       ]),
     { initialPageSize: 100, pageSizeOptions: [25, 50, 100, 200] },
   );
-
-  useEffect(() => {
-    void fetchRows();
-  }, []);
 
   async function fetchRows() {
     try {
