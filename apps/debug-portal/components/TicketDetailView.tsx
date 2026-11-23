@@ -1019,7 +1019,11 @@ export function TicketDetailView({
           )}
           {shots.length < MAX_TICKET_SCREENSHOTS && !locked ? (
             <div className="border-t border-slate-100 pt-4">
-              <label className={`dp-btn-secondary inline-flex cursor-pointer ${uploadingShots ? "pointer-events-none opacity-60" : ""}`}>
+              <label
+                className={`dp-btn-secondary inline-flex cursor-pointer ${uploadingShots ? "pointer-events-none opacity-60" : ""}`}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              >
                 {uploadingShots ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Upload className="h-4 w-4" aria-hidden />}
                 {uploadingShots ? "Uploading…" : "Add screenshots or PDFs"}
                 <input
@@ -1028,6 +1032,7 @@ export function TicketDetailView({
                   accept={TICKET_ATTACHMENT_ACCEPT}
                   className="sr-only"
                   disabled={uploadingShots}
+                  onClick={(e) => e.stopPropagation()}
                   onChange={(e) => {
                     void addScreenshots(e.target.files);
                     e.target.value = "";
