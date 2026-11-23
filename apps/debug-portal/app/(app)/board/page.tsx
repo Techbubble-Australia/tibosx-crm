@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarRange,
   Check,
@@ -113,7 +113,7 @@ function ColorSwatches({ value, onChange }: { value: string; onChange: (color: s
   );
 }
 
-export default function BoardPage() {
+function BoardPageInner() {
   const { isAdmin } = usePortalUser();
   const confirm = useConfirm();
   const router = useRouter();
@@ -935,5 +935,19 @@ export default function BoardPage() {
         />
       ) : null}
     </div>
+  );
+}
+
+export default function BoardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-48 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-sky-500" aria-label="Loading" />
+        </div>
+      }
+    >
+      <BoardPageInner />
+    </Suspense>
   );
 }
