@@ -108,6 +108,18 @@ export function ContractsListPage({ activeFilter }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("contractNumber");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
+  // Effects first so a throw in a later memo can't change the hook count (React #310).
+  useEffect(() => {
+    void adminFetch("/api/admin/clients")
+      .then((res) => res.json())
+      .then((data) => setClients((data.data ?? []) as Array<{ id: string; name: string }>))
+      .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    void fetchRows();
+  }, [activeFilter, clientIdFilter, typeFilter, statusFilter, expiringFilter]);
+
   const sortedRows = useMemo(() => {
     const list = [...rows];
     list.sort((a, b) => {
@@ -143,7 +155,7 @@ export function ContractsListPage({ activeFilter }: Props) {
 
   const cardScopeRows = useMemo(() => {
     if (!selectedClient) return sortedRows;
-    return sortedRows.filter((row) => row.clientName === selectedClient);
+    return sortedRows.filter((row) => (row.clientName ?? "") === selectedClient);
   }, [sortedRows, selectedClient]);
 
   const {
@@ -173,30 +185,20 @@ export function ContractsListPage({ activeFilter }: Props) {
     { initialPageSize: 100, pageSizeOptions: [25, 50, 100, 200] },
   );
 
-  const groupedByClient = useMemo(() => {
-    const map = new Map<string, ContractRow[]>();
-    for (const row of sortedRows) {
-      const list = map.get(row.clientName) ?? [];
-      list.push(row);
-      map.set(row.clientName, list);
-    }
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [sortedRows]);
-
   useEffect(() => {
     setSelectedClient(null);
   }, [search, viewMode, activeFilter]);
 
-  useEffect(() => {
-    void adminFetch("/api/admin/clients")
-      .then((res) => res.json())
-      .then((data) => setClients((data.data ?? []) as Array<{ id: string; name: string }>))
-      .catch(console.error);
-  }, []);
-
-  useEffect(() => {
-    void fetchRows();
-  }, [activeFilter, clientIdFilter, typeFilter, statusFilter, expiringFilter]);
+  const groupedByClient = useMemo(() => {
+    const map = new Map<string, ContractRow[]>();
+    for (const row of sortedRows) {
+      const key = row.clientName?.trim() || "Unknown client";
+      const list = map.get(key) ?? [];
+      list.push(row);
+      map.set(key, list);
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [sortedRows]);
 
   function updateFilters(next: { clientId?: string; type?: string; status?: string }) {
     const params = new URLSearchParams(searchParams.toString());
