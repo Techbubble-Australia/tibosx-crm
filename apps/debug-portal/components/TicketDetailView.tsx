@@ -22,6 +22,8 @@ import { BACKLOG, SPRINT_STATUS_LABELS, isSprintLocked, useSprints, type SprintS
 import {
   DEBUG_ISSUE_TYPES,
   TICKET_TITLE_MAX,
+  boardFamilyForLevel,
+  boardFamilyForType,
   formatEnvironment,
   formatTicketType,
   isDebugIssueType,
@@ -596,6 +598,11 @@ export function TicketDetailView({
               <StatusSelect
                 value={status}
                 onChange={setStatus}
+                boardFamily={
+                  typeof row.hierarchyLevel === "number"
+                    ? boardFamilyForLevel(row.hierarchyLevel)
+                    : boardFamilyForType(row.type)
+                }
                 className={inModal ? "min-w-0 flex-1" : undefined}
                 aria-label="Change ticket status"
               />
@@ -615,7 +622,9 @@ export function TicketDetailView({
                 type="button"
                 disabled={saving}
                 onClick={() => void saveStatus(memberTarget)}
-                className={memberTarget === "COMPLETED" ? "dp-btn-primary" : "dp-btn-secondary"}
+                className={
+                  memberTarget === "COMPLETED" || memberTarget === "DONE" ? "dp-btn-primary" : "dp-btn-secondary"
+                }
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
                 {memberTarget === "COMPLETED"

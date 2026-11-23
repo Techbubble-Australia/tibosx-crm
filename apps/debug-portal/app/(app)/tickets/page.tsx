@@ -73,16 +73,21 @@ function TicketsListInner() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [page, setPage] = useState(0);
 
-  const { statuses, labelOf } = useTicketStatuses();
+  const { allStatuses, statusesOf, labelOf } = useTicketStatuses();
+  const statusOptions = useMemo(() => {
+    if (levelFilter === "") return allStatuses;
+    const family = levelFilter === "1" || levelFilter === "2" ? "STRATEGY" : "WORK";
+    return statusesOf(family);
+  }, [allStatuses, levelFilter, statusesOf]);
 
   const filteredStatus = useMemo((): TicketStatus | null => {
     if (!statusFilter) return null;
-    return statuses.some((s) => s.key === statusFilter) ? statusFilter : null;
-  }, [statusFilter, statuses]);
+    return statusOptions.some((s) => s.key === statusFilter) ? statusFilter : null;
+  }, [statusFilter, statusOptions]);
 
   const bulkTargetStatus = useMemo(
-    () => (filteredStatus ? nextStatusInOrder(statuses, filteredStatus) : null),
-    [filteredStatus, statuses],
+    () => (filteredStatus ? nextStatusInOrder(statusOptions, filteredStatus) : null),
+    [filteredStatus, statusOptions],
   );
 
   const showBulkActions = isAdmin && Boolean(bulkTargetStatus && filteredStatus);
@@ -290,9 +295,10 @@ function TicketsListInner() {
               aria-label="Filter by status"
             >
               <option value="">All statuses</option>
-              {statuses.map((s) => (
-                <option key={s.key} value={s.key}>
+              {statusOptions.map((s) => (
+                <option key={`${s.boardFamily ?? "WORK"}-${s.key}`} value={s.key}>
                   {s.label}
+                  {levelFilter === "" && s.boardFamily === "STRATEGY" ? " (strategy)" : ""}
                 </option>
               ))}
             </ChevronSelect>

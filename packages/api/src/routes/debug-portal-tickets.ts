@@ -17,7 +17,12 @@ import {
   serializeDebugTicketLog,
   type DebugTicketActor,
 } from "../lib/debug-ticket-log.js";
-import { isDebugTicketStatus, previousDebugTicketStatus } from "../lib/debug-ticket-statuses.js";
+import {
+  boardFamilyForHierarchyLevel,
+  defaultStatusForFamily,
+  isDebugTicketStatus,
+  previousDebugTicketStatus,
+} from "../lib/debug-ticket-statuses.js";
 import { activeDebugSprintId } from "../lib/debug-sprints.js";
 import { notifyAsync } from "../lib/notifications/index.js";
 import {
@@ -57,10 +62,12 @@ function requirePortalAdmin(req: PortalRequest, res: import("express").Response)
   return false;
 }
 
-/** Non-admins may only close a reviewed ticket or reopen a completed one. */
+/** Non-admins may only close a reviewed/active ticket or reopen a completed/done one. */
 const MEMBER_STATUS_MOVES: ReadonlyArray<[string, string]> = [
   ["FOR_REVIEW", "COMPLETED"],
   ["COMPLETED", "PENDING"],
+  ["ACTIVE", "DONE"],
+  ["DONE", "PLANNED"],
 ];
 
 function canChangeStatus(user: DebugPortalUser, from: string, to: string): boolean {
@@ -364,8 +371,11 @@ router.post("/", async (req: PortalRequest, res) => {
     };
 
     const sprintId = await activeDebugSprintId();
+    const family = boardFamilyForHierarchyLevel(hierarchy.hierarchyLevel);
     const initialStatus =
-      adminUser.isAdmin && input.status && (await isDebugTicketStatus(input.status)) ? input.status : "PENDING";
+      adminUser.isAdmin && input.status && (await isDebugTicketStatus(input.status, family))
+        ? input.status
+        : defaultStatusForFamily(family);
     let attemptId = ticketId;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -495,22 +505,28 @@ router.patch("/bulk-status", async (req: PortalRequest, res) => {
   try {
     if (!requirePortalAdmin(req, res)) return;
     const { ids, status, fromStatus } = bulkStatusSchema.parse(req.body);
-    if (!(await isDebugTicketStatus(status))) {
-      return res.status(400).json({ error: "Unknown status" });
-    }
-    const requiredFrom = fromStatus ?? (await previousDebugTicketStatus(status));
-    if (!requiredFrom || requiredFrom === status) {
-      return res.status(400).json({ error: "Invalid bulk target status" });
-    }
 
     const uniqueIds = [...new Set(ids)];
     const rows = await prisma.debugCaptureTicket.findMany({
       where: { id: { in: uniqueIds } },
-      select: { id: true, status: true },
+      select: { id: true, status: true, hierarchyLevel: true },
     });
 
     if (rows.length !== uniqueIds.length) {
       return res.status(404).json({ error: "One or more tickets were not found" });
+    }
+
+    const families = new Set(rows.map((r) => boardFamilyForHierarchyLevel(r.hierarchyLevel)));
+    if (families.size !== 1) {
+      return res.status(400).json({ error: "Bulk status updates must stay within one board family" });
+    }
+    const family = [...families][0]!;
+    if (!(await isDebugTicketStatus(status, family))) {
+      return res.status(400).json({ error: "Unknown status" });
+    }
+    const requiredFrom = fromStatus ?? (await previousDebugTicketStatus(status, family));
+    if (!requiredFrom || requiredFrom === status) {
+      return res.status(400).json({ error: "Invalid bulk target status" });
     }
 
     const invalid = rows.filter((r) => r.status !== requiredFrom);
@@ -842,12 +858,22 @@ router.patch("/:id", async (req: PortalRequest, res) => {
     const row = await prisma.debugCaptureTicket.findUnique({ where: { id: req.params.id } });
     if (!row || !canViewTicket(user, row)) return res.status(404).json({ error: "Not found" });
     if (await lockedForUser(user, row.sprintId)) return res.status(403).json({ error: LOCKED_SPRINT_ERROR });
-    if (body.status !== undefined && body.status !== row.status && !(await isDebugTicketStatus(body.status))) {
+    const statusFamily = boardFamilyForHierarchyLevel(
+      body.type && isDebugIssueType(body.type) ? hierarchyLevelForType(body.type) : row.hierarchyLevel,
+    );
+    if (
+      body.status !== undefined &&
+      body.status !== row.status &&
+      !(await isDebugTicketStatus(body.status, statusFamily))
+    ) {
       return res.status(400).json({ error: "Unknown status" });
     }
     if (body.status !== undefined && body.status !== row.status && !canChangeStatus(user, row.status, body.status)) {
       return res.status(403).json({
-        error: "You can only move a ticket from For review to Completed, or from Completed back to Pending.",
+        error:
+          statusFamily === "STRATEGY"
+            ? "You can only move a ticket from Active to Done, or from Done back to Planned."
+            : "You can only move a ticket from For review to Completed, or from Completed back to Pending.",
       });
     }
 
@@ -903,6 +929,20 @@ router.patch("/:id", async (req: PortalRequest, res) => {
           oldValue: row.parentId ?? "",
           newValue: hierarchy.parentId ?? "",
         });
+      }
+      const nextFamily = boardFamilyForHierarchyLevel(hierarchy.hierarchyLevel);
+      const currentFamily = boardFamilyForHierarchyLevel(row.hierarchyLevel);
+      if (nextFamily !== currentFamily && body.status === undefined) {
+        const remapped = defaultStatusForFamily(nextFamily);
+        if (remapped !== row.status) {
+          data.status = remapped;
+          entries.push({
+            action: "STATUS_CHANGED",
+            field: "status",
+            oldValue: row.status,
+            newValue: remapped,
+          });
+        }
       }
     }
 

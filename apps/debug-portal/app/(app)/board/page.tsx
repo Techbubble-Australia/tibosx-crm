@@ -43,6 +43,7 @@ import {
 import {
   BOARD_LEVEL_TABS,
   STATUS_COLORS,
+  boardFamilyForLevel,
   canMoveStatus,
   formatEnvironment,
   formatTicketType,
@@ -51,6 +52,7 @@ import {
   statusColorClasses,
   typeBorderClass,
   typesForLevel,
+  type BoardFamily,
   type HierarchyLevel,
   type StatusOption,
   type TicketStatus,
@@ -81,11 +83,33 @@ const BOARD_LIMIT = 500;
 const TICKET_DRAG = "application/x-dp-ticket";
 const COLUMN_DRAG = "application/x-dp-status";
 
-async function statusRequest(path: string, init: RequestInit): Promise<StatusOption[]> {
-  const res = await fetch(`/api/debug-portal/statuses${path}`, {
+async function statusRequest(
+  path: string,
+  init: RequestInit,
+  family: BoardFamily,
+): Promise<StatusOption[]> {
+  const qs = path.includes("?") ? "&" : "?";
+  const url =
+    path === "/order" || path.includes("boardFamily=")
+      ? `/api/debug-portal/statuses${path}`
+      : `/api/debug-portal/statuses${path}${qs}boardFamily=${family}`;
+  const body =
+    init.body && typeof init.body === "string"
+      ? (() => {
+          try {
+            const parsed = JSON.parse(init.body) as Record<string, unknown>;
+            if (parsed.boardFamily == null) parsed.boardFamily = family;
+            return JSON.stringify(parsed);
+          } catch {
+            return init.body;
+          }
+        })()
+      : init.body;
+  const res = await fetch(url, {
     credentials: "include",
     headers: { "Content-Type": "application/json" },
     ...init,
+    body,
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Could not update statuses");
@@ -119,8 +143,11 @@ function BoardPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const boardLevel = parseHierarchyLevel(searchParams.get("level"));
+  const boardFamily = boardFamilyForLevel(boardLevel);
   const levelTypes = typesForLevel(boardLevel);
-  const { statuses, setStatuses } = useTicketStatuses();
+  const { statusesOf, setStatusesForFamily } = useTicketStatuses();
+  const statuses = statusesOf(boardFamily);
+  const setStatuses = (rows: StatusOption[]) => setStatusesForFamily(boardFamily, rows);
   const [tickets, setTickets] = useState<BoardTicket[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -339,7 +366,13 @@ function BoardPageInner() {
     setStatuses(keys.map((key, position) => ({ ...statuses.find((s) => s.key === key)!, position })));
     setError("");
     try {
-      setStatuses(await statusRequest("/order", { method: "PUT", body: JSON.stringify({ keys }) }));
+      setStatuses(
+        await statusRequest(
+          "/order",
+          { method: "PUT", body: JSON.stringify({ keys, boardFamily }) },
+          boardFamily,
+        ),
+      );
     } catch (err) {
       setStatuses(previous);
       setError(err instanceof Error ? err.message : "Could not save column order");
@@ -357,10 +390,18 @@ function BoardPageInner() {
     setError("");
     try {
       setStatuses(
-        await statusRequest(`/${encodeURIComponent(key)}`, {
-          method: "PATCH",
-          body: JSON.stringify({ label: columnDraft.label.trim(), color: columnDraft.color }),
-        }),
+        await statusRequest(
+          `/${encodeURIComponent(key)}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({
+              label: columnDraft.label.trim(),
+              color: columnDraft.color,
+              boardFamily,
+            }),
+          },
+          boardFamily,
+        ),
       );
       setEditingColumn(null);
     } catch (err) {
@@ -373,7 +414,7 @@ function BoardPageInner() {
   async function deleteColumn(status: StatusOption) {
     const ok = await confirm({
       title: `Delete the "${status.label}" column?`,
-      message: "The column is removed from the board for every sprint.",
+      message: "The column is removed from this board family for every sprint.",
       confirmLabel: "Delete column",
       tone: "danger",
     });
@@ -381,7 +422,9 @@ function BoardPageInner() {
     setStatusSaving(true);
     setError("");
     try {
-      setStatuses(await statusRequest(`/${encodeURIComponent(status.key)}`, { method: "DELETE" }));
+      setStatuses(
+        await statusRequest(`/${encodeURIComponent(status.key)}`, { method: "DELETE" }, boardFamily),
+      );
       setEditingColumn(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete status");
@@ -396,10 +439,18 @@ function BoardPageInner() {
     setError("");
     try {
       setStatuses(
-        await statusRequest("", {
-          method: "POST",
-          body: JSON.stringify({ label: newStatus.label.trim(), color: newStatus.color }),
-        }),
+        await statusRequest(
+          "",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              label: newStatus.label.trim(),
+              color: newStatus.color,
+              boardFamily,
+            }),
+          },
+          boardFamily,
+        ),
       );
       setNewStatus({ label: "", color: "slate" });
       setAdding(false);

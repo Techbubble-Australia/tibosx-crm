@@ -2,19 +2,30 @@
 
 import { ChevronSelect } from "@/components/ChevronSelect";
 import { useTicketStatuses } from "@/components/TicketStatusesProvider";
-import type { TicketStatus } from "@/lib/tickets";
+import type { BoardFamily, TicketStatus } from "@/lib/tickets";
 
 type Props = {
   value: TicketStatus;
   onChange: (value: TicketStatus) => void;
+  /** Which board family's columns to offer (defaults to WORK). */
+  boardFamily?: BoardFamily;
   id?: string;
   disabled?: boolean;
   className?: string;
   "aria-label"?: string;
 };
 
-export function StatusSelect({ value, onChange, id, disabled, className, "aria-label": ariaLabel }: Props) {
-  const { statuses, labelOf } = useTicketStatuses();
+export function StatusSelect({
+  value,
+  onChange,
+  boardFamily = "WORK",
+  id,
+  disabled,
+  className,
+  "aria-label": ariaLabel,
+}: Props) {
+  const { statusesOf, labelOf } = useTicketStatuses();
+  const statuses = statusesOf(boardFamily);
   const known = statuses.some((s) => s.key === value);
   return (
     <ChevronSelect

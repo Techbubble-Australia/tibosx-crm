@@ -49,7 +49,7 @@ function debugTicketUrl(id: string): string | null {
 }
 
 async function debugStatusLabel(key: string): Promise<string> {
-  const row = await prisma.debugTicketStatus.findUnique({ where: { key }, select: { label: true } });
+  const row = await prisma.debugTicketStatus.findFirst({ where: { key }, select: { label: true } });
   return row?.label ?? key.replace(/_/g, " ").toLowerCase();
 }
 

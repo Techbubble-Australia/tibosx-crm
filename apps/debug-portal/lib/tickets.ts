@@ -3,13 +3,25 @@ import { resolveMediaPreviewUrl } from "@/lib/media-url";
 /** Key of a board status (built-in: PENDING, IN_PROGRESS, FOR_REVIEW, COMPLETED; admins can add more). */
 export type TicketStatus = string;
 
+export type BoardFamily = "WORK" | "STRATEGY";
+
 export type StatusOption = {
   key: string;
   label: string;
   color: string;
   position: number;
   isSystem: boolean;
+  boardFamily?: BoardFamily;
 };
+
+export function boardFamilyForLevel(level: number): BoardFamily {
+  return level === 1 || level === 2 ? "STRATEGY" : "WORK";
+}
+
+export function boardFamilyForType(type: string): BoardFamily {
+  if (type === "INITIATIVE" || type === "EPIC") return "STRATEGY";
+  return "WORK";
+}
 
 export const DEBUG_ISSUE_TYPES = [
   "INITIATIVE",
@@ -66,12 +78,30 @@ export function typesForLevel(level: HierarchyLevel): DebugIssueType[] {
 }
 
 /** Used until the board's statuses load (and if the statuses API is unavailable). */
-export const DEFAULT_STATUSES: StatusOption[] = [
-  { key: "PENDING", label: "Pending", color: "amber", position: 0, isSystem: true },
-  { key: "IN_PROGRESS", label: "In progress", color: "sky", position: 1, isSystem: true },
-  { key: "FOR_REVIEW", label: "For review", color: "violet", position: 2, isSystem: true },
-  { key: "COMPLETED", label: "Completed", color: "emerald", position: 3, isSystem: true },
+export const DEFAULT_WORK_STATUSES: StatusOption[] = [
+  { key: "PENDING", label: "Pending", color: "amber", position: 0, isSystem: true, boardFamily: "WORK" },
+  { key: "IN_PROGRESS", label: "In progress", color: "sky", position: 1, isSystem: true, boardFamily: "WORK" },
+  { key: "FOR_REVIEW", label: "For review", color: "violet", position: 2, isSystem: true, boardFamily: "WORK" },
+  { key: "COMPLETED", label: "Completed", color: "emerald", position: 3, isSystem: true, boardFamily: "WORK" },
 ];
+
+export const DEFAULT_STRATEGY_STATUSES: StatusOption[] = [
+  { key: "PLANNED", label: "Planned", color: "amber", position: 0, isSystem: true, boardFamily: "STRATEGY" },
+  { key: "ACTIVE", label: "Active", color: "sky", position: 1, isSystem: true, boardFamily: "STRATEGY" },
+  { key: "DONE", label: "Done", color: "emerald", position: 2, isSystem: true, boardFamily: "STRATEGY" },
+];
+
+/** @deprecated Prefer DEFAULT_WORK_STATUSES or defaultsForFamily. */
+export const DEFAULT_STATUSES = DEFAULT_WORK_STATUSES;
+
+export function defaultsForFamily(family: BoardFamily): StatusOption[] {
+  return family === "STRATEGY" ? DEFAULT_STRATEGY_STATUSES : DEFAULT_WORK_STATUSES;
+}
+
+export function statusesForFamily(all: StatusOption[], family: BoardFamily): StatusOption[] {
+  const scoped = all.filter((s) => (s.boardFamily ?? "WORK") === family);
+  return scoped.length ? scoped : defaultsForFamily(family);
+}
 
 export const STATUS_COLORS = [
   "amber",
@@ -172,6 +202,8 @@ export function resolveScreenshotUrl(url: string | null | undefined): string | n
 const MEMBER_STATUS_MOVES: Partial<Record<TicketStatus, TicketStatus>> = {
   FOR_REVIEW: "COMPLETED",
   COMPLETED: "PENDING",
+  ACTIVE: "DONE",
+  DONE: "PLANNED",
 };
 
 export function memberStatusTarget(from: TicketStatus): TicketStatus | null {

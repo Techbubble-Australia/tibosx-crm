@@ -1373,20 +1373,30 @@ model DebugSprint {
   @@index([status])
 }
 
+enum DebugTicketBoardFamily {
+  /// Stories, tasks, bugs, subtasks (Pending → … → Completed).
+  WORK
+  /// Initiatives and epics (Planned → Active → Done).
+  STRATEGY
+}
+
 /// Board columns for debug tickets. System statuses can be renamed/recoloured but not deleted.
 model DebugTicketStatus {
-  id        String   @id @default(cuid())
-  /// Stable value stored on tickets (e.g. PENDING, BLOCKED).
-  key       String   @unique
-  label     String
+  id          String                  @id @default(cuid())
+  /// Which hierarchy boards this column appears on.
+  boardFamily DebugTicketBoardFamily  @default(WORK)
+  /// Stable value stored on tickets (e.g. PENDING, BLOCKED). Unique per board family.
+  key         String
+  label       String
   /// Palette name used by the debug portal (amber, sky, violet, emerald, rose, …).
-  color     String   @default("slate")
-  position  Int
-  isSystem  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  color       String                  @default("slate")
+  position    Int
+  isSystem    Boolean                 @default(false)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
 
-  @@index([position])
+  @@unique([boardFamily, key])
+  @@index([boardFamily, position])
 }
 
 model DebugCaptureTicket {
