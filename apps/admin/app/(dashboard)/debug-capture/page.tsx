@@ -6,6 +6,9 @@ import { Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useIsDevelopmentAppEnv } from "@/lib/use-is-development-app-env";
 import { useRouter } from "next/navigation";
+import { TablePagination } from "@/components/ui/TablePagination";
+import { useListView } from "@/hooks/useListView";
+import { buildSearchHaystack } from "@/lib/search-text";
 
 type Row = {
   id: string;
@@ -36,6 +39,20 @@ export default function DebugCaptureListPage() {
       .finally(() => setLoading(false));
   }, [isDev, router]);
 
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    paginated,
+    totalItems,
+  } = useListView(
+    rows,
+    (row) =>
+      buildSearchHaystack([row.ticketId, row.type, row.reportedEnvironment, row.reporterEmail, row.currentUrl, row.title]),
+    { initialPageSize: 25, pageSizeOptions: [10, 25, 50, 100] },
+  );
+
   if (!isDev) return null;
 
   if (loading) {
@@ -52,7 +69,8 @@ export default function DebugCaptureListPage() {
         <h2 className="text-xl font-semibold">Debug captures</h2>
         <p className="text-sm text-gray-500">Tickets saved from debug mode (development only).</p>
       </div>
-      <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
+      <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+        <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500 dark:bg-gray-950/60">
             <tr>
@@ -65,7 +83,7 @@ export default function DebugCaptureListPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {paginated.map((row) => (
               <tr key={row.id} className="border-t border-gray-100 dark:border-gray-800">
                 <td className="px-4 py-3">
                   <Link href={`/debug-capture/${row.id}`} className="font-medium text-sky-600 hover:underline">
@@ -93,6 +111,15 @@ export default function DebugCaptureListPage() {
             ) : null}
           </tbody>
         </table>
+        </div>
+        <TablePagination
+          page={page}
+          pageSize={pageSize}
+          totalItems={totalItems}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[10, 25, 50, 100]}
+        />
       </div>
     </div>
   );

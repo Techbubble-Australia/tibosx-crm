@@ -6,6 +6,9 @@ import { Trash2, UserPlus } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 import { JobAddProfileForm } from "@/components/jobs/JobAddProfileForm";
+import { TablePagination } from "@/components/ui/TablePagination";
+import { useListView } from "@/hooks/useListView";
+import { buildSearchHaystack } from "@/lib/search-text";
 
 type ApplicationRow = {
   id: string;
@@ -50,6 +53,20 @@ export function JobApplicationsPanel({
   useEffect(() => {
     void fetchApplications();
   }, [fetchApplications]);
+
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    paginated,
+    totalItems,
+  } = useListView(
+    rows,
+    (row) =>
+      buildSearchHaystack([row.firstName, row.lastName, row.email, row.phone, row.city, row.country]),
+    { initialPageSize: 25, pageSizeOptions: [10, 25, 50, 100] },
+  );
 
   async function deleteApplication(id: string) {
     if (!(await appConfirm("Delete this application? This cannot be undone."))) return;
@@ -103,7 +120,8 @@ export function JobApplicationsPanel({
       {rows.length === 0 ? (
         <p className="text-sm text-gray-400">There are no profiles for this job.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+          <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-sm">
             <thead className="border-b border-gray-200 dark:border-gray-700">
               <tr>
@@ -118,7 +136,7 @@ export function JobApplicationsPanel({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {rows.map((row) => (
+              {paginated.map((row) => (
                 <tr key={row.id}>
                   <td className="px-3 py-2 text-gray-900 dark:text-gray-100">
                     {row.firstName} {row.lastName}
@@ -148,6 +166,15 @@ export function JobApplicationsPanel({
               ))}
             </tbody>
           </table>
+          </div>
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={[10, 25, 50, 100]}
+          />
         </div>
       )}
       {showAddProfile ? (

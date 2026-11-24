@@ -1,13 +1,15 @@
 "use client";
 import { appAlert, appConfirm } from "@/lib/app-alert";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { workspaceFetch } from "@/lib/workspace-fetch";
 import { messageFromApiError } from "@/lib/api-error";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
-import { buildSearchHaystack, matchesSearch } from "@/lib/search-text";
+import { TablePagination } from "@/components/ui/TablePagination";
+import { useListView } from "@/hooks/useListView";
+import { buildSearchHaystack } from "@/lib/search-text";
 
 type TimesheetRow = {
   id: string;
@@ -83,7 +85,6 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
   const [error, setError] = useState("");
   const [actingId, setActingId] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
@@ -120,16 +121,22 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
     load();
   }, [load]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((row) =>
-      matchesSearch(
-        buildSearchHaystack([row.memberName, row.targetLabel, formatDate(row.startDate), formatDate(row.endDate)]),
-        q,
-      ),
-    );
-  }, [rows, search]);
+  const {
+    search,
+    setSearch,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    paginated,
+    totalItems,
+    totalSourceItems,
+  } = useListView(
+    rows,
+    (row) =>
+      buildSearchHaystack([row.memberName, row.targetLabel, formatDate(row.startDate), formatDate(row.endDate)]),
+    { initialPageSize: 25, pageSizeOptions: [10, 25, 50, 100] },
+  );
 
   async function approve(id: string) {
     if (
@@ -217,11 +224,12 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
             value={search}
             onChange={setSearch}
             placeholder="Search by member, project, ticket, or dates…"
-            filteredCount={filtered.length}
-            totalCount={rows.length}
+            filteredCount={totalItems}
+            totalCount={totalSourceItems}
           />
 
-          <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+          <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+            <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead className="border-b border-gray-200 bg-gray-50 text-left text-gray-500 dark:border-gray-700 dark:bg-gray-800">
                 <tr>
@@ -232,14 +240,14 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {filtered.length === 0 ? (
+                {paginated.length === 0 ? (
                   <tr>
                     <td colSpan={mode === "submitted" ? 4 : 3} className="px-4 py-10 text-center text-gray-500">
                       {mode === "submitted" ? "No submitted timesheets." : "No approved timesheets yet."}
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((row) => (
+                  paginated.map((row) => (
                     <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                         <Link
@@ -282,6 +290,15 @@ export function WorkspaceClientTimesheetsView({ mode }: Props) {
                 )}
               </tbody>
             </table>
+            </div>
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              totalItems={totalItems}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              pageSizeOptions={[10, 25, 50, 100]}
+            />
           </div>
         </>
       )}

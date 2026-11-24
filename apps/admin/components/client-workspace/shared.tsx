@@ -1,5 +1,9 @@
 "use client";
 
+import { TablePagination } from "@/components/ui/TablePagination";
+import { useListView } from "@/hooks/useListView";
+import { buildSearchHaystack } from "@/lib/search-text";
+
 export type Overview = {
   /** `id` is "all" when an admin views every client together. */
   client: { id: string; name: string };
@@ -131,10 +135,24 @@ export function Section({
 
 /** Projects table shared by the Client workspace and the client Projects page. */
 export function ProjectsTable({ projects }: { projects: Overview["projects"] }) {
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    paginated,
+    totalItems,
+  } = useListView(
+    projects,
+    (p) => buildSearchHaystack([p.projectNumber, p.title, p.members.join(" "), p.state]),
+    { initialPageSize: 25, pageSizeOptions: [10, 25, 50, 100] },
+  );
+
   return (
     <>
         {projects.length ? (
-          <div className="overflow-x-auto">
+          <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+            <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
@@ -147,7 +165,7 @@ export function ProjectsTable({ projects }: { projects: Overview["projects"] }) 
                 </tr>
               </thead>
               <tbody>
-                {projects.map((p) => (
+                {paginated.map((p) => (
                   <tr key={p.id} className="border-b border-gray-50 dark:border-gray-800">
                     <td className="py-2 pr-3 font-medium">{p.projectNumber} · {p.title}</td>
                     <td className="py-2 pr-3">{p.members.join(", ") || "—"}</td>
@@ -171,6 +189,15 @@ export function ProjectsTable({ projects }: { projects: Overview["projects"] }) 
                 ))}
               </tbody>
             </table>
+            </div>
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              totalItems={totalItems}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              pageSizeOptions={[10, 25, 50, 100]}
+            />
           </div>
         ) : (
           <p className="text-sm text-gray-500">No projects yet.</p>

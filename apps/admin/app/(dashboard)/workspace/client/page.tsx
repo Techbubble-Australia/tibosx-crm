@@ -3,11 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SortableTh, toggleSortKey, type SortDir } from "@/components/ui/SortableTh";
+import { TablePagination } from "@/components/ui/TablePagination";
 import { Loader2, Paperclip } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { resolveDocumentHref } from "@/lib/media-url";
 import { anyEffectiveRole } from "@/lib/admin-roles";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
+import { useListView } from "@/hooks/useListView";
+import { buildSearchHaystack } from "@/lib/search-text";
 import {
   Card,
   Pill,
@@ -98,6 +101,44 @@ export default function ClientWorkspacePage() {
     });
     return rows;
   }, [data, invoiceSort, invoiceStatusFilter]);
+
+  const {
+    page: invoicePage,
+    setPage: setInvoicePage,
+    pageSize: invoicePageSize,
+    setPageSize: setInvoicePageSize,
+    paginated: pagedInvoices,
+    totalItems: invoiceTotalItems,
+  } = useListView(
+    sortedInvoices,
+    (inv) =>
+      buildSearchHaystack([
+        inv.invoiceNumber,
+        inv.clientName,
+        inv.contractTitle,
+        inv.reference,
+        invoiceStatusLabel(inv),
+      ]),
+    { initialPageSize: 25, pageSizeOptions: [10, 25, 50, 100] },
+  );
+
+  const timesheetRows = data?.timesheets ?? [];
+  const {
+    page: timesheetPage,
+    setPage: setTimesheetPage,
+    pageSize: timesheetPageSize,
+    setPageSize: setTimesheetPageSize,
+    paginated: pagedTimesheets,
+    totalItems: timesheetTotalItems,
+  } = useListView(
+    timesheetRows,
+    (t) => buildSearchHaystack([t.month, t.projectNumber, t.projectTitle, t.member, t.status]),
+    { initialPageSize: 25, pageSizeOptions: [10, 25, 50, 100] },
+  );
+
+  useEffect(() => {
+    setInvoicePage(1);
+  }, [invoiceStatusFilter, clientId, currencyChoice, setInvoicePage]);
 
   const sortInvoices = (key: InvoiceSortKey) => setInvoiceSort((s) => toggleSortKey(key, s.key, s.dir));
 
@@ -260,6 +301,7 @@ export default function ClientWorkspacePage() {
                 </span>
               ) : null}
             </div>
+            <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
             <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
@@ -278,14 +320,14 @@ export default function ClientWorkspacePage() {
                 </tr>
               </thead>
               <tbody>
-                {sortedInvoices.length === 0 ? (
+                {pagedInvoices.length === 0 ? (
                   <tr>
                     <td colSpan={allClients ? 9 : 8} className="py-4 text-sm text-gray-400">
                       No invoices match this status.
                     </td>
                   </tr>
                 ) : null}
-                {sortedInvoices.map((inv) => (
+                {pagedInvoices.map((inv) => (
                   <tr key={inv.id} className="border-b border-gray-50 dark:border-gray-800">
                     <td className="whitespace-nowrap py-2 pr-3 font-medium">{inv.invoiceNumber}</td>
                     {allClients ? <td className="py-2 pr-3 text-gray-700 dark:text-gray-300">{inv.clientName}</td> : null}
@@ -317,6 +359,15 @@ export default function ClientWorkspacePage() {
               </tbody>
             </table>
             </div>
+            <TablePagination
+              page={invoicePage}
+              pageSize={invoicePageSize}
+              totalItems={invoiceTotalItems}
+              onPageChange={setInvoicePage}
+              onPageSizeChange={setInvoicePageSize}
+              pageSizeOptions={[10, 25, 50, 100]}
+            />
+            </div>
           </div>
         ) : (
           <p className="mt-4 text-sm text-gray-500">No invoices issued yet this financial year.</p>
@@ -339,7 +390,8 @@ export default function ClientWorkspacePage() {
         }
       >
         {data.timesheets.length ? (
-          <div className="overflow-x-auto">
+          <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+            <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
@@ -351,7 +403,7 @@ export default function ClientWorkspacePage() {
                 </tr>
               </thead>
               <tbody>
-                {data.timesheets.map((t) => (
+                {pagedTimesheets.map((t) => (
                   <tr key={t.id} className="border-b border-gray-50 dark:border-gray-800">
                     <td className="whitespace-nowrap py-2 pr-3">{monthLabel(t.month)}</td>
                     <td className="py-2 pr-3">{t.projectNumber} · {t.projectTitle}</td>
@@ -362,6 +414,15 @@ export default function ClientWorkspacePage() {
                 ))}
               </tbody>
             </table>
+            </div>
+            <TablePagination
+              page={timesheetPage}
+              pageSize={timesheetPageSize}
+              totalItems={timesheetTotalItems}
+              onPageChange={setTimesheetPage}
+              onPageSizeChange={setTimesheetPageSize}
+              pageSizeOptions={[10, 25, 50, 100]}
+            />
           </div>
         ) : (
           <p className="text-sm text-gray-500">No timesheets to show yet.</p>

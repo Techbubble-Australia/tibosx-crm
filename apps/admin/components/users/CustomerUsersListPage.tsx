@@ -6,6 +6,9 @@ import { Trash2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { appAlert, appConfirm } from "@/lib/app-alert";
 import { messageFromApiError } from "@/lib/api-error";
+import { TablePagination } from "@/components/ui/TablePagination";
+import { useListView } from "@/hooks/useListView";
+import { buildSearchHaystack } from "@/lib/search-text";
 
 type CustomerUserRow = {
   id: string;
@@ -35,6 +38,23 @@ export function CustomerUsersListPage({ activeOnly }: { activeOnly: boolean }) {
     () => rows.filter((row) => (activeOnly ? row.active : !row.active)),
     [rows, activeOnly],
   );
+
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    paginated,
+    totalItems,
+  } = useListView(
+    filtered,
+    (row) => buildSearchHaystack([row.name, row.email, row.phone]),
+    { initialPageSize: 25, pageSizeOptions: [10, 25, 50, 100] },
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeOnly, setPage]);
 
   async function deactivate(row: CustomerUserRow) {
     if (!(await appConfirm(`Deactivate ${row.name || row.email}? They will not be able to sign in.`))) return;
@@ -96,14 +116,14 @@ export function CustomerUsersListPage({ activeOnly }: { activeOnly: boolean }) {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {paginated.length === 0 ? (
               <tr>
                 <td colSpan={activeOnly ? 5 : 4} className="px-4 py-8 text-center text-gray-500">
                   No customer users found.
                 </td>
               </tr>
             ) : (
-              filtered.map((row) => (
+              paginated.map((row) => (
                 <tr key={row.id} className="border-b border-gray-100 dark:border-gray-800">
                   <td className="px-4 py-3 font-medium">
                     <Link href={`/customer-users/${row.id}`} className="hover:text-blue-600 hover:underline">
@@ -151,6 +171,14 @@ export function CustomerUsersListPage({ activeOnly }: { activeOnly: boolean }) {
             )}
           </tbody>
         </table>
+        <TablePagination
+          page={page}
+          pageSize={pageSize}
+          totalItems={totalItems}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[10, 25, 50, 100]}
+        />
       </div>
     </div>
   );

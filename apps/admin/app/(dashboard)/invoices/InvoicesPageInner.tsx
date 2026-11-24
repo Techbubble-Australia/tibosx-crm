@@ -8,6 +8,9 @@ import { useSearchParams } from "next/navigation";
 import { adminFetch } from "@/lib/admin-api";
 import { ClientsOnlyGuard } from "@/components/ClientsOnlyGuard";
 import { ViewModeToggle, type ViewMode } from "@/components/ui/ViewModeToggle";
+import { TablePagination } from "@/components/ui/TablePagination";
+import { useListView } from "@/hooks/useListView";
+import { buildSearchHaystack } from "@/lib/search-text";
 import {
   CONTRACT_INVOICE_STATUSES,
   CONTRACT_INVOICE_STATUS_COLORS,
@@ -168,15 +171,41 @@ export default function InvoicesPageInner() {
 
   const filteredRows = useMemo(() => rows, [rows]);
 
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    paginated,
+    totalItems,
+  } = useListView(
+    filteredRows,
+    (row) =>
+      buildSearchHaystack([
+        row.invoiceNumber,
+        row.clientName,
+        row.contractNumber,
+        row.contractTitle,
+        row.description,
+        row.reference,
+        row.status,
+      ]),
+    { initialPageSize: 25, pageSizeOptions: [10, 25, 50, 100] },
+  );
+
   const groupedByClient = useMemo(() => {
     const map = new Map<string, InvoiceRow[]>();
-    for (const row of filteredRows) {
+    for (const row of paginated) {
       const list = map.get(row.clientName) ?? [];
       list.push(row);
       map.set(row.clientName, list);
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [filteredRows]);
+  }, [paginated]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, clientFilter, dueFilter, viewMode, setPage]);
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -308,10 +337,19 @@ export default function InvoicesPageInner() {
                   </div>
                 </section>
               ))}
+              <TablePagination
+                page={page}
+                pageSize={pageSize}
+                totalItems={totalItems}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                pageSizeOptions={[10, 25, 50, 100]}
+              />
             </div>
           )
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+            <div className="overflow-x-auto">
             <table className="w-full min-w-[1200px] text-sm">
               <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
                 <tr>
@@ -339,12 +377,12 @@ export default function InvoicesPageInner() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {filteredRows.length === 0 ? (
+                {paginated.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="px-4 py-8 text-center text-gray-400">No invoices found.</td>
                   </tr>
                 ) : (
-                  filteredRows.map((row) => {
+                  paginated.map((row) => {
                     const colors = CONTRACT_INVOICE_STATUS_COLORS[row.status] ?? CONTRACT_INVOICE_STATUS_COLORS.DRAFT;
                     return (
                       <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
@@ -425,6 +463,15 @@ export default function InvoicesPageInner() {
                 )}
               </tbody>
             </table>
+            </div>
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              totalItems={totalItems}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              pageSizeOptions={[10, 25, 50, 100]}
+            />
           </div>
         )}
       </div>
