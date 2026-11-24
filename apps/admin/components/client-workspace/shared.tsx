@@ -100,7 +100,11 @@ export const STATUS_PILL: Record<string, { label: string; className: string }> =
 
 export function Pill({ status }: { status: string }) {
   const pill = STATUS_PILL[status] ?? { label: status, className: "bg-gray-100 text-gray-700" };
-  return <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${pill.className}`}>{pill.label}</span>;
+  return (
+    <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${pill.className}`}>
+      {pill.label}
+    </span>
+  );
 }
 
 export function Card({ label, value, hint, tone = "default" }: { label: string; value: string; hint: string; tone?: "default" | "warn" | "alert" }) {
@@ -151,26 +155,26 @@ export function ProjectsTable({ projects }: { projects: Overview["projects"] }) 
   return (
     <>
         {projects.length ? (
-          <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
             <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
-                  <th className="py-2 pr-3">Project</th>
-                  <th className="py-2 pr-3">Member</th>
-                  <th className="py-2 pr-3">Dates</th>
-                  <th className="py-2 pr-3">Progress</th>
-                  <th className="py-2 pr-3">Remaining</th>
-                  <th className="py-2">Status</th>
+                <tr className="border-b border-gray-200 bg-gray-50 text-left dark:border-gray-700 dark:bg-gray-800/80">
+                  <th className="px-4 py-3.5 font-medium text-gray-600 dark:text-gray-300">Project</th>
+                  <th className="px-4 py-3.5 font-medium text-gray-600 dark:text-gray-300">Member</th>
+                  <th className="px-4 py-3.5 font-medium text-gray-600 dark:text-gray-300">Dates</th>
+                  <th className="px-4 py-3.5 font-medium text-gray-600 dark:text-gray-300">Progress</th>
+                  <th className="px-4 py-3.5 font-medium text-gray-600 dark:text-gray-300">Remaining</th>
+                  <th className="px-4 py-3.5 font-medium text-gray-600 dark:text-gray-300">Status</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {paginated.map((p) => (
-                  <tr key={p.id} className="border-b border-gray-50 dark:border-gray-800">
-                    <td className="py-2 pr-3 font-medium">{p.projectNumber} · {p.title}</td>
-                    <td className="py-2 pr-3">{p.members.join(", ") || "—"}</td>
-                    <td className="whitespace-nowrap py-2 pr-3">{day(p.startDate)} – {day(p.endDate)}</td>
-                    <td className="py-2 pr-3">
+                  <tr key={p.id} className="align-middle transition-colors hover:bg-gray-50/90 dark:hover:bg-gray-800/40">
+                    <td className="px-4 py-3.5 font-medium text-gray-900 dark:text-gray-100">{p.projectNumber} · {p.title}</td>
+                    <td className="px-4 py-3.5 text-gray-700 dark:text-gray-300">{p.members.join(", ") || "—"}</td>
+                    <td className="whitespace-nowrap px-4 py-3.5 text-gray-600 dark:text-gray-400">{day(p.startDate)} – {day(p.endDate)}</td>
+                    <td className="px-4 py-3.5">
                       <div className="flex items-center gap-2">
                         <div className="h-2 w-24 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
                           <div
@@ -181,10 +185,10 @@ export function ProjectsTable({ projects }: { projects: Overview["projects"] }) 
                         <span className="tabular-nums text-gray-600">{p.progress}%</span>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap py-2 pr-3 tabular-nums">
+                    <td className="whitespace-nowrap px-4 py-3.5 tabular-nums text-gray-700 dark:text-gray-300">
                       {p.remainingDays == null ? "—" : plural(p.remainingDays, "day")}
                     </td>
-                    <td className="py-2"><Pill status={p.state} /></td>
+                    <td className="px-4 py-3.5"><Pill status={p.state} /></td>
                   </tr>
                 ))}
               </tbody>

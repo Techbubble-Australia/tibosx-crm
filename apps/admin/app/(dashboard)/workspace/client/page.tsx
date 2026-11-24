@@ -301,44 +301,52 @@ export default function ClientWorkspacePage() {
                 </span>
               ) : null}
             </div>
-            <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
             <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
-                  <SortableTh label="Invoice" sortKey="invoiceNumber" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="py-2 pr-3" />
+                <tr className="border-b border-gray-200 bg-gray-50 text-left dark:border-gray-700 dark:bg-gray-800/80">
+                  <SortableTh label="Invoice" sortKey="invoiceNumber" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="px-4 py-3.5" />
                   {allClients ? (
-                    <SortableTh label="Client" sortKey="clientName" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="py-2 pr-3" />
+                    <SortableTh label="Client" sortKey="clientName" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="px-4 py-3.5" />
                   ) : null}
-                  <SortableTh label="Contract" sortKey="contractTitle" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="py-2 pr-3" />
-                  <SortableTh label="Reference" sortKey="reference" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="py-2 pr-3" />
-                  <SortableTh label="Issued" sortKey="issueDate" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="py-2 pr-3" />
-                  <SortableTh label="Due" sortKey="dueDate" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="py-2 pr-3" />
-                  <SortableTh label="Amount" sortKey="amount" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="py-2 pr-3 text-right" />
-                  <SortableTh label="Status" sortKey="status" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="py-2 pr-3" />
-                  <th className="py-2"><span className="sr-only">Invoice copy</span></th>
+                  <SortableTh label="Contract" sortKey="contractTitle" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="px-4 py-3.5" />
+                  <SortableTh label="Reference" sortKey="reference" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="px-4 py-3.5" />
+                  <SortableTh label="Issued" sortKey="issueDate" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="px-4 py-3.5" />
+                  <SortableTh label="Due" sortKey="dueDate" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="px-4 py-3.5" />
+                  <SortableTh label="Amount" sortKey="amount" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="px-4 py-3.5 text-right" />
+                  <SortableTh label="Status" sortKey="status" activeKey={invoiceSort.key} dir={invoiceSort.dir} onSort={sortInvoices} className="px-4 py-3.5" />
+                  <th className="px-4 py-3.5"><span className="sr-only">Invoice copy</span></th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {pagedInvoices.length === 0 ? (
                   <tr>
-                    <td colSpan={allClients ? 9 : 8} className="py-4 text-sm text-gray-400">
+                    <td colSpan={allClients ? 9 : 8} className="px-4 py-8 text-center text-sm text-gray-400">
                       No invoices match this status.
                     </td>
                   </tr>
                 ) : null}
                 {pagedInvoices.map((inv) => (
-                  <tr key={inv.id} className="border-b border-gray-50 dark:border-gray-800">
-                    <td className="whitespace-nowrap py-2 pr-3 font-medium">{inv.invoiceNumber}</td>
-                    {allClients ? <td className="py-2 pr-3 text-gray-700 dark:text-gray-300">{inv.clientName}</td> : null}
-                    <td className="py-2 pr-3 text-gray-700 dark:text-gray-300">{inv.contractTitle}</td>
-                    <td className="py-2 pr-3 text-gray-700 dark:text-gray-300">{inv.reference || "—"}</td>
-                    <td className="whitespace-nowrap py-2 pr-3">{day(inv.issueDate)}</td>
-                    <td className="whitespace-nowrap py-2 pr-3">{day(inv.dueDate)}</td>
-                    <td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{money(inv.amount, inv.currency)}</td>
-                    <td className="py-2 pr-3"><Pill status={invoiceStatusLabel(inv)} /></td>
-                    <td className="py-2">
-                      <span className="flex items-center gap-1">
+                  <tr key={inv.id} className="align-middle transition-colors hover:bg-gray-50/90 dark:hover:bg-gray-800/40">
+                    <td className="whitespace-nowrap px-4 py-3.5 font-semibold text-gray-900 dark:text-gray-100">{inv.invoiceNumber}</td>
+                    {allClients ? (
+                      <td className="max-w-[12rem] px-4 py-3.5 text-gray-700 dark:text-gray-300">
+                        <span className="line-clamp-2" title={inv.clientName}>{inv.clientName}</span>
+                      </td>
+                    ) : null}
+                    <td className="max-w-[14rem] px-4 py-3.5 text-gray-700 dark:text-gray-300">
+                      <span className="line-clamp-2" title={inv.contractTitle}>{inv.contractTitle}</span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3.5 text-gray-600 dark:text-gray-400">{inv.reference || "—"}</td>
+                    <td className="whitespace-nowrap px-4 py-3.5 text-gray-600 dark:text-gray-400">{day(inv.issueDate)}</td>
+                    <td className="whitespace-nowrap px-4 py-3.5 text-gray-600 dark:text-gray-400">{day(inv.dueDate)}</td>
+                    <td className="whitespace-nowrap px-4 py-3.5 text-right font-medium tabular-nums text-gray-900 dark:text-gray-100">
+                      {money(inv.amount, inv.currency)}
+                    </td>
+                    <td className="px-4 py-3.5"><Pill status={invoiceStatusLabel(inv)} /></td>
+                    <td className="px-4 py-3.5">
+                      <span className="flex items-center justify-end gap-1">
                         {inv.files.map((file, i) => (
                           <a
                             key={`${file.url}-${i}`}
@@ -347,7 +355,7 @@ export default function ClientWorkspacePage() {
                             rel="noreferrer"
                             title={`Open ${file.name}`}
                             aria-label={`Open ${file.name} for ${inv.invoiceNumber}`}
-                            className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800"
+                            className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800"
                           >
                             <Paperclip className="h-4 w-4" />
                           </a>
@@ -390,26 +398,26 @@ export default function ClientWorkspacePage() {
         }
       >
         {data.timesheets.length ? (
-          <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
             <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 text-left text-gray-500 dark:border-gray-800">
-                  <th className="py-2 pr-3">Period</th>
-                  <th className="py-2 pr-3">Project</th>
-                  <th className="py-2 pr-3">Member</th>
-                  <th className="py-2 pr-3 text-right">Hours</th>
-                  <th className="py-2">Status</th>
+                <tr className="border-b border-gray-200 bg-gray-50 text-left dark:border-gray-700 dark:bg-gray-800/80">
+                  <th className="px-4 py-3.5 font-medium text-gray-600 dark:text-gray-300">Period</th>
+                  <th className="px-4 py-3.5 font-medium text-gray-600 dark:text-gray-300">Project</th>
+                  <th className="px-4 py-3.5 font-medium text-gray-600 dark:text-gray-300">Member</th>
+                  <th className="px-4 py-3.5 text-right font-medium text-gray-600 dark:text-gray-300">Hours</th>
+                  <th className="px-4 py-3.5 font-medium text-gray-600 dark:text-gray-300">Status</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {pagedTimesheets.map((t) => (
-                  <tr key={t.id} className="border-b border-gray-50 dark:border-gray-800">
-                    <td className="whitespace-nowrap py-2 pr-3">{monthLabel(t.month)}</td>
-                    <td className="py-2 pr-3">{t.projectNumber} · {t.projectTitle}</td>
-                    <td className="py-2 pr-3">{t.member}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{t.hours}</td>
-                    <td className="py-2"><Pill status={t.status} /></td>
+                  <tr key={t.id} className="align-middle transition-colors hover:bg-gray-50/90 dark:hover:bg-gray-800/40">
+                    <td className="whitespace-nowrap px-4 py-3.5 text-gray-700 dark:text-gray-300">{monthLabel(t.month)}</td>
+                    <td className="px-4 py-3.5 font-medium text-gray-900 dark:text-gray-100">{t.projectNumber} · {t.projectTitle}</td>
+                    <td className="px-4 py-3.5 text-gray-700 dark:text-gray-300">{t.member}</td>
+                    <td className="px-4 py-3.5 text-right font-medium tabular-nums text-gray-900 dark:text-gray-100">{t.hours}</td>
+                    <td className="px-4 py-3.5"><Pill status={t.status} /></td>
                   </tr>
                 ))}
               </tbody>
