@@ -86,6 +86,12 @@ export default function NewTicketPage() {
   }, [canHaveParent, parentLevel]);
 
   const effectiveStatus = startStatus && (isAdmin || startStatus === "PENDING") ? startStatus : null;
+  const imageShots = shots
+    .map((shot, index) => ({ shot, index }))
+    .filter(({ shot }) => shot.file.type.startsWith("image/"));
+  const fileShots = shots
+    .map((shot, index) => ({ shot, index }))
+    .filter(({ shot }) => !shot.file.type.startsWith("image/"));
 
   const addFiles = useCallback((incoming: File[]) => {
     const images = incoming.filter((file) => TICKET_ATTACHMENT_ACCEPT.split(",").includes(file.type) || isPdfFile(file));
@@ -343,16 +349,56 @@ export default function NewTicketPage() {
             </label>
           </div>
           {shots.length ? (
-            <ul className="mt-3 space-y-2">
-              {shots.map((shot, index) => (
-                <li key={shot.previewUrl} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
-                  <span className="truncate">{shot.file.name}</span>
-                  <button type="button" onClick={() => removeShot(index)} className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-                    <X className="h-4 w-4" aria-hidden />
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-3 space-y-3">
+              {imageShots.length ? (
+                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                  {imageShots.map(({ shot, index }) => (
+                    <li key={shot.previewUrl} className="relative rounded-lg border border-slate-200 bg-white p-1">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={shot.previewUrl}
+                        alt={shot.file.name}
+                        className="h-28 w-full rounded-md object-contain"
+                      />
+                      <p className="mt-1 truncate px-1 text-[11px] text-slate-500" title={shot.file.name}>
+                        {shot.file.name}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => removeShot(index)}
+                        className="absolute right-1.5 top-1.5 rounded-full bg-white/95 p-0.5 text-slate-600 shadow hover:text-red-600"
+                        aria-label={`Remove ${shot.file.name}`}
+                      >
+                        <X className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {fileShots.length ? (
+                <ul className="space-y-2">
+                  {fileShots.map(({ shot, index }) => (
+                    <li
+                      key={shot.previewUrl}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                    >
+                      <span className="inline-flex min-w-0 items-center gap-2">
+                        <FileText className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                        <span className="truncate">{shot.file.name}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeShot(index)}
+                        className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                        aria-label={`Remove ${shot.file.name}`}
+                      >
+                        <X className="h-4 w-4" aria-hidden />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
           ) : null}
         </div>
 
