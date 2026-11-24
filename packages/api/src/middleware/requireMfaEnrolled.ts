@@ -12,7 +12,10 @@ async function impersonatorBypassesMfaForTarget(req: AuthRequest): Promise<boole
   return Boolean(impersonator?.active && impersonator.role === "admin" && impersonator.mfaEnabled);
 }
 
-/** Blocks access until the user has completed MFA enrollment. */
+/**
+ * Customer (portal) users must complete MFA.
+ * Internal AdminUser accounts may opt out of MFA; only block incomplete setup sessions.
+ */
 export async function requireMfaEnrolled(req: AuthRequest, res: Response, next: NextFunction) {
   const userId = req.user?.id;
   if (!userId) {
@@ -21,6 +24,13 @@ export async function requireMfaEnrolled(req: AuthRequest, res: Response, next: 
 
   if (await impersonatorBypassesMfaForTarget(req)) {
     return next();
+  }
+
+  if (req.mfaSetupRequired) {
+    return res.status(403).json({
+      error: "MFA setup is required before you can access TBOS",
+      code: "MFA_SETUP_REQUIRED",
+    });
   }
 
   const customer = await prisma.customerUser.findUnique({
@@ -39,10 +49,15 @@ export async function requireMfaEnrolled(req: AuthRequest, res: Response, next: 
 
   const user = await prisma.adminUser.findUnique({
     where: { id: userId },
-    select: { mfaEnabled: true },
+    select: { id: true, mfaEnabled: true, totpSecretEnc: true },
   });
 
-  if (!user?.mfaEnabled) {
+  if (!user) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  // Internal: MFA optional. Only force setup when MFA is marked on but not enrolled yet.
+  if (user.mfaEnabled && !user.totpSecretEnc) {
     return res.status(403).json({
       error: "MFA setup is required before you can access TBOS",
       code: "MFA_SETUP_REQUIRED",

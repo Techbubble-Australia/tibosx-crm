@@ -57,11 +57,7 @@ export function MfaEnrollmentGuard({ children }: { children: React.ReactNode }) 
           return;
         }
 
-        if (user?.mfaEnabled === false) {
-          window.location.assign("/mfa-setup");
-          return;
-        }
-
+        // Internal users may leave MFA off; only incomplete setup sessions are forced above.
         setAllowed(true);
       })
       .catch(() => {

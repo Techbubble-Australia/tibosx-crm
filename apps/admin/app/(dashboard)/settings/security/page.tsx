@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, ShieldCheck, ShieldOff } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
@@ -70,13 +71,6 @@ function SecuritySettingsPage() {
     void loadStatus();
   }, []);
 
-  useEffect(() => {
-    if (isLoading || !status) return;
-    if (!status.mfaEnabled) {
-      window.location.assign("/mfa-setup");
-    }
-  }, [isLoading, status]);
-
   async function disableMfa(e: React.FormEvent) {
     e.preventDefault();
     setIsSubmitting(true);
@@ -97,7 +91,9 @@ function SecuritySettingsPage() {
       }
       setDisablePassword("");
       setDisableCode("");
-      setMessage("Two-factor authentication has been disabled. You will be prompted to set it up again when you sign in.");
+      setMessage(
+        "Two-factor authentication is now off. You can sign in with just your email and password until you turn MFA back on.",
+      );
       await loadStatus();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to disable MFA");
@@ -119,8 +115,8 @@ function SecuritySettingsPage() {
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Security</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Two-factor authentication is required for all TIBOSX.AI users. You can disable MFA temporarily, but you must
-          set it up again to access the app after signing in.
+          Two-factor authentication adds a code from your authenticator app when you sign in. Internal users can turn
+          it off and sign in with email and password only.
         </p>
       </div>
 
@@ -140,7 +136,7 @@ function SecuritySettingsPage() {
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {status?.mfaEnabled
                 ? `Enabled${status.mfaEnrolledAt ? ` since ${new Date(status.mfaEnrolledAt).toLocaleString()}` : ""}.`
-                : "MFA is not enabled on this account."}
+                : "MFA is turned off on this account. You can enable it anytime."}
             </p>
           </div>
           {status?.mfaEnabled ? (
@@ -148,13 +144,19 @@ function SecuritySettingsPage() {
               <ShieldCheck className="h-3.5 w-3.5" />
               Enabled
             </span>
-          ) : null}
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+              <ShieldOff className="h-3.5 w-3.5" />
+              Off
+            </span>
+          )}
         </div>
 
         {status?.mfaEnabled ? (
           <form onSubmit={disableMfa} className="mt-6 max-w-md space-y-4">
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              To disable MFA, confirm your password and enter a current authenticator code.
+              To turn MFA off, confirm your password and enter a current authenticator code. After that you can sign in
+              without an authenticator code.
             </p>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="mfa-disable-password">
@@ -197,7 +199,15 @@ function SecuritySettingsPage() {
             </button>
           </form>
         ) : (
-          <p className="mt-4 text-sm text-gray-500">Sign out and sign in again to complete MFA setup.</p>
+          <div className="mt-6">
+            <Link
+              href="/mfa-setup"
+              className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Enable MFA
+            </Link>
+          </div>
         )}
       </div>
     </div>

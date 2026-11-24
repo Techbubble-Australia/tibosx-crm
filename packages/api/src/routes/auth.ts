@@ -114,6 +114,7 @@ router.post("/login", async (req, res) => {
         mfaEnabled: true,
         totpSecretEnc: true,
         role: true,
+        additionalRoles: true,
       },
     });
 
@@ -221,17 +222,25 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    const setupToken = generateMfaSetupRequiredToken({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-    });
+    // Admin marked MFA required (e.g. after admin reset) but not enrolled yet → force setup.
+    // When MFA is off, internal users may sign in with password only.
+    if (user.mfaEnabled && !user.totpSecretEnc) {
+      const setupToken = generateMfaSetupRequiredToken(sessionAuthUser(user));
+      return res.json({
+        message: "MFA setup required",
+        data: {
+          requiresMfaSetup: true,
+          token: setupToken,
+          user: publicUser(user),
+        },
+      });
+    }
 
+    const token = generateToken(sessionAuthUser(user));
     return res.json({
-      message: "MFA setup required",
+      message: "Login successful",
       data: {
-        requiresMfaSetup: true,
-        token: setupToken,
+        token,
         user: publicUser(user),
       },
     });
@@ -910,16 +919,15 @@ router.post("/password/change-required", authMiddleware, async (req: AuthRequest
       ...updated,
       additionalRoles: user.additionalRoles,
     });
-    const token = mfaFullyEnrolled
-      ? generateToken(sessionUser)
-      : generateMfaSetupRequiredToken(sessionUser);
+    // Internal users: MFA is optional after password reset — issue a full session.
+    const token = generateToken(sessionUser);
 
     res.json({
       message: "Password updated",
       data: {
         token,
-        user: publicUser(updated),
-        requiresMfaSetup: !mfaFullyEnrolled,
+        user: publicUser({ ...updated, mfaEnabled: mfaFullyEnrolled ? updated.mfaEnabled : false }),
+        requiresMfaSetup: false,
       },
     });
   } catch (error) {

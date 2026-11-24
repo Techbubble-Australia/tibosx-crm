@@ -89,8 +89,8 @@ export function AdminResetMfaSection({ resetUrl, mfaEnabled, mfaEnrolledAt, onRe
         </button>
       </div>
       <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-        Clears the user’s authenticator app pairing. They must complete MFA setup again before using TBOS (unless an
-        administrator is impersonating them).
+        Clears the user’s authenticator app pairing and requires them to set MFA up again on next sign-in. To let them
+        sign in without MFA, ask them to turn MFA off under Settings → Security (or leave MFA off after they disable it).
       </p>
     </div>
   );
