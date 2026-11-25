@@ -54,14 +54,61 @@ function splitCsvLine(line: string): string[] {
   return out;
 }
 
-function downloadJson(filename: string, rows: unknown[]) {
-  const blob = new Blob([JSON.stringify(rows, null, 2)], { type: "application/json" });
+function escapeCsvCell(value: unknown): string {
+  const raw = value == null ? "" : String(value);
+  if (/[",\n\r]/.test(raw)) {
+    return `"${raw.replace(/"/g, '""')}"`;
+  }
+  return raw;
+}
+
+function rowsToCsv(rows: Array<Record<string, unknown>>): string {
+  if (!rows.length) return "";
+  const headers = Object.keys(rows[0]);
+  const lines = [
+    headers.join(","),
+    ...rows.map((row) => headers.map((h) => escapeCsvCell(row[h])).join(",")),
+  ];
+  return lines.join("\n");
+}
+
+function downloadText(filename: string, content: string, mime = "text/csv;charset=utf-8") {
+  const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function downloadTemplate(entity: Entity) {
+  const headers = ENTITY_FIELDS[entity];
+  const sample: Record<string, string> = {};
+  for (const field of headers) {
+    sample[field] = "";
+  }
+  if (entity === "clients") {
+    sample.name = "Acme Pty Ltd";
+    sample.country = "Australia";
+    sample.website = "https://acme.example";
+    sample.status = "ACTIVE";
+  } else if (entity === "leads") {
+    sample.firstName = "Jane";
+    sample.lastName = "Citizen";
+    sample.email = "jane@example.com";
+    sample.company = "Acme";
+    sample.source = "website";
+    sample.country = "Australia";
+  } else {
+    sample.name = "Website rebuild";
+    sample.clientName = "Acme Pty Ltd";
+    sample.amount = "25000";
+    sample.currency = "AUD";
+    sample.location = "Sydney";
+    sample.country = "Australia";
+  }
+  downloadText(`${entity}-template.csv`, rowsToCsv([sample]));
 }
 
 export default function ImportExportPage() {
@@ -139,7 +186,12 @@ export default function ImportExportPage() {
       const res = await adminFetch(`/api/admin/crm/settings/export?entity=${target}`);
       const data = await res.json();
       if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Export failed");
-      downloadJson(`${target}-export.json`, data.data ?? []);
+      const rows = (data.data ?? []) as Array<Record<string, unknown>>;
+      if (!rows.length) {
+        downloadText(`${target}-export.csv`, ENTITY_FIELDS[target].join(",") + "\n");
+        return;
+      }
+      downloadText(`${target}-export.csv`, rowsToCsv(rows));
     } catch (err) {
       appAlert(err instanceof Error ? err.message : "Export failed");
     }
@@ -149,11 +201,27 @@ export default function ImportExportPage() {
     <ClientsOnlyGuard>
       <div className="space-y-8">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Import / export</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Import and export</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Paste CSV or JSON rows, map columns, dry-run, then commit.
+            CSV or Excel. Check before anything is saved.
           </p>
         </div>
+
+        <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <h3 className="mb-3 font-semibold text-gray-900 dark:text-gray-100">Download template</h3>
+          <div className="flex flex-wrap gap-2">
+            {(["clients", "leads", "opportunities"] as Entity[]).map((e) => (
+              <button
+                key={e}
+                type="button"
+                onClick={() => downloadTemplate(e)}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm capitalize hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+              >
+                {e} CSV
+              </button>
+            ))}
+          </div>
+        </section>
 
         <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
           <div className="flex flex-wrap items-end gap-3">
@@ -258,6 +326,7 @@ export default function ImportExportPage() {
 
         <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
           <h3 className="mb-3 font-semibold text-gray-900 dark:text-gray-100">Export</h3>
+          <p className="mb-3 text-xs text-gray-500">Downloads a CSV file for the selected entity.</p>
           <div className="flex flex-wrap gap-2">
             {(["clients", "leads", "opportunities"] as Entity[]).map((e) => (
               <button

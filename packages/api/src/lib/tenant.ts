@@ -16,6 +16,7 @@ export type TenantContext = {
   tenantId: string;
   tenantSlug: string;
   tenantName: string;
+  region: string;
   isPlatformAdmin: boolean;
   membershipRole: string | null;
   modules: Record<TenantModuleKey, boolean>;
@@ -140,6 +141,7 @@ export async function resolveTenantContext(opts: {
     tenantId: tenant.id,
     tenantSlug: tenant.slug,
     tenantName: tenant.name,
+    region: tenant.region,
     isPlatformAdmin,
     membershipRole: membership?.role ?? (isPlatformAdmin ? "owner" : null),
     modules,

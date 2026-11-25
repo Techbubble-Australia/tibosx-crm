@@ -36,7 +36,23 @@ export type OpportunityFormValues = {
   amount: number;
   comments: string;
   active?: boolean;
+  nextStep?: string | null;
+  nextStepDue?: string | Date | null;
 };
+
+function toDateInputValue(value: string | Date | null | undefined): string {
+  if (!value) return "";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
+export function toNextStepDueIso(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (trimmed.includes("T")) return trimmed;
+  return new Date(`${trimmed}T12:00:00.000Z`).toISOString();
+}
 
 type Props = {
   defaults?: Partial<OpportunityFormValues>;
@@ -230,6 +246,27 @@ export function OpportunityFields({ defaults = {}, presetClientId = "", defaultO
         </div>
       </div>
 
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Next step</label>
+          <input
+            name="nextStep"
+            defaultValue={defaults.nextStep ?? ""}
+            className={inputClass}
+            placeholder="e.g. Send proposal draft"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Next step due</label>
+          <input
+            name="nextStepDue"
+            type="date"
+            defaultValue={toDateInputValue(defaults.nextStepDue)}
+            className={inputClass}
+          />
+        </div>
+      </div>
+
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Comments</label>
         <textarea name="comments" rows={4} defaultValue={defaults.comments ?? ""} className={inputClass} placeholder="Optional notes" />
@@ -267,6 +304,8 @@ export function readOpportunityFormData(formData: FormData) {
     currency: String(formData.get("currency") ?? "").trim(),
     amount: formData.get("amount"),
     comments: String(formData.get("comments") ?? "").trim(),
+    nextStep: String(formData.get("nextStep") ?? "").trim() || null,
+    nextStepDue: toNextStepDueIso(String(formData.get("nextStepDue") ?? "")),
     ...(formData.get("_hasActiveField") === "1"
       ? { active: formData.get("active") === "true" }
       : {}),

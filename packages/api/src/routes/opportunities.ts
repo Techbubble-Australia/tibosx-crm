@@ -485,6 +485,10 @@ router.put("/:id", async (req, res) => {
       ...data,
       contactId: data.contactId === undefined ? undefined : data.contactId ?? null,
       ownerId: data.ownerId === undefined ? undefined : data.ownerId ?? null,
+      ...(data.nextStepDue !== undefined
+        ? { nextStepDue: data.nextStepDue ? new Date(data.nextStepDue) : null }
+        : {}),
+      ...(data.nextStep !== undefined ? { nextStep: data.nextStep ?? null } : {}),
       ...(data.status === "REJECTED" ? { active: false } : {}),
       ...(data.active === false ? { active: false } : {}),
     };
@@ -538,6 +542,10 @@ router.patch("/:id/list-fields", async (req, res) => {
     const listUpdateData = {
       ...data,
       contactId: data.contactId === undefined ? undefined : data.contactId ?? null,
+      ...(data.nextStepDue !== undefined
+        ? { nextStepDue: data.nextStepDue ? new Date(data.nextStepDue) : null }
+        : {}),
+      ...(data.nextStep !== undefined ? { nextStep: data.nextStep ?? null } : {}),
       ...(data.status === "REJECTED" ? { active: false } : {}),
     };
 

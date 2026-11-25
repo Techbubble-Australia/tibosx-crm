@@ -39,6 +39,7 @@ type InvoiceRow = {
   taxAmount: number;
   totalAmount: number;
   fileUrl: string | null;
+  accountingSyncStatus?: string;
 };
 
 type ClientOption = { id: string; name: string };
@@ -203,6 +204,11 @@ export default function InvoicesPageInner() {
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [paginated]);
 
+  const showAccounting = useMemo(
+    () => rows.some((row) => typeof row.accountingSyncStatus === "string"),
+    [rows],
+  );
+
   const kpis = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -211,19 +217,24 @@ export default function InvoicesPageInner() {
     let awaiting = 0;
     let overdue = 0;
     let paidThisMonth = 0;
+    const currencies = new Set<string>();
     for (const row of rows) {
-      if (row.status === "DRAFT") draft += 1;
+      currencies.add(row.currency || "AUD");
+      if (row.status === "DRAFT") draft += row.totalAmount;
       if (row.status === "AWAITING_PAYMENT") {
-        awaiting += 1;
+        awaiting += row.totalAmount;
         const due = new Date(row.dueDate);
-        if (due < today) overdue += 1;
+        if (due < today) overdue += row.totalAmount;
       }
       if (row.status === "PAID") {
         const paidAt = new Date(row.issueDate);
-        if (paidAt >= monthStart) paidThisMonth += 1;
+        if (paidAt >= monthStart) paidThisMonth += row.totalAmount;
       }
     }
-    return { draft, awaiting, overdue, paidThisMonth };
+    const currencyList = [...currencies];
+    const currencyLabel =
+      currencyList.length <= 1 ? currencyList[0] ?? "AUD" : `mixed (${currencyList.length})`;
+    return { draft, awaiting, overdue, paidThisMonth, currencyLabel };
   }, [rows]);
 
   useEffect(() => {
@@ -250,6 +261,12 @@ export default function InvoicesPageInner() {
           <div className="flex flex-wrap items-center gap-3">
             <ViewModeToggle mode={viewMode} onChange={setViewMode} />
             <Link
+              href="/invoices/new?from=timesheets"
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
+            >
+              Generate from timesheets
+            </Link>
+            <Link
               href="/invoices/new"
               className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
             >
@@ -271,7 +288,9 @@ export default function InvoicesPageInner() {
               className="border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900"
             >
               <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{kpi.label}</p>
-              <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">{kpi.value}</p>
+              <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">
+                {formatMoney(kpis.currencyLabel, kpi.value)}
+              </p>
             </div>
           ))}
         </div>
@@ -414,12 +433,15 @@ export default function InvoicesPageInner() {
                   <th className="px-4 py-3 text-left">
                     <SortHeader label="Total" sortKey="totalAmount" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                   </th>
+                  {showAccounting ? (
+                    <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Accounting</th>
+                  ) : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-gray-400">No invoices found.</td>
+                    <td colSpan={showAccounting ? 10 : 9} className="px-4 py-8 text-center text-gray-400">No invoices found.</td>
                   </tr>
                 ) : (
                   paginated.map((row) => {
@@ -497,6 +519,11 @@ export default function InvoicesPageInner() {
                         </td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.amount)}</td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.totalAmount)}</td>
+                        {showAccounting ? (
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                            {(row.accountingSyncStatus ?? "NOT_SYNCED").replace(/_/g, " ").toLowerCase()}
+                          </td>
+                        ) : null}
                       </tr>
                     );
                   })

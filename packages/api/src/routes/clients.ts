@@ -27,6 +27,11 @@ const clientSchema = z.object({
   contacts: z.array(contactSchema).optional().default([]),
 });
 
+function toNumber(value: { toString(): string } | number | null | undefined): number {
+  if (value == null) return 0;
+  return typeof value === "number" ? value : Number(value.toString());
+}
+
 function serializeClient(row: {
   id: string;
   name: string;
@@ -34,11 +39,47 @@ function serializeClient(row: {
   country: string;
   order: number;
   status: string;
+  customFields?: unknown;
   createdAt: Date;
   updatedAt: Date;
   contacts?: unknown[];
-  _count?: { opportunities: number };
+  _count?: { opportunities: number; contracts?: number };
+  opportunities?: Array<{
+    id: string;
+    name: string;
+    amount: { toString(): string } | number;
+    currency: string;
+    status: string;
+    active: boolean;
+    stage?: { id: string; name: string } | null;
+  }>;
+  contracts?: Array<{
+    id: string;
+    contractNumber: string;
+    title: string;
+    status: string;
+    consumed: { toString(): string } | number;
+    contractValue: { toString(): string } | number;
+  }>;
 }) {
+  const opportunities = (row.opportunities ?? []).map((o) => ({
+    id: o.id,
+    name: o.name,
+    amount: toNumber(o.amount),
+    currency: o.currency,
+    status: o.status,
+    active: o.active,
+    stage: o.stage?.name ?? null,
+    stageId: o.stage?.id ?? null,
+  }));
+  const contracts = (row.contracts ?? []).map((c) => ({
+    id: c.id,
+    contractNumber: c.contractNumber,
+    title: c.title,
+    status: c.status,
+    consumed: toNumber(c.consumed),
+    contractValue: toNumber(c.contractValue),
+  }));
   return {
     id: row.id,
     name: row.name,
@@ -46,8 +87,11 @@ function serializeClient(row: {
     country: row.country,
     order: row.order,
     status: row.status,
-    opportunityCount: row._count?.opportunities ?? 0,
+    customFields: row.customFields ?? null,
+    opportunityCount: row._count?.opportunities ?? opportunities.length,
     contacts: row.contacts ?? [],
+    opportunities,
+    contracts,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -318,7 +362,30 @@ router.get("/:id", async (req, res) => {
         contacts: {
           orderBy: [{ order: "asc" }, { name: "asc" }],
         },
-        _count: { select: { opportunities: true } },
+        opportunities: {
+          orderBy: [{ active: "desc" }, { updatedAt: "desc" }],
+          select: {
+            id: true,
+            name: true,
+            amount: true,
+            currency: true,
+            status: true,
+            active: true,
+            stage: { select: { id: true, name: true } },
+          },
+        },
+        contracts: {
+          orderBy: [{ updatedAt: "desc" }],
+          select: {
+            id: true,
+            contractNumber: true,
+            title: true,
+            status: true,
+            consumed: true,
+            contractValue: true,
+          },
+        },
+        _count: { select: { opportunities: true, contracts: true } },
       },
     });
     if (!row) return res.status(404).json({ error: "Not found" });

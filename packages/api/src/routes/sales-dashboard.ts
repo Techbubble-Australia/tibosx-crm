@@ -100,48 +100,161 @@ router.get("/stats", async (req, res) => {
     const nextMonth = thisMonth === 11 ? 0 : thisMonth + 1;
     const nextMonthYear = thisMonth === 11 ? year + 1 : year;
 
-    const [activeOpportunities, activeContracts, contracts, invoices] = await Promise.all([
-      prisma.opportunity.count({ where: { active: true } }),
-      prisma.contract.count({ where: { status: "ACTIVE" } }),
-      prisma.contract.findMany({
-        where: { status: "ACTIVE" },
-        include: {
-          client: { select: { id: true, name: true, country: true } },
-          workUnitMonths: { orderBy: [{ year: "asc" }, { month: "asc" }] },
-          variations: {
-            select: {
-              id: true,
-              variationDate: true,
-              variationEndDate: true,
-              rate: true,
-            },
-          },
-          milestones: { select: { milestoneDate: true, amount: true } },
-        },
-      }),
-      prisma.contractInvoice.findMany({
-        include: {
-          contract: {
-            select: {
-              clientId: true,
-              client: { select: { id: true, name: true } },
-            },
-          },
-        },
-      }),
-    ]);
+    const ninetyDaysAgo = new Date(now);
+    ninetyDaysAgo.setUTCDate(ninetyDaysAgo.getUTCDate() - 90);
 
-    const expiringThisMonth = contracts.filter((row) => {
+    const [activeOpportunities, activeContracts, contracts, invoices, openOpportunities, closedRecent] =
+      await Promise.all([
+        prisma.opportunity.count({ where: { active: true } }),
+        prisma.contract.count({ where: { status: "ACTIVE" } }),
+        prisma.contract.findMany({
+          where: { status: "ACTIVE" },
+          include: {
+            client: { select: { id: true, name: true, country: true } },
+            workUnitMonths: { orderBy: [{ year: "asc" }, { month: "asc" }] },
+            variations: {
+              select: {
+                id: true,
+                variationDate: true,
+                variationEndDate: true,
+                rate: true,
+              },
+            },
+            milestones: { select: { milestoneDate: true, amount: true } },
+          },
+        }),
+        prisma.contractInvoice.findMany({
+          include: {
+            contract: {
+              select: {
+                clientId: true,
+                client: { select: { id: true, name: true } },
+              },
+            },
+          },
+        }),
+        prisma.opportunity.findMany({
+          where: {
+            active: true,
+            OR: [{ stageId: null }, { stage: { stageType: "open" } }],
+          },
+          select: {
+            id: true,
+            name: true,
+            amount: true,
+            currency: true,
+            probability: true,
+            nextStep: true,
+            nextStepDue: true,
+            client: { select: { id: true, name: true } },
+            stage: {
+              select: {
+                id: true,
+                name: true,
+                stageType: true,
+                winProbability: true,
+                order: true,
+              },
+            },
+          },
+          orderBy: { updatedAt: "desc" },
+          take: 500,
+        }),
+        prisma.opportunity.findMany({
+          where: {
+            updatedAt: { gte: ninetyDaysAgo },
+            stage: { stageType: { in: ["won", "lost"] } },
+          },
+          select: {
+            id: true,
+            stage: { select: { stageType: true } },
+          },
+        }),
+      ]);
+
+    const expiringThisMonthRows = contracts.filter((row) => {
       const expiry = resolveContractExpiryDate(row.endDate, row.variations);
       return expiry && isDateInMonth(expiry, year, thisMonth);
-    }).length;
+    });
+    const expiringThisMonth = expiringThisMonthRows.length;
 
-    const expiringNextMonth = contracts.filter((row) => {
+    const expiringNextMonthRows = contracts.filter((row) => {
       const expiry = resolveContractExpiryDate(row.endDate, row.variations);
       return expiry && isDateInMonth(expiry, nextMonthYear, nextMonth);
-    }).length;
+    });
+    const expiringNextMonth = expiringNextMonthRows.length;
 
     const invoicesAwaitingPayment = invoices.filter((row) => row.status === "AWAITING_PAYMENT").length;
+
+    let openPipelineAmount = 0;
+    let weightedForecast = 0;
+    const pipelineByStageMap = new Map<
+      string,
+      { stageId: string | null; stageName: string; order: number; count: number; amount: number }
+    >();
+    const needsAttentionOpps: Array<{
+      id: string;
+      name: string;
+      clientName: string;
+      amount: number;
+      currency: string;
+      stageName: string | null;
+    }> = [];
+
+    for (const opp of openOpportunities) {
+      const amount = toBase(toNumber(opp.amount), opp.currency, baseCurrency, rates);
+      openPipelineAmount += amount;
+      const winProb = opp.probability ?? opp.stage?.winProbability ?? 0;
+      weightedForecast += amount * (winProb / 100);
+
+      const stageKey = opp.stage?.id ?? "__none__";
+      const stageName = opp.stage?.name ?? "No stage";
+      const stageOrder = opp.stage?.order ?? 999;
+      const existingStage = pipelineByStageMap.get(stageKey);
+      if (existingStage) {
+        existingStage.count += 1;
+        existingStage.amount += amount;
+      } else {
+        pipelineByStageMap.set(stageKey, {
+          stageId: opp.stage?.id ?? null,
+          stageName,
+          order: stageOrder,
+          count: 1,
+          amount,
+        });
+      }
+
+      if (!opp.nextStep?.trim()) {
+        needsAttentionOpps.push({
+          id: opp.id,
+          name: opp.name,
+          clientName: opp.client.name,
+          amount,
+          currency: baseCurrency,
+          stageName: opp.stage?.name ?? null,
+        });
+      }
+    }
+
+    const wonCount = closedRecent.filter((row) => row.stage?.stageType === "won").length;
+    const lostCount = closedRecent.filter((row) => row.stage?.stageType === "lost").length;
+    const closedTotal = wonCount + lostCount;
+    const winRateLast90Days = closedTotal > 0 ? wonCount / closedTotal : null;
+
+    const needsAttentionContracts = [...expiringThisMonthRows, ...expiringNextMonthRows]
+      .slice(0, 20)
+      .map((row) => {
+        const expiry = resolveContractExpiryDate(row.endDate, row.variations);
+        return {
+          id: row.id,
+          contractNumber: row.contractNumber,
+          title: row.title,
+          clientName: row.client.name,
+          expiryDate: expiry ? expiry.toISOString() : null,
+        };
+      });
+
+    const pipelineByStage = [...pipelineByStageMap.values()].sort((a, b) => a.order - b.order);
 
     const activeContractsByClient = new Map<string, { clientId: string; clientName: string; count: number }>();
     for (const row of contracts) {
@@ -314,6 +427,21 @@ router.get("/stats", async (req, res) => {
         year,
         baseCurrency,
         forecastScope: isCurrentYear ? "ytd" : "full_year",
+        kpis: {
+          openPipelineAmount,
+          openOpportunityCount: openOpportunities.length,
+          weightedForecast,
+          winRateLast90Days,
+          wonCountLast90Days: wonCount,
+          lostCountLast90Days: lostCount,
+          activeContracts,
+          contractsExpiringThisMonth: expiringThisMonth,
+        },
+        needsAttention: {
+          opportunitiesMissingNextStep: needsAttentionOpps.slice(0, 15),
+          contractsExpiringSoon: needsAttentionContracts,
+        },
+        pipelineByStage,
         actuals: {
           activeOpportunities,
           activeContracts,

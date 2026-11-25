@@ -19,6 +19,7 @@ type Quote = {
   taxAmount: number;
   totalAmount: number;
   notes: string;
+  validUntil: string | null;
   client: { id: string; name: string } | null;
   opportunity: { id: string; name: string } | null;
   lines: Array<{
@@ -37,6 +38,15 @@ function formatMoney(currency: string, amount: number) {
   }).format(amount)}`;
 }
 
+function formatDate(value: string | null | undefined) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export default function QuoteDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -44,6 +54,7 @@ export default function QuoteDetailPage() {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const load = useCallback(() => {
     if (!id) return;
@@ -83,6 +94,29 @@ export default function QuoteDetailPage() {
     }
   }
 
+  async function sendForAcceptance() {
+    setSending(true);
+    try {
+      const res = await adminFetch(`/api/admin/crm/quotes/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "SENT" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Send failed");
+      setQuote((data.data ?? null) as Quote | null);
+      appAlert("Quote marked as sent for acceptance.");
+    } catch (err) {
+      appAlert(err instanceof Error ? err.message : "Send failed");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function previewPdf() {
+    window.print();
+  }
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -102,7 +136,7 @@ export default function QuoteDetailPage() {
   return (
     <ClientsOnlyGuard>
       <div className="max-w-3xl space-y-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3 print:hidden">
           <div className="flex items-start gap-3">
             <Link href="/quotes" className="mt-0.5 rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
               <ArrowLeft className="h-4 w-4" />
@@ -118,78 +152,120 @@ export default function QuoteDetailPage() {
               </p>
             </div>
           </div>
-          {quote.status !== "ACCEPTED" ? (
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={accepting}
-              onClick={() => void acceptQuote()}
-              className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+              onClick={previewPdf}
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
             >
-              {accepting ? "Accepting…" : "Accept & create contract"}
+              Preview PDF
             </button>
+            {quote.status === "DRAFT" || quote.status === "SENT" ? (
+              <button
+                type="button"
+                disabled={sending || quote.status === "SENT"}
+                onClick={() => void sendForAcceptance()}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
+              >
+                {quote.status === "SENT" ? "Sent" : sending ? "Sending…" : "Send for acceptance"}
+              </button>
+            ) : null}
+            {quote.status !== "ACCEPTED" ? (
+              <button
+                type="button"
+                disabled={accepting}
+                onClick={() => void acceptQuote()}
+                className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+              >
+                {accepting ? "Accepting…" : "Accept & create contract"}
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        <div id="quote-print" className="space-y-6">
+          <div className="hidden print:block">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{quote.quoteNumber}</p>
+            <h2 className="text-lg font-semibold text-gray-900">{quote.title}</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              {quote.client?.name ?? "—"} · {quote.status}
+            </p>
+          </div>
+
+          {quote.opportunity ? (
+            <p className="text-sm text-gray-600 dark:text-gray-400 print:text-gray-700">
+              Opportunity:{" "}
+              <Link
+                href={`/opportunities/${quote.opportunity.id}`}
+                className="text-blue-600 hover:underline dark:text-blue-400 print:text-black print:no-underline"
+              >
+                {quote.opportunity.name}
+              </Link>
+            </p>
           ) : null}
-        </div>
 
-        {quote.opportunity ? (
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Opportunity:{" "}
-            <Link
-              href={`/opportunities/${quote.opportunity.id}`}
-              className="text-blue-600 hover:underline dark:text-blue-400"
-            >
-              {quote.opportunity.name}
-            </Link>
-          </p>
-        ) : null}
+          <section className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 text-sm dark:border-gray-700 dark:bg-gray-900 sm:grid-cols-2">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Valid until</p>
+              <p className="mt-1 text-gray-900 dark:text-gray-100">{formatDate(quote.validUntil)}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Status</p>
+              <p className="mt-1 text-gray-900 dark:text-gray-100">{quote.status}</p>
+            </div>
+          </section>
 
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Description</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-600">Qty</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-600">Unit price</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-600">Amount</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {quote.lines.map((line) => (
-                <tr key={line.id}>
-                  <td className="px-4 py-3 text-gray-900 dark:text-gray-100">{line.description}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-gray-600">{line.qty}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-gray-600">
-                    {formatMoney(quote.currency, line.unitPrice)}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-gray-600">
-                    {formatMoney(quote.currency, line.amount)}
-                  </td>
+          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+            <table className="w-full text-sm">
+              <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Description</th>
+                  <th className="px-4 py-3 text-right font-medium text-gray-600">Qty</th>
+                  <th className="px-4 py-3 text-right font-medium text-gray-600">Unit price</th>
+                  <th className="px-4 py-3 text-right font-medium text-gray-600">Amount</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {quote.lines.map((line) => (
+                  <tr key={line.id}>
+                    <td className="px-4 py-3 text-gray-900 dark:text-gray-100">{line.description}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-gray-600">{line.qty}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-gray-600">
+                      {formatMoney(quote.currency, line.unitPrice)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-gray-600">
+                      {formatMoney(quote.currency, line.amount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-        <div className="ml-auto max-w-xs space-y-1 text-sm">
-          <div className="flex justify-between text-gray-600">
-            <span>Subtotal</span>
-            <span className="tabular-nums">{formatMoney(quote.currency, quote.subtotal)}</span>
+          <div className="ml-auto max-w-xs space-y-1 text-sm">
+            <div className="flex justify-between text-gray-600">
+              <span>Subtotal</span>
+              <span className="tabular-nums">{formatMoney(quote.currency, quote.subtotal)}</span>
+            </div>
+            <div className="flex justify-between text-gray-600">
+              <span>Tax ({quote.taxRate}%)</span>
+              <span className="tabular-nums">{formatMoney(quote.currency, quote.taxAmount)}</span>
+            </div>
+            <div className="flex justify-between border-t border-gray-200 pt-2 font-semibold text-gray-900 dark:border-gray-700 dark:text-gray-100">
+              <span>Total</span>
+              <span className="tabular-nums">{formatMoney(quote.currency, quote.totalAmount)}</span>
+            </div>
           </div>
-          <div className="flex justify-between text-gray-600">
-            <span>Tax ({quote.taxRate}%)</span>
-            <span className="tabular-nums">{formatMoney(quote.currency, quote.taxAmount)}</span>
-          </div>
-          <div className="flex justify-between border-t border-gray-200 pt-2 font-semibold text-gray-900 dark:border-gray-700 dark:text-gray-100">
-            <span>Total</span>
-            <span className="tabular-nums">{formatMoney(quote.currency, quote.totalAmount)}</span>
-          </div>
-        </div>
 
-        {quote.notes ? (
           <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
             <h3 className="mb-1 text-sm font-semibold text-gray-900 dark:text-gray-100">Notes</h3>
-            <p className="whitespace-pre-wrap text-sm text-gray-600 dark:text-gray-400">{quote.notes}</p>
+            {quote.notes?.trim() ? (
+              <p className="whitespace-pre-wrap text-sm text-gray-600 dark:text-gray-400">{quote.notes}</p>
+            ) : (
+              <p className="text-sm text-gray-400">No notes.</p>
+            )}
           </section>
-        ) : null}
+        </div>
       </div>
     </ClientsOnlyGuard>
   );

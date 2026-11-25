@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { appAlert } from "@/lib/app-alert";
@@ -14,6 +14,7 @@ type TenantRow = {
   slug: string;
   region: string;
   active: boolean;
+  plan: { id: string; name: string; slug: string } | null;
   modules: Record<string, boolean>;
   memberCount: number;
   clientCount: number;
@@ -21,6 +22,15 @@ type TenantRow = {
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
+
+function modulesSummary(modules: Record<string, boolean>) {
+  const enabled = MODULE_KEYS.filter((key) => modules[key]).map((key) =>
+    key.replace(/_/g, " "),
+  );
+  if (enabled.length === 0) return "None";
+  if (enabled.length === MODULE_KEYS.length) return "All modules";
+  return enabled.join(", ");
+}
 
 export default function TenantsPage() {
   const [rows, setRows] = useState<TenantRow[]>([]);
@@ -121,9 +131,9 @@ export default function TenantsPage() {
     <ClientsOnlyGuard>
       <div className="space-y-6">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Tenants</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Tenants console</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Platform admin: create tenants, view-as, and toggle modules.
+            Visible to TechBubble super admins only. Create tenants, view-as, and toggle modules.
           </p>
         </div>
 
@@ -173,72 +183,125 @@ export default function TenantsPage() {
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-black border-t-transparent dark:border-white" />
           </div>
         ) : (
-          <div className="space-y-3">
-            {rows.map((row) => {
-              const open = expandedId === row.id;
-              return (
-                <section
-                  key={row.id}
-                  className="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-gray-100">{row.name}</p>
-                      <p className="text-xs text-gray-500">
-                        {row.slug} · {row.region} · {row.memberCount} members · {row.clientCount} clients
-                        {!row.active ? " · inactive" : ""}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setExpandedId(open ? null : row.id)}
-                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-600"
-                      >
-                        {open ? "Hide modules" : "Modules"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void viewAs(row.id)}
-                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-600"
-                      >
-                        View as
-                      </button>
-                    </div>
-                  </div>
-                  {open ? (
-                    <div className="border-t border-gray-100 px-4 py-3 dark:border-gray-800">
-                      <ul className="mb-3 space-y-2">
-                        {MODULE_KEYS.map((key) => (
-                          <li key={key} className="flex items-center justify-between text-sm">
-                            <span className="capitalize text-gray-700 dark:text-gray-300">
-                              {key.replace(/_/g, " ")}
-                            </span>
-                            <input
-                              type="checkbox"
-                              checked={Boolean(row.modules[key])}
-                              onChange={(e) => {
-                                const next = { ...row.modules, [key]: e.target.checked };
-                                setRows((prev) =>
-                                  prev.map((r) => (r.id === row.id ? { ...r, modules: next } : r)),
-                                );
-                              }}
-                            />
-                          </li>
-                        ))}
-                      </ul>
-                      <button
-                        type="button"
-                        onClick={() => void saveModules(row, row.modules)}
-                        className="rounded-lg bg-black px-3 py-1.5 text-xs font-medium text-white dark:bg-white dark:text-black"
-                      >
-                        Save modules
-                      </button>
-                    </div>
-                  ) : null}
-                </section>
-              );
-            })}
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-sm">
+                <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium text-gray-600">Name</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-600">Slug</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-600">Region</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-600">Plan</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-600">Modules</th>
+                    <th className="px-4 py-3 text-right font-medium text-gray-600">Members</th>
+                    <th className="px-4 py-3 text-right font-medium text-gray-600">Clients</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-600">Active</th>
+                    <th className="px-4 py-3 text-right font-medium text-gray-600">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
+                        No tenants yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    rows.map((row) => {
+                      const open = expandedId === row.id;
+                      return (
+                        <Fragment key={row.id}>
+                          <tr className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
+                              {row.name}
+                            </td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.slug}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.region}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                              {row.plan?.name ?? "—"}
+                            </td>
+                            <td className="max-w-[220px] px-4 py-3 text-gray-600 dark:text-gray-400">
+                              <span className="line-clamp-2" title={modulesSummary(row.modules)}>
+                                {modulesSummary(row.modules)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right tabular-nums text-gray-600">
+                              {row.memberCount}
+                            </td>
+                            <td className="px-4 py-3 text-right tabular-nums text-gray-600">
+                              {row.clientCount}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span
+                                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                                  row.active
+                                    ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200"
+                                    : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                                }`}
+                              >
+                                {row.active ? "Active" : "Inactive"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="inline-flex flex-wrap justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedId(open ? null : row.id)}
+                                  className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium hover:bg-gray-50 dark:border-gray-600"
+                                >
+                                  {open ? "Hide" : "Modules"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void viewAs(row.id)}
+                                  className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium hover:bg-gray-50 dark:border-gray-600"
+                                >
+                                  View as
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                          {open ? (
+                            <tr>
+                              <td colSpan={9} className="bg-gray-50 px-4 py-3 dark:bg-gray-800/40">
+                                <ul className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                                  {MODULE_KEYS.map((key) => (
+                                    <li key={key} className="flex items-center justify-between text-sm">
+                                      <span className="capitalize text-gray-700 dark:text-gray-300">
+                                        {key.replace(/_/g, " ")}
+                                      </span>
+                                      <input
+                                        type="checkbox"
+                                        checked={Boolean(row.modules[key])}
+                                        onChange={(e) => {
+                                          const next = { ...row.modules, [key]: e.target.checked };
+                                          setRows((prev) =>
+                                            prev.map((r) =>
+                                              r.id === row.id ? { ...r, modules: next } : r,
+                                            ),
+                                          );
+                                        }}
+                                      />
+                                    </li>
+                                  ))}
+                                </ul>
+                                <button
+                                  type="button"
+                                  onClick={() => void saveModules(row, row.modules)}
+                                  className="rounded-lg bg-black px-3 py-1.5 text-xs font-medium text-white dark:bg-white dark:text-black"
+                                >
+                                  Save modules
+                                </button>
+                              </td>
+                            </tr>
+                          ) : null}
+                        </Fragment>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

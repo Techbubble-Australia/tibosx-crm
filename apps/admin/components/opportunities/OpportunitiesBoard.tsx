@@ -21,6 +21,8 @@ type BoardOpp = {
   amount: number;
   stageId: string | null;
   ownerName: string;
+  nextStep?: string | null;
+  probability?: number | null;
 };
 
 type BoardData = {
@@ -31,6 +33,21 @@ type BoardData = {
 
 function formatAmount(currency: string, amount: number) {
   return `${currency} ${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(amount)}`;
+}
+
+function ownerInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return `${parts[0]![0] ?? ""}${parts[parts.length - 1]![0] ?? ""}`.toUpperCase();
+}
+
+function columnSum(opps: BoardOpp[]) {
+  return opps.reduce((sum, o) => sum + (o.amount || 0), 0);
+}
+
+function columnCurrency(opps: BoardOpp[]) {
+  return opps[0]?.currency ?? "AUD";
 }
 
 export function OpportunitiesBoard() {
@@ -74,6 +91,7 @@ export function OpportunitiesBoard() {
   }
 
   function renderCard(opp: BoardOpp) {
+    const hasNextStep = Boolean(opp.nextStep?.trim());
     return (
       <article
         key={opp.id}
@@ -84,16 +102,38 @@ export function OpportunitiesBoard() {
           dragOppId === opp.id ? "opacity-60" : ""
         }`}
       >
-        <Link
-          href={`/opportunities/${opp.id}`}
-          className="text-sm font-medium text-gray-900 hover:underline dark:text-gray-100"
-        >
-          {opp.name}
-        </Link>
+        <div className="flex items-start justify-between gap-2">
+          <Link
+            href={`/opportunities/${opp.id}`}
+            className="text-sm font-medium text-gray-900 hover:underline dark:text-gray-100"
+          >
+            {opp.name}
+          </Link>
+          <span
+            title={opp.ownerName || "Unassigned"}
+            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+          >
+            {ownerInitials(opp.ownerName || "?")}
+          </span>
+        </div>
         <p className="mt-0.5 truncate text-xs text-gray-500">{opp.clientName || "—"}</p>
-        <p className="mt-1 text-xs tabular-nums text-gray-600 dark:text-gray-400">
-          {formatAmount(opp.currency, opp.amount)}
-        </p>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <p className="text-xs tabular-nums text-gray-600 dark:text-gray-400">
+            {formatAmount(opp.currency, opp.amount)}
+          </p>
+          {opp.probability != null ? (
+            <span className="text-[11px] text-gray-500">{opp.probability}%</span>
+          ) : null}
+        </div>
+        {hasNextStep ? (
+          <p className="mt-1.5 line-clamp-2 text-[11px] text-gray-600 dark:text-gray-400">
+            Next: {opp.nextStep}
+          </p>
+        ) : (
+          <p className="mt-1.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+            No next step
+          </p>
+        )}
         <select
           disabled={movingId === opp.id}
           value={opp.stageId ?? ""}
@@ -161,6 +201,8 @@ export function OpportunitiesBoard() {
       <div className="flex gap-3 overflow-x-auto pb-2">
         {columns.map((col) => {
           const isDropTarget = col.stage.id !== "__unstaged";
+          const sum = columnSum(col.opportunities);
+          const currency = columnCurrency(col.opportunities);
           return (
             <div
               key={col.stage.id}
@@ -171,7 +213,7 @@ export function OpportunitiesBoard() {
                 e.preventDefault();
                 if (dragOppId && isDropTarget) void moveToStage(dragOppId, col.stage.id);
               }}
-              className="flex w-64 shrink-0 flex-col rounded-xl border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-950/40"
+              className="flex w-72 shrink-0 flex-col rounded-xl border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-950/40"
             >
               <div className="border-b border-gray-200 px-3 py-2 dark:border-gray-700">
                 <div className="flex items-center justify-between gap-2">
@@ -180,11 +222,10 @@ export function OpportunitiesBoard() {
                     {col.opportunities.length}
                   </span>
                 </div>
-                {col.stage.id !== "__unstaged" ? (
-                  <p className="text-[11px] text-gray-500">
-                    {col.stage.stageType} · {col.stage.winProbability}%
-                  </p>
-                ) : null}
+                <p className="mt-0.5 text-[11px] tabular-nums text-gray-500">
+                  {formatAmount(currency, sum)}
+                  {col.stage.id !== "__unstaged" ? ` · ${col.stage.winProbability}%` : ""}
+                </p>
               </div>
               <div className="flex flex-1 flex-col gap-2 p-2">
                 {col.opportunities.length === 0 ? (

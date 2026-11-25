@@ -12,6 +12,7 @@ type Stage = {
   stageType: string;
   winProbability: number;
   order: number;
+  requiredFields?: string[] | null;
 };
 
 type Pipeline = {
@@ -35,6 +36,13 @@ const DEFAULT_STAGES = [
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
 
+function requiredFieldsNote(fields: Stage["requiredFields"]) {
+  if (!fields || !Array.isArray(fields) || fields.length === 0) {
+    return "No required fields";
+  }
+  return fields.join(", ");
+}
+
 export default function PipelinesSettingsPage() {
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,12 +50,30 @@ export default function PipelinesSettingsPage() {
   const [kind, setKind] = useState("services");
   const [isDefault, setIsDefault] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [stageDrafts, setStageDrafts] = useState<
+    Record<string, { name: string; stageType: string; winProbability: number; order: number }>
+  >({});
+  const [savingStageId, setSavingStageId] = useState<string | null>(null);
+  const [addingPipelineId, setAddingPipelineId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
     void adminFetch("/api/admin/crm/pipelines")
       .then((res) => res.json())
-      .then((data) => setPipelines((data.data ?? []) as Pipeline[]))
+      .then((data) => {
+        const rows = (data.data ?? []) as Pipeline[];
+        setPipelines(rows);
+        const drafts: typeof stageDrafts = {};
+        for (const pipeline of rows) {
+          drafts[pipeline.id] = {
+            name: "",
+            stageType: "open",
+            winProbability: 50,
+            order: pipeline.stages.length,
+          };
+        }
+        setStageDrafts(drafts);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -82,13 +108,66 @@ export default function PipelinesSettingsPage() {
     }
   }
 
+  async function updateWinProbability(stage: Stage, value: number) {
+    setSavingStageId(stage.id);
+    try {
+      const res = await adminFetch(`/api/admin/crm/pipelines/stages/${stage.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ winProbability: value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Failed to update stage");
+      setPipelines((prev) =>
+        prev.map((pipeline) => ({
+          ...pipeline,
+          stages: pipeline.stages.map((s) =>
+            s.id === stage.id ? { ...s, winProbability: data.data?.winProbability ?? value } : s,
+          ),
+        })),
+      );
+    } catch (err) {
+      appAlert(err instanceof Error ? err.message : "Failed to update stage");
+    } finally {
+      setSavingStageId(null);
+    }
+  }
+
+  async function addStage(pipelineId: string) {
+    const draft = stageDrafts[pipelineId];
+    if (!draft?.name.trim()) {
+      appAlert("Stage name is required.");
+      return;
+    }
+    setAddingPipelineId(pipelineId);
+    try {
+      const res = await adminFetch(`/api/admin/crm/pipelines/${pipelineId}/stages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: draft.name.trim(),
+          stageType: draft.stageType,
+          winProbability: draft.winProbability,
+          order: draft.order,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Failed to add stage");
+      load();
+    } catch (err) {
+      appAlert(err instanceof Error ? err.message : "Failed to add stage");
+    } finally {
+      setAddingPipelineId(null);
+    }
+  }
+
   return (
     <ClientsOnlyGuard>
       <div className="space-y-6">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Pipelines</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Pipelines and stages</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Opportunity stages for your sales process.
+            Per workspace. Each pipeline has its own stages, probabilities and required fields.
           </p>
         </div>
 
@@ -156,6 +235,7 @@ export default function PipelinesSettingsPage() {
                         <th className="px-4 py-2 text-left font-medium text-gray-600">Stage</th>
                         <th className="px-4 py-2 text-left font-medium text-gray-600">Type</th>
                         <th className="px-4 py-2 text-right font-medium text-gray-600">Win %</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600">Required fields</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -164,13 +244,126 @@ export default function PipelinesSettingsPage() {
                           <td className="px-4 py-2 text-gray-500">{stage.order}</td>
                           <td className="px-4 py-2 text-gray-900 dark:text-gray-100">{stage.name}</td>
                           <td className="px-4 py-2 text-gray-600">{stage.stageType}</td>
-                          <td className="px-4 py-2 text-right tabular-nums text-gray-600">
-                            {stage.winProbability}%
+                          <td className="px-4 py-2 text-right">
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={stage.winProbability}
+                              disabled={savingStageId === stage.id}
+                              onChange={(e) => {
+                                const next = Number.parseInt(e.target.value, 10);
+                                if (Number.isNaN(next)) return;
+                                setPipelines((prev) =>
+                                  prev.map((p) =>
+                                    p.id !== pipeline.id
+                                      ? p
+                                      : {
+                                          ...p,
+                                          stages: p.stages.map((s) =>
+                                            s.id === stage.id ? { ...s, winProbability: next } : s,
+                                          ),
+                                        },
+                                  ),
+                                );
+                              }}
+                              onBlur={(e) => {
+                                const next = Number.parseInt(e.target.value, 10);
+                                if (Number.isNaN(next)) return;
+                                void updateWinProbability(stage, Math.min(100, Math.max(0, next)));
+                              }}
+                              className="ml-auto w-20 rounded border border-gray-200 bg-white px-2 py-1 text-right tabular-nums dark:border-gray-600 dark:bg-gray-800"
+                            />
+                          </td>
+                          <td className="px-4 py-2 text-xs text-gray-500">
+                            {requiredFieldsNote(stage.requiredFields)}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                </div>
+                <div className="flex flex-wrap items-end gap-2 border-t border-gray-100 px-4 py-3 dark:border-gray-800">
+                  <div className="min-w-[140px] flex-1">
+                    <label className="mb-1 block text-xs font-medium text-gray-600">New stage</label>
+                    <input
+                      value={stageDrafts[pipeline.id]?.name ?? ""}
+                      onChange={(e) =>
+                        setStageDrafts((d) => ({
+                          ...d,
+                          [pipeline.id]: {
+                            ...(d[pipeline.id] ?? {
+                              name: "",
+                              stageType: "open",
+                              winProbability: 50,
+                              order: pipeline.stages.length,
+                            }),
+                            name: e.target.value,
+                          },
+                        }))
+                      }
+                      placeholder="Stage name"
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="w-28">
+                    <label className="mb-1 block text-xs font-medium text-gray-600">Type</label>
+                    <select
+                      value={stageDrafts[pipeline.id]?.stageType ?? "open"}
+                      onChange={(e) =>
+                        setStageDrafts((d) => ({
+                          ...d,
+                          [pipeline.id]: {
+                            ...(d[pipeline.id] ?? {
+                              name: "",
+                              stageType: "open",
+                              winProbability: 50,
+                              order: pipeline.stages.length,
+                            }),
+                            stageType: e.target.value,
+                          },
+                        }))
+                      }
+                      className={inputClass}
+                    >
+                      <option value="open">open</option>
+                      <option value="won">won</option>
+                      <option value="lost">lost</option>
+                    </select>
+                  </div>
+                  <div className="w-24">
+                    <label className="mb-1 block text-xs font-medium text-gray-600">Win %</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={stageDrafts[pipeline.id]?.winProbability ?? 50}
+                      onChange={(e) =>
+                        setStageDrafts((d) => ({
+                          ...d,
+                          [pipeline.id]: {
+                            ...(d[pipeline.id] ?? {
+                              name: "",
+                              stageType: "open",
+                              winProbability: 50,
+                              order: pipeline.stages.length,
+                            }),
+                            winProbability: Number.parseInt(e.target.value, 10) || 0,
+                          },
+                        }))
+                      }
+                      className={inputClass}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={addingPipelineId === pipeline.id}
+                    onClick={() => void addStage(pipeline.id)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    {addingPipelineId === pipeline.id ? "Adding…" : "Add stage"}
+                  </button>
                 </div>
               </section>
             ))}

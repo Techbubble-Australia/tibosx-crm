@@ -9,6 +9,28 @@ type ClientCount = { clientId: string; clientName: string; count: number };
 type ClientAmount = { clientId: string; clientName: string; amount: number };
 type ForecastVsActual = { clientId: string; clientName: string; forecast: number; actual: number };
 type ForecastMonthRow = { month: number; label: string; forecast: number; actual: number };
+type PipelineStageRow = {
+  stageId: string | null;
+  stageName: string;
+  order: number;
+  count: number;
+  amount: number;
+};
+type NeedsAttentionOpp = {
+  id: string;
+  name: string;
+  clientName: string;
+  amount: number;
+  currency: string;
+  stageName: string | null;
+};
+type NeedsAttentionContract = {
+  id: string;
+  contractNumber: string;
+  title: string;
+  clientName: string;
+  expiryDate: string | null;
+};
 
 const BASE_CURRENCIES = ["AUD", "USD", "INR"] as const;
 
@@ -16,6 +38,21 @@ type SalesDashboardStats = {
   year: number;
   baseCurrency: string;
   forecastScope?: "ytd" | "full_year";
+  kpis?: {
+    openPipelineAmount: number;
+    openOpportunityCount: number;
+    weightedForecast: number;
+    winRateLast90Days: number | null;
+    wonCountLast90Days: number;
+    lostCountLast90Days: number;
+    activeContracts: number;
+    contractsExpiringThisMonth: number;
+  };
+  needsAttention?: {
+    opportunitiesMissingNextStep: NeedsAttentionOpp[];
+    contractsExpiringSoon: NeedsAttentionContract[];
+  };
+  pipelineByStage?: PipelineStageRow[];
   actuals: {
     activeOpportunities: number;
     activeContracts: number;
@@ -42,6 +79,11 @@ function formatAmount(value: number, currency?: string) {
     }).format(value);
   }
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
+}
+
+function formatPercent(value: number | null | undefined) {
+  if (value == null || Number.isNaN(value)) return "—";
+  return `${Math.round(value * 100)}%`;
 }
 
 function yearOptions(anchorYear: number) {
@@ -211,14 +253,25 @@ function MonthlyForecastChart({
   );
 }
 
-function StatCard({ label, value, href }: { label: string; value: number | string; href: string }) {
+function KpiCard({
+  label,
+  value,
+  detail,
+  href,
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+  href: string;
+}) {
   return (
     <Link
       href={href}
       className="rounded-xl border border-gray-200 bg-white p-5 transition-colors hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600 dark:hover:bg-gray-800/50"
     >
       <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
-      <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">{value}</p>
+      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">{value}</p>
+      {detail ? <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{detail}</p> : null}
     </Link>
   );
 }
@@ -247,7 +300,11 @@ export default function SalesDashboardPage() {
 
   const year = stats?.year ?? selectedYear;
   const displayCurrency = stats?.baseCurrency ?? baseCurrency;
-  const isCurrentYear = year === currentYear;
+  const kpis = stats?.kpis;
+  const needsAttention = stats?.needsAttention;
+  const pipelineByStage = stats?.pipelineByStage ?? [];
+  const missingNextStep = needsAttention?.opportunitiesMissingNextStep ?? [];
+  const expiringSoon = needsAttention?.contractsExpiringSoon ?? [];
 
   return (
     <ClientsOnlyGuard>
@@ -290,23 +347,119 @@ export default function SalesDashboardPage() {
           </div>
         ) : (
           <>
+            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <KpiCard
+                label="Open pipeline"
+                value={formatAmount(kpis?.openPipelineAmount ?? 0, displayCurrency)}
+                detail={`${kpis?.openOpportunityCount ?? stats?.actuals.activeOpportunities ?? 0} opportunities`}
+                href="/opportunities/active"
+              />
+              <KpiCard
+                label="Weighted forecast"
+                value={formatAmount(kpis?.weightedForecast ?? 0, displayCurrency)}
+                detail="Sum of amount × stage probability"
+                href="/opportunities/active"
+              />
+              <KpiCard
+                label="Win rate (90 days)"
+                value={formatPercent(kpis?.winRateLast90Days)}
+                detail={
+                  kpis
+                    ? `${kpis.wonCountLast90Days} won · ${kpis.lostCountLast90Days} lost`
+                    : undefined
+                }
+                href="/opportunities"
+              />
+              <KpiCard
+                label="Active contracts"
+                value={String(kpis?.activeContracts ?? stats?.actuals.activeContracts ?? 0)}
+                detail={`${kpis?.contractsExpiringThisMonth ?? stats?.actuals.contractsExpiringThisMonth ?? 0} expiring this month`}
+                href="/contracts/active"
+              />
+            </section>
+
+            {(missingNextStep.length > 0 || expiringSoon.length > 0) && (
+              <section className="rounded-xl border border-amber-200 bg-amber-50/60 p-5 dark:border-amber-900/50 dark:bg-amber-950/20">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200">
+                  Needs attention
+                </h2>
+                <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                  <div>
+                    <p className="mb-2 text-xs font-medium text-amber-900/80 dark:text-amber-200/80">
+                      Opportunities missing next step ({missingNextStep.length})
+                    </p>
+                    {missingNextStep.length === 0 ? (
+                      <p className="text-sm text-gray-500">None</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {missingNextStep.slice(0, 6).map((opp) => (
+                          <li key={opp.id} className="flex items-center justify-between gap-3 text-sm">
+                            <Link
+                              href={`/opportunities/${opp.id}`}
+                              className="truncate font-medium text-blue-700 hover:underline dark:text-blue-300"
+                            >
+                              {opp.name}
+                              <span className="ml-1 font-normal text-gray-500">· {opp.clientName}</span>
+                            </Link>
+                            <span className="shrink-0 tabular-nums text-gray-600 dark:text-gray-400">
+                              {formatAmount(opp.amount, displayCurrency)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div>
+                    <p className="mb-2 text-xs font-medium text-amber-900/80 dark:text-amber-200/80">
+                      Contracts expiring soon ({expiringSoon.length})
+                    </p>
+                    {expiringSoon.length === 0 ? (
+                      <p className="text-sm text-gray-500">None</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {expiringSoon.slice(0, 6).map((row) => (
+                          <li key={row.id} className="flex items-center justify-between gap-3 text-sm">
+                            <Link
+                              href={`/contracts/${row.id}`}
+                              className="truncate font-medium text-blue-700 hover:underline dark:text-blue-300"
+                            >
+                              {row.contractNumber}
+                              <span className="ml-1 font-normal text-gray-500">· {row.clientName}</span>
+                            </Link>
+                            <span className="shrink-0 text-gray-600 dark:text-gray-400">
+                              {row.expiryDate
+                                ? new Date(row.expiryDate).toLocaleDateString("en-AU", {
+                                    day: "numeric",
+                                    month: "short",
+                                  })
+                                : "—"}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {pipelineByStage.length > 0 ? (
+              <BarChart
+                title="Pipeline by stage"
+                subtitle={`Open opportunity value in ${displayCurrency} by stage.`}
+                items={pipelineByStage.map((row) => ({
+                  stageName: `${row.stageName} (${row.count})`,
+                  amount: row.amount,
+                }))}
+                labelKey="stageName"
+                valueKey="amount"
+                currency={displayCurrency}
+                getHref={() => "/opportunities/active"}
+              />
+            ) : null}
+
             <section className="space-y-4">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Actuals</h2>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                <StatCard label="Active opportunities" value={stats?.actuals.activeOpportunities ?? 0} href="/opportunities/active" />
-                <StatCard label="Active contracts" value={stats?.actuals.activeContracts ?? 0} href="/contracts/active" />
-                <StatCard
-                  label={isCurrentYear ? "Expiring this month" : "Expiring this month (live)"}
-                  value={stats?.actuals.contractsExpiringThisMonth ?? 0}
-                  href="/contracts/active?expiring=thisMonth"
-                />
-                <StatCard
-                  label={isCurrentYear ? "Expiring next month" : "Expiring next month (live)"}
-                  value={stats?.actuals.contractsExpiringNextMonth ?? 0}
-                  href="/contracts/active?expiring=nextMonth"
-                />
-                <StatCard label="Invoices awaiting payment" value={stats?.actuals.invoicesAwaitingPayment ?? 0} href="/invoices?status=AWAITING_PAYMENT" />
-              </div>
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                 <BarChart
                   title="Active contracts by client"

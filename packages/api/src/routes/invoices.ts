@@ -107,6 +107,7 @@ router.get("/", async (req, res) => {
         taxAmount: toNumber(row.taxAmount),
         totalAmount: toNumber(row.totalAmount),
         fileUrl: row.fileUrl,
+        accountingSyncStatus: row.accountingSyncStatus,
       })),
     });
   } catch (error) {

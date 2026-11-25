@@ -37,7 +37,6 @@ import {
   FileSpreadsheet,
   BarChart3,
   GitBranch,
-  SlidersHorizontal,
   Upload,
 } from "lucide-react";
 import { UserAccountMenu } from "@/components/UserAccountMenu";
@@ -152,28 +151,16 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    id: "crm_settings",
-    label: "CRM Settings",
-    icon: SlidersHorizontal,
-    roles: ["admin", "sales"],
-    items: [
-      { href: "/settings/crm/pipelines", label: "Pipelines", icon: GitBranch, roles: ["admin", "sales"] },
-      { href: "/settings/crm/custom-fields", label: "Custom fields", icon: Layers, roles: ["admin", "sales"] },
-      { href: "/settings/crm/import-export", label: "Import / export", icon: Upload, roles: ["admin", "sales"] },
-      { href: "/settings/crm/workspace", label: "Workspace & modules", icon: Building2, roles: ["admin"] },
-      { href: "/settings/crm/tenants", label: "Tenants", icon: Building, roles: ["admin"] },
-    ],
-  },
-  {
     id: "settings",
     label: "Settings",
     icon: Settings,
-    roles: ["admin"],
+    /** Sales users see CRM settings; admins see CRM + platform settings. */
+    roles: ["admin", "sales"],
     items: [
-      { href: "/settings/categories", label: "Category", icon: Layers, roles: ["admin", "website"] },
-      { href: "/settings/technologies", label: "Technology", icon: Cpu, roles: ["admin", "website"] },
-      { href: "/settings/departments", label: "Department", icon: Building, roles: ["admin", "website"] },
-      { href: "/settings/levels", label: "Level", icon: Target, roles: ["admin", "website"] },
+      { href: "/settings/crm/pipelines", label: "Pipelines and stages", icon: GitBranch, roles: ["admin", "sales"] },
+      { href: "/settings/crm/custom-fields", label: "Custom fields", icon: Layers, roles: ["admin", "sales"] },
+      { href: "/settings/crm/import-export", label: "Import and export", icon: Upload, roles: ["admin", "sales"] },
+      { href: "/settings/crm/workspace", label: "Workspace and modules", icon: Building2, roles: ["admin", "sales"] },
       { href: "/settings/templates", label: "Templates", icon: FileCode, roles: ["admin"] },
       { href: "/settings/notifications", label: "Email notifications", icon: Mail, roles: ["admin"] },
       { href: "/settings/groups", label: "Groups", icon: Users, roles: ["admin"] },
@@ -181,7 +168,20 @@ const navGroups: NavGroup[] = [
       { href: "/settings/database", label: "Database clone", icon: Database, roles: ["admin"] },
       { href: "/users/active", label: "Internal users", icon: UserCircle, roles: ["admin"] },
       { href: "/customer-users/active", label: "Customer users", icon: UserCircle, roles: ["admin"] },
+      { href: "/settings/categories", label: "Category", icon: Layers, roles: ["admin"] },
+      { href: "/settings/technologies", label: "Technology", icon: Cpu, roles: ["admin"] },
+      { href: "/settings/departments", label: "Department", icon: Building, roles: ["admin"] },
+      { href: "/settings/levels", label: "Level", icon: Target, roles: ["admin"] },
       { href: "/debug-capture", label: "Debug captures", icon: Bug, roles: ["admin"] },
+    ],
+  },
+  {
+    id: "platform",
+    label: "Platform",
+    icon: Building,
+    roles: ["admin"],
+    items: [
+      { href: "/settings/crm/tenants", label: "Tenants console", icon: Building, roles: ["admin"] },
     ],
   },
 ];
@@ -218,7 +218,12 @@ function groupIsActive(group: NavGroup, pathname: string): boolean {
   ) {
     return true;
   }
-  if (group.id === "crm_settings" && pathname.startsWith("/settings/crm")) {
+  if (group.id === "settings" && (pathname.startsWith("/settings") || pathname.startsWith("/users") || pathname.startsWith("/customer-users") || pathname.startsWith("/debug-capture"))) {
+    // Platform tenants console is its own group
+    if (pathname.startsWith("/settings/crm/tenants")) return false;
+    return true;
+  }
+  if (group.id === "platform" && pathname.startsWith("/settings/crm/tenants")) {
     return true;
   }
   if (group.id === "project_management") {
