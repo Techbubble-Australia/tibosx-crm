@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
 
@@ -20,6 +19,9 @@ type SearchData = {
   }>;
 };
 
+/**
+ * Wireframe header search: wide rounded field, placeholder only (no leading icon).
+ */
 export function GlobalCrmSearch() {
   const router = useRouter();
   const { canAccessSales, sessionLoaded } = useAdminSession();
@@ -63,7 +65,14 @@ export function GlobalCrmSearch() {
     };
   }, [query, sessionLoaded, canAccessSales]);
 
-  if (!sessionLoaded || !canAccessSales) return null;
+  if (!sessionLoaded || !canAccessSales) {
+    // Keep layout space matching the wireframe search width even before sales session resolves.
+    return (
+      <div className="min-w-0 flex-1">
+        <div className="h-9 w-full max-w-[36rem] rounded-lg border border-transparent bg-transparent" />
+      </div>
+    );
+  }
 
   const hasResults =
     !!data &&
@@ -84,8 +93,7 @@ export function GlobalCrmSearch() {
 
   return (
     <div className="relative min-w-0 flex-1" ref={rootRef}>
-      <form onSubmit={onSubmit} className="relative mx-auto w-full max-w-xl">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+      <form onSubmit={onSubmit} className="w-full max-w-[36rem]">
         <input
           type="search"
           value={query}
@@ -97,12 +105,12 @@ export function GlobalCrmSearch() {
             if (query.trim().length >= 2) setOpen(true);
           }}
           placeholder="Search leads, clients, opportunities"
-          className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500"
+          className="h-9 w-full rounded-lg border border-gray-200 bg-white px-3.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-300 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500"
           aria-label="Search leads, clients, opportunities"
         />
       </form>
       {open && query.trim().length >= 2 ? (
-        <div className="absolute left-1/2 z-50 mt-1 w-full max-w-xl -translate-x-1/2 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+        <div className="absolute left-0 z-50 mt-1.5 w-full max-w-[36rem] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
           {loading && !data ? (
             <p className="px-3 py-3 text-sm text-gray-400">Searching…</p>
           ) : !hasResults ? (
@@ -119,7 +127,11 @@ export function GlobalCrmSearch() {
                       key={l.id}
                       type="button"
                       className="flex w-full flex-col px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                      onClick={() => go(`/leads?highlight=${encodeURIComponent(l.id)}&q=${encodeURIComponent(query.trim())}`)}
+                      onClick={() =>
+                        go(
+                          `/leads?highlight=${encodeURIComponent(l.id)}&q=${encodeURIComponent(query.trim())}`,
+                        )
+                      }
                     >
                       <span className="font-medium text-gray-900 dark:text-gray-100">
                         {l.company || l.name}

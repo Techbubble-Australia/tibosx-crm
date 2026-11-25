@@ -17,7 +17,6 @@ type Props = {
   showPersonalHome?: boolean;
   personalHomeHref?: string;
   showClientHome?: boolean;
-  accessLabel?: string | null;
 };
 
 function initials(name: string) {
@@ -27,11 +26,14 @@ function initials(name: string) {
   return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
 }
 
+/**
+ * Wireframe header workspace chip:
+ * [TB] TechBubble Workspace ⌄  — single line, pill border.
+ */
 export function TenantWorkspaceMenu({
   showPersonalHome,
   personalHomeHref = "/my-workspace",
   showClientHome,
-  accessLabel,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [tenant, setTenant] = useState<TenantMe | null>(null);
@@ -66,32 +68,29 @@ export function TenantWorkspaceMenu({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-left hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:hover:bg-gray-800"
+        className="inline-flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 text-left hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:hover:bg-gray-800"
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label="Workspace"
+        aria-label={`${name} Workspace`}
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded bg-gray-900 text-[10px] font-bold tracking-wide text-white dark:bg-white dark:text-gray-900">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] bg-gray-950 text-[10px] font-bold leading-none tracking-wide text-white dark:bg-white dark:text-gray-950">
           {badge}
         </span>
-        <span className="hidden min-w-0 sm:block">
-          <span className="block truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{name}</span>
-          <span className="block text-[11px] text-gray-500 dark:text-gray-400">Workspace</span>
+        <span className="hidden items-baseline gap-1.5 whitespace-nowrap sm:inline-flex">
+          <span className="text-sm font-semibold text-gray-950 dark:text-gray-100">{name}</span>
+          <span className="text-sm font-normal text-gray-500 dark:text-gray-400">Workspace</span>
         </span>
-        <ChevronDown className="h-4 w-4 shrink-0 text-gray-500" />
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-gray-500" aria-hidden />
       </button>
       {open ? (
         <div
           role="menu"
-          className="absolute left-0 z-50 mt-1 w-64 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+          className="absolute left-0 z-50 mt-1.5 w-60 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
         >
           <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-800">
-            <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{name}</p>
+            <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{name}</p>
             {tenant?.tenantSlug ? (
               <p className="truncate text-xs text-gray-500 dark:text-gray-400">{tenant.tenantSlug}</p>
-            ) : null}
-            {accessLabel ? (
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{accessLabel}</p>
             ) : null}
           </div>
           {showPersonalHome ? (

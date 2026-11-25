@@ -15,6 +15,11 @@ type Props = {
   onImpersonate?: () => void;
   /** e.g. "Project member", "Administrator" */
   accessLabel?: string | null;
+  /**
+   * Wireframe header: name + role only (no avatar, border, or chevron).
+   * Default keeps the bordered avatar chip used elsewhere.
+   */
+  variant?: "default" | "wireframe";
 };
 
 export function UserAccountMenu({
@@ -26,6 +31,7 @@ export function UserAccountMenu({
   canImpersonate,
   onImpersonate,
   accessLabel,
+  variant = "default",
 }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -39,24 +45,44 @@ export function UserAccountMenu({
   }, []);
 
   const displayName = name?.trim() || email;
+  const wireframe = variant === "wireframe";
 
   return (
     <div className="relative" ref={rootRef}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex max-w-[240px] items-center gap-2 rounded-lg border border-gray-200 px-2 py-1.5 text-left text-sm hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+        className={
+          wireframe
+            ? "inline-flex max-w-[220px] flex-col items-end rounded-md px-1 py-0.5 text-right hover:bg-gray-50 dark:hover:bg-gray-800"
+            : "inline-flex max-w-[240px] items-center gap-2 rounded-lg border border-gray-200 px-2 py-1.5 text-left text-sm hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+        }
         aria-expanded={open}
         aria-haspopup="menu"
       >
-        <UserAvatar name={name} email={email} photoUrl={photoUrl} size="sm" />
-        <span className="hidden min-w-0 flex-col truncate sm:flex">
-          <span className="truncate font-medium text-gray-900 dark:text-gray-100">{displayName}</span>
-          {accessLabel ? (
-            <span className="truncate text-xs font-normal text-gray-500 dark:text-gray-400">{accessLabel}</span>
-          ) : null}
-        </span>
-        <ChevronDown className="h-4 w-4 shrink-0 text-gray-500" />
+        {wireframe ? (
+          <>
+            <span className="truncate text-sm font-semibold leading-tight text-gray-950 dark:text-gray-100">
+              {displayName}
+            </span>
+            {accessLabel ? (
+              <span className="truncate text-xs font-normal leading-tight text-gray-500 dark:text-gray-400">
+                {accessLabel}
+              </span>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <UserAvatar name={name} email={email} photoUrl={photoUrl} size="sm" />
+            <span className="hidden min-w-0 flex-col truncate sm:flex">
+              <span className="truncate font-medium text-gray-900 dark:text-gray-100">{displayName}</span>
+              {accessLabel ? (
+                <span className="truncate text-xs font-normal text-gray-500 dark:text-gray-400">{accessLabel}</span>
+              ) : null}
+            </span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-gray-500" />
+          </>
+        )}
       </button>
       {open ? (
         <div

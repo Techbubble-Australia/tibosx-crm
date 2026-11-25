@@ -40,7 +40,6 @@ import {
   Upload,
 } from "lucide-react";
 import { UserAccountMenu } from "@/components/UserAccountMenu";
-import { HelpSupportHeaderButton } from "@/components/HelpSupportHeaderButton";
 import { ImpersonationBanner } from "@/components/users/ImpersonationBanner";
 import { ImpersonateUserModal } from "@/components/users/ImpersonateUserModal";
 import { DebugModeGate } from "@/components/debug/DebugModeGate";
@@ -58,7 +57,6 @@ import { MemberProfileCompletionGate } from "@/components/onboarding/MemberProfi
 import { AppAlertProvider } from "@/components/ui/AppAlertProvider";
 import { TechBubbleLogo } from "@/components/TechBubbleLogo";
 import { InactivityLogout } from "@/components/InactivityLogout";
-import { TicketPortalLink } from "@/components/TicketPortalLink";
 import { TenantWorkspaceMenu } from "@/components/TenantWorkspaceMenu";
 import { GlobalCrmSearch } from "@/components/GlobalCrmSearch";
 import { isCareerApplicationsPath, isJobListingsPath } from "@/lib/job-routes";
@@ -593,19 +591,18 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
 
       <main className="min-w-0 flex-1 bg-gray-50 dark:bg-gray-950">
         <ImpersonationBanner />
-        <header className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900 sm:px-6 lg:px-8">
+        {/* Wireframe header: [TB] TechBubble Workspace ⌄ | Search… | Name / role */}
+        <header className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-2.5 dark:border-gray-700 dark:bg-gray-900 sm:gap-4 sm:px-6 lg:px-8">
           <TenantWorkspaceMenu
             showPersonalHome={showWorkspaceHome}
             personalHomeHref={personalHomeHref}
             showClientHome={isAdminHome || canAccessClientWorkspace}
-            accessLabel={accessLabel}
           />
           <GlobalCrmSearch />
-          <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-            <TicketPortalLink />
-            {!loading && email ? <HelpSupportHeaderButton /> : null}
+          <div className="ml-auto flex shrink-0 items-center">
             {!loading && email ? (
               <UserAccountMenu
+                variant="wireframe"
                 name={userName}
                 email={email}
                 photoUrl={profilePhotoUrl}
