@@ -390,9 +390,7 @@ export default function PipelinesSettingsPage() {
                   <div>
                     <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                       {pipeline.name}
-                      {pipeline.isDefault ? (
-                        <span className="ml-2 text-xs font-normal text-gray-500">(default)</span>
-                      ) : null}
+                      {pipeline.isDefault ? " (default)" : ""}
                     </h3>
                     <p className="text-xs text-gray-500">
                       {pipeline.kind}
@@ -403,19 +401,21 @@ export default function PipelinesSettingsPage() {
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50 dark:bg-gray-800">
+                    <thead>
                       <tr>
-                        <th className="px-4 py-2 text-left font-medium text-gray-600">Stage</th>
-                        <th className="px-4 py-2 text-left font-medium text-gray-600">Probability</th>
-                        <th className="px-4 py-2 text-left font-medium text-gray-600">
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Stage</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Probability</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">
                           Required to enter
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {/* NOTE: wireframe shows ⠿ drag handles for stage reordering. The stage API has no
+                        reorder endpoint yet (only `order` on create), so handles are intentionally omitted. */}
+                    <tbody>
                       {pipeline.stages.map((stage) => (
                         <tr key={stage.id}>
-                          <td className="px-4 py-2 text-gray-900 dark:text-gray-100">{stage.name}</td>
+                          <td className="px-4 py-2.5 text-gray-900 dark:text-gray-100">{stage.name}</td>
                           <td className="px-4 py-2">
                             <div className="flex items-center gap-1">
                               <input
@@ -447,12 +447,12 @@ export default function PipelinesSettingsPage() {
                                   if (Number.isNaN(next)) return;
                                   void updateWinProbability(stage, Math.min(100, Math.max(0, next)));
                                 }}
-                                className="w-16 rounded border border-gray-200 bg-white px-2 py-1 text-right tabular-nums dark:border-gray-600 dark:bg-gray-800"
+                                className="w-14 rounded border border-transparent bg-transparent px-1 py-1 text-right tabular-nums hover:border-gray-200 focus:border-gray-300 focus:bg-white focus:outline-none dark:hover:border-gray-600 dark:focus:bg-gray-800"
                               />
-                              <span className="text-xs text-gray-500">%</span>
+                              <span className="text-sm text-gray-500">%</span>
                             </div>
                           </td>
-                          <td className="px-4 py-2 text-xs text-gray-500">
+                          <td className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">
                             {requiredFieldsNote(stage.requiredFields)}
                           </td>
                         </tr>

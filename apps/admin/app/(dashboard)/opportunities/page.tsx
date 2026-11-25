@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Plus, Upload } from "lucide-react";
 import { OpportunitiesBoard } from "@/components/opportunities/OpportunitiesBoard";
 import { adminFetch } from "@/lib/admin-api";
+import { formatCrmMoney } from "@/lib/crm-format";
 
 type Opp = { amount: number; currency: string; probability: number | null; active: boolean; stageType: string | null };
 
@@ -27,7 +28,7 @@ export default function OpportunitiesIndexPage() {
   }, [rows]);
 
   function money(n: number) {
-    return `${summary.currency} ${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(n)}`;
+    return formatCrmMoney(n, summary.currency);
   }
 
   return (

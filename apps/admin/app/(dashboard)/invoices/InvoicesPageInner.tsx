@@ -3,7 +3,7 @@ import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, ChevronDown, ChevronUp, Pencil } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { adminFetch } from "@/lib/admin-api";
 import { ClientsOnlyGuard } from "@/components/ClientsOnlyGuard";
@@ -11,9 +11,10 @@ import { ViewModeToggle, type ViewMode } from "@/components/ui/ViewModeToggle";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { useListView } from "@/hooks/useListView";
 import { buildSearchHaystack } from "@/lib/search-text";
+import { formatCrmMoney } from "@/lib/crm-format";
+import { accountingPill, formatDayMonth, invoicePeriod, invoiceStatusChip } from "@/lib/invoice-display";
 import {
   CONTRACT_INVOICE_STATUSES,
-  CONTRACT_INVOICE_STATUS_COLORS,
   CONTRACT_INVOICE_STATUS_LABELS,
   type ContractInvoiceStatus,
 } from "@/lib/contract-invoice-status";
@@ -40,6 +41,7 @@ type InvoiceRow = {
   totalAmount: number;
   fileUrl: string | null;
   accountingSyncStatus?: string;
+  accountingProvider?: string | null;
 };
 
 type ClientOption = { id: string; name: string };
@@ -47,20 +49,34 @@ type ClientOption = { id: string; name: string };
 type SortKey = "dueDate" | "issueDate" | "invoiceNumber" | "clientName" | "totalAmount" | "status";
 
 function formatMoney(currency: string, amount: number) {
-  return `${currency} ${new Intl.NumberFormat("en-US").format(amount)}`;
+  return formatCrmMoney(amount, currency);
 }
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function toDateInputValue(value: string) {
-  const date = new Date(value);
-  const y = date.getUTCFullYear();
-  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(date.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+function monthKey(value: string) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
+
+function monthLabel(key: string) {
+  const [y, m] = key.split("-");
+  return new Date(Date.UTC(Number(y), Number(m) - 1, 1)).toLocaleDateString("en-AU", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function csvEscape(value: string) {
+  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+const filterSelectClass =
+  "rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100";
 
 function invoiceDetailHref(row: InvoiceRow) {
   return `/invoices/${row.id}`;
@@ -84,7 +100,7 @@ function SortHeader({
     <button
       type="button"
       onClick={() => onSort(sortKey)}
-      className="inline-flex items-center gap-1 font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
+      className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
     >
       {label}
       {active ? (dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />) : null}
@@ -103,9 +119,9 @@ export default function InvoicesPageInner() {
   const [sortKey, setSortKey] = useState<SortKey>("dueDate");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>("card");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [monthFilter, setMonthFilter] = useState("");
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
-  const [editingDueId, setEditingDueId] = useState<string | null>(null);
 
   async function patchInvoice(
     row: InvoiceRow,
@@ -158,9 +174,7 @@ export default function InvoicesPageInner() {
   useEffect(() => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (statusFilter) params.set("status", statusFilter);
     if (clientFilter) params.set("clientId", clientFilter);
-    if (dueFilter) params.set("due", dueFilter);
     params.set("sortBy", sortKey);
     params.set("sortDir", sortDir);
     void adminFetch(`/api/admin/invoices?${params.toString()}`)
@@ -168,9 +182,30 @@ export default function InvoicesPageInner() {
       .then((data) => setRows((data.data ?? []) as InvoiceRow[]))
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [statusFilter, clientFilter, dueFilter, sortKey, sortDir]);
+  }, [clientFilter, sortKey, sortDir]);
 
-  const filteredRows = useMemo(() => rows, [rows]);
+  const monthOptions = useMemo(
+    () => [...new Set(rows.map((row) => monthKey(row.issueDate)).filter(Boolean))].sort().reverse(),
+    [rows],
+  );
+
+  // KPIs summarise the client + month scope; status / overdue filters only narrow the table.
+  const scopeRows = useMemo(
+    () => (monthFilter ? rows.filter((row) => monthKey(row.issueDate) === monthFilter) : rows),
+    [rows, monthFilter],
+  );
+
+  const filteredRows = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return scopeRows.filter((row) => {
+      if (statusFilter && row.status !== statusFilter) return false;
+      if (dueFilter === "overdue") {
+        return row.status === "AWAITING_PAYMENT" && new Date(row.dueDate) < today;
+      }
+      return true;
+    });
+  }, [scopeRows, statusFilter, dueFilter]);
 
   const {
     page,
@@ -204,42 +239,74 @@ export default function InvoicesPageInner() {
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [paginated]);
 
-  const showAccounting = useMemo(
-    () => rows.some((row) => typeof row.accountingSyncStatus === "string"),
-    [rows],
-  );
 
   const kpis = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-    let draft = 0;
-    let awaiting = 0;
-    let overdue = 0;
-    let paidThisMonth = 0;
+    const draft = { amount: 0, count: 0 };
+    const awaiting = { amount: 0, count: 0 };
+    const overdue = { amount: 0, count: 0 };
+    const paid = { amount: 0, count: 0 };
     const currencies = new Set<string>();
-    for (const row of rows) {
+    for (const row of scopeRows) {
       currencies.add(row.currency || "AUD");
-      if (row.status === "DRAFT") draft += row.totalAmount;
-      if (row.status === "AWAITING_PAYMENT") {
-        awaiting += row.totalAmount;
-        const due = new Date(row.dueDate);
-        if (due < today) overdue += row.totalAmount;
+      if (row.status === "DRAFT") {
+        draft.amount += row.totalAmount;
+        draft.count += 1;
       }
-      if (row.status === "PAID") {
-        const paidAt = new Date(row.issueDate);
-        if (paidAt >= monthStart) paidThisMonth += row.totalAmount;
+      if (row.status === "AWAITING_PAYMENT") {
+        awaiting.amount += row.totalAmount;
+        awaiting.count += 1;
+        if (new Date(row.dueDate) < today) {
+          overdue.amount += row.totalAmount;
+          overdue.count += 1;
+        }
+      }
+      if (row.status === "PAID" && new Date(row.issueDate) >= monthStart) {
+        paid.amount += row.amount;
+        paid.count += 1;
       }
     }
     const currencyList = [...currencies];
-    const currencyLabel =
-      currencyList.length <= 1 ? currencyList[0] ?? "AUD" : `mixed (${currencyList.length})`;
-    return { draft, awaiting, overdue, paidThisMonth, currencyLabel };
-  }, [rows]);
+    const currency = currencyList.length === 1 ? currencyList[0]! : "AUD";
+    return { draft, awaiting, overdue, paid, currency, mixed: currencyList.length > 1 };
+  }, [scopeRows]);
+
+  function exportCsv() {
+    const header = ["No.", "Client", "Contract", "Period", "Issued", "Due", "Amount", "GST", "Total", "Status", "Accounting"];
+    const lines = [
+      header.join(","),
+      ...filteredRows.map((row) =>
+        [
+          row.invoiceNumber,
+          row.clientName,
+          row.contractNumber,
+          invoicePeriod(row),
+          formatDayMonth(row.issueDate),
+          formatDayMonth(row.dueDate),
+          String(row.amount),
+          String(row.taxAmount),
+          String(row.totalAmount),
+          CONTRACT_INVOICE_STATUS_LABELS[row.status] ?? row.status,
+          accountingPill(row.accountingSyncStatus, row.accountingProvider).label,
+        ]
+          .map(csvEscape)
+          .join(","),
+      ),
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "invoices.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, clientFilter, dueFilter, viewMode, setPage]);
+  }, [statusFilter, clientFilter, dueFilter, monthFilter, viewMode, setPage]);
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -253,78 +320,138 @@ export default function InvoicesPageInner() {
   return (
     <ClientsOnlyGuard>
       <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Invoices</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">All contract invoices across clients.</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {kpis.awaiting.count} awaiting payment
+              {" · "}
+              {formatMoney(kpis.currency, kpis.awaiting.amount)} owed
+              {" · "}
+              {kpis.draft.count} draft
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+            <button
+              type="button"
+              onClick={exportCsv}
+              disabled={filteredRows.length === 0}
+              className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
+            >
+              Export
+            </button>
             <Link
               href="/invoices/new?from=timesheets"
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
+              className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
             >
               Generate from timesheets
             </Link>
             <Link
               href="/invoices/new"
-              className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
+              className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
             >
-              <Plus className="h-4 w-4" />
-              Add invoice
+              + Invoice
             </Link>
           </div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { label: "Draft", value: kpis.draft },
-            { label: "Awaiting payment", value: kpis.awaiting },
-            { label: "Overdue", value: kpis.overdue },
-            { label: "Paid this month", value: kpis.paidThisMonth },
+            {
+              label: "Draft",
+              amount: kpis.draft.amount,
+              sub: `${kpis.draft.count} invoice${kpis.draft.count === 1 ? "" : "s"}`,
+              onClick: () => setStatusFilter(statusFilter === "DRAFT" ? "" : "DRAFT"),
+              active: statusFilter === "DRAFT",
+            },
+            {
+              label: "Awaiting payment",
+              amount: kpis.awaiting.amount,
+              sub: `${kpis.awaiting.count} invoice${kpis.awaiting.count === 1 ? "" : "s"}`,
+              onClick: () => setStatusFilter(statusFilter === "AWAITING_PAYMENT" ? "" : "AWAITING_PAYMENT"),
+              active: statusFilter === "AWAITING_PAYMENT",
+            },
+            {
+              label: "Overdue",
+              amount: kpis.overdue.amount,
+              sub: kpis.overdue.count === 0 ? "none" : `${kpis.overdue.count} invoice${kpis.overdue.count === 1 ? "" : "s"}`,
+              onClick: () => setDueFilter(dueFilter === "overdue" ? "" : "overdue"),
+              active: dueFilter === "overdue",
+            },
+            {
+              label: "Paid this month",
+              amount: kpis.paid.amount,
+              sub: "excl. GST",
+              onClick: () => setStatusFilter(statusFilter === "PAID" ? "" : "PAID"),
+              active: statusFilter === "PAID",
+            },
           ].map((kpi) => (
-            <div
+            <button
               key={kpi.label}
-              className="border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900"
+              type="button"
+              onClick={kpi.onClick}
+              className={`rounded-xl border bg-white px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800 ${
+                kpi.active ? "border-gray-900 dark:border-gray-100" : "border-gray-200 dark:border-gray-700"
+              }`}
             >
-              <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{kpi.label}</p>
-              <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                {formatMoney(kpis.currencyLabel, kpi.value)}
+              <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                {kpi.label}
               </p>
-            </div>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+                {formatMoney(kpis.currency, kpi.amount)}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {kpi.sub}
+                {kpis.mixed ? " · mixed currencies" : ""}
+              </p>
+            </button>
           ))}
         </div>
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <select
+            aria-label="Client"
             value={clientFilter}
             onChange={(e) => setClientFilter(e.target.value)}
-            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+            className={filterSelectClass}
           >
-            <option value="">All clients</option>
+            <option value="">Client: all</option>
             {clients.map((client) => (
               <option key={client.id} value={client.id}>{client.name}</option>
             ))}
           </select>
           <select
-            value={dueFilter}
-            onChange={(e) => setDueFilter(e.target.value)}
-            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-          >
-            <option value="">All due dates</option>
-            <option value="overdue">Overdue</option>
-            <option value="due_this_month">Due this month</option>
-          </select>
-          <select
+            aria-label="Status"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+            className={filterSelectClass}
           >
-            <option value="">All statuses</option>
+            <option value="">Status: all</option>
             {CONTRACT_INVOICE_STATUSES.map((status) => (
               <option key={status} value={status}>{CONTRACT_INVOICE_STATUS_LABELS[status]}</option>
             ))}
           </select>
+          <select
+            aria-label="Month"
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+            className={filterSelectClass}
+          >
+            <option value="">Month: all</option>
+            {monthOptions.map((key) => (
+              <option key={key} value={key}>Month: {monthLabel(key)}</option>
+            ))}
+          </select>
+          {dueFilter === "overdue" ? (
+            <button
+              type="button"
+              onClick={() => setDueFilter("")}
+              className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400"
+            >
+              Overdue only ×
+            </button>
+          ) : null}
         </div>
 
         {loading ? (
@@ -351,8 +478,6 @@ export default function InvoicesPageInner() {
                   </div>
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {clientRows.map((row) => {
-                      const colors =
-                        CONTRACT_INVOICE_STATUS_COLORS[row.status] ?? CONTRACT_INVOICE_STATUS_COLORS.DRAFT;
                       return (
                         <article
                           key={row.id}
@@ -366,7 +491,7 @@ export default function InvoicesPageInner() {
                               {row.invoiceNumber}
                             </Link>
                             <span
-                              className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`}
+                              className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${invoiceStatusChip(row.status)}`}
                             >
                               {CONTRACT_INVOICE_STATUS_LABELS[row.status]}
                             </span>
@@ -409,121 +534,90 @@ export default function InvoicesPageInner() {
         ) : (
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
             <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px] text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+            <table className="w-full min-w-[960px] text-sm">
+              <thead className="border-b border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
                 <tr>
                   <th className="whitespace-nowrap px-4 py-3 text-left">
-                    <SortHeader label="Invoice" sortKey="invoiceNumber" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                    <SortHeader label="No." sortKey="invoiceNumber" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                   </th>
-                  <th className="max-w-[200px] px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Contract</th>
-                  <th className="max-w-[240px] px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Description</th>
                   <th className="px-4 py-3 text-left">
                     <SortHeader label="Client" sortKey="clientName" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Contract</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Period</th>
                   <th className="whitespace-nowrap px-4 py-3 text-left">
-                    <SortHeader label="Issue date" sortKey="issueDate" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                    <SortHeader label="Issued" sortKey="issueDate" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                   </th>
                   <th className="whitespace-nowrap px-4 py-3 text-left">
                     <SortHeader label="Due" sortKey="dueDate" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                   </th>
                   <th className="px-4 py-3 text-left">
+                    <SortHeader label="Amount" sortKey="totalAmount" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                  </th>
+                  <th className="px-4 py-3 text-left">
                     <SortHeader label="Status" sortKey="status" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                   </th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Amount</th>
-                  <th className="px-4 py-3 text-left">
-                    <SortHeader label="Total" sortKey="totalAmount" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                  </th>
-                  {showAccounting ? (
-                    <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Accounting</th>
-                  ) : null}
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Accounting</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={showAccounting ? 10 : 9} className="px-4 py-8 text-center text-gray-400">No invoices found.</td>
+                    <td colSpan={9} className="px-4 py-8 text-center text-gray-400">No invoices found.</td>
                   </tr>
                 ) : (
                   paginated.map((row) => {
-                    const colors = CONTRACT_INVOICE_STATUS_COLORS[row.status] ?? CONTRACT_INVOICE_STATUS_COLORS.DRAFT;
+                    const pill = accountingPill(row.accountingSyncStatus, row.accountingProvider);
                     return (
                       <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <td className="whitespace-nowrap px-4 py-3">
                           <Link
                             href={invoiceDetailHref(row)}
-                            className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                            className="font-medium text-gray-900 hover:text-blue-600 hover:underline dark:text-gray-100 dark:hover:text-blue-400"
                           >
                             {row.invoiceNumber}
                           </Link>
                         </td>
-                        <td className="max-w-[200px] px-4 py-3 text-gray-600 dark:text-gray-400">
-                          <span className="block truncate" title={`${row.contractNumber} — ${row.contractTitle}`}>
-                            {row.contractNumber} — {row.contractTitle}
-                          </span>
-                        </td>
-                        <td className="max-w-[240px] px-4 py-3 text-gray-600 dark:text-gray-400">
-                          {row.description ? (
-                            <Link
-                              href={invoiceDetailHref(row)}
-                              className="line-clamp-2 text-blue-600 hover:underline dark:text-blue-400"
-                              title={row.description}
-                            >
-                              {row.description}
-                            </Link>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.clientName}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
-                          {formatDate(row.issueDate)}
-                        </td>
+                        <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{row.clientName}</td>
                         <td className="whitespace-nowrap px-4 py-3">
-                          {editingDueId === row.id ? (
-                            <input
-                              type="date"
-                              value={toDateInputValue(row.dueDate)}
-                              disabled={updatingInvoiceId === row.id}
-                              autoFocus
-                              onChange={(e) => void patchInvoice(row, { dueDate: e.target.value })}
-                              onBlur={() => setEditingDueId(null)}
-                              className="rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-                            />
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
-                              {formatDate(row.dueDate)}
-                              <button
-                                type="button"
-                                onClick={() => setEditingDueId(row.id)}
-                                className="rounded p-0.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100"
-                                aria-label={`Edit due date for ${row.invoiceNumber}`}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
-                            </span>
-                          )}
+                          <Link
+                            href={`/contracts/${row.contractId}`}
+                            title={row.contractTitle}
+                            className="text-gray-700 hover:text-blue-600 hover:underline dark:text-gray-300 dark:hover:text-blue-400"
+                          >
+                            {row.contractNumber}
+                          </Link>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-gray-300">{invoicePeriod(row)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-gray-300">
+                          {formatDayMonth(row.issueDate)}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-gray-300">
+                          {formatDayMonth(row.dueDate)}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 tabular-nums text-gray-700 dark:text-gray-300">
+                          {formatMoney(row.currency, row.amount)}
                         </td>
                         <td className="px-4 py-3">
                           <select
                             value={row.status}
                             disabled={updatingInvoiceId === row.id}
+                            aria-label={`Status for ${row.invoiceNumber}`}
                             onChange={(e) =>
                               void patchInvoice(row, { status: e.target.value as ContractInvoiceStatus })
                             }
-                            className={`rounded-full border-0 px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`}
+                            className={`cursor-pointer appearance-none rounded-full border-0 px-2.5 py-0.5 text-xs font-medium ${invoiceStatusChip(row.status)}`}
                           >
                             {CONTRACT_INVOICE_STATUSES.map((value) => (
                               <option key={value} value={value}>{CONTRACT_INVOICE_STATUS_LABELS[value]}</option>
                             ))}
                           </select>
                         </td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.amount)}</td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.totalAmount)}</td>
-                        {showAccounting ? (
-                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                            {(row.accountingSyncStatus ?? "NOT_SYNCED").replace(/_/g, " ").toLowerCase()}
-                          </td>
-                        ) : null}
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${pill.className}`}>
+                            {pill.label}
+                          </span>
+                        </td>
                       </tr>
                     );
                   })

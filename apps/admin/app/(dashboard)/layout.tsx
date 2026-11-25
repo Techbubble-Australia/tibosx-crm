@@ -395,14 +395,14 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
     canAccessClientWorkspace;
   const isAdminHome = anyEffectiveRole(role, additionalRoles, ["admin"]);
   const hasSalesCrm = anyEffectiveRole(role, additionalRoles, ["admin", "sales"]);
-  /** Wireframe Home for Sales is My day; others keep personal workspace. */
+  /** Wireframe Home for Sales is My day (PDF p2); Sales → Dashboard is pipeline KPIs (PDF p1). */
   const personalHomeHref = hasSalesCrm ? "/sales/my-day" : workspaceNavItem.href;
   /** Admins default to Client; non-admin internals to Personal; clients to Client. */
   const workspaceHomeHref = clientHome || isAdminHome ? "/workspace/client" : personalHomeHref;
   const showWorkspaceHome =
     !loading && (clientHome || (role !== "client" && !isRestrictedToWorkspaceOnly(role, additionalRoles)));
-  const onPersonalHome =
-    pathUnder("/my-workspace", pathname) || pathUnder("/sales/my-day", pathname);
+  /** Do not treat Sales → Dashboard as Personal Home active — wireframe highlights Dashboard under Sales. */
+  const onPersonalHome = pathUnder("/my-workspace", pathname) || pathUnder("/sales/my-day", pathname);
   const onClientHome = pathUnder("/workspace/client", pathname);
   /** Single Home nav item; Personal/Client switching is only on the Home pages. */
   const workspaceHomeActive = onPersonalHome || onClientHome;

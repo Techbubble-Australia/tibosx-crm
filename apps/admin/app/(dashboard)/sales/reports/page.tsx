@@ -34,16 +34,30 @@ function pct(rate: number) {
   return `${Math.round(rate * 100)}%`;
 }
 
-function money(value: number) {
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
+function ReportCard({
+  title,
+  empty,
+  children,
+}: {
+  title: string;
+  empty: string;
+  children: React.ReactNode;
+}) {
+  const hasRows = Array.isArray(children) ? children.length > 0 : Boolean(children);
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+      <h3 className="mb-3 font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
+      {hasRows ? <ul className="space-y-2 text-sm">{children}</ul> : <p className="text-sm text-gray-400">{empty}</p>}
+    </section>
+  );
 }
 
-function Tile({ label, value }: { label: string; value: string | number }) {
+function ReportRow({ label, value }: { label: string; value: string | number | null }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
-      <p className="mt-2 text-3xl font-bold tabular-nums text-gray-900 dark:text-gray-100">{value}</p>
-    </div>
+    <li className="flex items-start justify-between gap-3">
+      <span className="text-gray-700 dark:text-gray-300">{label}</span>
+      <span className="tabular-nums text-gray-900 dark:text-gray-100">{value}</span>
+    </li>
   );
 }
 
@@ -82,7 +96,7 @@ export default function SalesReportsPage() {
 
   return (
     <ClientsOnlyGuard>
-      <div className="space-y-8">
+      <div className="space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Reports</h2>
@@ -106,135 +120,41 @@ export default function SalesReportsPage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-              <Tile label="Open deals" value={data.tiles.openDeals} />
-              <Tile label="Won deals" value={data.tiles.wonDeals} />
-              <Tile label="Lost deals" value={data.tiles.lostDeals} />
-              <Tile label="Win rate" value={pct(data.tiles.winRate)} />
-              <Tile label="Pipeline value" value={money(data.tiles.pipelineValue)} />
-              <Tile label="Won value" value={money(data.tiles.wonValue)} />
-              <Tile label="New leads" value={data.tiles.newLeads} />
+            <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-3">
+              <ReportCard title="Win rate by source" empty="No lead source data.">
+                {data.winRateBySource.map((row) => (
+                  <ReportRow key={row.source} label={row.source} value={pct(row.rate)} />
+                ))}
+              </ReportCard>
+
+              {/* API returns all-time lost reasons; wireframe title says 90 days. TODO: filter server-side. */}
+              <ReportCard title="Lost reasons, 90 days" empty="No lost deals.">
+                {data.lostReasons.map((row) => (
+                  <ReportRow key={row.reason} label={row.reason} value={row.count} />
+                ))}
+              </ReportCard>
+
+              <ReportCard title="Stage conversion" empty="No stages configured.">
+                {stageRows
+                  .filter((row) => row.conversionLabel != null)
+                  .map((row) => (
+                    <ReportRow
+                      key={`${row.stageId}-conv`}
+                      label={row.toLabel}
+                      value={row.conversionLabel}
+                    />
+                  ))}
+              </ReportCard>
             </div>
 
-            <section className="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-              <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100">Win rate by source</h3>
-              </div>
+            <section className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-800">
+                  <thead className="border-b border-gray-100 dark:border-gray-800">
                     <tr>
-                      <th className="px-4 py-2 text-left font-medium text-gray-600">Source</th>
-                      <th className="px-4 py-2 text-right font-medium text-gray-600">Total</th>
-                      <th className="px-4 py-2 text-right font-medium text-gray-600">Converted</th>
-                      <th className="px-4 py-2 text-right font-medium text-gray-600">Rate</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {data.winRateBySource.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-4 py-6 text-center text-gray-400">
-                          No lead source data.
-                        </td>
-                      </tr>
-                    ) : (
-                      data.winRateBySource.map((row) => (
-                        <tr key={row.source}>
-                          <td className="px-4 py-2 text-gray-900 dark:text-gray-100">{row.source}</td>
-                          <td className="px-4 py-2 text-right tabular-nums text-gray-600">{row.total}</td>
-                          <td className="px-4 py-2 text-right tabular-nums text-gray-600">{row.converted}</td>
-                          <td className="px-4 py-2 text-right tabular-nums text-gray-600">{pct(row.rate)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <section className="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-                <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-                  <h3 className="font-semibold text-gray-900 dark:text-gray-100">Lost reasons</h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 dark:bg-gray-800">
-                      <tr>
-                        <th className="px-4 py-2 text-left font-medium text-gray-600">Reason</th>
-                        <th className="px-4 py-2 text-right font-medium text-gray-600">Count</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                      {data.lostReasons.length === 0 ? (
-                        <tr>
-                          <td colSpan={2} className="px-4 py-6 text-center text-gray-400">
-                            No lost deals.
-                          </td>
-                        </tr>
-                      ) : (
-                        data.lostReasons.map((row) => (
-                          <tr key={row.reason}>
-                            <td className="px-4 py-2 text-gray-900 dark:text-gray-100">{row.reason}</td>
-                            <td className="px-4 py-2 text-right tabular-nums text-gray-600">{row.count}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-
-              <section className="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-                <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-                  <h3 className="font-semibold text-gray-900 dark:text-gray-100">Stage conversion</h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 dark:bg-gray-800">
-                      <tr>
-                        <th className="px-4 py-2 text-left font-medium text-gray-600">Transition</th>
-                        <th className="px-4 py-2 text-right font-medium text-gray-600">From deals</th>
-                        <th className="px-4 py-2 text-right font-medium text-gray-600">Conversion</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                      {stageRows.filter((row) => row.conversionLabel != null).length === 0 ? (
-                        <tr>
-                          <td colSpan={3} className="px-4 py-6 text-center text-gray-400">
-                            No stages configured.
-                          </td>
-                        </tr>
-                      ) : (
-                        stageRows
-                          .filter((row) => row.conversionLabel != null)
-                          .map((row) => (
-                            <tr key={`${row.stageId}-conv`}>
-                              <td className="px-4 py-2 text-gray-900 dark:text-gray-100">{row.toLabel}</td>
-                              <td className="px-4 py-2 text-right tabular-nums text-gray-600">{row.count}</td>
-                              <td className="px-4 py-2 text-right tabular-nums font-medium text-gray-900 dark:text-gray-100">
-                                {row.conversionLabel}
-                              </td>
-                            </tr>
-                          ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            </div>
-
-            <section className="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-              <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100">Saved reports</h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-800">
-                    <tr>
-                      <th className="px-4 py-2 text-left font-medium text-gray-600">Saved report</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-600">Owner</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-600">Schedule</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Saved report</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Owner</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Schedule</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -247,9 +167,11 @@ export default function SalesReportsPage() {
                     ) : (
                       savedReports.map((row) => (
                         <tr key={row.id}>
-                          <td className="px-4 py-2 text-gray-900 dark:text-gray-100">{row.name}</td>
-                          <td className="px-4 py-2 text-gray-600">{row.owner ?? "—"}</td>
-                          <td className="px-4 py-2 text-gray-600">{row.schedule ?? (row.kind === "built_in" ? "Built-in" : "None")}</td>
+                          <td className="px-4 py-3 text-gray-900 dark:text-gray-100">{row.name}</td>
+                          <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{row.owner ?? "—"}</td>
+                          <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                            {row.schedule ?? (row.kind === "built_in" ? "Built-in" : "None")}
+                          </td>
                         </tr>
                       ))
                     )}

@@ -9,7 +9,6 @@ import { ClientsOnlyGuard } from "@/components/ClientsOnlyGuard";
 import { SALES_CURRENCIES } from "@/lib/opportunity-status";
 import {
   CONTRACT_INVOICE_STATUSES,
-  CONTRACT_INVOICE_STATUS_COLORS,
   CONTRACT_INVOICE_STATUS_LABELS,
   type ContractInvoiceStatus,
 } from "@/lib/contract-invoice-status";
@@ -23,8 +22,8 @@ import {
   invoiceLinesSubtotal,
   type InvoiceLineDraft,
 } from "@/components/invoices/InvoiceLineItemsEditor";
-import { InvoiceActivityLogSection } from "@/components/invoices/InvoiceActivityLogSection";
-import type { InvoiceActivityLogEntry } from "@/lib/invoice-activity";
+import { formatInvoiceActivitySummary, type InvoiceActivityLogEntry } from "@/lib/invoice-activity";
+import { accountingPill, formatDayMonth, invoicePeriod, invoiceStatusChip } from "@/lib/invoice-display";
 
 type InvoiceDetail = {
   id: string;
@@ -54,6 +53,7 @@ type InvoiceDetail = {
   defaultCurrency: string;
   activityLogs?: InvoiceActivityLogEntry[];
   accountingSyncStatus?: string | null;
+  accountingProvider?: string | null;
   contractRemaining?: number | null;
   poNumber?: string | null;
   timesheetApproved?: boolean | null;
@@ -71,7 +71,9 @@ function toDateInputValue(value: string) {
 }
 
 function formatMoney(currency: string, amount: number) {
-  return `${currency} ${new Intl.NumberFormat("en-US").format(amount)}`;
+  const code = (currency || "AUD").toUpperCase();
+  const n = new Intl.NumberFormat("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
+  return code === "AUD" ? `A$${n}` : `${code} ${n}`;
 }
 
 function computePreview(amount: number, taxRate: number) {
@@ -282,94 +284,222 @@ export default function InvoiceDetailPage() {
     );
   }
 
-  const statusColors = CONTRACT_INVOICE_STATUS_COLORS[row.status] ?? CONTRACT_INVOICE_STATUS_COLORS.DRAFT;
+  const pill = accountingPill(accountingSyncStatus, row.accountingProvider);
+  const baseButton =
+    "rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800";
+  const periodLabel = invoicePeriod({ description: row.description, issueDate: row.issueDate });
+  const lineRows = lines
+    .filter((l) => l.description.trim() || Number.parseFloat(l.rate))
+    .map((l) => {
+      const qty = Number.parseFloat(l.qty) || 0;
+      const rate = Number.parseFloat(l.rate) || 0;
+      return { description: l.description, qty, rate, amount: qty * rate };
+    });
+  const history = row.activityLogs ?? [];
+  const cardClass = "rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900";
 
   return (
     <ClientsOnlyGuard>
-      <div className="mx-auto max-w-3xl space-y-6">
-        <div>
-          <Link href="/invoices" className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400">
-            <ArrowLeft className="h-4 w-4" />
-            Back to invoices
-          </Link>
-          <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{row.invoiceNumber}</h1>
-              <p className="text-sm text-gray-500">
-                {row.clientName} ·{" "}
-                <Link href={`/contracts/${row.contractId}`} className="text-sky-600 hover:underline">
-                  {row.contractNumber} — {row.contractTitle}
-                </Link>
-              </p>
-              {accountingSyncStatus ? (
-                <p className="mt-1 text-xs text-gray-400">
-                  Accounting: {accountingSyncStatus.replace(/_/g, " ").toLowerCase()}
+      <div className="max-w-6xl space-y-4">
+        <section className={cardClass}>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <Link
+                href="/invoices"
+                className="mt-0.5 rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 print:hidden"
+                aria-label="Back to invoices"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+              <div className="min-w-0">
+                <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
+                  {row.invoiceNumber}
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${invoiceStatusChip(row.status)}`}>
+                    {CONTRACT_INVOICE_STATUS_LABELS[row.status]}
+                  </span>
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${pill.className}`}>{pill.label}</span>
+                </h1>
+                <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+                  {row.clientName} ·{" "}
+                  <Link href={`/contracts/${row.contractId}`} className="hover:text-blue-600 hover:underline">
+                    {row.contractNumber}
+                  </Link>{" "}
+                  · {periodLabel} · Issue {formatDayMonth(row.issueDate)}, due {formatDayMonth(row.dueDate)}
                 </p>
-              ) : null}
+              </div>
             </div>
-            <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusColors.bg} ${statusColors.text}`}>
-              {CONTRACT_INVOICE_STATUS_LABELS[row.status]}
-            </span>
+            <div className="flex flex-wrap gap-2 print:hidden">
+              <button type="button" onClick={handlePreviewPdf} className={`${baseButton} inline-flex items-center gap-1.5`}>
+                <Printer className="h-4 w-4" />
+                Preview PDF
+              </button>
+              <button
+                type="button"
+                disabled={actionBusy}
+                onClick={() => void handleSendToAccounting()}
+                className={baseButton}
+              >
+                Send to accounting
+              </button>
+              <button
+                type="button"
+                disabled={actionBusy || status !== "DRAFT"}
+                onClick={() => void handleApproveAndSend()}
+                className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+              >
+                Approve and send
+              </button>
+            </div>
           </div>
-          <div className="mt-4 flex flex-wrap gap-2 print:hidden">
-            <button
-              type="button"
-              onClick={handlePreviewPdf}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
-            >
-              <Printer className="h-4 w-4" />
-              Preview PDF
-            </button>
-            <button
-              type="button"
-              disabled={actionBusy}
-              onClick={() => void handleSendToAccounting()}
-              className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
-            >
-              Send to accounting
-            </button>
-            <button
-              type="button"
-              disabled={actionBusy || status !== "DRAFT"}
-              onClick={() => void handleApproveAndSend()}
-              className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-200"
-            >
-              Approve and send
-            </button>
+        </section>
+
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <section className={`${cardClass} min-w-0 self-start`}>
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100">Lines</h3>
+            <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+              Currency {currency}. Foreign rates, when used, show the rate and date.
+            </p>
+            <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+              <table className="w-full min-w-[420px] text-sm">
+                <thead className="text-left text-xs text-gray-500 dark:text-gray-400">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Description</th>
+                    <th className="px-3 py-2 font-medium">Qty</th>
+                    <th className="px-3 py-2 font-medium">Rate</th>
+                    <th className="px-3 py-2 text-right font-medium">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lineRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-4 text-center text-gray-400">
+                        No lines yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    lineRows.map((line, index) => (
+                      <tr key={index} className="border-t border-gray-100 dark:border-gray-800">
+                        <td className="px-3 py-2.5 text-gray-900 dark:text-gray-100">{line.description}</td>
+                        <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-gray-700 dark:text-gray-300">
+                          {line.qty}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-gray-700 dark:text-gray-300">
+                          {formatMoney(currency, line.rate)}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-gray-900 dark:text-gray-100">
+                          {formatMoney(currency, line.amount)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <dl className="mt-3 space-y-1 text-right text-sm text-gray-700 dark:text-gray-300">
+              <div>
+                <dt className="mr-2 inline">Subtotal</dt>
+                <dd className="inline tabular-nums">{formatMoney(currency, preview.amount)}</dd>
+              </div>
+              <div>
+                <dt className="mr-2 inline">GST {Number.parseFloat(taxRate) || 0}%</dt>
+                <dd className="inline tabular-nums">{formatMoney(currency, preview.taxAmount)}</dd>
+              </div>
+              <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                <dt className="mr-2 inline">Total</dt>
+                <dd className="inline tabular-nums">{formatMoney(currency, preview.totalAmount)}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <div className="space-y-4 print:hidden">
+            <section className={cardClass}>
+              <h3 className="mb-3 font-semibold text-gray-900 dark:text-gray-100">Source</h3>
+              <dl className="space-y-2.5 text-sm">
+                {typeof row.timesheetApproved === "boolean" ? (
+                  <div>
+                    <dt className="text-xs text-gray-500 dark:text-gray-400">Timesheet</dt>
+                    <dd>
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                          row.timesheetApproved
+                            ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                            : "bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                        }`}
+                      >
+                        {row.timesheetApproved ? "Approved" : "Not approved"}
+                      </span>
+                    </dd>
+                  </div>
+                ) : null}
+                <div>
+                  <dt className="text-xs text-gray-500 dark:text-gray-400">Contract</dt>
+                  <dd className="text-gray-900 dark:text-gray-100">
+                    <Link href={`/contracts/${row.contractId}`} className="text-blue-600 hover:underline dark:text-blue-400">
+                      {row.contractNumber}
+                    </Link>
+                    {typeof row.contractRemaining === "number"
+                      ? `, ${formatMoney(currency, row.contractRemaining)} remaining${
+                          row.status === "DRAFT" ? " before this invoice" : ""
+                        }`
+                      : ""}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500 dark:text-gray-400">PO number</dt>
+                  <dd className="text-gray-900 dark:text-gray-100">
+                    {row.poNumber ? `${row.poNumber}, printed on invoice` : <span className="text-gray-400">Not set</span>}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            <section className={cardClass}>
+              <h3 className="mb-3 font-semibold text-gray-900 dark:text-gray-100">Checks before sending</h3>
+              <ul className="flex flex-wrap gap-2">
+                {checks.map((check) => (
+                  <li
+                    key={check.id}
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
+                      check.ok
+                        ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                        : "bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                    }`}
+                  >
+                    {check.ok ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                    {check.label}
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            <section className={cardClass}>
+              <h3 className="mb-3 font-semibold text-gray-900 dark:text-gray-100">History</h3>
+              {history.length === 0 ? (
+                <p className="text-sm text-gray-400">No activity recorded yet.</p>
+              ) : (
+                <ul className="space-y-1.5 text-sm text-gray-900 dark:text-gray-100">
+                  {history.slice(0, 8).map((log) => (
+                    <li key={log.id}>
+                      <span className="text-gray-500 dark:text-gray-400">{formatDayMonth(log.createdAt)}: </span>
+                      {formatInvoiceActivitySummary(log)}
+                      {log.performedByName ? (
+                        <span className="text-gray-500 dark:text-gray-400"> by {log.performedByName}</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           </div>
         </div>
 
-        <section className="rounded-xl border border-gray-200 bg-white p-4 print:hidden dark:border-gray-700 dark:bg-gray-900">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Checks before sending</h3>
-          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-            {checks.map((check) => (
-              <li
-                key={check.id}
-                className="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 text-sm dark:border-gray-800"
-              >
-                <span
-                  className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${
-                    check.ok
-                      ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
-                      : "bg-gray-100 text-gray-400 dark:bg-gray-800"
-                  }`}
-                >
-                  {check.ok ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
-                </span>
-                <span className={check.ok ? "text-gray-900 dark:text-gray-100" : "text-gray-500"}>
-                  {check.label}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        {!fieldsEditable ? (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40">
-            Set status to <strong>Draft</strong> to edit all invoice fields. You can still change status and due date below.
-          </p>
-        ) : null}
-
+        <div className="max-w-3xl space-y-4 print:hidden">
+          {!fieldsEditable ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40">
+              Set status to <strong>Draft</strong> to edit all invoice fields. You can still change status and due date below.
+            </p>
+          ) : null}
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100">Edit invoice</h3>
         <form onSubmit={handleSave} className="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -443,8 +573,6 @@ export default function InvoiceDetailPage() {
             </Link>
           </div>
         </form>
-        <div className="mt-6">
-          <InvoiceActivityLogSection logs={row.activityLogs ?? []} />
         </div>
       </div>
     </ClientsOnlyGuard>

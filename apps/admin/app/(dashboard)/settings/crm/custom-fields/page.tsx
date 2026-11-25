@@ -30,6 +30,30 @@ const FIELD_TYPES = ["text", "number", "date", "select", "boolean"] as const;
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
 
+/** "select" with options -> "Pick list: A, B"; others -> friendly label. */
+function typeLabel(row: CustomField) {
+  switch (row.fieldType) {
+    case "select":
+      return row.options?.length ? `Pick list: ${row.options.join(", ")}` : "Pick list";
+    case "boolean":
+      return "Yes/No";
+    case "number":
+      return "Number";
+    case "date":
+      return "Date";
+    default:
+      return "Text";
+  }
+}
+
+/**
+ * No per-field usage tracking exists yet. Per the Rules note, active fields appear on the record
+ * detail, imports/exports and reports; inactive fields are hidden everywhere.
+ */
+function usedIn(row: CustomField) {
+  return row.active ? "Detail, import/export, reports" : "Hidden";
+}
+
 export default function CustomFieldsPage() {
   const [rows, setRows] = useState<CustomField[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,7 +173,7 @@ export default function CustomFieldsPage() {
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-1 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex flex-wrap gap-2">
           {ENTITY_TABS.map((tab) => {
             const active = entityFilter === tab.value;
             return (
@@ -157,10 +181,10 @@ export default function CustomFieldsPage() {
                 key={tab.value}
                 type="button"
                 onClick={() => setEntityFilter(tab.value)}
-                className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
                   active
-                    ? "border-black text-gray-900 dark:border-white dark:text-gray-100"
-                    : "border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+                    ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                 }`}
               >
                 {tab.label}
@@ -267,19 +291,20 @@ export default function CustomFieldsPage() {
         ) : (
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
             <table className="w-full text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+              <thead className="border-b border-gray-100 dark:border-gray-800">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Field</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Type</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Required</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Active</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Field</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Required</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Used in</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Active</th>
                   <th className="px-4 py-3 text-right font-medium text-gray-600">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                       No custom fields for {ENTITY_TABS.find((t) => t.value === entityFilter)?.label ?? entityFilter}.
                     </td>
                   </tr>
@@ -287,11 +312,12 @@ export default function CustomFieldsPage() {
                   rows.map((row) => (
                     <tr key={row.id}>
                       <td className="px-4 py-3">
-                        <p className="font-medium text-gray-900 dark:text-gray-100">{row.label}</p>
-                        <p className="font-mono text-xs text-gray-500">{row.key}</p>
+                        <p className="text-gray-900 dark:text-gray-100">{row.label}</p>
+                        <p className="font-mono text-[11px] text-gray-400" title="Field key">{row.key}</p>
                       </td>
-                      <td className="px-4 py-3 text-gray-600">{row.fieldType}</td>
-                      <td className="px-4 py-3 text-gray-600">{row.required ? "Yes" : "No"}</td>
+                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{typeLabel(row)}</td>
+                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{row.required ? "Yes" : "No"}</td>
+                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{usedIn(row)}</td>
                       <td className="px-4 py-3">
                         <button
                           type="button"
@@ -317,6 +343,14 @@ export default function CustomFieldsPage() {
             </table>
           </div>
         )}
+
+        <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100">Rules</h3>
+          <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
+            Fields are stored per workspace, appear in imports and exports, and can be used in saved
+            views and reports. Up to 50 per object on the standard plan.
+          </p>
+        </section>
       </div>
     </ClientsOnlyGuard>
   );

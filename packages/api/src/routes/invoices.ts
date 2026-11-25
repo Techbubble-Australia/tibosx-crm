@@ -18,6 +18,14 @@ function endOfUtcMonth(date = new Date()): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 23, 59, 59, 999));
 }
 
+/** Contracts have no dedicated PO field yet: pick "PO 123456" out of the comments. */
+function extractPoNumber(comments: string | null | undefined): string | null {
+  const match = /(?:\bPO\b|\bP\.O\.|\bpurchase order\b)(?:\s*(?:no\.?|number|#))?\s*[:#-]?\s*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,})/i.exec(
+    comments ?? "",
+  );
+  return match?.[1] ?? null;
+}
+
 const SORT_FIELDS = ["dueDate", "issueDate", "invoiceNumber", "clientName", "totalAmount", "status"] as const;
 type SortField = (typeof SORT_FIELDS)[number];
 
@@ -108,6 +116,7 @@ router.get("/", async (req, res) => {
         totalAmount: toNumber(row.totalAmount),
         fileUrl: row.fileUrl,
         accountingSyncStatus: row.accountingSyncStatus,
+        accountingProvider: row.accountingProvider,
       })),
     });
   } catch (error) {
@@ -128,7 +137,13 @@ router.get("/:id", async (req, res) => {
             title: true,
             status: true,
             currency: true,
-            client: { select: { id: true, name: true } },
+            contractValue: true,
+            totalVariation: true,
+            consumed: true,
+            comments: true,
+            fileUrls: true,
+            opportunity: { select: { contact: { select: { email: true } } } },
+            client: { select: { id: true, name: true, contacts: { select: { email: true }, orderBy: { order: "asc" }, take: 5 } } },
           },
         },
         activityLogs: {
@@ -165,6 +180,17 @@ router.get("/:id", async (req, res) => {
         lineItems: invoiceLineItems(row),
         files: invoiceFiles(row),
         defaultCurrency: row.contract.currency,
+        accountingSyncStatus: row.accountingSyncStatus,
+        accountingProvider: row.accountingProvider,
+        contractRemaining:
+          toNumber(row.contract.contractValue) +
+          toNumber(row.contract.totalVariation) -
+          toNumber(row.contract.consumed),
+        poNumber: extractPoNumber(row.contract.comments),
+        contactEmail:
+          row.contract.opportunity?.contact?.email ??
+          row.contract.client.contacts.find((c) => c.email.includes("@"))?.email ??
+          null,
         activityLogs: row.activityLogs.map(serializeInvoiceActivityLog),
       },
     });

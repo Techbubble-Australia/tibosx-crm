@@ -4,8 +4,9 @@ import { appAlert, appConfirm } from "@/lib/app-alert";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Download, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
+import { formatCrmMoney } from "@/lib/crm-format";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { ViewModeToggle, type ViewMode } from "@/components/ui/ViewModeToggle";
@@ -19,8 +20,8 @@ import {
 import { CONTRACT_ACTIVE_STATUSES, CONTRACT_INACTIVE_STATUSES } from "@/lib/contract-groups";
 import { CONTRACT_TYPES, CONTRACT_TYPE_LABELS, type ContractType } from "@/lib/contract-types";
 
-const filterInputClass =
-  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
+const filterSelectClass =
+  "rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100";
 
 interface ContractRow {
   id: string;
@@ -41,6 +42,7 @@ interface ContractRow {
   remaining: number;
   ownerId: string | null;
   ownerName: string;
+  poNumber?: string | null;
   latestVariationStartDate?: string | null;
   latestVariationEndDate?: string | null;
 }
@@ -87,7 +89,7 @@ function SortHeader({
     <button
       type="button"
       onClick={() => onSort(sortKey)}
-      className="inline-flex items-center gap-1 font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
+      className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
     >
       {label}
       {active ? (dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />) : null}
@@ -96,26 +98,73 @@ function SortHeader({
 }
 
 function formatMoney(currency: string, amount: number) {
-  return `${currency} ${new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount)}`;
+  const sign = amount < 0 ? "-" : "";
+  return `${sign}${formatCrmMoney(Math.abs(amount), currency)}`;
+}
+
+/** A$1.98M / A$412K / A$950 for the page subtitle. */
+function formatCompactMoney(currency: string, amount: number) {
+  const prefix = (currency || "AUD").toUpperCase() === "AUD" ? "A$" : `${currency.toUpperCase()} `;
+  const abs = Math.abs(amount);
+  if (abs >= 1_000_000) return `${prefix}${Number((abs / 1_000_000).toFixed(2))}M`;
+  if (abs >= 10_000) return `${prefix}${Math.round(abs / 1000)}K`;
+  return formatMoney(currency, amount);
 }
 
 function formatDate(value: string | null) {
-  if (!value) return "—";
+  if (!value) return "open";
   return new Date(value).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function BurnBar({ consumed, contractValue, totalVariation }: { consumed: number; contractValue: number; totalVariation: number }) {
-  const total = contractValue + totalVariation;
-  const pct = total > 0 ? Math.min(100, Math.round((consumed / total) * 100)) : 0;
-  const tone = pct >= 90 ? "bg-red-600" : pct >= 80 ? "bg-amber-500" : "bg-gray-800 dark:bg-gray-200";
+/** Whole days from today until `endDate`, or null when open-ended / invalid. */
+function daysUntil(endDate: string | null): number | null {
+  if (!endDate) return null;
+  const end = new Date(endDate);
+  if (Number.isNaN(end.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+  return Math.round((end.getTime() - today.getTime()) / 86_400_000);
+}
+
+const RENEWAL_WINDOW_DAYS = 30;
+
+type StatusBadge = { label: string; className: string };
+
+function statusBadge(row: ContractRow): StatusBadge {
+  const colors = CONTRACT_STATUS_COLORS[row.status] ?? CONTRACT_STATUS_COLORS.DRAFT;
+  const base = `${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`;
+  if (row.status === "ACTIVE") {
+    if (row.remaining < 0) {
+      return {
+        label: "Over budget",
+        className: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+      };
+    }
+    const days = daysUntil(row.endDate);
+    if (days != null && days >= 0 && days <= RENEWAL_WINDOW_DAYS) {
+      return {
+        label: days === 0 ? "Ends today" : `Ends in ${days} day${days === 1 ? "" : "s"}`,
+        className: "bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+      };
+    }
+  }
+  return { label: CONTRACT_STATUS_LABELS[row.status] ?? row.status, className: base };
+}
+
+function BurnBar({ row }: { row: ContractRow }) {
+  const total = totalValue(row);
+  const over = row.remaining < 0 || (total > 0 && row.consumed > total);
+  const pct = total > 0 ? Math.min(100, Math.round((row.consumed / total) * 100)) : over ? 100 : 0;
+  const tone = over ? "bg-red-600" : pct >= 80 ? "bg-amber-500" : "bg-gray-900 dark:bg-gray-100";
+  const started = row.consumed > 0;
   return (
-    <div className="min-w-[4.5rem]">
-      <div className="mb-0.5 text-xs tabular-nums text-gray-600 dark:text-gray-400">{pct}%</div>
+    <div className="min-w-[7rem]">
       <div className="h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-        <div className={`h-full rounded-full ${tone}`} style={{ width: `${pct}%` }} />
+        {started ? <div className={`h-full rounded-full ${tone}`} style={{ width: `${Math.max(pct, 3)}%` }} /> : null}
+      </div>
+      <div className="mt-0.5 text-xs tabular-nums text-gray-500 dark:text-gray-400">
+        {started ? `${formatMoney(row.currency, row.consumed)} used` : "not started"}
       </div>
     </div>
   );
@@ -231,7 +280,7 @@ export function ContractsListPage({ activeFilter }: Props) {
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [sortedRows]);
 
-  function updateFilters(next: { clientId?: string; type?: string; status?: string }) {
+  function updateFilters(next: { clientId?: string; type?: string; status?: string; expiring?: string }) {
     const params = new URLSearchParams(searchParams.toString());
     const setOrDelete = (key: string, value: string) => {
       if (value) params.set(key, value);
@@ -240,6 +289,7 @@ export function ContractsListPage({ activeFilter }: Props) {
     if (next.clientId !== undefined) setOrDelete("clientId", next.clientId);
     if (next.type !== undefined) setOrDelete("type", next.type);
     if (next.status !== undefined) setOrDelete("status", next.status);
+    if (next.expiring !== undefined) setOrDelete("expiring", next.expiring);
     // Drop legacy date filters if still present in the URL.
     ["startDateFrom", "startDateTo", "endDateFrom", "endDateTo"].forEach((key) => params.delete(key));
     router.push(`?${params.toString()}`);
@@ -247,7 +297,7 @@ export function ContractsListPage({ activeFilter }: Props) {
 
   function clearFilters() {
     const params = new URLSearchParams(searchParams.toString());
-    ["clientId", "type", "status", "startDateFrom", "startDateTo", "endDateFrom", "endDateTo"].forEach((key) =>
+    ["clientId", "type", "status", "expiring", "startDateFrom", "startDateTo", "endDateFrom", "endDateTo"].forEach((key) =>
       params.delete(key),
     );
     router.push(`?${params.toString()}`);
@@ -337,11 +387,11 @@ export function ContractsListPage({ activeFilter }: Props) {
   }
 
   function renderTableRow(row: ContractRow) {
-    const colors = CONTRACT_STATUS_COLORS[row.status] ?? CONTRACT_STATUS_COLORS.DRAFT;
+    const badge = statusBadge(row);
     const value = totalValue(row);
     return (
-      <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-        <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
+      <tr key={row.id} className="group align-top hover:bg-gray-50 dark:hover:bg-gray-800/50">
+        <td className="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-gray-300">
           <span className="inline-flex items-center gap-2">
             {row.isIncomplete ? (
               <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" title="Incomplete contract data" />
@@ -349,33 +399,45 @@ export function ContractsListPage({ activeFilter }: Props) {
             {row.contractNumber}
           </span>
         </td>
-        <td className="px-4 py-3 text-gray-900 dark:text-gray-100">
-          <Link href={`/contracts/${row.id}`} className="hover:text-blue-600 hover:underline dark:hover:text-blue-400">
+        <td className="px-4 py-3">
+          <Link
+            href={`/contracts/${row.id}`}
+            className="font-semibold text-gray-900 hover:text-blue-600 hover:underline dark:text-gray-100 dark:hover:text-blue-400"
+          >
             {row.title}
           </Link>
+          {row.poNumber ? (
+            <div className="text-xs text-gray-500 dark:text-gray-400">PO {row.poNumber}</div>
+          ) : null}
         </td>
-        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.clientName}</td>
-        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.typeLabel}</td>
+        <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{row.clientName}</td>
+        <td className="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-gray-300">{row.typeLabel}</td>
         <td className="px-4 py-3">
-          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`}>
-            {CONTRACT_STATUS_LABELS[row.status]}
+          <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${badge.className}`}>
+            {badge.label}
           </span>
         </td>
-        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatDate(row.endDate)}</td>
-        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, value)}</td>
-        <td className="px-4 py-3">
-          <div className="flex items-center gap-3">
-            <span className="text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.consumed)}</span>
-            <BurnBar
-              consumed={row.consumed}
-              contractValue={row.contractValue}
-              totalVariation={row.totalVariation}
-            />
-          </div>
+        <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{formatDate(row.endDate)}</td>
+        <td className="whitespace-nowrap px-4 py-3 tabular-nums text-gray-700 dark:text-gray-300">
+          {formatMoney(row.currency, value)}
         </td>
-        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.remaining)}</td>
-        <td className="px-4 py-3 text-right">
-          <button type="button" onClick={() => void deleteRow(row.id)} className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20">
+        <td className="px-4 py-3">
+          <BurnBar row={row} />
+        </td>
+        <td
+          className={`whitespace-nowrap px-4 py-3 tabular-nums ${
+            row.remaining < 0 ? "font-medium text-red-600 dark:text-red-400" : "text-gray-700 dark:text-gray-300"
+          }`}
+        >
+          {formatMoney(row.currency, row.remaining)}
+        </td>
+        <td className="px-2 py-3 text-right">
+          <button
+            type="button"
+            onClick={() => void deleteRow(row.id)}
+            aria-label={`Delete ${row.contractNumber}`}
+            className="rounded p-1.5 text-gray-400 opacity-0 hover:bg-red-50 hover:text-red-600 focus:opacity-100 group-hover:opacity-100 dark:hover:bg-red-900/20"
+          >
             <Trash2 className="h-4 w-4" />
           </button>
         </td>
@@ -414,7 +476,7 @@ export function ContractsListPage({ activeFilter }: Props) {
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {summary.activeCount} {activeFilter ? "active" : "inactive"}
             {" · "}
-            {formatMoney(summary.currency, summary.valueSum)} total value
+            {formatCompactMoney(summary.currency, summary.valueSum)} total value
             {" · "}
             {summary.expiringCount} expiring this month
           </p>
@@ -425,76 +487,75 @@ export function ContractsListPage({ activeFilter }: Props) {
             type="button"
             onClick={exportCsv}
             disabled={rows.length === 0}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
+            className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
           >
-            <Download className="h-4 w-4" />
             Export
           </button>
           <Link
             href="/contracts/new"
-            className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+            className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
           >
-            <Plus className="h-4 w-4" />
-            Contract
+            + Contract
           </Link>
         </div>
       </div>
 
-      <section className="mb-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Filters</h3>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <select
+          aria-label="Client"
+          value={clientIdFilter}
+          onChange={(e) => updateFilters({ clientId: e.target.value })}
+          className={filterSelectClass}
+        >
+          <option value="">Client: all</option>
+          {clients.map((client) => (
+            <option key={client.id} value={client.id}>{client.name}</option>
+          ))}
+        </select>
+        <select
+          aria-label="Type"
+          value={typeFilter}
+          onChange={(e) => updateFilters({ type: e.target.value })}
+          className={filterSelectClass}
+        >
+          <option value="">Type: all</option>
+          {CONTRACT_TYPES.map((type) => (
+            <option key={type} value={type}>{CONTRACT_TYPE_LABELS[type]}</option>
+          ))}
+        </select>
+        <select
+          aria-label="Status"
+          value={statusFilter}
+          onChange={(e) => updateFilters({ status: e.target.value })}
+          className={filterSelectClass}
+        >
+          <option value="">Status: {activeFilter ? "active" : "all"}</option>
+          {statusOptions.map((status) => (
+            <option key={status} value={status}>
+              {CONTRACT_STATUS_LABELS[status]}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Renewal"
+          value={expiringFilter}
+          onChange={(e) => updateFilters({ expiring: e.target.value })}
+          className={filterSelectClass}
+        >
+          <option value="">Renewal: any</option>
+          <option value="thisMonth">Renewal: this month</option>
+          <option value="nextMonth">Renewal: next month</option>
+        </select>
+        {clientIdFilter || typeFilter || statusFilter || expiringFilter ? (
           <button
             type="button"
             onClick={clearFilters}
             className="text-xs font-medium text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
           >
-            Clear all
+            Clear
           </button>
-        </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Client</label>
-            <select
-              value={clientIdFilter}
-              onChange={(e) => updateFilters({ clientId: e.target.value })}
-              className={filterInputClass}
-            >
-              <option value="">All clients</option>
-              {clients.map((client) => (
-                <option key={client.id} value={client.id}>{client.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Type</label>
-            <select
-              value={typeFilter}
-              onChange={(e) => updateFilters({ type: e.target.value })}
-              className={filterInputClass}
-            >
-              <option value="">All types</option>
-              {CONTRACT_TYPES.map((type) => (
-                <option key={type} value={type}>{CONTRACT_TYPE_LABELS[type]}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Status</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => updateFilters({ status: e.target.value })}
-              className={filterInputClass}
-            >
-              <option value="">All statuses</option>
-              {statusOptions.map((status) => (
-                <option key={status} value={status}>
-                  {CONTRACT_STATUS_LABELS[status]}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </section>
+        ) : null}
+      </div>
 
       <AdminSearchField
         id="contract-search"
@@ -508,7 +569,7 @@ export function ContractsListPage({ activeFilter }: Props) {
       {viewMode === "list" ? (
         <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
           <table className="w-full min-w-[960px] text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+            <thead className="border-b border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
               <tr>
                 <th className="px-4 py-3 text-left">
                   <SortHeader label="No." sortKey="contractNumber" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
@@ -531,8 +592,8 @@ export function ContractsListPage({ activeFilter }: Props) {
                 <th className="px-4 py-3 text-left">
                   <SortHeader label="Value (incl. variations)" sortKey="contractValue" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                 </th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Consumed</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Remaining</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Consumed</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Remaining</th>
                 <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300" />
               </tr>
             </thead>

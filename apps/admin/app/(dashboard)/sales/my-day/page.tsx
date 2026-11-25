@@ -1,36 +1,47 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+/**
+ * My day — wireframe PDF page 2.
+ * Sales Home for CRM users; not a Sales nav item (Dashboard stays pipeline KPIs).
+ */
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import { ClientsOnlyGuard } from "@/components/ClientsOnlyGuard";
 import { MyDayPanel } from "@/components/sales/MyDayPanel";
 
+function todayLabel() {
+  return new Date().toLocaleDateString("en-AU", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
+
 export default function MyDayPage() {
+  const router = useRouter();
+  const dateLabel = useMemo(() => todayLabel(), []);
+  const [busy] = useState(false);
+
   return (
     <ClientsOnlyGuard>
       <div className="space-y-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <Link
-              href="/my-workspace"
-              className="mt-0.5 rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">My day</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Due and overdue next steps, new leads, closings this month, and contracts needing attention.
-              </p>
-            </div>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">My day</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{dateLabel}</p>
           </div>
-          <Link
-            href="/leads"
-            className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => router.push("/opportunities")}
+            className="inline-flex items-center gap-1.5 rounded-md bg-black px-3 py-1.5 text-sm font-medium text-white dark:bg-white dark:text-black"
           >
-            Open leads
-          </Link>
+            <Plus className="h-4 w-4" />
+            Activity
+          </button>
         </div>
+
         <MyDayPanel variant="full" />
       </div>
     </ClientsOnlyGuard>

@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { adminFetch } from "@/lib/admin-api";
 import { appAlert } from "@/lib/app-alert";
+import { formatCrmMoney, formatCrmShortDate, titleCaseToken } from "@/lib/crm-format";
 
 type Stage = {
   id: string;
@@ -20,10 +21,18 @@ type BoardOpp = {
   currency: string;
   amount: number;
   stageId: string | null;
+  ownerId?: string | null;
   ownerName: string;
   nextStep?: string | null;
+  nextStepDue?: string | null;
+  engagementModel?: string | null;
   probability?: number | null;
 };
+
+type PipelineOption = { id: string; name: string; isDefault?: boolean };
+
+const filterSelectClass =
+  "rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
 
 type BoardData = {
   pipeline: { id: string; name: string; stages: Stage[] } | null;
@@ -32,7 +41,7 @@ type BoardData = {
 };
 
 function formatAmount(currency: string, amount: number) {
-  return `${currency} ${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(amount)}`;
+  return formatCrmMoney(amount, currency);
 }
 
 function ownerInitials(name: string) {
@@ -55,19 +64,47 @@ export function OpportunitiesBoard() {
   const [loading, setLoading] = useState(true);
   const [movingId, setMovingId] = useState<string | null>(null);
   const [dragOppId, setDragOppId] = useState<string | null>(null);
+  const [pipelines, setPipelines] = useState<PipelineOption[]>([]);
+  const [pipelineId, setPipelineId] = useState("");
+  const [ownerFilter, setOwnerFilter] = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
-    void adminFetch("/api/admin/opportunities/board")
+    const params = new URLSearchParams();
+    if (pipelineId) params.set("pipelineId", pipelineId);
+    const qs = params.toString();
+    void adminFetch(`/api/admin/opportunities/board${qs ? `?${qs}` : ""}`)
       .then((res) => res.json())
       .then((data) => setBoard((data.data ?? null) as BoardData | null))
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [pipelineId]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    void adminFetch("/api/admin/crm/pipelines")
+      .then((res) => res.json())
+      .then((data) => setPipelines((data.data ?? []) as PipelineOption[]))
+      .catch(console.error);
+  }, []);
+
+  const ownerOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const col of board?.columns ?? []) {
+      for (const o of col.opportunities) if (o.ownerName) names.add(o.ownerName);
+    }
+    for (const o of board?.unstaged ?? []) if (o.ownerName) names.add(o.ownerName);
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [board]);
+
+  function matchesOwner(o: BoardOpp) {
+    if (!ownerFilter) return true;
+    if (ownerFilter === "__unassigned") return !o.ownerName;
+    return o.ownerName === ownerFilter;
+  }
 
   const allStages = board?.pipeline?.stages ?? board?.columns.map((c) => c.stage) ?? [];
 
@@ -92,6 +129,7 @@ export function OpportunitiesBoard() {
 
   function renderCard(opp: BoardOpp) {
     const hasNextStep = Boolean(opp.nextStep?.trim());
+    const dueLabel = formatCrmShortDate(opp.nextStepDue);
     return (
       <article
         key={opp.id}
@@ -116,23 +154,22 @@ export function OpportunitiesBoard() {
             {ownerInitials(opp.ownerName || "?")}
           </span>
         </div>
-        <p className="mt-0.5 truncate text-xs text-gray-500">{opp.clientName || "—"}</p>
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <p className="text-xs tabular-nums text-gray-600 dark:text-gray-400">
-            {formatAmount(opp.currency, opp.amount)}
-          </p>
-          {opp.probability != null ? (
-            <span className="text-[11px] text-gray-500">{opp.probability}%</span>
-          ) : null}
-        </div>
+        <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
+          {opp.clientName || "—"}
+          {opp.engagementModel ? ` · ${titleCaseToken(opp.engagementModel)}` : ""}
+        </p>
+        <p className="mt-1 text-xs font-medium tabular-nums text-gray-700 dark:text-gray-300">
+          {formatAmount(opp.currency, opp.amount)}
+        </p>
         {hasNextStep ? (
           <p className="mt-1.5 line-clamp-2 text-[11px] text-gray-600 dark:text-gray-400">
             Next: {opp.nextStep}
+            {dueLabel ? `, ${dueLabel}` : ""}
           </p>
         ) : (
-          <p className="mt-1.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+          <span className="mt-1.5 inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300">
             No next step
-          </p>
+          </span>
         )}
         <select
           disabled={movingId === opp.id}
@@ -175,8 +212,8 @@ export function OpportunitiesBoard() {
   }
 
   const columns = [
-    ...board.columns,
-    ...(board.unstaged.length
+    ...board.columns.map((c) => ({ ...c, opportunities: c.opportunities.filter(matchesOwner) })),
+    ...(board.unstaged.filter(matchesOwner).length
       ? [
           {
             stage: {
@@ -186,7 +223,7 @@ export function OpportunitiesBoard() {
               winProbability: 0,
               order: 999,
             } as Stage,
-            opportunities: board.unstaged,
+            opportunities: board.unstaged.filter(matchesOwner),
           },
         ]
       : []),
@@ -194,10 +231,34 @@ export function OpportunitiesBoard() {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-gray-500 dark:text-gray-400">
-        Pipeline: <span className="font-medium text-gray-800 dark:text-gray-200">{board.pipeline.name}</span>
-        {" · "}drag cards onto a column or use the stage dropdown.
-      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+          Pipeline
+          <select
+            value={pipelineId || board.pipeline.id}
+            onChange={(e) => setPipelineId(e.target.value)}
+            className={filterSelectClass}
+          >
+            {(pipelines.length ? pipelines : [board.pipeline]).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+          Owner
+          <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} className={filterSelectClass}>
+            <option value="">All owners</option>
+            {ownerOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span className="text-xs text-gray-400">Drag cards onto a column or use the stage dropdown.</span>
+      </div>
       <div className="flex gap-3 overflow-x-auto pb-2">
         {columns.map((col) => {
           const isDropTarget = col.stage.id !== "__unstaged";
@@ -218,13 +279,14 @@ export function OpportunitiesBoard() {
               <div className="border-b border-gray-200 px-3 py-2 dark:border-gray-700">
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{col.stage.name}</h3>
-                  <span className="rounded-full bg-white px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-900 dark:text-gray-400">
-                    {col.opportunities.length}
-                  </span>
+                  {col.stage.id !== "__unstaged" ? (
+                    <span className="text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                      {col.stage.winProbability}%
+                    </span>
+                  ) : null}
                 </div>
                 <p className="mt-0.5 text-[11px] tabular-nums text-gray-500">
-                  {formatAmount(currency, sum)}
-                  {col.stage.id !== "__unstaged" ? ` · ${col.stage.winProbability}%` : ""}
+                  {col.opportunities.length} · {formatAmount(currency, sum)}
                 </p>
               </div>
               <div className="flex flex-1 flex-col gap-2 p-2">

@@ -110,7 +110,8 @@ function serializeOpportunity(row: {
   createdAt: Date;
   updatedAt: Date;
   client?: { id: string; name: string; status: string } | null;
-  contact?: { id: string; name: string; email: string } | null;
+  customFields?: unknown;
+  contact?: { id: string; name: string; email: string; position?: string | null } | null;
   owner?: { id: string; name: string | null; email: string } | null;
   stage?: { id: string; name: string; stageType: string; winProbability: number; order: number } | null;
   pipeline?: { id: string; name: string } | null;
@@ -130,6 +131,9 @@ function serializeOpportunity(row: {
     typeLabel: OPPORTUNITY_TYPE_LABELS[type] ?? row.type,
     contactId: row.contactId,
     contactName: row.contact?.name ?? "",
+    contactEmail: row.contact?.email ?? "",
+    contactPosition: row.contact?.position ?? "",
+    customFields: row.customFields ?? null,
     ownerId: row.ownerId,
     ownerName: row.owner?.name || row.owner?.email || "",
     currency: row.currency,
@@ -162,7 +166,7 @@ function serializeOpportunity(row: {
 
 const opportunityInclude = {
   client: { select: { id: true, name: true, status: true } },
-  contact: { select: { id: true, name: true, email: true } },
+  contact: { select: { id: true, name: true, email: true, position: true } },
   owner: { select: { id: true, name: true, email: true } },
   stage: { select: { id: true, name: true, stageType: true, winProbability: true, order: true } },
   pipeline: { select: { id: true, name: true } },
@@ -324,6 +328,10 @@ router.get("/:id", async (req, res) => {
           select: { id: true, quoteNumber: true, status: true, totalAmount: true },
           orderBy: { createdAt: "desc" },
         },
+        contracts: {
+          select: { id: true, contractNumber: true, title: true, status: true },
+          orderBy: { createdAt: "desc" },
+        },
         stageHistory: {
           orderBy: { createdAt: "desc" },
           take: 20,
@@ -348,11 +356,12 @@ router.get("/:id", async (req, res) => {
       },
     });
     if (!row) return res.status(404).json({ error: "Not found" });
-    const { jobs, stageHistory, ...rest } = row;
+    const { jobs, stageHistory, contracts, ...rest } = row;
     res.json({
       data: {
         ...serializeOpportunity(rest),
         stageHistory,
+        contracts,
         jobs: jobs.map((job) => ({
           id: job.id,
           title: job.title,

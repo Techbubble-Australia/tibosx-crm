@@ -67,7 +67,7 @@ const MODULE_ROWS: ModuleRow[] = [
   {
     key: "website_cms",
     label: "Website CMS",
-    note: "Add-on; not in menu",
+    note: "Add-on",
     moduleKey: null,
   },
 ];
@@ -82,6 +82,8 @@ const INTEGRATIONS = [
   { system: "MYOB", status: "Not connected" as const, use: "Later" },
   { system: "Microsoft 365 mail", status: "Connected" as const, use: "Email logging" },
 ];
+
+const statePill = "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
@@ -191,7 +193,7 @@ export default function CrmWorkspacePage() {
 
   return (
     <ClientsOnlyGuard>
-      <div className="max-w-3xl space-y-6">
+      <div className="max-w-6xl space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -217,6 +219,7 @@ export default function CrmWorkspacePage() {
           </div>
         ) : (
           <>
+            <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
             <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Workspace</h3>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -317,27 +320,35 @@ export default function CrmWorkspacePage() {
                         <tr key={row.key}>
                           <td className="py-2.5 text-gray-900 dark:text-gray-100">{row.label}</td>
                           <td className="py-2.5">
-                            <label className="inline-flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={on}
-                                disabled={disabled}
-                                onChange={(e) => {
-                                  if (!row.moduleKey) return;
-                                  setModules((m) => ({ ...m, [row.moduleKey!]: e.target.checked }));
-                                }}
-                                className="h-4 w-4"
-                              />
+                            {/* Website CMS (and other non-switchable rows) render as a static add-on pill. */}
+                            {disabled ? (
                               <span
-                                className={`text-xs font-medium ${
-                                  on ? "text-green-700 dark:text-green-300" : "text-gray-500"
+                                className={`${statePill} ${
+                                  on
+                                    ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                    : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
                                 }`}
                               >
                                 {on ? "On" : "Off"}
                               </span>
-                            </label>
+                            ) : (
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={on}
+                                title="Click to switch"
+                                onClick={() => setModules((m) => ({ ...m, [row.moduleKey!]: !on }))}
+                                className={`${statePill} ${
+                                  on
+                                    ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                    : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                                }`}
+                              >
+                                {on ? "On" : "Off"}
+                              </button>
+                            )}
                           </td>
-                          <td className="py-2.5 text-xs text-gray-500">{row.note}</td>
+                          <td className="py-2.5 text-sm text-gray-600 dark:text-gray-400">{row.note}</td>
                         </tr>
                       );
                     })}
@@ -345,16 +356,27 @@ export default function CrmWorkspacePage() {
                 </table>
               </div>
             </section>
+            </div>
 
             <section className="space-y-2 rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                 Security and data
               </h3>
+              <div className="flex flex-wrap gap-2 text-[11px] font-medium">
+                <span className="rounded-full bg-green-50 px-2.5 py-1 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                  MFA required for all users
+                </span>
+                <span className="rounded-full bg-green-50 px-2.5 py-1 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                  Data hosted in {regionLabel(workspace.dataRegion)}
+                </span>
+                <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                  US region available
+                </span>
+                <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                  Audit log: 24 months
+                </span>
+              </div>
               <p className="text-sm text-gray-700 dark:text-gray-300">
-                MFA required for all users · Data hosted in {regionLabel(workspace.dataRegion)} · US
-                region available · Audit log: 24 months
-              </p>
-              <p className="text-xs text-gray-500">
                 Every record carries a tenant ID. Queries are filtered by row-level security, so one
                 tenant can never read another.
               </p>
@@ -379,14 +401,14 @@ export default function CrmWorkspacePage() {
                           <span
                             className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
                               row.status === "Connected"
-                                ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200"
+                                ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                                 : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
                             }`}
                           >
                             {row.status}
                           </span>
                         </td>
-                        <td className="py-2.5 text-xs text-gray-500">{row.use}</td>
+                        <td className="py-2.5 text-sm text-gray-600 dark:text-gray-400">{row.use}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -402,16 +424,17 @@ export default function CrmWorkspacePage() {
                 Rights requests under US state laws and the Australian Privacy Principles
               </p>
               <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                <li>
-                  <span className="font-medium tabular-nums">2 open</span>
-                  <span className="text-gray-500">
-                    {" "}
-                    · Access request from a US contact, due in 28 days
+                <li className="flex items-center gap-2">
+                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium tabular-nums text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                    2 open
                   </span>
+                  Access request from a US contact, due in 28 days
                 </li>
-                <li>
-                  <span className="font-medium tabular-nums">1 closed</span>
-                  <span className="text-gray-500"> · Deletion request, completed 12 Nov</span>
+                <li className="flex items-center gap-2">
+                  <span className="rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-medium tabular-nums text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                    1 closed
+                  </span>
+                  Deletion request, completed 12 Nov
                 </li>
               </ul>
             </section>

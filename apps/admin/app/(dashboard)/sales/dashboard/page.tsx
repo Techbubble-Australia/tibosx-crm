@@ -1,14 +1,15 @@
 "use client";
 
+/**
+ * Sales → Dashboard — wireframe PDF page 1 (“Sales dashboard”).
+ * My day is PDF page 2 at /sales/my-day (Home for sales).
+ */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Download, Plus } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { ClientsOnlyGuard } from "@/components/ClientsOnlyGuard";
 
-type ClientCount = { clientId: string; clientName: string; count: number };
-type ClientAmount = { clientId: string; clientName: string; amount: number };
-type ForecastVsActual = { clientId: string; clientName: string; forecast: number; actual: number };
-type ForecastMonthRow = { month: number; label: string; forecast: number; actual: number };
 type PipelineStageRow = {
   stageId: string | null;
   stageName: string;
@@ -23,6 +24,8 @@ type NeedsAttentionOpp = {
   amount: number;
   currency: string;
   stageName: string | null;
+  reason?: string;
+  idleDays?: number;
 };
 type NeedsAttentionContract = {
   id: string;
@@ -31,8 +34,8 @@ type NeedsAttentionContract = {
   clientName: string;
   expiryDate: string | null;
 };
-
-const BASE_CURRENCIES = ["AUD", "USD", "INR"] as const;
+type ForecastMonthRow = { month: number; label: string; forecast: number; actual: number };
+type ClientAmount = { clientId: string; clientName: string; amount: number };
 
 type SalesDashboardStats = {
   year: number;
@@ -45,235 +48,68 @@ type SalesDashboardStats = {
     winRateLast90Days: number | null;
     wonCountLast90Days: number;
     lostCountLast90Days: number;
+    avgSalesCycleDays: number | null;
+    avgSalesCycleDeltaDays?: number | null;
     activeContracts: number;
     contractsExpiringThisMonth: number;
   };
   needsAttention?: {
     opportunitiesMissingNextStep: NeedsAttentionOpp[];
+    opportunitiesIdle?: NeedsAttentionOpp[];
+    opportunitiesCloseDatePassed?: NeedsAttentionOpp[];
     contractsExpiringSoon: NeedsAttentionContract[];
   };
   pipelineByStage?: PipelineStageRow[];
   actuals: {
-    activeOpportunities: number;
-    activeContracts: number;
-    contractsExpiringThisMonth: number;
-    contractsExpiringNextMonth: number;
-    invoicesAwaitingPayment: number;
-    activeContractsByClient: ClientCount[];
     amountOwedByClient: ClientAmount[];
   };
   forecast: {
     forecastedRevenueThisYear: number;
     actualRevenueThisYear: number;
-    forecastVsActualByClient: ForecastVsActual[];
     forecastByMonth: ForecastMonthRow[];
+    quarterTarget?: {
+      label: string;
+      actual: number;
+      target: number;
+    };
   };
 };
 
-function formatAmount(value: number, currency?: string) {
-  if (currency) {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 0,
-    }).format(value);
-  }
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
+const BASE_CURRENCIES = ["AUD", "USD", "INR"] as const;
+
+function money(value: number, currency: string) {
+  return new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
-function formatPercent(value: number | null | undefined) {
+function moneyShort(value: number, currency: string) {
+  if (Math.abs(value) >= 1000) {
+    const k = value / 1000;
+    const prefix =
+      currency === "AUD" ? "A$" : currency === "USD" ? "US$" : `${currency} `;
+    return `${prefix}${k % 1 === 0 ? k.toFixed(0) : k.toFixed(0)}k`;
+  }
+  return money(value, currency);
+}
+
+function pct(value: number | null | undefined) {
   if (value == null || Number.isNaN(value)) return "—";
   return `${Math.round(value * 100)}%`;
 }
 
-function yearOptions(anchorYear: number) {
-  return Array.from({ length: 7 }, (_, index) => anchorYear - 2 + index);
+function fiscalLabel(year: number) {
+  return `FY${year}-${String(year + 1).slice(2)}`;
 }
 
-function BarChart({
-  title,
-  subtitle,
-  items,
-  labelKey,
-  valueKey,
-  getHref,
-  currency,
-}: {
-  title: string;
-  subtitle: string;
-  items: Array<Record<string, string | number>>;
-  labelKey: string;
-  valueKey: string;
-  getHref?: (item: Record<string, string | number>) => string | undefined;
-  currency?: string;
-}) {
-  const max = useMemo(() => Math.max(...items.map((item) => Number(item[valueKey])), 1), [items, valueKey]);
-
-  return (
-    <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-      <div className="mb-6">
-        <h3 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
-      </div>
-      {!items.length ? (
-        <p className="text-sm text-gray-400">No data yet.</p>
-      ) : (
-        <div className="space-y-3">
-          {items.map((item) => (
-            <div key={String(item[labelKey])} className="grid grid-cols-[minmax(0,1fr)_1fr_auto] items-center gap-3">
-              <span className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">{String(item[labelKey])}</span>
-              <div className="h-3 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-                <div
-                  className="h-full rounded-full bg-black dark:bg-white"
-                  style={{ width: `${(Number(item[valueKey]) / max) * 100}%` }}
-                />
-              </div>
-              <span className="text-sm tabular-nums text-gray-600 dark:text-gray-400">
-                {getHref?.(item) ? (
-                  <Link href={getHref(item)!} className="font-medium text-blue-600 hover:underline dark:text-blue-400">
-                    {currency ? formatAmount(Number(item[valueKey]), currency) : formatAmount(Number(item[valueKey]))}
-                  </Link>
-                ) : (
-                  currency ? formatAmount(Number(item[valueKey]), currency) : formatAmount(Number(item[valueKey]))
-                )}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function DualBarChart({
-  title,
-  subtitle,
-  items,
-  currency,
-}: {
-  title: string;
-  subtitle: string;
-  items: ForecastVsActual[];
-  currency: string;
-}) {
-  const max = useMemo(
-    () => Math.max(...items.map((item) => Math.max(item.forecast, item.actual)), 1),
-    [items],
-  );
-
-  return (
-    <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-      <div className="mb-6">
-        <h3 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
-      </div>
-      {!items.length ? (
-        <p className="text-sm text-gray-400">No data yet.</p>
-      ) : (
-        <div className="space-y-4">
-          {items.map((item) => (
-            <div key={item.clientId} className="space-y-1">
-              <p className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">{item.clientName}</p>
-              <div className="grid grid-cols-[4rem_1fr_auto] items-center gap-2 text-xs">
-                <span className="text-gray-500">Forecast</span>
-                <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-                  <div className="h-full rounded-full bg-amber-500" style={{ width: `${(item.forecast / max) * 100}%` }} />
-                </div>
-                <span className="tabular-nums text-gray-600">{formatAmount(item.forecast, currency)}</span>
-              </div>
-              <div className="grid grid-cols-[4rem_1fr_auto] items-center gap-2 text-xs">
-                <span className="text-gray-500">Actual</span>
-                <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-                  <div className="h-full rounded-full bg-green-600" style={{ width: `${(item.actual / max) * 100}%` }} />
-                </div>
-                <span className="tabular-nums text-gray-600">{formatAmount(item.actual, currency)}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function MonthlyForecastChart({
-  year,
-  items,
-  currency,
-}: {
-  year: number;
-  items: ForecastMonthRow[];
-  currency: string;
-}) {
-  const max = useMemo(
-    () => Math.max(...items.map((item) => Math.max(item.forecast, item.actual)), 1),
-    [items],
-  );
-
-  return (
-    <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-      <div className="mb-6">
-        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Forecast vs actual by month</h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Monthly breakdown for {year} — planned work (amber) vs invoices by issue date (green).
-        </p>
-      </div>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-        {items.map((item) => (
-          <div key={item.month} className="space-y-2 rounded-lg border border-gray-100 p-3 dark:border-gray-800">
-            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.label}</p>
-            <div className="space-y-1">
-              <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
-                <span>Forecast</span>
-                <span className="tabular-nums">{formatAmount(item.forecast, currency)}</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-                <div
-                  className="h-full rounded-full bg-amber-500"
-                  style={{ width: `${(item.forecast / max) * 100}%` }}
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
-                <span>Actual</span>
-                <span className="tabular-nums">{formatAmount(item.actual, currency)}</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-                <div
-                  className="h-full rounded-full bg-green-600"
-                  style={{ width: `${(item.actual / max) * 100}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function KpiCard({
-  label,
-  value,
-  detail,
-  href,
-}: {
-  label: string;
-  value: string;
-  detail?: string;
-  href: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="rounded-xl border border-gray-200 bg-white p-5 transition-colors hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600 dark:hover:bg-gray-800/50"
-    >
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">{value}</p>
-      {detail ? <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{detail}</p> : null}
-    </Link>
-  );
+function currentQuarterMeta(now = new Date()) {
+  const month = now.getMonth(); // 0-11
+  const q = Math.floor(month / 3) + 1;
+  const startMonth = (q - 1) * 3;
+  const labels = ["Jan-Mar", "Apr-Jun", "Jul-Sep", "Oct-Dec"];
+  return { q, startMonth, endMonth: startMonth + 2, label: `Q${q} (${labels[q - 1]})` };
 }
 
 export default function SalesDashboardPage() {
@@ -298,46 +134,109 @@ export default function SalesDashboardPage() {
     loadStats(selectedYear, baseCurrency);
   }, [loadStats, selectedYear, baseCurrency]);
 
-  const year = stats?.year ?? selectedYear;
-  const displayCurrency = stats?.baseCurrency ?? baseCurrency;
+  const currency = stats?.baseCurrency ?? baseCurrency;
   const kpis = stats?.kpis;
-  const needsAttention = stats?.needsAttention;
-  const pipelineByStage = stats?.pipelineByStage ?? [];
-  const missingNextStep = needsAttention?.opportunitiesMissingNextStep ?? [];
-  const expiringSoon = needsAttention?.contractsExpiringSoon ?? [];
+  const stages = stats?.pipelineByStage ?? [];
+  const stageMax = useMemo(() => Math.max(...stages.map((s) => s.amount), 1), [stages]);
+  const months = stats?.forecast.forecastByMonth ?? [];
+  const owed = stats?.actuals.amountOwedByClient ?? [];
+  const missingNext = stats?.needsAttention?.opportunitiesMissingNextStep ?? [];
+  const idle = stats?.needsAttention?.opportunitiesIdle ?? [];
+  const closePassed = stats?.needsAttention?.opportunitiesCloseDatePassed ?? [];
+  const expiring = stats?.needsAttention?.contractsExpiringSoon ?? [];
+
+  const qMeta = useMemo(() => currentQuarterMeta(), []);
+  const quarterMonths = months.filter((m) => m.month >= qMeta.startMonth && m.month <= qMeta.endMonth);
+  const quarterActual = quarterMonths.reduce((s, m) => s + m.actual, 0);
+  const quarterTarget = quarterMonths.reduce((s, m) => s + m.forecast, 0);
+  const quarterGap = Math.max(0, quarterTarget - quarterActual);
+  const cover =
+    quarterGap > 0 && (kpis?.weightedForecast ?? 0) > 0
+      ? ((kpis?.weightedForecast ?? 0) / quarterGap).toFixed(1)
+      : null;
+
+  // Forecast vs actual panel: show recent/upcoming months around now for current year
+  const forecastMonths = useMemo(() => {
+    if (selectedYear !== currentYear) return months;
+    const nowM = new Date().getMonth();
+    const start = Math.max(0, nowM - 3);
+    const end = Math.min(11, nowM + 1);
+    return months.filter((m) => m.month >= start && m.month <= end);
+  }, [months, selectedYear, currentYear]);
+
+  function exportCsv() {
+    const lines = [
+      "metric,value",
+      `open_pipeline,${kpis?.openPipelineAmount ?? 0}`,
+      `weighted_forecast,${kpis?.weightedForecast ?? 0}`,
+      `win_rate_90d,${kpis?.winRateLast90Days ?? ""}`,
+      `avg_sales_cycle_days,${kpis?.avgSalesCycleDays ?? ""}`,
+      `active_contracts,${kpis?.activeContracts ?? 0}`,
+      ...stages.map((s) => `stage_${s.stageName.replace(/,/g, " ")},${s.amount}`),
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `sales-dashboard-${selectedYear}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <ClientsOnlyGuard>
-      <div className="space-y-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Sales pipeline overview — actuals and forecast for {year}.
-          </p>
-          <div className="flex flex-wrap items-center gap-4">
-            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <span className="font-medium">Year</span>
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Sales dashboard</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Pipeline, forecast and targets for {fiscalLabel(selectedYear)}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+              Year
               <select
                 value={selectedYear}
-                onChange={(e) => setSelectedYear(Number.parseInt(e.target.value, 10))}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-900"
               >
-                {yearOptions(currentYear).map((value) => (
-                  <option key={value} value={value}>{value}</option>
+                {[currentYear - 1, currentYear, currentYear + 1].map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
                 ))}
               </select>
             </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <span className="font-medium">Base currency</span>
+            <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+              Currency
               <select
                 value={baseCurrency}
                 onChange={(e) => setBaseCurrency(e.target.value)}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
+                className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-900"
               >
-                {BASE_CURRENCIES.map((code) => (
-                  <option key={code} value={code}>{code}</option>
+                {BASE_CURRENCIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
                 ))}
               </select>
             </label>
+            <button
+              type="button"
+              onClick={exportCsv}
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+            >
+              <Download className="h-4 w-4" />
+              Export
+            </button>
+            <Link
+              href="/opportunities/new"
+              className="inline-flex items-center gap-1.5 rounded-md bg-black px-3 py-1.5 text-sm font-medium text-white dark:bg-white dark:text-black"
+            >
+              <Plus className="h-4 w-4" />
+              Opportunity
+            </Link>
           </div>
         </div>
 
@@ -347,199 +246,246 @@ export default function SalesDashboardPage() {
           </div>
         ) : (
           <>
-            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <KpiCard
-                label="Open pipeline"
-                value={formatAmount(kpis?.openPipelineAmount ?? 0, displayCurrency)}
-                detail={`${kpis?.openOpportunityCount ?? stats?.actuals.activeOpportunities ?? 0} opportunities`}
-                href="/opportunities/active"
-              />
-              <KpiCard
-                label="Weighted forecast"
-                value={formatAmount(kpis?.weightedForecast ?? 0, displayCurrency)}
-                detail="Sum of amount × stage probability"
-                href="/opportunities/active"
-              />
-              <KpiCard
-                label="Win rate (90 days)"
-                value={formatPercent(kpis?.winRateLast90Days)}
-                detail={
-                  kpis
-                    ? `${kpis.wonCountLast90Days} won · ${kpis.lostCountLast90Days} lost`
-                    : undefined
-                }
-                href="/opportunities"
-              />
-              <KpiCard
-                label="Active contracts"
-                value={String(kpis?.activeContracts ?? stats?.actuals.activeContracts ?? 0)}
-                detail={`${kpis?.contractsExpiringThisMonth ?? stats?.actuals.contractsExpiringThisMonth ?? 0} expiring this month`}
-                href="/contracts/active"
-              />
+            <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              {[
+                {
+                  label: "Open pipeline",
+                  value: money(kpis?.openPipelineAmount ?? 0, currency),
+                  detail: `${kpis?.openOpportunityCount ?? 0} opportunities`,
+                  href: "/opportunities",
+                },
+                {
+                  label: "Weighted forecast",
+                  value: money(kpis?.weightedForecast ?? 0, currency),
+                  detail: "probability-adjusted",
+                  href: "/opportunities/forecast",
+                },
+                {
+                  label: "Win rate (90 days)",
+                  value: pct(kpis?.winRateLast90Days),
+                  detail: `${kpis?.wonCountLast90Days ?? 0} won, ${kpis?.lostCountLast90Days ?? 0} lost`,
+                  href: "/sales/reports",
+                },
+                {
+                  label: "Avg sales cycle",
+                  value:
+                    kpis?.avgSalesCycleDays != null ? `${Math.round(kpis.avgSalesCycleDays)} days` : "—",
+                  detail:
+                    kpis?.avgSalesCycleDeltaDays != null
+                      ? `${kpis.avgSalesCycleDeltaDays < 0 ? "down" : "up"} ${Math.abs(Math.round(kpis.avgSalesCycleDeltaDays))} days`
+                      : "won deals (created → close)",
+                  href: "/opportunities/list",
+                },
+                {
+                  label: "Active contracts",
+                  value: String(kpis?.activeContracts ?? 0),
+                  detail: `${kpis?.contractsExpiringThisMonth ?? 0} expiring this month`,
+                  href: "/contracts/active",
+                },
+              ].map((card) => (
+                <Link
+                  key={card.label}
+                  href={card.href}
+                  className="rounded-lg border border-gray-200 bg-white px-4 py-4 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800/60"
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{card.label}</p>
+                  <p className="mt-2 text-2xl font-semibold tabular-nums text-gray-900 dark:text-gray-100">{card.value}</p>
+                  <p className="mt-1 text-xs text-gray-500">{card.detail}</p>
+                </Link>
+              ))}
             </section>
 
-            {(missingNextStep.length > 0 || expiringSoon.length > 0) && (
-              <section className="rounded-xl border border-amber-200 bg-amber-50/60 p-5 dark:border-amber-900/50 dark:bg-amber-950/20">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200">
-                  Needs attention
-                </h2>
-                <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                  <div>
-                    <p className="mb-2 text-xs font-medium text-amber-900/80 dark:text-amber-200/80">
-                      Opportunities missing next step ({missingNextStep.length})
-                    </p>
-                    {missingNextStep.length === 0 ? (
-                      <p className="text-sm text-gray-500">None</p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {missingNextStep.slice(0, 6).map((opp) => (
-                          <li key={opp.id} className="flex items-center justify-between gap-3 text-sm">
-                            <Link
-                              href={`/opportunities/${opp.id}`}
-                              className="truncate font-medium text-blue-700 hover:underline dark:text-blue-300"
-                            >
-                              {opp.name}
-                              <span className="ml-1 font-normal text-gray-500">· {opp.clientName}</span>
-                            </Link>
-                            <span className="shrink-0 tabular-nums text-gray-600 dark:text-gray-400">
-                              {formatAmount(opp.amount, displayCurrency)}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+            <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <div className="space-y-4">
+                <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
+                  <div className="mb-4">
+                    <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Pipeline by stage</h2>
+                    <p className="text-xs text-gray-500">Click a bar to open the filtered board</p>
                   </div>
-                  <div>
-                    <p className="mb-2 text-xs font-medium text-amber-900/80 dark:text-amber-200/80">
-                      Contracts expiring soon ({expiringSoon.length})
-                    </p>
-                    {expiringSoon.length === 0 ? (
-                      <p className="text-sm text-gray-500">None</p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {expiringSoon.slice(0, 6).map((row) => (
-                          <li key={row.id} className="flex items-center justify-between gap-3 text-sm">
-                            <Link
-                              href={`/contracts/${row.id}`}
-                              className="truncate font-medium text-blue-700 hover:underline dark:text-blue-300"
-                            >
-                              {row.contractNumber}
-                              <span className="ml-1 font-normal text-gray-500">· {row.clientName}</span>
-                            </Link>
-                            <span className="shrink-0 text-gray-600 dark:text-gray-400">
-                              {row.expiryDate
-                                ? new Date(row.expiryDate).toLocaleDateString("en-AU", {
-                                    day: "numeric",
-                                    month: "short",
-                                  })
-                                : "—"}
+                  {!stages.length ? (
+                    <p className="text-sm text-gray-400">No open pipeline yet.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {stages.map((stage) => (
+                        <Link
+                          key={stage.stageId ?? stage.stageName}
+                          href={
+                            stage.stageId
+                              ? `/opportunities?stageId=${encodeURIComponent(stage.stageId)}`
+                              : "/opportunities"
+                          }
+                          className="block"
+                        >
+                          <div className="mb-1 flex items-center justify-between gap-2 text-sm">
+                            <span className="font-medium text-gray-800 dark:text-gray-200">{stage.stageName}</span>
+                            <span className="tabular-nums text-gray-600 dark:text-gray-400">
+                              {money(stage.amount, currency)}
                             </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                          </div>
+                          <div className="h-2.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                            <div
+                              className="h-full rounded-full bg-gray-900 dark:bg-white"
+                              style={{ width: `${(stage.amount / stageMax) * 100}%` }}
+                            />
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
+                  <div className="mb-4">
+                    <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      Forecast vs actual, {selectedYear}
+                    </h2>
+                    <p className="text-xs text-gray-500">
+                      Planned contract revenue vs invoices issued (existing TIBOSX view, kept)
+                    </p>
                   </div>
-                </div>
-              </section>
-            )}
-
-            {pipelineByStage.length > 0 ? (
-              <BarChart
-                title="Pipeline by stage"
-                subtitle={`Open opportunity value in ${displayCurrency} by stage.`}
-                items={pipelineByStage.map((row) => ({
-                  stageName: `${row.stageName} (${row.count})`,
-                  amount: row.amount,
-                }))}
-                labelKey="stageName"
-                valueKey="amount"
-                currency={displayCurrency}
-                getHref={() => "/opportunities/active"}
-              />
-            ) : null}
-
-            <section className="space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Actuals</h2>
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                <BarChart
-                  title="Active contracts by client"
-                  subtitle="Number of active contracts per client."
-                  items={(stats?.actuals.activeContractsByClient ?? []).map((row) => ({
-                    clientName: row.clientName,
-                    count: row.count,
-                    clientId: row.clientId,
-                  }))}
-                  labelKey="clientName"
-                  valueKey="count"
-                  getHref={(item) => `/contracts/active?clientId=${encodeURIComponent(String(item.clientId))}`}
-                />
-                <BarChart
-                  title="Amount owed by client"
-                  subtitle={`Total invoice amounts in ${displayCurrency} (draft and awaiting payment).`}
-                  items={(stats?.actuals.amountOwedByClient ?? []).map((row) => ({
-                    clientName: row.clientName,
-                    amount: row.amount,
-                    clientId: row.clientId,
-                  }))}
-                  labelKey="clientName"
-                  valueKey="amount"
-                  currency={displayCurrency}
-                  getHref={() => "/invoices?status=AWAITING_PAYMENT"}
-                />
-              </div>
-            </section>
-
-            <section className="space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Forecast</h2>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
-                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    {stats?.forecastScope === "ytd"
-                      ? `Forecasted revenue (YTD ${year})`
-                      : `Forecasted revenue (${year})`}
-                  </p>
-                  <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
-                    {formatAmount(stats?.forecast.forecastedRevenueThisYear ?? 0, displayCurrency)}
-                  </p>
-                  <p className="mt-1 text-xs text-gray-500">
-                    {stats?.forecastScope === "ytd"
-                      ? `Planned work through this month, converted to ${displayCurrency}`
-                      : `Converted to ${displayCurrency} at current exchange rates`}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
-                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    {stats?.forecastScope === "ytd"
-                      ? `Actual revenue (YTD ${year})`
-                      : `Actual revenue (${year})`}
-                  </p>
-                  <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
-                    {formatAmount(stats?.forecast.actualRevenueThisYear ?? 0, displayCurrency)}
-                  </p>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Invoice amounts (excl. tax) in {displayCurrency} by issue date
-                  </p>
+                  <div className="space-y-2.5">
+                    {forecastMonths.map((m) => {
+                      const max = Math.max(m.forecast, m.actual, 1);
+                      return (
+                        <div key={m.month} className="grid grid-cols-[2.75rem_1fr_auto] items-center gap-2 text-xs">
+                          <span className="font-medium text-gray-700 dark:text-gray-300">{m.label}</span>
+                          <div className="space-y-1">
+                            <div className="h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                              <div
+                                className="h-full rounded-full bg-gray-400"
+                                style={{ width: `${(m.forecast / max) * 100}%` }}
+                              />
+                            </div>
+                            <div className="h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                              <div
+                                className="h-full rounded-full bg-gray-900 dark:bg-white"
+                                style={{ width: `${(m.actual / max) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                          <span className="tabular-nums text-gray-500">
+                            {moneyShort(m.actual, currency)} of {moneyShort(m.forecast, currency)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-              <MonthlyForecastChart
-                year={year}
-                items={stats?.forecast.forecastByMonth ?? []}
-                currency={displayCurrency}
-              />
-              <DualBarChart
-                title={
-                  stats?.forecastScope === "ytd"
-                    ? `Forecast vs actual (YTD ${year})`
-                    : `Forecast vs actual (${year})`
-                }
-                subtitle={
-                  stats?.forecastScope === "ytd"
-                    ? `Grouped by client in ${displayCurrency} — planned work through this month (amber) vs invoices by issue date (green).`
-                    : `Grouped by client in ${displayCurrency} — forecast (amber) vs actual by issue date (green).`
-                }
-                items={stats?.forecast.forecastVsActualByClient ?? []}
-                currency={displayCurrency}
-              />
+
+              <div className="space-y-4">
+                <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
+                  <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    Target: {qMeta.label}
+                  </h2>
+                  <p className="mt-3 text-2xl font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+                    {moneyShort(quarterActual, currency)} of {moneyShort(quarterTarget, currency)}
+                  </p>
+                  <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                    <div
+                      className="h-full rounded-full bg-emerald-600"
+                      style={{
+                        width: `${quarterTarget > 0 ? Math.min(100, (quarterActual / quarterTarget) * 100) : 0}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">
+                    Gap {moneyShort(quarterGap, currency)}
+                    {cover ? `. Weighted pipeline covers ${cover}x of the gap.` : "."}
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
+                  <div className="mb-3">
+                    <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Needs attention</h2>
+                    <p className="text-xs text-gray-500">Rules run per workspace</p>
+                  </div>
+                  <ul className="space-y-2.5 text-sm">
+                    {missingNext.slice(0, 5).map((o) => (
+                      <li key={`ns-${o.id}`} className="flex items-start gap-2">
+                        <span className="mt-0.5 shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-red-800 dark:bg-red-900/40 dark:text-red-200">
+                          No next step
+                        </span>
+                        <Link href={`/opportunities/${o.id}`} className="font-medium text-gray-900 hover:underline dark:text-gray-100">
+                          {o.name}
+                        </Link>
+                      </li>
+                    ))}
+                    {idle.slice(0, 4).map((o) => (
+                      <li key={`idle-${o.id}`} className="flex items-start gap-2">
+                        <span className="mt-0.5 shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                          Idle {o.idleDays ?? "?"} days
+                        </span>
+                        <Link href={`/opportunities/${o.id}`} className="font-medium text-gray-900 hover:underline dark:text-gray-100">
+                          {o.name}
+                        </Link>
+                      </li>
+                    ))}
+                    {closePassed.slice(0, 4).map((o) => (
+                      <li key={`cd-${o.id}`} className="flex items-start gap-2">
+                        <span className="mt-0.5 shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-red-800 dark:bg-red-900/40 dark:text-red-200">
+                          Close date passed
+                        </span>
+                        <Link href={`/opportunities/${o.id}`} className="font-medium text-gray-900 hover:underline dark:text-gray-100">
+                          {o.name}
+                        </Link>
+                      </li>
+                    ))}
+                    {expiring.slice(0, 4).map((c) => (
+                      <li key={c.id} className="flex items-start gap-2">
+                        <span className="mt-0.5 shrink-0 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-orange-800 dark:bg-orange-900/40 dark:text-orange-200">
+                          Contract expiring
+                        </span>
+                        <Link href={`/contracts/${c.id}`} className="font-medium text-gray-900 hover:underline dark:text-gray-100">
+                          {c.contractNumber} {c.clientName}
+                          {c.expiryDate
+                            ? `, ${new Date(c.expiryDate).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}`
+                            : ""}
+                        </Link>
+                      </li>
+                    ))}
+                    {!missingNext.length && !idle.length && !closePassed.length && !expiring.length ? (
+                      <li className="text-gray-400">Nothing needs attention right now.</li>
+                    ) : null}
+                  </ul>
+                </div>
+
+                <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
+                  <div className="mb-3">
+                    <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Amount owed by client</h2>
+                  </div>
+                  {!owed.length ? (
+                    <p className="text-sm text-gray-400">No outstanding amounts.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {owed.slice(0, 8).map((row) => {
+                        const maxOwed = Math.max(...owed.slice(0, 8).map((r) => r.amount), 1);
+                        return (
+                          <li key={row.clientId}>
+                            <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+                              <Link
+                                href={`/invoices?clientId=${encodeURIComponent(row.clientId)}`}
+                                className="font-medium text-gray-900 hover:underline dark:text-gray-100"
+                              >
+                                {row.clientName}
+                              </Link>
+                              <span className="tabular-nums text-gray-600 dark:text-gray-400">
+                                {money(row.amount, currency)}
+                              </span>
+                            </div>
+                            <div className="h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                              <div
+                                className="h-full rounded-full bg-gray-800 dark:bg-gray-200"
+                                style={{ width: `${(row.amount / maxOwed) * 100}%` }}
+                              />
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </div>
             </section>
           </>
         )}

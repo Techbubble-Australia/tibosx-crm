@@ -262,29 +262,22 @@ export default function ImportExportPage() {
 
   return (
     <ClientsOnlyGuard>
-      <div className="space-y-8">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Import and export</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            CSV or Excel. Check before anything is saved.
-          </p>
-        </div>
-
-        <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-          <h3 className="mb-3 font-semibold text-gray-900 dark:text-gray-100">Download template</h3>
-          <div className="flex flex-wrap gap-2">
-            {(["clients", "leads", "opportunities"] as Entity[]).map((e) => (
-              <button
-                key={e}
-                type="button"
-                onClick={() => downloadTemplate(e)}
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm capitalize hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
-              >
-                {e} CSV
-              </button>
-            ))}
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Import and export</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              CSV or Excel. Check before anything is saved.
+            </p>
           </div>
-        </section>
+          <button
+            type="button"
+            onClick={() => downloadTemplate(entity)}
+            className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:bg-transparent dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            Download template
+          </button>
+        </div>
 
         <section className="space-y-5 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
           <div className="flex flex-wrap items-end gap-3">
@@ -448,12 +441,16 @@ export default function ImportExportPage() {
             <div className="space-y-4">
               {preview ? (
                 <>
-                  <div className="flex flex-wrap gap-4 text-sm">
-                    <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">
+                  <div className="flex flex-wrap gap-2 text-xs font-medium">
+                    <span className="rounded-full bg-green-50 px-2.5 py-1 tabular-nums text-green-700 dark:bg-green-900/30 dark:text-green-400">
                       {checkNew} new
                     </span>
-                    <span className="tabular-nums text-gray-600">{checkDupes} duplicates</span>
-                    <span className="tabular-nums text-red-600">{checkErrors} errors</span>
+                    <span className="rounded-full bg-amber-50 px-2.5 py-1 tabular-nums text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                      {checkDupes} duplicates
+                    </span>
+                    <span className="rounded-full bg-red-50 px-2.5 py-1 tabular-nums text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                      {checkErrors} errors
+                    </span>
                   </div>
                   <p className="text-xs text-gray-500">
                     Duplicates matched on domain and name. Choose skip, update or merge. Dry-run
@@ -503,7 +500,7 @@ export default function ImportExportPage() {
 
         <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
           <h3 className="mb-2 font-semibold text-gray-900 dark:text-gray-100">Export</h3>
-          <p className="mb-3 text-xs text-gray-500">
+          <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">
             Every list can be exported with the current filters. Exports are written to the audit
             log.
           </p>

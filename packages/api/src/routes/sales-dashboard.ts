@@ -103,8 +103,15 @@ router.get("/stats", async (req, res) => {
     const ninetyDaysAgo = new Date(now);
     ninetyDaysAgo.setUTCDate(ninetyDaysAgo.getUTCDate() - 90);
 
-    const [activeOpportunities, activeContracts, contracts, invoices, openOpportunities, closedRecent] =
-      await Promise.all([
+    const [
+      activeOpportunities,
+      activeContracts,
+      contracts,
+      invoices,
+      openOpportunities,
+      closedRecent,
+      wonPriorWindow,
+    ] = await Promise.all([
         prisma.opportunity.count({ where: { active: true } }),
         prisma.contract.count({ where: { status: "ACTIVE" } }),
         prisma.contract.findMany({
@@ -146,6 +153,9 @@ router.get("/stats", async (req, res) => {
             probability: true,
             nextStep: true,
             nextStepDue: true,
+            customFields: true,
+            createdAt: true,
+            updatedAt: true,
             client: { select: { id: true, name: true } },
             stage: {
               select: {
@@ -167,8 +177,21 @@ router.get("/stats", async (req, res) => {
           },
           select: {
             id: true,
+            createdAt: true,
+            updatedAt: true,
             stage: { select: { stageType: true } },
           },
+        }),
+        prisma.opportunity.findMany({
+          where: {
+            updatedAt: {
+              gte: new Date(now.getTime() - 180 * 86400000),
+              lt: ninetyDaysAgo,
+            },
+            stage: { stageType: "won" },
+          },
+          select: { createdAt: true, updatedAt: true },
+          take: 200,
         }),
       ]);
 
@@ -200,6 +223,32 @@ router.get("/stats", async (req, res) => {
       currency: string;
       stageName: string | null;
     }> = [];
+    const idleOpps: Array<{
+      id: string;
+      name: string;
+      clientName: string;
+      amount: number;
+      currency: string;
+      stageName: string | null;
+      idleDays: number;
+    }> = [];
+    const closeDatePassedOpps: Array<{
+      id: string;
+      name: string;
+      clientName: string;
+      amount: number;
+      currency: string;
+      stageName: string | null;
+    }> = [];
+
+    function parseCloseDate(customFields: unknown): Date | null {
+      if (!customFields || typeof customFields !== "object" || Array.isArray(customFields)) return null;
+      const record = customFields as Record<string, unknown>;
+      const raw = record.closeDate ?? record.expectedCloseDate ?? record.close_date ?? record.expected_close_date;
+      if (typeof raw !== "string" && typeof raw !== "number") return null;
+      const d = new Date(raw);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
 
     for (const opp of openOpportunities) {
       const amount = toBase(toNumber(opp.amount), opp.currency, baseCurrency, rates);
@@ -234,12 +283,52 @@ router.get("/stats", async (req, res) => {
           stageName: opp.stage?.name ?? null,
         });
       }
+
+      const idleMs = now.getTime() - opp.updatedAt.getTime();
+      const idleDays = Math.floor(idleMs / 86400000);
+      if (idleDays >= 7 && opp.nextStep?.trim()) {
+        idleOpps.push({
+          id: opp.id,
+          name: opp.name,
+          clientName: opp.client.name,
+          amount,
+          currency: baseCurrency,
+          stageName: opp.stage?.name ?? null,
+          idleDays,
+        });
+      }
+
+      const closeDate = parseCloseDate(opp.customFields) ?? (opp.nextStepDue && winProb >= 50 ? opp.nextStepDue : null);
+      if (closeDate && closeDate < now) {
+        closeDatePassedOpps.push({
+          id: opp.id,
+          name: opp.name,
+          clientName: opp.client.name,
+          amount,
+          currency: baseCurrency,
+          stageName: opp.stage?.name ?? null,
+        });
+      }
     }
+
+    idleOpps.sort((a, b) => b.idleDays - a.idleDays);
 
     const wonCount = closedRecent.filter((row) => row.stage?.stageType === "won").length;
     const lostCount = closedRecent.filter((row) => row.stage?.stageType === "lost").length;
     const closedTotal = wonCount + lostCount;
     const winRateLast90Days = closedTotal > 0 ? wonCount / closedTotal : null;
+
+    function avgCycleDays(rows: Array<{ createdAt: Date; updatedAt: Date }>): number | null {
+      const won = rows.filter((row) => row.updatedAt > row.createdAt);
+      if (!won.length) return null;
+      const total = won.reduce((sum, row) => sum + (row.updatedAt.getTime() - row.createdAt.getTime()) / 86400000, 0);
+      return total / won.length;
+    }
+    const wonRecent = closedRecent.filter((row) => row.stage?.stageType === "won");
+    const avgSalesCycleDays = avgCycleDays(wonRecent);
+    const priorAvg = avgCycleDays(wonPriorWindow);
+    const avgSalesCycleDeltaDays =
+      avgSalesCycleDays != null && priorAvg != null ? avgSalesCycleDays - priorAvg : null;
 
     const needsAttentionContracts = [...expiringThisMonthRows, ...expiringNextMonthRows]
       .slice(0, 20)
@@ -434,11 +523,15 @@ router.get("/stats", async (req, res) => {
           winRateLast90Days,
           wonCountLast90Days: wonCount,
           lostCountLast90Days: lostCount,
+          avgSalesCycleDays,
+          avgSalesCycleDeltaDays,
           activeContracts,
           contractsExpiringThisMonth: expiringThisMonth,
         },
         needsAttention: {
           opportunitiesMissingNextStep: needsAttentionOpps.slice(0, 15),
+          opportunitiesIdle: idleOpps.slice(0, 15),
+          opportunitiesCloseDatePassed: closeDatePassedOpps.slice(0, 15),
           contractsExpiringSoon: needsAttentionContracts,
         },
         pipelineByStage,

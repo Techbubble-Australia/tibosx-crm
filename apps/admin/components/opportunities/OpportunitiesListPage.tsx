@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Plus, Trash2, ChevronDown, ChevronUp, Pencil } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
+import { formatCrmMoney, formatCrmShortDate } from "@/lib/crm-format";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { ViewModeToggle, type ViewMode } from "@/components/ui/ViewModeToggle";
@@ -42,7 +43,10 @@ interface OpportunityRow {
   comments: string;
   order: number;
   active: boolean;
-  activeJobsCount: number;
+  stageName?: string;
+  nextStep?: string | null;
+  nextStepDue?: string | null;
+  engagementModel?: string | null;
 }
 
 type ContactOption = { id: string; name: string; email: string };
@@ -53,7 +57,7 @@ type Props = {
 };
 
 function formatValue(row: OpportunityRow): string {
-  return `${row.currency} ${new Intl.NumberFormat("en-US").format(row.amount)}`;
+  return formatCrmMoney(row.amount, row.currency);
 }
 
 type OpportunitySortKey = "name" | "clientName" | "location" | "type" | "amount" | "status" | "order" | "ownerName";
@@ -223,7 +227,9 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
         row.currency,
         row.amount,
         row.status,
-        row.comments,
+        row.stageName,
+        row.nextStep,
+        row.engagementModel,
       ]),
     { initialPageSize: 100, pageSizeOptions: [25, 50, 100, 200] },
   );
@@ -496,14 +502,6 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
     return `/opportunities/${listTab}?clientId=${encodeURIComponent(clientId)}`;
   }
 
-  function activeJobsHref(row: OpportunityRow) {
-    const params = new URLSearchParams();
-    params.set("clientId", row.clientId);
-    if (row.location) params.set("country", row.location);
-    params.set("opportunityId", row.id);
-    return `/jobs/active?${params.toString()}`;
-  }
-
   function resolveStatus(status: string): OpportunityStatus {
     if ((OPPORTUNITY_STATUSES as readonly string[]).includes(status)) {
       return status as OpportunityStatus;
@@ -607,15 +605,7 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
             <span>{row.location || "—"}</span>
           </InlineEditableCell>
         </td>
-        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-          {(row.activeJobsCount ?? 0) > 0 ? (
-            <Link href={activeJobsHref(row)} className="font-medium text-blue-600 hover:underline dark:text-blue-400">
-              {row.activeJobsCount}
-            </Link>
-          ) : (
-            "0"
-          )}
-        </td>
+        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.stageName || "—"}</td>
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
           <InlineEditableCell
             label={`Edit estimated value for ${row.name}`}
@@ -667,8 +657,17 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
             </span>
           </InlineEditableCell>
         </td>
-        <td className="max-w-[240px] truncate px-4 py-3 text-gray-600 dark:text-gray-400" title={row.comments || undefined}>
-          {row.comments || "—"}
+        <td className="max-w-[240px] px-4 py-3">
+          {row.nextStep?.trim() ? (
+            <span className="block truncate text-gray-600 dark:text-gray-400" title={row.nextStep}>
+              {row.nextStep}
+              {row.nextStepDue ? `, ${formatCrmShortDate(row.nextStepDue)}` : ""}
+            </span>
+          ) : (
+            <span className="inline-flex rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300">
+              No next step
+            </span>
+          )}
         </td>
         <td className="px-4 py-3 text-right">
           <div className="inline-flex items-center gap-2">
@@ -765,14 +764,14 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
                 <th className="px-4 py-3 text-left">
                   <SortHeader label="Location" sortKey="location" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                 </th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Active jobs</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Stage</th>
                 <th className="px-4 py-3 text-left">
                   <SortHeader label="Estimated Value" sortKey="amount" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                 </th>
                 <th className="px-4 py-3 text-left">
                   <SortHeader label="Status" sortKey="status" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                 </th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Comments</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Next step</th>
                 <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
               </tr>
             </thead>

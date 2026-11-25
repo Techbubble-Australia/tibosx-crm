@@ -606,6 +606,8 @@ function serializeInvoice(row: {
   fileUrl: string | null;
   lineItems?: unknown;
   fileUrls?: unknown;
+  accountingSyncStatus?: string | null;
+  accountingProvider?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -626,6 +628,8 @@ function serializeInvoice(row: {
     taxAmount: toNumber(row.taxAmount),
     totalAmount: toNumber(row.totalAmount),
     fileUrl: row.fileUrl,
+    accountingSyncStatus: row.accountingSyncStatus ?? "NOT_SYNCED",
+    accountingProvider: row.accountingProvider ?? null,
     lineItems: invoiceLineItems({ ...row, lineItems: row.lineItems ?? null }),
     files: invoiceFiles({ fileUrls: row.fileUrls ?? null, fileUrl: row.fileUrl }),
     createdAt: row.createdAt.toISOString(),
@@ -652,6 +656,10 @@ function serializeContract(row: {
   comments: string;
   fileUrls: unknown;
   ownerId: string | null;
+  opportunityId?: string | null;
+  quoteId?: string | null;
+  opportunity?: { id: string; name: string } | null;
+  quote?: { id: string; quoteNumber: string; title: string } | null;
   createdAt: Date;
   updatedAt: Date;
   client?: { id: string; name: string } | null;
@@ -788,6 +796,13 @@ function serializeContract(row: {
     fileUrls,
     ownerId: row.ownerId,
     ownerName: row.owner?.name || row.owner?.email || "",
+    opportunityId: row.opportunityId ?? null,
+    opportunity: row.opportunity ? { id: row.opportunity.id, name: row.opportunity.name } : null,
+    quoteId: row.quoteId ?? null,
+    quote: row.quote
+      ? { id: row.quote.id, quoteNumber: row.quote.quoteNumber, title: row.quote.title }
+      : null,
+    poNumber: extractPoNumber(row.comments),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     workUnitMonths:
@@ -856,9 +871,19 @@ function serializeContract(row: {
   };
 }
 
+/** Contracts have no dedicated PO field yet: pick "PO 123456" / "PO: 123456" out of the comments. */
+function extractPoNumber(comments: string | null | undefined): string | null {
+  const match = /(?:\bPO\b|\bP\.O\.|\bpurchase order\b)(?:\s*(?:no\.?|number|#))?\s*[:#-]?\s*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,})/i.exec(
+    comments ?? "",
+  );
+  return match?.[1] ?? null;
+}
+
 const contractInclude = {
   client: { select: { id: true, name: true } },
   owner: { select: { id: true, name: true, email: true } },
+  opportunity: { select: { id: true, name: true } },
+  quote: { select: { id: true, quoteNumber: true, title: true } },
   contractProfiles: { select: { id: true } },
   careerApplication: { select: { id: true } },
   variations: {
