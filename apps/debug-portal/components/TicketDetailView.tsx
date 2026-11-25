@@ -12,6 +12,7 @@ import {
   MAX_TICKET_SCREENSHOTS,
   TICKET_ATTACHMENT_ACCEPT,
   attachmentLabel,
+  isAcceptedTicketAttachment,
   isPdfUrl,
   uploadScreenshots,
 } from "@/lib/upload-screenshot";
@@ -434,6 +435,12 @@ export function TicketDetailView({
 
   async function addScreenshots(files: FileList | null) {
     if (!row || !files?.length) return;
+    const incoming = Array.from(files);
+    const accepted = incoming.filter(isAcceptedTicketAttachment);
+    if (!accepted.length) {
+      setError("Only PNG, JPEG, GIF, WebP images or PDF files can be attached.");
+      return;
+    }
     const room = MAX_TICKET_SCREENSHOTS - shots.length;
     if (room <= 0) {
       setError(`A ticket can have at most ${MAX_TICKET_SCREENSHOTS} screenshots.`);
@@ -442,7 +449,7 @@ export function TicketDetailView({
     setUploadingShots(true);
     setError("");
     try {
-      const urls = await uploadScreenshots(Array.from(files).slice(0, room));
+      const urls = await uploadScreenshots(accepted.slice(0, room));
       const res = await fetch(`/api/debug-portal/tickets/${id}/screenshots`, {
         method: "POST",
         credentials: "include",
@@ -1029,7 +1036,7 @@ export function TicketDetailView({
                 <input
                   type="file"
                   multiple
-                  accept={TICKET_ATTACHMENT_ACCEPT}
+                  accept={`${TICKET_ATTACHMENT_ACCEPT},.png,.jpg,.jpeg,.gif,.webp,.pdf`}
                   className="sr-only"
                   disabled={uploadingShots}
                   onClick={(e) => e.stopPropagation()}

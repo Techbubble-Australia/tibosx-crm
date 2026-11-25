@@ -10,6 +10,35 @@ export function isPdfFile(file: File): boolean {
   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 }
 
+/** True when a file can be attached to a ticket (by MIME and/or extension). */
+export function isAcceptedTicketAttachment(file: File): boolean {
+  const mime = (file.type || "").toLowerCase();
+  if (mime === "image/jpg" || mime === "image/jpeg" || mime === "image/png" || mime === "image/gif" || mime === "image/webp") {
+    return true;
+  }
+  if (TICKET_ATTACHMENT_ACCEPT.split(",").includes(file.type)) return true;
+  if (isPdfFile(file)) return true;
+  const name = file.name.toLowerCase();
+  if (/\.(png|jpe?g|gif|webp|pdf)$/.test(name)) return true;
+  // Clipboard pastes sometimes omit MIME/type but are still images.
+  if (!mime && (name.startsWith("pasted-") || name === "image.png" || name === "image.jpg")) return true;
+  return false;
+}
+
+/** Collect files from a paste event (clipboard `files` and `items`). */
+export function filesFromClipboard(data: DataTransfer | null | undefined): File[] {
+  if (!data) return [];
+  const fromFiles = Array.from(data.files ?? []);
+  if (fromFiles.length) return fromFiles;
+  const fromItems: File[] = [];
+  for (const item of Array.from(data.items ?? [])) {
+    if (item.kind !== "file") continue;
+    const file = item.getAsFile();
+    if (file) fromItems.push(file);
+  }
+  return fromItems;
+}
+
 export function isPdfUrl(url: string): boolean {
   return /\.pdf(?:$|[?#])/i.test(url);
 }

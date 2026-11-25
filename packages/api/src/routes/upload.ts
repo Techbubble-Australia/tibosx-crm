@@ -39,10 +39,12 @@ const upload = multer({
     const mt = (file.mimetype || "").toLowerCase();
     const allowedMt =
       /^image\/(jpe?g|png|gif|webp)$/.test(mt) ||
+      mt === "image/jpg" ||
       mt === "application/pdf" ||
       mt === "application/msword" ||
       mt === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-    if (allowedExt && allowedMt) {
+    // Accept when extension or MIME matches. Empty MIME is common for paste/browse on some OS/browsers.
+    if (allowedExt || allowedMt) {
       return cb(null, true);
     }
     cb(new Error("Only images (JPEG, PNG, GIF, WebP) and documents are allowed"));
@@ -74,7 +76,12 @@ const attachmentUpload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    if (ATTACHMENT_EXT.test(ext) && ATTACHMENT_MIME.has((file.mimetype || "").toLowerCase())) {
+    const mt = (file.mimetype || "").toLowerCase();
+    const mimeOk = !mt || ATTACHMENT_MIME.has(mt) || mt === "image/jpg" || mt.startsWith("image/");
+    if (ATTACHMENT_EXT.test(ext) || (mt && mimeOk && ATTACHMENT_MIME.has(mt))) {
+      return cb(null, true);
+    }
+    if (!ext && mt && (ATTACHMENT_MIME.has(mt) || mt.startsWith("image/"))) {
       return cb(null, true);
     }
     cb(new Error("Unsupported file type. Allowed: images, PDF, Word, Excel, CSV, TXT, LOG, JSON, ZIP"));

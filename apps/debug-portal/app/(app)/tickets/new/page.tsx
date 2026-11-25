@@ -9,7 +9,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import {
   MAX_TICKET_SCREENSHOTS,
   TICKET_ATTACHMENT_ACCEPT,
-  isPdfFile,
+  filesFromClipboard,
+  isAcceptedTicketAttachment,
   uploadScreenshots,
 } from "@/lib/upload-screenshot";
 import { useSprints } from "@/lib/sprints";
@@ -86,26 +87,42 @@ export default function NewTicketPage() {
   }, [canHaveParent, parentLevel]);
 
   const effectiveStatus = startStatus && (isAdmin || startStatus === "PENDING") ? startStatus : null;
+  const isImageAttachment = (file: File) =>
+    file.type.startsWith("image/") || /\.(png|jpe?g|gif|webp)$/i.test(file.name);
   const imageShots = shots
     .map((shot, index) => ({ shot, index }))
-    .filter(({ shot }) => shot.file.type.startsWith("image/"));
+    .filter(({ shot }) => isImageAttachment(shot.file));
   const fileShots = shots
     .map((shot, index) => ({ shot, index }))
-    .filter(({ shot }) => !shot.file.type.startsWith("image/"));
+    .filter(({ shot }) => !isImageAttachment(shot.file));
 
   const addFiles = useCallback((incoming: File[]) => {
-    const images = incoming.filter((file) => TICKET_ATTACHMENT_ACCEPT.split(",").includes(file.type) || isPdfFile(file));
-    if (incoming.length && !images.length) {
+    const accepted = incoming.filter(isAcceptedTicketAttachment);
+    if (incoming.length && !accepted.length) {
       setError("Only PNG, JPEG, GIF, WebP images or PDF files can be attached.");
       return;
     }
+    setError("");
     setShots((prev) => {
       const room = MAX_TICKET_SCREENSHOTS - prev.length;
-      if (images.length > room) {
+      if (accepted.length > room) {
         setError(`You can attach up to ${MAX_TICKET_SCREENSHOTS} screenshots per ticket.`);
       }
-      const picked = images.slice(0, Math.max(room, 0));
-      return [...prev, ...picked.map((file) => ({ file, previewUrl: URL.createObjectURL(file) }))];
+      const picked = accepted.slice(0, Math.max(room, 0));
+      return [
+        ...prev,
+        ...picked.map((file) => {
+          const normalized =
+            file.type && file.type !== "application/octet-stream"
+              ? file
+              : new File([file], file.name || `attachment-${Date.now()}.png`, {
+                  type: file.name.toLowerCase().endsWith(".pdf")
+                    ? "application/pdf"
+                    : file.type || "image/png",
+                });
+          return { file: normalized, previewUrl: URL.createObjectURL(normalized) };
+        }),
+      ];
     });
   }, []);
 
@@ -115,12 +132,12 @@ export default function NewTicketPage() {
 
   useEffect(() => {
     function onPaste(e: ClipboardEvent) {
-      const files = Array.from(e.clipboardData?.files ?? []);
+      const files = filesFromClipboard(e.clipboardData);
       if (!files.length) return;
       e.preventDefault();
       addFiles(
         files.map((file, i) =>
-          file.name && file.name !== "image.png"
+          file.name && file.name !== "image.png" && file.name !== "image.jpg"
             ? file
             : new File([file], `pasted-${Date.now()}-${i + 1}.png`, { type: file.type || "image/png" }),
         ),
@@ -341,10 +358,13 @@ export default function NewTicketPage() {
               Choose files
               <input
                 type="file"
-                accept={TICKET_ATTACHMENT_ACCEPT}
+                accept={`${TICKET_ATTACHMENT_ACCEPT},.png,.jpg,.jpeg,.gif,.webp,.pdf`}
                 multiple
                 className="hidden"
-                onChange={(e) => onPickScreenshots(e.target.files)}
+                onChange={(e) => {
+                  onPickScreenshots(e.target.files);
+                  e.target.value = "";
+                }}
               />
             </label>
           </div>
