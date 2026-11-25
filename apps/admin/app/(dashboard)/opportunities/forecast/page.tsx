@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Upload } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
-import { ClientsOnlyGuard } from "@/components/ClientsOnlyGuard";
+import { formatCrmMoney } from "@/lib/crm-format";
+import { OpportunitiesShell } from "@/components/opportunities/OpportunitiesShell";
 
 type Opp = {
   id: string;
@@ -16,13 +16,8 @@ type Opp = {
   stageName: string;
   stageType: string | null;
   active: boolean;
-  nextStepDue: string | null;
   ownerName: string;
 };
-
-function money(currency: string, amount: number) {
-  return `${currency} ${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(amount)}`;
-}
 
 export default function OpportunitiesForecastPage() {
   const [rows, setRows] = useState<Opp[]>([]);
@@ -40,6 +35,8 @@ export default function OpportunitiesForecastPage() {
     () => rows.filter((r) => r.active && r.stageType !== "won" && r.stageType !== "lost"),
     [rows],
   );
+
+  const currency = open[0]?.currency || "AUD";
 
   const totals = useMemo(() => {
     const pipeline = open.reduce((s, r) => s + r.amount, 0);
@@ -60,125 +57,105 @@ export default function OpportunitiesForecastPage() {
     return [...map.values()].sort((a, b) => b.amount - a.amount);
   }, [open]);
 
-  const currency = open[0]?.currency || "AUD";
+  const summary = `${totals.count} open · ${formatCrmMoney(totals.pipeline, currency)} · weighted ${formatCrmMoney(totals.weighted, currency)}`;
 
   return (
-    <ClientsOnlyGuard>
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Opportunities</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {totals.count} open · {money(currency, totals.pipeline)} · weighted{" "}
-              {money(currency, totals.weighted)}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/settings/crm/import-export?entity=opportunities"
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium dark:border-gray-600 dark:bg-gray-900"
-            >
-              <Upload className="h-4 w-4" />
-              Import
-            </Link>
-            <Link
-              href="/opportunities/new"
-              className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
-            >
-              <Plus className="h-4 w-4" />
-              Opportunity
-            </Link>
-          </div>
+    <OpportunitiesShell summary={summary}>
+      {loading ? (
+        <div className="flex h-40 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-black border-t-transparent dark:border-white" />
         </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              { label: "Open pipeline", value: formatCrmMoney(totals.pipeline, currency) },
+              { label: "Weighted forecast", value: formatCrmMoney(totals.weighted, currency) },
+              { label: "Open deals", value: String(totals.count) },
+            ].map((k) => (
+              <div
+                key={k.label}
+                className="rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900"
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{k.label}</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-gray-900 dark:text-gray-100">{k.value}</p>
+              </div>
+            ))}
+          </div>
 
-        {loading ? (
-          <p className="text-sm text-gray-500">Loading forecast…</p>
-        ) : (
-          <>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {[
-                { label: "Open pipeline", value: money(currency, totals.pipeline) },
-                { label: "Weighted forecast", value: money(currency, totals.weighted) },
-                { label: "Open deals", value: String(totals.count) },
-              ].map((k) => (
-                <div key={k.label} className="border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900">
-                  <p className="text-xs uppercase tracking-wide text-gray-500">{k.label}</p>
-                  <p className="mt-1 text-xl font-semibold tabular-nums text-gray-900 dark:text-gray-100">{k.value}</p>
-                </div>
-              ))}
+          <section className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+            <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">By stage</h3>
             </div>
-
-            <section className="border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-              <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">By stage</h3>
-              </div>
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500 dark:bg-gray-800">
-                  <tr>
-                    <th className="px-4 py-2">Stage</th>
-                    <th className="px-4 py-2">Deals</th>
-                    <th className="px-4 py-2">Pipeline</th>
-                    <th className="px-4 py-2">Weighted</th>
+            <table className="min-w-full text-sm">
+              <thead className="text-left text-xs text-gray-500">
+                <tr>
+                  <th className="px-4 py-2 font-medium">Stage</th>
+                  <th className="px-4 py-2 font-medium">Deals</th>
+                  <th className="px-4 py-2 font-medium">Pipeline</th>
+                  <th className="px-4 py-2 font-medium">Weighted</th>
+                </tr>
+              </thead>
+              <tbody>
+                {byStage.map((s) => (
+                  <tr key={s.name} className="border-t border-gray-100 dark:border-gray-800">
+                    <td className="px-4 py-2.5 font-medium text-gray-900 dark:text-gray-100">{s.name}</td>
+                    <td className="px-4 py-2.5 tabular-nums">{s.count}</td>
+                    <td className="px-4 py-2.5 tabular-nums">{formatCrmMoney(s.amount, currency)}</td>
+                    <td className="px-4 py-2.5 tabular-nums">{formatCrmMoney(s.weighted, currency)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {byStage.map((s) => (
-                    <tr key={s.name} className="border-t border-gray-100 dark:border-gray-800">
-                      <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">{s.name}</td>
-                      <td className="px-4 py-2 tabular-nums">{s.count}</td>
-                      <td className="px-4 py-2 tabular-nums">{money(currency, s.amount)}</td>
-                      <td className="px-4 py-2 tabular-nums">{money(currency, s.weighted)}</td>
-                    </tr>
-                  ))}
-                  {!byStage.length ? (
-                    <tr>
-                      <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
-                        No open opportunities.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </section>
-
-            <section className="border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-              <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Open deals</h3>
-              </div>
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500 dark:bg-gray-800">
+                ))}
+                {!byStage.length ? (
                   <tr>
-                    <th className="px-4 py-2">Opportunity</th>
-                    <th className="px-4 py-2">Client</th>
-                    <th className="px-4 py-2">Stage</th>
-                    <th className="px-4 py-2">Value</th>
-                    <th className="px-4 py-2">Weighted</th>
-                    <th className="px-4 py-2">Owner</th>
+                    <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
+                      No open opportunities.
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {open.map((r) => (
-                    <tr key={r.id} className="border-t border-gray-100 dark:border-gray-800">
-                      <td className="px-4 py-2">
-                        <Link href={`/opportunities/${r.id}`} className="font-medium text-blue-600 hover:underline">
-                          {r.name}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-2 text-gray-600">{r.clientName}</td>
-                      <td className="px-4 py-2">{r.stageName || "—"}</td>
-                      <td className="px-4 py-2 tabular-nums">{money(r.currency, r.amount)}</td>
-                      <td className="px-4 py-2 tabular-nums">
-                        {money(r.currency, r.amount * ((r.probability ?? 0) / 100))}
-                      </td>
-                      <td className="px-4 py-2 text-gray-600">{r.ownerName || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          </>
-        )}
-      </div>
-    </ClientsOnlyGuard>
+                ) : null}
+              </tbody>
+            </table>
+          </section>
+
+          <section className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+            <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Open deals</h3>
+            </div>
+            <table className="min-w-full text-sm">
+              <thead className="text-left text-xs text-gray-500">
+                <tr>
+                  <th className="px-4 py-2 font-medium">Opportunity</th>
+                  <th className="px-4 py-2 font-medium">Client</th>
+                  <th className="px-4 py-2 font-medium">Stage</th>
+                  <th className="px-4 py-2 font-medium">Value</th>
+                  <th className="px-4 py-2 font-medium">Weighted</th>
+                  <th className="px-4 py-2 font-medium">Owner</th>
+                </tr>
+              </thead>
+              <tbody>
+                {open.map((r) => (
+                  <tr key={r.id} className="border-t border-gray-100 dark:border-gray-800">
+                    <td className="px-4 py-2.5">
+                      <Link
+                        href={`/opportunities/${r.id}`}
+                        className="font-medium text-gray-900 hover:underline dark:text-gray-100"
+                      >
+                        {r.name}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">{r.clientName}</td>
+                    <td className="px-4 py-2.5">{r.stageName || "—"}</td>
+                    <td className="px-4 py-2.5 tabular-nums">{formatCrmMoney(r.amount, r.currency)}</td>
+                    <td className="px-4 py-2.5 tabular-nums">
+                      {formatCrmMoney(r.amount * ((r.probability ?? 0) / 100), r.currency)}
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">{r.ownerName || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        </div>
+      )}
+    </OpportunitiesShell>
   );
 }

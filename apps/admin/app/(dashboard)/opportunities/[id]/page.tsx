@@ -421,7 +421,7 @@ export default function EditOpportunityPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-3">
             <Link
-              href="/opportunities/active"
+              href="/opportunities"
               className="mt-0.5 rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800"
               aria-label="Back to opportunities"
             >

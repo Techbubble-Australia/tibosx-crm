@@ -54,6 +54,8 @@ type ContactOption = { id: string; name: string; email: string };
 type Props = {
   /** When undefined, list shows all opportunities (wireframe List tab). */
   activeFilter?: boolean;
+  /** When true, omit page title / Import / Add (parent OpportunitiesShell owns chrome). */
+  embedded?: boolean;
 };
 
 function formatValue(row: OpportunityRow): string {
@@ -123,7 +125,7 @@ function InlineEditableCell({
   );
 }
 
-export function OpportunitiesListPage({ activeFilter }: Props) {
+export function OpportunitiesListPage({ activeFilter, embedded = false }: Props) {
   const searchParams = useSearchParams();
   const clientIdFilter = searchParams.get("clientId")?.trim() ?? "";
   const listTab = activeFilter === false ? "inactive" : "list";
@@ -698,41 +700,50 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
 
   return (
     <div>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {activeFilter === true
-              ? "Active opportunities"
-              : activeFilter === false
-                ? "Inactive opportunities"
-                : "All opportunities"}
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {clientIdFilter && clientName
-              ? `Showing opportunities for ${clientName}.`
-              : activeFilter === true
-                ? "Opportunities currently being pursued."
+      {!embedded ? (
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {activeFilter === true
+                ? "Active opportunities"
                 : activeFilter === false
-                  ? "Archived opportunities no longer being pursued."
-                  : "Board companion list of deals."}
-          </p>
-          {clientIdFilter ? (
-            <Link href={`/opportunities/${listTab}`} className="mt-1 inline-block text-sm text-blue-600 hover:underline dark:text-blue-400">
-              Show all opportunities
+                  ? "Inactive opportunities"
+                  : "All opportunities"}
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {clientIdFilter && clientName
+                ? `Showing opportunities for ${clientName}.`
+                : activeFilter === true
+                  ? "Opportunities currently being pursued."
+                  : activeFilter === false
+                    ? "Archived opportunities no longer being pursued."
+                    : "Board companion list of deals."}
+            </p>
+            {clientIdFilter ? (
+              <Link
+                href={`/opportunities/${listTab}`}
+                className="mt-1 inline-block text-sm text-blue-600 hover:underline dark:text-blue-400"
+              >
+                Show all opportunities
+              </Link>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+            <Link
+              href="/opportunities/new"
+              className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+            >
+              <Plus className="h-4 w-4" />
+              Add Opportunity
             </Link>
-          ) : null}
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+      ) : (
+        <div className="mb-4 flex justify-end">
           <ViewModeToggle mode={viewMode} onChange={setViewMode} />
-          <Link
-            href="/opportunities/new"
-            className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
-          >
-            <Plus className="h-4 w-4" />
-            Add Opportunity
-          </Link>
         </div>
-      </div>
+      )}
 
       <AdminSearchField
         id="opportunity-search"
