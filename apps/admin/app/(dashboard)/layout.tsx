@@ -59,7 +59,8 @@ import { AppAlertProvider } from "@/components/ui/AppAlertProvider";
 import { TechBubbleLogo } from "@/components/TechBubbleLogo";
 import { InactivityLogout } from "@/components/InactivityLogout";
 import { TicketPortalLink } from "@/components/TicketPortalLink";
-import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
+import { TenantWorkspaceMenu } from "@/components/TenantWorkspaceMenu";
+import { GlobalCrmSearch } from "@/components/GlobalCrmSearch";
 import { isCareerApplicationsPath, isJobListingsPath } from "@/lib/job-routes";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { useIsDevelopmentAppEnv } from "@/lib/use-is-development-app-env";
@@ -406,9 +407,6 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
   const onClientHome = pathUnder("/workspace/client", pathname);
   /** Single Home nav item; Personal/Client switching is only on the Home pages. */
   const workspaceHomeActive = onPersonalHome || onClientHome;
-  const canSwitchWorkspaces = !clientHome && (isAdminHome || canAccessClientWorkspace);
-  const showHomeWorkspaceSwitcher =
-    !loading && showWorkspaceHome && canSwitchWorkspaces && (onPersonalHome || onClientHome);
 
   function toggleGroup(id: string) {
     setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -595,11 +593,15 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
 
       <main className="min-w-0 flex-1 bg-gray-50 dark:bg-gray-950">
         <ImpersonationBanner />
-        <header className="flex flex-wrap items-center justify-end gap-3 border-b border-gray-200 bg-white px-6 py-4 dark:border-gray-700 dark:bg-gray-900 lg:px-8">
-          <div className="flex items-center gap-3">
-            {showHomeWorkspaceSwitcher ? (
-              <WorkspaceSwitcher showPersonal showClient={isAdminHome || canAccessClientWorkspace} />
-            ) : null}
+        <header className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900 sm:px-6 lg:px-8">
+          <TenantWorkspaceMenu
+            showPersonalHome={showWorkspaceHome}
+            personalHomeHref={personalHomeHref}
+            showClientHome={isAdminHome || canAccessClientWorkspace}
+            accessLabel={accessLabel}
+          />
+          <GlobalCrmSearch />
+          <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
             <TicketPortalLink />
             {!loading && email ? <HelpSupportHeaderButton /> : null}
             {!loading && email ? (
