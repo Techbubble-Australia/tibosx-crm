@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Clock } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { appAlert } from "@/lib/app-alert";
-import { formatCrmMoney, formatCrmShortDate, titleCaseToken } from "@/lib/crm-format";
+import { formatCrmMoney, formatCrmMoneyCompact, formatCrmShortDate, titleCaseToken } from "@/lib/crm-format";
 import { OpportunitiesShell } from "@/components/opportunities/OpportunitiesShell";
 
 type Stage = {
@@ -38,9 +37,6 @@ type BoardData = {
   columns: Array<{ stage: Stage; opportunities: BoardOpp[] }>;
   unstaged: BoardOpp[];
 };
-
-const filterSelectClass =
-  "rounded-md border border-gray-200 bg-white py-1.5 pl-2 pr-7 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100";
 
 const ENGAGEMENT_OPTIONS = [
   { value: "", label: "all" },
@@ -83,7 +79,7 @@ function isClosingThisMonth(opp: BoardOpp) {
   return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
 }
 
-function FilterLabel({
+function FilterControl({
   label,
   children,
 }: {
@@ -91,8 +87,8 @@ function FilterLabel({
   children: React.ReactNode;
 }) {
   return (
-    <label className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
-      <span className="font-medium text-gray-700 dark:text-gray-300">{label}:</span>
+    <label className="inline-flex h-9 items-center gap-1.5 rounded-md border border-gray-200 bg-white pl-2.5 pr-1 text-sm dark:border-gray-600 dark:bg-gray-900">
+      <span className="whitespace-nowrap font-medium text-gray-700 dark:text-gray-300">{label}:</span>
       {children}
     </label>
   );
@@ -163,19 +159,18 @@ export function OpportunitiesBoard() {
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [board]);
 
-  function matchesFilters(o: BoardOpp) {
+  function matchesBase(o: BoardOpp) {
     if (ownerFilter === "__unassigned" && o.ownerName) return false;
     if (ownerFilter && ownerFilter !== "__unassigned" && o.ownerName !== ownerFilter) return false;
-    if (engagementFilter) {
-      const eng = normalizeEngagement(o.engagementModel);
-      if (eng !== normalizeEngagement(engagementFilter)) return false;
+    if (engagementFilter && normalizeEngagement(o.engagementModel) !== normalizeEngagement(engagementFilter)) {
+      return false;
     }
-    if (savedView === "closing" && !isClosingThisMonth(o) && (o.probability ?? 0) < 50) {
-      // Wireframe default "Closing this month" — keep high-prob + due this month; if empty filter too aggressive, show all when none match later
-    }
-    if (savedView === "closing") {
-      return isClosingThisMonth(o) || (o.probability ?? 0) >= 50;
-    }
+    return true;
+  }
+
+  function matchesFilters(o: BoardOpp) {
+    if (!matchesBase(o)) return false;
+    if (savedView === "closing") return isClosingThisMonth(o) || (o.probability ?? 0) >= 50;
     if (savedView === "no_next") return !o.nextStep?.trim();
     return true;
   }
@@ -211,47 +206,45 @@ export function OpportunitiesBoard() {
         draggable={!movingId}
         onDragStart={() => setDragOppId(opp.id)}
         onDragEnd={() => setDragOppId(null)}
-        className={`overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900 ${
+        className={`overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 ${
           dragOppId === opp.id ? "opacity-60" : ""
         }`}
       >
-        <div className="space-y-1.5 p-3">
+        <div className="px-3 pb-2.5 pt-3">
           <Link
             href={`/opportunities/${opp.id}`}
-            className="block text-sm font-semibold text-gray-900 hover:underline dark:text-gray-100"
+            className="block text-[13px] font-semibold leading-snug text-gray-950 hover:underline dark:text-gray-100"
           >
             {opp.name}
           </Link>
-          <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+          <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
             {opp.clientName || "—"}
             {eng ? ` · ${eng}` : ""}
           </p>
-          <div className="flex items-center justify-between gap-2 pt-0.5">
-            <p className="text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+          {/* Value | % | avatar — one row, matching wireframe */}
+          <div className="mt-2.5 grid grid-cols-3 items-center">
+            <p className="text-[15px] font-semibold tabular-nums text-gray-950 dark:text-gray-100">
               {formatCrmMoney(opp.amount, opp.currency)}
             </p>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs tabular-nums text-gray-500">{prob}%</span>
+            <span className="text-center text-xs tabular-nums text-gray-500">{prob}%</span>
+            <span className="flex justify-end">
               <span
                 title={opp.ownerName || "Unassigned"}
                 className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-300"
               >
                 {ownerInitials(opp.ownerName || "?")}
               </span>
-            </div>
+            </span>
           </div>
         </div>
-        <div className="border-t border-gray-100 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-950/50">
+        <div className="border-t border-gray-100 px-3 py-2 dark:border-gray-800">
           {hasNextStep ? (
-            <p className="flex items-start gap-1.5 text-[11px] text-gray-600 dark:text-gray-400">
-              <Clock className="mt-0.5 h-3 w-3 shrink-0 text-gray-400" aria-hidden />
-              <span className="line-clamp-2">
-                Next: {opp.nextStep}
-                {dueLabel ? `, ${dueLabel}` : ""}
-              </span>
+            <p className="text-[11px] leading-snug text-gray-500 dark:text-gray-400">
+              Next: {opp.nextStep}
+              {dueLabel ? `, ${dueLabel}` : ""}
             </p>
           ) : (
-            <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-200">
+            <span className="inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600 dark:bg-red-900/30 dark:text-red-300">
               No next step
             </span>
           )}
@@ -260,23 +253,26 @@ export function OpportunitiesBoard() {
     );
   }
 
+  const bareSelectClass =
+    "max-w-[11rem] border-0 bg-transparent py-1.5 pl-0 pr-1 text-sm text-gray-800 focus:outline-none focus:ring-0 dark:text-gray-100";
+
   const filters = (
     <>
-      <FilterLabel label="Pipeline">
+      <FilterControl label="Pipeline">
         <select
           value={pipelineId || board?.pipeline?.id || ""}
           onChange={(e) => setPipelineId(e.target.value)}
-          className={filterSelectClass}
+          className={bareSelectClass}
         >
           {(pipelines.length ? pipelines : board?.pipeline ? [board.pipeline] : []).map((p) => (
             <option key={p.id} value={p.id}>
-              {p.name}
+              {p.name.replace(/\s*pipeline$/i, "") || p.name}
             </option>
           ))}
         </select>
-      </FilterLabel>
-      <FilterLabel label="Owner">
-        <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} className={filterSelectClass}>
+      </FilterControl>
+      <FilterControl label="Owner">
+        <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} className={bareSelectClass}>
           <option value="">everyone</option>
           <option value="__unassigned">Unassigned</option>
           {ownerOptions.map((name) => (
@@ -285,12 +281,12 @@ export function OpportunitiesBoard() {
             </option>
           ))}
         </select>
-      </FilterLabel>
-      <FilterLabel label="Engagement model">
+      </FilterControl>
+      <FilterControl label="Engagement model">
         <select
           value={engagementFilter}
           onChange={(e) => setEngagementFilter(e.target.value)}
-          className={filterSelectClass}
+          className={bareSelectClass}
         >
           {ENGAGEMENT_OPTIONS.map((o) => (
             <option key={o.value || "all"} value={o.value}>
@@ -298,14 +294,14 @@ export function OpportunitiesBoard() {
             </option>
           ))}
         </select>
-      </FilterLabel>
-      <FilterLabel label="Saved view">
-        <select value={savedView} onChange={(e) => setSavedView(e.target.value)} className={filterSelectClass}>
-          <option value="all">All open</option>
+      </FilterControl>
+      <FilterControl label="Saved view">
+        <select value={savedView} onChange={(e) => setSavedView(e.target.value)} className={bareSelectClass}>
           <option value="closing">Closing this month</option>
+          <option value="all">All open</option>
           <option value="no_next">No next step</option>
         </select>
-      </FilterLabel>
+      </FilterControl>
     </>
   );
 
@@ -338,77 +334,51 @@ export function OpportunitiesBoard() {
       ...c,
       opportunities: c.opportunities.filter(matchesFilters),
     })),
-    ...(board.unstaged.filter(matchesFilters).length
-      ? [
-          {
-            stage: {
-              id: "__unstaged",
-              name: "Unstaged",
-              stageType: "open",
-              winProbability: 0,
-              order: 999,
-            } as Stage,
-            opportunities: board.unstaged.filter(matchesFilters),
-          },
-        ]
-      : []),
   ];
 
-  // If "Closing this month" yields nothing, fall back to all filtered by owner/engagement so the board isn't empty.
   const anyVisible = columns.some((c) => c.opportunities.length > 0);
   if (!anyVisible && savedView === "closing") {
-    columns = [
-      ...board.columns.map((c) => ({
-        ...c,
-        opportunities: c.opportunities.filter((o) => {
-          if (ownerFilter === "__unassigned" && o.ownerName) return false;
-          if (ownerFilter && ownerFilter !== "__unassigned" && o.ownerName !== ownerFilter) return false;
-          if (engagementFilter && normalizeEngagement(o.engagementModel) !== normalizeEngagement(engagementFilter)) {
-            return false;
-          }
-          return true;
-        }),
-      })),
-    ];
+    columns = board.columns.map((c) => ({
+      ...c,
+      opportunities: c.opportunities.filter(matchesBase),
+    }));
   }
 
   return (
     <OpportunitiesShell summary={summary.label} filters={filters}>
-      <div className="flex gap-3 overflow-x-auto pb-1">
+      <div className="flex gap-3 overflow-x-auto pb-2">
         {columns.map((col) => {
-          const isDropTarget = col.stage.id !== "__unstaged";
+          const isDropTarget = true;
           const sum = columnSum(col.opportunities);
           const currency = col.opportunities[0]?.currency ?? summary.currency;
           return (
             <div
               key={col.stage.id}
               onDragOver={(e) => {
-                if (isDropTarget) e.preventDefault();
+                e.preventDefault();
               }}
               onDrop={(e) => {
                 e.preventDefault();
-                if (dragOppId && isDropTarget) void moveToStage(dragOppId, col.stage.id);
+                if (dragOppId) void moveToStage(dragOppId, col.stage.id);
               }}
-              className="flex w-[17.5rem] shrink-0 flex-col"
+              className="flex w-[16.5rem] shrink-0 flex-col"
             >
               <div className="mb-2 px-0.5">
                 <div className="flex items-baseline justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{col.stage.name}</h3>
-                  {col.stage.id !== "__unstaged" ? (
-                    <span className="text-xs tabular-nums text-gray-500">{col.stage.winProbability}%</span>
-                  ) : null}
+                  <h3 className="text-sm font-semibold text-gray-950 dark:text-gray-100">{col.stage.name}</h3>
+                  <span className="text-xs tabular-nums text-gray-500">{col.stage.winProbability}%</span>
                 </div>
-                <p className="text-xs tabular-nums text-gray-500">
-                  {col.opportunities.length} · {formatCrmMoney(sum, currency)}
+                <p className="mt-0.5 text-xs tabular-nums text-gray-500">
+                  {col.opportunities.length} · {formatCrmMoneyCompact(sum, currency)}
                 </p>
               </div>
               <div
-                className={`flex min-h-[12rem] flex-1 flex-col gap-2 rounded-xl bg-gray-100/80 p-2 dark:bg-gray-950/50 ${
+                className={`flex min-h-[14rem] flex-1 flex-col gap-2 rounded-xl bg-[#eceef1] p-2 dark:bg-gray-950/60 ${
                   dragOppId && isDropTarget ? "ring-2 ring-gray-300 dark:ring-gray-600" : ""
                 }`}
               >
                 {col.opportunities.length === 0 ? (
-                  <p className="px-1 py-6 text-center text-xs text-gray-400">Empty</p>
+                  <p className="px-1 py-8 text-center text-xs text-gray-400">Empty</p>
                 ) : (
                   col.opportunities.map((opp) => renderCard(opp, col.stage.winProbability))
                 )}
@@ -419,10 +389,10 @@ export function OpportunitiesBoard() {
       </div>
 
       <section className="rounded-xl border border-gray-200 bg-white px-5 py-4 dark:border-gray-700 dark:bg-gray-900">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+        <h2 className="text-sm font-semibold text-gray-950 dark:text-gray-100">
           What changed from the current Opportunities page
         </h2>
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-600 dark:text-gray-400">
+        <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-snug text-gray-600 dark:text-gray-400">
           <li>Single &quot;In progress&quot; status is replaced by stages with probability, so forecast is weighted.</li>
           <li>
             Free-text Comments is replaced by a mandatory next step and date; cards with none are flagged.

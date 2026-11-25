@@ -5,6 +5,18 @@ export function formatCrmMoney(amount: number, currency = "AUD"): string {
   return code === "AUD" ? `A$${n}` : `${code} ${n}`;
 }
 
+/** Compact board column totals, e.g. A$61k. */
+export function formatCrmMoneyCompact(amount: number, currency = "AUD"): string {
+  const code = (currency || "AUD").toUpperCase();
+  const abs = Math.abs(amount || 0);
+  if (abs >= 1000) {
+    const k = Math.round(abs / 1000);
+    const prefix = code === "AUD" ? "A$" : `${code} `;
+    return `${amount < 0 ? "-" : ""}${prefix}${k}k`;
+  }
+  return formatCrmMoney(amount, currency);
+}
+
 /** Short en-AU date, e.g. "12 Dec". Returns "" for missing/invalid values. */
 export function formatCrmShortDate(value: string | Date | null | undefined): string {
   if (!value) return "";
