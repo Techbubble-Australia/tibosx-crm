@@ -9,6 +9,7 @@ const LEAD_STATUSES = [
   "NEW",
   "CONTACTED",
   "QUALIFIED",
+  "NURTURING",
   "UNQUALIFIED",
   "CONVERTED",
   "DISQUALIFIED",
@@ -47,12 +48,29 @@ function serializeLead(row: any) {
 
 router.get("/", async (req: AuthRequest, res) => {
   const tenantId = req.tenant!.tenantId;
-  const status = typeof req.query.status === "string" ? req.query.status : undefined;
+  const status = typeof req.query.status === "string" ? req.query.status.trim() : "";
+  const source = typeof req.query.source === "string" ? req.query.source.trim() : "";
+  const ownerId = typeof req.query.ownerId === "string" ? req.query.ownerId.trim() : "";
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+
+  /** Wireframe "Status: open" = active pipeline (not converted / disqualified / unqualified). */
+  const statusFilter =
+    status === "open"
+      ? { status: { in: ["NEW", "CONTACTED", "QUALIFIED", "NURTURING"] } }
+      : status
+        ? { status }
+        : {};
+
   const leads = await prisma.lead.findMany({
     where: {
       tenantId,
-      ...(status ? { status } : {}),
+      ...statusFilter,
+      ...(source ? { source } : {}),
+      ...(ownerId === "unassigned"
+        ? { ownerId: null }
+        : ownerId
+          ? { ownerId }
+          : {}),
       ...(q
         ? {
             OR: [

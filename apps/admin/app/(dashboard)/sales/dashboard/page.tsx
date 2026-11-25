@@ -171,7 +171,6 @@ export default function SalesDashboardPage() {
       `weighted_forecast,${kpis?.weightedForecast ?? 0}`,
       `win_rate_90d,${kpis?.winRateLast90Days ?? ""}`,
       `avg_sales_cycle_days,${kpis?.avgSalesCycleDays ?? ""}`,
-      `active_contracts,${kpis?.activeContracts ?? 0}`,
       ...stages.map((s) => `stage_${s.stageName.replace(/,/g, " ")},${s.amount}`),
     ];
     const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
@@ -246,7 +245,7 @@ export default function SalesDashboardPage() {
           </div>
         ) : (
           <>
-            <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {[
                 {
                   label: "Open pipeline",
@@ -275,12 +274,6 @@ export default function SalesDashboardPage() {
                       ? `${kpis.avgSalesCycleDeltaDays < 0 ? "down" : "up"} ${Math.abs(Math.round(kpis.avgSalesCycleDeltaDays))} days`
                       : "won deals (created → close)",
                   href: "/opportunities/list",
-                },
-                {
-                  label: "Active contracts",
-                  value: String(kpis?.activeContracts ?? 0),
-                  detail: `${kpis?.contractsExpiringThisMonth ?? 0} expiring this month`,
-                  href: "/contracts/active",
                 },
               ].map((card) => (
                 <Link

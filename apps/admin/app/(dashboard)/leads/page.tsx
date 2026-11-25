@@ -1,23 +1,13 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Plus, RefreshCw, Upload } from "lucide-react";
+import { Plus } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { appAlert } from "@/lib/app-alert";
 import { ClientsOnlyGuard } from "@/components/ClientsOnlyGuard";
 import { titleCaseToken } from "@/lib/crm-format";
-
-const LEAD_STATUSES = [
-  "NEW",
-  "CONTACTED",
-  "QUALIFIED",
-  "NURTURING",
-  "UNQUALIFIED",
-  "CONVERTED",
-  "DISQUALIFIED",
-] as const;
 
 type Lead = {
   id: string;
@@ -36,17 +26,29 @@ type Lead = {
   createdAt: string;
 };
 
-const inputClass =
-  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
-
+/** Wireframe status pills */
 const STATUS_BADGE: Record<string, string> = {
-  NEW: "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-  CONTACTED: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
-  QUALIFIED: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
-  NURTURING: "bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300",
-  CONVERTED: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  NEW: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200",
+  CONTACTED: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200",
+  QUALIFIED: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200",
+  NURTURING: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  CONVERTED: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+  UNQUALIFIED: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+  DISQUALIFIED: "bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
 };
 const STATUS_BADGE_FALLBACK = "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+
+const STATUS_FILTER_OPTIONS = [
+  { value: "open", label: "open" },
+  { value: "NEW", label: "New" },
+  { value: "CONTACTED", label: "Contacted" },
+  { value: "QUALIFIED", label: "Qualified" },
+  { value: "NURTURING", label: "Nurturing" },
+  { value: "CONVERTED", label: "Converted" },
+  { value: "UNQUALIFIED", label: "Unqualified" },
+  { value: "DISQUALIFIED", label: "Disqualified" },
+  { value: "", label: "all" },
+] as const;
 
 function formatCreated(value: string) {
   const date = new Date(value);
@@ -62,38 +64,51 @@ function formatCreated(value: string) {
   return date.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
 }
 
+function sourceLabel(source: string | null | undefined) {
+  const s = (source ?? "").trim().toLowerCase();
+  if (!s || s === "manual") return "Manual";
+  if (s === "website" || s === "web" || s === "website_form" || s === "contact_form") {
+    return "Website form";
+  }
+  if (s === "referral") return "Referral";
+  if (s === "event") return "Event";
+  if (s === "careers" || s === "careers_page") return "Careers page";
+  return titleCaseToken(source);
+}
+
 function ownerLabel(lead: Lead) {
   if (!lead.owner) return "Unassigned";
   return lead.owner.name?.trim() || lead.owner.email || "Unassigned";
 }
 
+const filterSelectClass =
+  "rounded-md border border-gray-200 bg-white py-1.5 pl-2.5 pr-8 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100";
+
 function LeadsPageInner() {
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight")?.trim() ?? "";
+  const qParam = searchParams.get("q")?.trim() ?? "";
+
   const [rows, setRows] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
-  const [q, setQ] = useState(() => searchParams.get("q")?.trim() ?? "");
-  const [status, setStatus] = useState("");
-  const [syncing, setSyncing] = useState(false);
+  const [status, setStatus] = useState("open");
+  const [source, setSource] = useState("");
+  const [ownerId, setOwnerId] = useState("");
   const [convertingId, setConvertingId] = useState<string | null>(null);
-
-  // Keep the search box in sync when ?q= changes (e.g. global search navigation).
-  const qParam = searchParams.get("q")?.trim() ?? "";
-  useEffect(() => {
-    setQ(qParam);
-  }, [qParam]);
 
   const load = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (q.trim()) params.set("q", q.trim());
+    if (qParam) params.set("q", qParam);
     if (status) params.set("status", status);
+    if (source) params.set("source", source);
+    if (ownerId) params.set("ownerId", ownerId);
     void adminFetch(`/api/admin/crm/leads?${params.toString()}`)
       .then((res) => res.json())
       .then((data) => setRows((data.data ?? []) as Lead[]))
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [q, status]);
+  }, [qParam, status, source, ownerId]);
 
   useEffect(() => {
     load();
@@ -103,6 +118,26 @@ function LeadsPageInner() {
     if (!highlightId || loading) return;
     document.getElementById(`lead-row-${highlightId}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [highlightId, loading, rows]);
+
+  const sourceOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const row of rows) {
+      if (row.source?.trim()) set.add(row.source.trim());
+    }
+    // Always offer common wireframe sources even if empty list.
+    for (const s of ["website", "referral", "event", "careers_page", "manual"]) set.add(s);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+
+  const ownerOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      if (row.owner?.id) {
+        map.set(row.owner.id, row.owner.name?.trim() || row.owner.email);
+      }
+    }
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [rows]);
 
   async function convertLead(id: string) {
     setConvertingId(id);
@@ -122,7 +157,7 @@ function LeadsPageInner() {
               ? {
                   ...r,
                   status: "CONVERTED",
-                  opportunity: { id: opportunityId, name: "Converted opportunity" },
+                  opportunity: { id: opportunityId, name: r.company || `${r.firstName} ${r.lastName}` },
                 }
               : r,
           ),
@@ -136,43 +171,25 @@ function LeadsPageInner() {
     }
   }
 
-  async function syncSubmissions() {
-    setSyncing(true);
-    try {
-      const res = await adminFetch("/api/admin/crm/leads/sync-contact-submissions", {
-        method: "POST",
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Sync failed");
-      appAlert(`Synced: ${data.data?.created ?? 0} new lead(s) from ${data.data?.scanned ?? 0} submissions.`);
-      load();
-    } catch (err) {
-      appAlert(err instanceof Error ? err.message : "Sync failed");
-    } finally {
-      setSyncing(false);
-    }
-  }
-
   return (
-    <div>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Leads</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Leads</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Website contact submissions land here automatically
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/settings/crm/import-export?entity=leads"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+            className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
           >
-            <Upload className="h-4 w-4" />
             Import
           </Link>
           <Link
             href="/leads/new"
-            className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-gray-950 px-3.5 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
           >
             <Plus className="h-4 w-4" />
             Lead
@@ -180,30 +197,64 @@ function LeadsPageInner() {
         </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search name, email, company…"
-          className={`${inputClass} max-w-xs`}
-        />
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className={`${inputClass} max-w-[200px]`}>
-          <option value="">All statuses</option>
-          {LEAD_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {titleCaseToken(s)}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={() => void syncSubmissions()}
-          disabled={syncing}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
-          Sync website submissions
-        </button>
+      {/* Wireframe filter row: Status / Source / Owner */}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+          <span className="font-medium text-gray-700 dark:text-gray-300">Status:</span>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className={filterSelectClass}
+            aria-label="Status"
+          >
+            {STATUS_FILTER_OPTIONS.map((opt) => (
+              <option key={opt.value || "all"} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+          <span className="font-medium text-gray-700 dark:text-gray-300">Source:</span>
+          <select
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+            className={filterSelectClass}
+            aria-label="Source"
+          >
+            <option value="">all</option>
+            {sourceOptions.map((s) => (
+              <option key={s} value={s}>
+                {sourceLabel(s)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+          <span className="font-medium text-gray-700 dark:text-gray-300">Owner:</span>
+          <select
+            value={ownerId}
+            onChange={(e) => setOwnerId(e.target.value)}
+            className={filterSelectClass}
+            aria-label="Owner"
+          >
+            <option value="">all</option>
+            <option value="unassigned">Unassigned</option>
+            {ownerOptions.map(([id, label]) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {qParam ? (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Searching “{qParam}”
+            <Link href="/leads" className="ml-2 underline hover:text-gray-800 dark:hover:text-gray-200">
+              Clear
+            </Link>
+          </p>
+        ) : null}
       </div>
 
       {loading ? (
@@ -211,86 +262,99 @@ function LeadsPageInner() {
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-black border-t-transparent dark:border-white" />
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Lead</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Source</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Created</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Owner</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Convert</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                    No leads yet.
-                  </td>
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-left text-xs font-medium text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                  <th className="px-4 py-3 font-medium">Lead</th>
+                  <th className="px-4 py-3 font-medium">Source</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Created</th>
+                  <th className="px-4 py-3 font-medium">Owner</th>
+                  <th className="px-4 py-3 font-medium">
+                    <span className="sr-only">Convert</span>
+                  </th>
                 </tr>
-              ) : (
-                rows.map((row) => {
-                  const highlighted = highlightId === row.id;
-                  const statusKey = row.status.toUpperCase();
-                  return (
-                    <tr
-                      key={row.id}
-                      id={`lead-row-${row.id}`}
-                      className={highlighted ? "bg-amber-50 dark:bg-amber-900/20" : undefined}
-                    >
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-gray-900 dark:text-gray-100">
-                          {row.company?.trim() || `${row.firstName} ${row.lastName}`}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {row.company?.trim() ? `${row.firstName} ${row.lastName}` : row.email}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{titleCaseToken(row.source) || "—"}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                            STATUS_BADGE[statusKey] ?? STATUS_BADGE_FALLBACK
-                          }`}
-                        >
-                          {titleCaseToken(row.status)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatCreated(row.createdAt)}</td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{ownerLabel(row)}</td>
-                      <td className="px-4 py-3 text-right">
-                        {statusKey !== "CONVERTED" ? (
-                          <button
-                            type="button"
-                            disabled={convertingId === row.id}
-                            onClick={() => void convertLead(row.id)}
-                            className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
+              </thead>
+              <tbody>
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
+                      No leads match these filters.
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((row) => {
+                    const highlighted = highlightId === row.id;
+                    const statusKey = row.status.toUpperCase();
+                    const person = `${row.firstName} ${row.lastName}`.trim();
+                    return (
+                      <tr
+                        key={row.id}
+                        id={`lead-row-${row.id}`}
+                        className={`border-b border-gray-100 last:border-0 dark:border-gray-800 ${
+                          highlighted ? "bg-amber-50 dark:bg-amber-900/20" : ""
+                        }`}
+                      >
+                        <td className="px-4 py-3.5">
+                          <p className="font-semibold text-gray-900 dark:text-gray-100">
+                            {row.company?.trim() || person}
+                          </p>
+                          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                            {row.company?.trim() ? person : row.email}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3.5 text-gray-700 dark:text-gray-300">
+                          {sourceLabel(row.source)}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                              STATUS_BADGE[statusKey] ?? STATUS_BADGE_FALLBACK
+                            }`}
                           >
-                            {convertingId === row.id ? "Converting…" : "Convert"}
-                          </button>
-                        ) : row.opportunity ? (
-                          <Link
-                            href={`/opportunities/${row.opportunity.id}`}
-                            className="text-xs text-blue-600 hover:underline dark:text-blue-400"
-                          >
-                            View opportunity
-                          </Link>
-                        ) : null}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                            {titleCaseToken(row.status)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-gray-700 dark:text-gray-300">
+                          {formatCreated(row.createdAt)}
+                        </td>
+                        <td className="px-4 py-3.5 text-gray-700 dark:text-gray-300">{ownerLabel(row)}</td>
+                        <td className="px-4 py-3.5 text-right">
+                          {statusKey !== "CONVERTED" ? (
+                            <button
+                              type="button"
+                              disabled={convertingId === row.id}
+                              onClick={() => void convertLead(row.id)}
+                              className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100 dark:hover:bg-gray-800"
+                            >
+                              {convertingId === row.id ? "…" : "Convert"}
+                            </button>
+                          ) : row.opportunity ? (
+                            <Link
+                              href={`/opportunities/${row.opportunity.id}`}
+                              className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                            >
+                              View opportunity
+                            </Link>
+                          ) : (
+                            <span className="text-xs text-gray-400">Converted</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
-      <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/60">
-        <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Convert in one click</p>
-        <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">
+      <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 dark:border-gray-700 dark:bg-gray-900">
+        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Convert in one click</p>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
           Convert creates the client (or links an existing one by domain and name check), a contact and an
           opportunity in the first stage of the chosen pipeline, and carries the lead&apos;s notes across.
         </p>
