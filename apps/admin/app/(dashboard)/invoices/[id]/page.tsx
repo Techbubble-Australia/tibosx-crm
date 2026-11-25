@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, Loader2, Printer, X } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { ClientsOnlyGuard } from "@/components/ClientsOnlyGuard";
 import { SALES_CURRENCIES } from "@/lib/opportunity-status";
@@ -33,6 +33,8 @@ type InvoiceDetail = {
   contractTitle: string;
   contractStatus: string;
   clientName: string;
+  clientEmail?: string | null;
+  contactEmail?: string | null;
   invoiceNumber: string;
   reference: string;
   issueDate: string;
@@ -51,6 +53,10 @@ type InvoiceDetail = {
   files?: UserFileRow[];
   defaultCurrency: string;
   activityLogs?: InvoiceActivityLogEntry[];
+  accountingSyncStatus?: string | null;
+  contractRemaining?: number | null;
+  poNumber?: string | null;
+  timesheetApproved?: boolean | null;
 };
 
 const inputClass =
@@ -91,6 +97,8 @@ export default function InvoiceDetailPage() {
   const [lines, setLines] = useState<InvoiceLineDraft[]>([emptyInvoiceLine()]);
   const [taxRate, setTaxRate] = useState("10");
   const [files, setFiles] = useState<UserFileRow[]>([]);
+  const [accountingSyncStatus, setAccountingSyncStatus] = useState<string>("NOT_SYNCED");
+  const [actionBusy, setActionBusy] = useState(false);
 
   useEffect(() => {
     if (!invoiceId) return;
@@ -101,6 +109,7 @@ export default function InvoiceDetailPage() {
         if (!res.ok) throw new Error(data.error || "Failed to load invoice");
         const detail = data.data as InvoiceDetail;
         setRow(detail);
+        setAccountingSyncStatus(detail.accountingSyncStatus ?? "NOT_SYNCED");
         setReference(detail.reference);
         setIssueDate(toDateInputValue(detail.issueDate));
         setDueDate(toDateInputValue(detail.dueDate));
@@ -128,6 +137,89 @@ export default function InvoiceDetailPage() {
     () => computePreview(invoiceLinesSubtotal(lines), Number.parseFloat(taxRate) || 0),
     [lines, taxRate],
   );
+
+  const checks = useMemo(() => {
+    if (!row) return [];
+    const desc = `${row.description} ${lines.map((l) => l.description).join(" ")}`.toLowerCase();
+    const timesheetApproved =
+      typeof row.timesheetApproved === "boolean"
+        ? row.timesheetApproved
+        : /timesheet/.test(desc) && /approved/.test(desc);
+    const poPresent = Boolean(
+      (row.poNumber && row.poNumber.trim()) ||
+        (row.reference && row.reference.trim()) ||
+        files.some((f) => /po|purchase/i.test(f.name)),
+    );
+    const withinValue =
+      typeof row.contractRemaining === "number"
+        ? row.contractRemaining >= preview.amount
+        : true;
+    const contactEmail = Boolean(
+      (row.contactEmail && row.contactEmail.includes("@")) ||
+        (row.clientEmail && row.clientEmail.includes("@")),
+    );
+    return [
+      { id: "timesheet", label: "Timesheet approved", ok: timesheetApproved },
+      { id: "po", label: "PO present", ok: poPresent },
+      { id: "value", label: "Within contract value", ok: withinValue },
+      { id: "email", label: "Client contact has email", ok: contactEmail },
+    ];
+  }, [row, lines, files, preview.amount]);
+
+  function handlePreviewPdf() {
+    window.print();
+  }
+
+  async function handleSendToAccounting() {
+    if (!row) return;
+    setActionBusy(true);
+    try {
+      const res = await adminFetch(`/api/admin/contracts/${row.contractId}/invoices/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountingSyncStatus: "PENDING" }),
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const next =
+          (data.data as { accountingSyncStatus?: string } | undefined)?.accountingSyncStatus ??
+          "PENDING";
+        setAccountingSyncStatus(next);
+        setRow((prev) => (prev ? { ...prev, accountingSyncStatus: next } : prev));
+        appAlert("Marked for accounting sync.");
+      } else {
+        setAccountingSyncStatus("PENDING");
+        setRow((prev) => (prev ? { ...prev, accountingSyncStatus: "PENDING" } : prev));
+        appAlert("Accounting sync queued locally (API stub). Sync providers wire-up coming soon.");
+      }
+    } catch {
+      setAccountingSyncStatus("PENDING");
+      appAlert("Accounting sync queued locally (API stub). Sync providers wire-up coming soon.");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function handleApproveAndSend() {
+    if (!row) return;
+    setActionBusy(true);
+    try {
+      const res = await adminFetch(`/api/admin/contracts/${row.contractId}/invoices/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "AWAITING_PAYMENT" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to approve invoice");
+      setStatus("AWAITING_PAYMENT");
+      setRow((prev) => (prev ? { ...prev, status: "AWAITING_PAYMENT" } : prev));
+      appAlert("Invoice approved and marked awaiting payment.");
+    } catch (error) {
+      appAlert(error instanceof Error ? error.message : "Approve and send is not available yet.");
+    } finally {
+      setActionBusy(false);
+    }
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -209,12 +301,68 @@ export default function InvoiceDetailPage() {
                   {row.contractNumber} — {row.contractTitle}
                 </Link>
               </p>
+              {accountingSyncStatus ? (
+                <p className="mt-1 text-xs text-gray-400">
+                  Accounting: {accountingSyncStatus.replace(/_/g, " ").toLowerCase()}
+                </p>
+              ) : null}
             </div>
             <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusColors.bg} ${statusColors.text}`}>
               {CONTRACT_INVOICE_STATUS_LABELS[row.status]}
             </span>
           </div>
+          <div className="mt-4 flex flex-wrap gap-2 print:hidden">
+            <button
+              type="button"
+              onClick={handlePreviewPdf}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+            >
+              <Printer className="h-4 w-4" />
+              Preview PDF
+            </button>
+            <button
+              type="button"
+              disabled={actionBusy}
+              onClick={() => void handleSendToAccounting()}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
+            >
+              Send to accounting
+            </button>
+            <button
+              type="button"
+              disabled={actionBusy || status !== "DRAFT"}
+              onClick={() => void handleApproveAndSend()}
+              className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+            >
+              Approve and send
+            </button>
+          </div>
         </div>
+
+        <section className="rounded-xl border border-gray-200 bg-white p-4 print:hidden dark:border-gray-700 dark:bg-gray-900">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Checks before sending</h3>
+          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+            {checks.map((check) => (
+              <li
+                key={check.id}
+                className="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 text-sm dark:border-gray-800"
+              >
+                <span
+                  className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${
+                    check.ok
+                      ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
+                      : "bg-gray-100 text-gray-400 dark:bg-gray-800"
+                  }`}
+                >
+                  {check.ok ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                </span>
+                <span className={check.ok ? "text-gray-900 dark:text-gray-100" : "text-gray-500"}>
+                  {check.label}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
 
         {!fieldsEditable ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40">

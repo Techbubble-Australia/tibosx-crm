@@ -3,7 +3,7 @@ import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { ClientsOnlyGuard } from "@/components/ClientsOnlyGuard";
@@ -35,8 +35,10 @@ const inputClass =
 
 export default function NewInvoicePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const presetContractId = searchParams.get("contractId")?.trim() ?? "";
   const [contracts, setContracts] = useState<ContractOption[]>([]);
-  const [contractId, setContractId] = useState("");
+  const [contractId, setContractId] = useState(presetContractId);
   const [reference, setReference] = useState("");
   const [issueDate, setIssueDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [dueDate, setDueDate] = useState("");
@@ -46,6 +48,10 @@ export default function NewInvoicePage() {
   const [files, setFiles] = useState<UserFileRow[]>([]);
   const [taxRate, setTaxRate] = useState("10");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (presetContractId) setContractId(presetContractId);
+  }, [presetContractId]);
 
   useEffect(() => {
     void Promise.all([

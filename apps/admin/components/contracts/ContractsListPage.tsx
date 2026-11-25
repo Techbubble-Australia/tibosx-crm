@@ -4,7 +4,7 @@ import { appAlert, appConfirm } from "@/lib/app-alert";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Download, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { AdminSearchField } from "@/components/ui/AdminSearchField";
 import { TablePagination } from "@/components/ui/TablePagination";
@@ -45,8 +45,25 @@ interface ContractRow {
   latestVariationEndDate?: string | null;
 }
 
-type SortKey = "contractNumber" | "title" | "clientName" | "type" | "status" | "contractValue" | "ownerName";
+type SortKey = "contractNumber" | "title" | "clientName" | "type" | "status" | "endDate" | "contractValue";
 type SortDir = "asc" | "desc";
+
+function totalValue(row: ContractRow) {
+  return (row.contractValue ?? 0) + (row.totalVariation ?? 0);
+}
+
+function isExpiringThisMonth(endDate: string | null) {
+  if (!endDate) return false;
+  const end = new Date(endDate);
+  if (Number.isNaN(end.getTime())) return false;
+  const now = new Date();
+  return end.getFullYear() === now.getFullYear() && end.getMonth() === now.getMonth() && end >= now;
+}
+
+function csvEscape(value: string) {
+  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+  return value;
+}
 
 type Props = {
   activeFilter: boolean;
@@ -154,11 +171,11 @@ export function ContractsListPage({ activeFilter }: Props) {
         case "status":
           cmp = (a.status ?? "").localeCompare(b.status ?? "");
           break;
-        case "contractValue":
-          cmp = (a.contractValue ?? 0) - (b.contractValue ?? 0);
+        case "endDate":
+          cmp = (a.endDate ?? "").localeCompare(b.endDate ?? "");
           break;
-        case "ownerName":
-          cmp = (a.ownerName ?? "").localeCompare(b.ownerName ?? "");
+        case "contractValue":
+          cmp = totalValue(a) - totalValue(b);
           break;
       }
       if (cmp === 0) cmp = (a.contractNumber ?? "").localeCompare(b.contractNumber ?? "");
@@ -270,6 +287,45 @@ export function ContractsListPage({ activeFilter }: Props) {
     }
   }
 
+  const summary = useMemo(() => {
+    const activeCount = activeFilter
+      ? rows.filter((r) => r.status === "ACTIVE").length
+      : rows.length;
+    const valueSum = rows.reduce((sum, row) => sum + totalValue(row), 0);
+    const expiringCount = rows.filter((row) => isExpiringThisMonth(row.endDate)).length;
+    const currency = rows[0]?.currency ?? "AUD";
+    return { activeCount, valueSum, expiringCount, currency };
+  }, [rows, activeFilter]);
+
+  function exportCsv() {
+    const header = ["No.", "Contract", "Client", "Type", "Status", "End", "Value", "Consumed", "Remaining"];
+    const lines = [
+      header.join(","),
+      ...sortedRows.map((row) =>
+        [
+          row.contractNumber,
+          row.title,
+          row.clientName,
+          row.typeLabel,
+          CONTRACT_STATUS_LABELS[row.status] ?? row.status,
+          formatDate(row.endDate),
+          String(totalValue(row)),
+          String(row.consumed),
+          String(row.remaining),
+        ]
+          .map(csvEscape)
+          .join(","),
+      ),
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${activeFilter ? "active" : "inactive"}-contracts.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function deleteRow(id: string) {
     if (!(await appConfirm("Delete this contract?"))) return;
     try {
@@ -282,6 +338,7 @@ export function ContractsListPage({ activeFilter }: Props) {
 
   function renderTableRow(row: ContractRow) {
     const colors = CONTRACT_STATUS_COLORS[row.status] ?? CONTRACT_STATUS_COLORS.DRAFT;
+    const value = totalValue(row);
     return (
       <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
         <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
@@ -304,32 +361,23 @@ export function ContractsListPage({ activeFilter }: Props) {
             {CONTRACT_STATUS_LABELS[row.status]}
           </span>
         </td>
-        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.ownerName || "—"}</td>
-        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatDate(row.startDate)}</td>
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatDate(row.endDate)}</td>
-        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-          {formatDate(row.latestVariationStartDate ?? null)}
-        </td>
-        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-          {formatDate(row.latestVariationEndDate ?? null)}
-        </td>
-        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.contractValue)}</td>
-        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.totalVariation)}</td>
-        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.consumed)}</td>
-        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.remaining)}</td>
+        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, value)}</td>
         <td className="px-4 py-3">
-          <BurnBar
-            consumed={row.consumed}
-            contractValue={row.contractValue}
-            totalVariation={row.totalVariation}
-          />
-        </td>
-        <td className="px-4 py-3 text-right">
-          <div className="inline-flex items-center gap-2">
-            <button type="button" onClick={() => void deleteRow(row.id)} className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20">
-              <Trash2 className="h-4 w-4" />
-            </button>
+          <div className="flex items-center gap-3">
+            <span className="text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.consumed)}</span>
+            <BurnBar
+              consumed={row.consumed}
+              contractValue={row.contractValue}
+              totalVariation={row.totalVariation}
+            />
           </div>
+        </td>
+        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.remaining)}</td>
+        <td className="px-4 py-3 text-right">
+          <button type="button" onClick={() => void deleteRow(row.id)} className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20">
+            <Trash2 className="h-4 w-4" />
+          </button>
         </td>
       </tr>
     );
@@ -361,22 +409,33 @@ export function ContractsListPage({ activeFilter }: Props) {
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {activeFilter ? "Active contracts" : "Inactive contracts"}
+            {activeFilter ? "Contracts" : "Inactive contracts"}
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {activeFilter
-              ? "Draft and active client contracts."
-              : "Expired and terminated contracts."}
+            {summary.activeCount} {activeFilter ? "active" : "inactive"}
+            {" · "}
+            {formatMoney(summary.currency, summary.valueSum)} total value
+            {" · "}
+            {summary.expiringCount} expiring this month
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={rows.length === 0}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </button>
           <Link
             href="/contracts/new"
             className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
           >
             <Plus className="h-4 w-4" />
-            Add Contract
+            Contract
           </Link>
         </div>
       </div>
@@ -448,14 +507,14 @@ export function ContractsListPage({ activeFilter }: Props) {
 
       {viewMode === "list" ? (
         <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-          <table className="w-full min-w-[1200px] text-sm">
+          <table className="w-full min-w-[960px] text-sm">
             <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
               <tr>
                 <th className="px-4 py-3 text-left">
-                  <SortHeader label="Number" sortKey="contractNumber" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                  <SortHeader label="No." sortKey="contractNumber" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                 </th>
                 <th className="px-4 py-3 text-left">
-                  <SortHeader label="Title" sortKey="title" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                  <SortHeader label="Contract" sortKey="title" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                 </th>
                 <th className="px-4 py-3 text-left">
                   <SortHeader label="Client" sortKey="clientName" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
@@ -467,36 +526,26 @@ export function ContractsListPage({ activeFilter }: Props) {
                   <SortHeader label="Status" sortKey="status" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                 </th>
                 <th className="px-4 py-3 text-left">
-                  <SortHeader label="Owner" sortKey="ownerName" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                </th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Start</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">End</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">
-                  Variation start
-                </th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">
-                  Variation end
+                  <SortHeader label="End" sortKey="endDate" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                 </th>
                 <th className="px-4 py-3 text-left">
-                  <SortHeader label="Contract value" sortKey="contractValue" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                  <SortHeader label="Value (incl. variations)" sortKey="contractValue" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                 </th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Total variation</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Consumed</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Remaining</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Burn</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
+                <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={16} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
                     No {activeFilter ? "active" : "inactive"} contracts yet.
                   </td>
                 </tr>
               ) : totalItems === 0 ? (
                 <tr>
-                  <td colSpan={16} className="px-4 py-8 text-center text-gray-400">No contracts match your search.</td>
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">No contracts match your search.</td>
                 </tr>
               ) : (
                 paginated.map((row) => renderTableRow(row))
@@ -526,7 +575,7 @@ export function ContractsListPage({ activeFilter }: Props) {
             {cardScopeRows.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-gray-400">No contracts for this client.</p>
             ) : (
-              <table className="w-full min-w-[1200px] text-sm">
+              <table className="w-full min-w-[960px] text-sm">
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {cardScopeRows.map((row) => renderTableRow(row))}
                 </tbody>

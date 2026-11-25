@@ -38,6 +38,82 @@ router.get("/me", async (req: AuthRequest, res) => {
   return res.json({ data: req.tenant });
 });
 
+const workspaceSettingSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  subdomain: z.string().max(80).optional(),
+  dataRegion: z.string().max(40).optional(),
+  baseCurrency: z.string().max(10).optional(),
+  fiscalYearStarts: z.string().max(40).optional(),
+  tax: z.string().max(40).optional(),
+});
+
+const putMeSettingsSchema = z.object({
+  workspace: workspaceSettingSchema,
+});
+
+router.get("/me/settings", async (req: AuthRequest, res) => {
+  const tenantId = req.tenant?.tenantId;
+  if (!tenantId) return res.status(403).json({ error: "Forbidden" });
+
+  const row = await prisma.tenantSetting.findUnique({
+    where: { tenantId_key: { tenantId, key: "workspace" } },
+  });
+  const stored =
+    row?.value && typeof row.value === "object" && !Array.isArray(row.value)
+      ? (row.value as Record<string, unknown>)
+      : {};
+
+  return res.json({
+    data: {
+      workspace: {
+        name: typeof stored.name === "string" ? stored.name : req.tenant?.tenantName ?? "",
+        subdomain:
+          typeof stored.subdomain === "string" ? stored.subdomain : req.tenant?.tenantSlug ?? "",
+        dataRegion:
+          typeof stored.dataRegion === "string" ? stored.dataRegion : req.tenant?.region ?? "au",
+        baseCurrency: typeof stored.baseCurrency === "string" ? stored.baseCurrency : "AUD",
+        fiscalYearStarts:
+          typeof stored.fiscalYearStarts === "string" ? stored.fiscalYearStarts : "July",
+        tax: typeof stored.tax === "string" ? stored.tax : "GST 10%",
+      },
+    },
+  });
+});
+
+router.put("/me/settings", async (req: AuthRequest, res) => {
+  const tenantId = req.tenant?.tenantId;
+  if (!tenantId) return res.status(403).json({ error: "Forbidden" });
+
+  const parsed = putMeSettingsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const existing = await prisma.tenantSetting.findUnique({
+    where: { tenantId_key: { tenantId, key: "workspace" } },
+  });
+  const prev =
+    existing?.value && typeof existing.value === "object" && !Array.isArray(existing.value)
+      ? (existing.value as Record<string, unknown>)
+      : {};
+  const next = { ...prev, ...parsed.data.workspace };
+
+  const row = await prisma.tenantSetting.upsert({
+    where: { tenantId_key: { tenantId, key: "workspace" } },
+    create: { tenantId, key: "workspace", value: next },
+    update: { value: next },
+  });
+
+  return res.json({
+    data: {
+      workspace:
+        row.value && typeof row.value === "object" && !Array.isArray(row.value)
+          ? row.value
+          : next,
+    },
+  });
+});
+
 const createSchema = z.object({
   name: z.string().min(1).max(200),
   slug: z.string().min(1).max(80).regex(/^[a-z0-9-]+$/),

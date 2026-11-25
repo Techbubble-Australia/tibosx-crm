@@ -48,7 +48,8 @@ interface OpportunityRow {
 type ContactOption = { id: string; name: string; email: string };
 
 type Props = {
-  activeFilter: boolean;
+  /** When undefined, list shows all opportunities (wireframe List tab). */
+  activeFilter?: boolean;
 };
 
 function formatValue(row: OpportunityRow): string {
@@ -121,7 +122,7 @@ function InlineEditableCell({
 export function OpportunitiesListPage({ activeFilter }: Props) {
   const searchParams = useSearchParams();
   const clientIdFilter = searchParams.get("clientId")?.trim() ?? "";
-  const listTab = activeFilter ? "active" : "inactive";
+  const listTab = activeFilter === false ? "inactive" : "list";
   const countryOptions = useMemo(() => getSortedCountryOptions(), []);
   const [rows, setRows] = useState<OpportunityRow[]>([]);
   const [clientName, setClientName] = useState("");
@@ -265,7 +266,8 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
     setIsLoading(true);
     try {
       const params = new URLSearchParams();
-      params.set("active", activeFilter ? "true" : "false");
+      if (activeFilter === true) params.set("active", "true");
+      if (activeFilter === false) params.set("active", "false");
       if (clientIdFilter) params.set("clientId", clientIdFilter);
       const res = await adminFetch(`/api/admin/opportunities?${params.toString()}`);
       const data = await res.json();
@@ -309,10 +311,10 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
       const data = await res.json();
       const updated = data.data as OpportunityRow;
       setRows((prev) => {
-        if (activeFilter && (updated.active === false || updated.status === "REJECTED")) {
+        if (activeFilter === true && (updated.active === false || updated.status === "REJECTED")) {
           return prev.filter((r) => r.id !== row.id);
         }
-        if (!activeFilter && updated.active !== false) {
+        if (activeFilter === false && updated.active !== false) {
           return prev.filter((r) => r.id !== row.id);
         }
         return prev.map((r) => (r.id === row.id ? { ...r, ...updated } : r));
@@ -674,9 +676,9 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
               type="button"
               onClick={() => void toggleActive(row)}
               className="rounded px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-              title={activeFilter ? "Mark inactive" : "Mark active"}
+              title={activeFilter === false ? "Mark active" : "Mark inactive"}
             >
-              {activeFilter ? "Deactivate" : "Activate"}
+              {activeFilter === false ? "Activate" : "Deactivate"}
             </button>
             <button type="button" onClick={() => void deleteRow(row.id)} className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20">
               <Trash2 className="h-4 w-4" />
@@ -700,14 +702,20 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {activeFilter ? "Active opportunities" : "Inactive opportunities"}
+            {activeFilter === true
+              ? "Active opportunities"
+              : activeFilter === false
+                ? "Inactive opportunities"
+                : "All opportunities"}
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {clientIdFilter && clientName
               ? `Showing opportunities for ${clientName}.`
-              : activeFilter
+              : activeFilter === true
                 ? "Opportunities currently being pursued."
-                : "Archived opportunities no longer being pursued."}
+                : activeFilter === false
+                  ? "Archived opportunities no longer being pursued."
+                  : "Board companion list of deals."}
           </p>
           {clientIdFilter ? (
             <Link href={`/opportunities/${listTab}`} className="mt-1 inline-block text-sm text-blue-600 hover:underline dark:text-blue-400">
@@ -772,7 +780,7 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
               {filteredByClient.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="px-4 py-8 text-center text-gray-400">
-                    No {activeFilter ? "active" : "inactive"} opportunities yet.
+                    No opportunities yet.
                   </td>
                 </tr>
               ) : totalItems === 0 ? (
@@ -819,7 +827,7 @@ export function OpportunitiesListPage({ activeFilter }: Props) {
         <div className="space-y-4">
           {filteredByClient.length === 0 ? (
             <div className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:bg-gray-900">
-              No {activeFilter ? "active" : "inactive"} opportunities.
+              No opportunities.
             </div>
           ) : totalItems === 0 ? (
             <div className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:bg-gray-900">

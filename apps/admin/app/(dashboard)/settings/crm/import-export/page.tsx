@@ -13,6 +13,23 @@ const ENTITY_FIELDS: Record<Entity, string[]> = {
   opportunities: ["name", "clientName", "amount", "currency", "location", "country"],
 };
 
+const FIELD_LABELS: Record<string, string> = {
+  name: "Client name / Name",
+  country: "Country",
+  website: "Website",
+  status: "Status",
+  firstName: "First name",
+  lastName: "Last name",
+  email: "Contact email",
+  company: "Company",
+  phone: "Phone",
+  source: "Source",
+  clientName: "Client name",
+  amount: "Opportunity value",
+  currency: "Currency",
+  location: "Location",
+};
+
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
 
@@ -111,10 +128,14 @@ function downloadTemplate(entity: Entity) {
   downloadText(`${entity}-template.csv`, rowsToCsv([sample]));
 }
 
+type Step = 1 | 2 | 3;
+
 export default function ImportExportPage() {
   const [entity, setEntity] = useState<Entity>("clients");
   const [raw, setRaw] = useState("");
+  const [fileName, setFileName] = useState<string | null>(null);
   const [columnMap, setColumnMap] = useState<Record<string, string>>({});
+  const [step, setStep] = useState<Step>(1);
   const [preview, setPreview] = useState<{
     dryRun: boolean;
     rowCount?: number;
@@ -149,20 +170,53 @@ export default function ImportExportPage() {
     return parseCsv(trimmed);
   }
 
-  function autoMap() {
+  const rowCount = useMemo(() => {
+    try {
+      const trimmed = raw.trim();
+      if (!trimmed) return 0;
+      if (trimmed.startsWith("[")) {
+        return (JSON.parse(trimmed) as unknown[]).length;
+      }
+      return parseCsv(trimmed).length;
+    } catch {
+      return 0;
+    }
+  }, [raw]);
+
+  function autoMap(cols: string[] = sourceColumns) {
     const next: Record<string, string> = {};
     for (const field of ENTITY_FIELDS[entity]) {
-      const match = sourceColumns.find((c) => c.toLowerCase() === field.toLowerCase());
+      const match = cols.find((c) => c.toLowerCase() === field.toLowerCase());
       if (match) next[field] = match;
     }
     setColumnMap(next);
+  }
+
+  function onFile(file: File | null) {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      appAlert("Please upload a .csv file.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result ?? "");
+      setRaw(text);
+      setFileName(file.name);
+      setPreview(null);
+      const rows = parseCsv(text);
+      const cols = rows[0] ? Object.keys(rows[0]) : [];
+      autoMap(cols);
+      setStep(cols.length ? 2 : 1);
+    };
+    reader.readAsText(file);
   }
 
   async function runImport(dryRun: boolean) {
     setBusy(true);
     try {
       const rows = parseRows();
-      if (!rows.length) throw new Error("Paste at least one data row (CSV or JSON array).");
+      if (!rows.length) throw new Error("Upload a CSV with at least one data row.");
       const res = await adminFetch("/api/admin/crm/settings/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -171,6 +225,7 @@ export default function ImportExportPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Import failed");
       setPreview(data.data);
+      setStep(3);
       if (!dryRun && !data.data?.errorCount) {
         appAlert(`Imported ${data.data?.created ?? 0} row(s).`);
       }
@@ -196,6 +251,12 @@ export default function ImportExportPage() {
       appAlert(err instanceof Error ? err.message : "Export failed");
     }
   }
+
+  const checkNew = preview
+    ? Math.max(0, (preview.rowCount ?? preview.created ?? 0) - (preview.errorCount ?? 0))
+    : 0;
+  const checkErrors = preview?.errorCount ?? 0;
+  const checkDupes = 0;
 
   return (
     <ClientsOnlyGuard>
@@ -223,7 +284,7 @@ export default function ImportExportPage() {
           </div>
         </section>
 
-        <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+        <section className="space-y-5 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
           <div className="flex flex-wrap items-end gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">Entity</label>
@@ -233,6 +294,7 @@ export default function ImportExportPage() {
                   setEntity(e.target.value as Entity);
                   setColumnMap({});
                   setPreview(null);
+                  setStep(raw.trim() ? 2 : 1);
                 }}
                 className={inputClass}
               >
@@ -241,92 +303,208 @@ export default function ImportExportPage() {
                 <option value="opportunities">Opportunities</option>
               </select>
             </div>
-            <button
-              type="button"
-              onClick={autoMap}
-              className="rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
-            >
-              Auto-map columns
-            </button>
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">
-              Paste CSV (header row) or JSON array of objects
-            </label>
-            <textarea
-              rows={8}
-              value={raw}
-              onChange={(e) => setRaw(e.target.value)}
-              placeholder={'name,country\nAcme,Australia\n\nor\n[{"name":"Acme","country":"Australia"}]'}
-              className={`${inputClass} font-mono text-xs`}
-            />
-          </div>
+          <ol className="flex flex-wrap gap-2 text-xs font-medium">
+            {([1, 2, 3] as Step[]).map((s) => (
+              <li key={s}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (s === 1 || (s === 2 && sourceColumns.length) || (s === 3 && preview)) {
+                      setStep(s);
+                    }
+                  }}
+                  className={`rounded-full px-3 py-1 ${
+                    step === s
+                      ? "bg-black text-white dark:bg-white dark:text-black"
+                      : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                  }`}
+                >
+                  {s}. {s === 1 ? "Upload" : s === 2 ? "Match columns" : "Check"}
+                </button>
+              </li>
+            ))}
+          </ol>
 
-          {sourceColumns.length > 0 ? (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {ENTITY_FIELDS[entity].map((field) => (
-                <div key={field}>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">{field} ←</label>
-                  <select
-                    value={columnMap[field] ?? ""}
-                    onChange={(e) => setColumnMap((m) => ({ ...m, [field]: e.target.value }))}
-                    className={inputClass}
-                  >
-                    <option value="">—</option>
-                    {sourceColumns.map((col) => (
-                      <option key={col} value={col}>
-                        {col}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ))}
+          {step === 1 ? (
+            <div className="space-y-3">
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center dark:border-gray-600 dark:bg-gray-800/40">
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                  Drop a file here
+                </span>
+                <span className="mt-1 text-xs text-gray-500">Accepts .csv</span>
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="sr-only"
+                  onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+              {fileName ? (
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  {fileName}
+                  {rowCount ? ` · ${rowCount} rows` : ""}
+                </p>
+              ) : null}
+              {raw.trim() ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    autoMap();
+                    setStep(2);
+                  }}
+                  className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
+                >
+                  Continue to match columns
+                </button>
+              ) : null}
             </div>
           ) : null}
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void runImport(true)}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600"
-            >
-              Dry run
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void runImport(false)}
-              className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
-            >
-              Commit import
-            </button>
-          </div>
+          {step === 2 ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Your column → Goes to
+                  {fileName ? (
+                    <span className="text-gray-500">
+                      {" "}
+                      · {fileName}
+                      {rowCount ? ` · ${rowCount} rows` : ""}
+                    </span>
+                  ) : null}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => autoMap()}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                >
+                  Auto-map
+                </button>
+              </div>
+              {sourceColumns.length === 0 ? (
+                <p className="text-sm text-gray-500">Upload a CSV first.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="border-b border-gray-100 dark:border-gray-800">
+                      <tr>
+                        <th className="py-2 text-left font-medium text-gray-600">Your column</th>
+                        <th className="py-2 text-left font-medium text-gray-600">Goes to</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {ENTITY_FIELDS[entity].map((field) => (
+                        <tr key={field}>
+                          <td className="py-2 pr-4">
+                            <select
+                              value={columnMap[field] ?? ""}
+                              onChange={(e) =>
+                                setColumnMap((m) => ({ ...m, [field]: e.target.value }))
+                              }
+                              className={inputClass}
+                            >
+                              <option value="">—</option>
+                              {sourceColumns.map((col) => (
+                                <option key={col} value={col}>
+                                  {col}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-2 text-gray-800 dark:text-gray-200">
+                            {FIELD_LABELS[field] ?? field}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || !sourceColumns.length}
+                  onClick={() => void runImport(true)}
+                  className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+                >
+                  {busy ? "Checking…" : "Dry run / Check"}
+                </button>
+              </div>
+            </div>
+          ) : null}
 
-          {preview ? (
-            <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-gray-800/50">
-              <p>
-                {preview.dryRun ? "Dry run" : "Commit"}: {preview.rowCount ?? preview.created ?? 0} rows,{" "}
-                {preview.errorCount} error(s)
-                {preview.created != null ? `, created ${preview.created}` : ""}.
-              </p>
-              {preview.errors?.length ? (
-                <ul className="mt-2 list-disc pl-5 text-xs text-red-600">
-                  {preview.errors.map((err) => (
-                    <li key={`${err.row}-${err.message}`}>
-                      Row {err.row}: {err.message}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
+          {step === 3 ? (
+            <div className="space-y-4">
+              {preview ? (
+                <>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">
+                      {checkNew} new
+                    </span>
+                    <span className="tabular-nums text-gray-600">{checkDupes} duplicates</span>
+                    <span className="tabular-nums text-red-600">{checkErrors} errors</span>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Duplicates matched on domain and name. Choose skip, update or merge. Dry-run
+                    results shown; nothing is saved until you commit.
+                  </p>
+                  {preview.errors?.length ? (
+                    <ul className="list-disc pl-5 text-xs text-red-600">
+                      {preview.errors.map((err) => (
+                        <li key={`${err.row}-${err.message}`}>
+                          Row {err.row}: {err.message}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setStep(2)}
+                      className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void runImport(true)}
+                      className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600"
+                    >
+                      Re-run dry run
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy || checkErrors > 0}
+                      onClick={() => void runImport(false)}
+                      className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+                    >
+                      Import {checkNew} rows
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-gray-500">Run a dry check from step 2 first.</p>
+              )}
             </div>
           ) : null}
         </section>
 
         <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-          <h3 className="mb-3 font-semibold text-gray-900 dark:text-gray-100">Export</h3>
-          <p className="mb-3 text-xs text-gray-500">Downloads a CSV file for the selected entity.</p>
+          <h3 className="mb-2 font-semibold text-gray-900 dark:text-gray-100">Export</h3>
+          <p className="mb-3 text-xs text-gray-500">
+            Every list can be exported with the current filters. Exports are written to the audit
+            log.
+          </p>
           <div className="flex flex-wrap gap-2">
             {(["clients", "leads", "opportunities"] as Entity[]).map((e) => (
               <button

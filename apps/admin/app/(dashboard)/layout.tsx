@@ -151,37 +151,34 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    /** Wireframe Settings: CRM config only (Website CMS removed from menu). */
     id: "settings",
     label: "Settings",
     icon: Settings,
-    /** Sales users see CRM settings; admins see CRM + platform settings. */
     roles: ["admin", "sales"],
     items: [
       { href: "/settings/crm/pipelines", label: "Pipelines and stages", icon: GitBranch, roles: ["admin", "sales"] },
       { href: "/settings/crm/custom-fields", label: "Custom fields", icon: Layers, roles: ["admin", "sales"] },
       { href: "/settings/crm/import-export", label: "Import and export", icon: Upload, roles: ["admin", "sales"] },
       { href: "/settings/crm/workspace", label: "Workspace and modules", icon: Building2, roles: ["admin", "sales"] },
-      { href: "/settings/templates", label: "Templates", icon: FileCode, roles: ["admin"] },
-      { href: "/settings/notifications", label: "Email notifications", icon: Mail, roles: ["admin"] },
-      { href: "/settings/groups", label: "Groups", icon: Users, roles: ["admin"] },
-      { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin"] },
-      { href: "/settings/database", label: "Database clone", icon: Database, roles: ["admin"] },
-      { href: "/users/active", label: "Internal users", icon: UserCircle, roles: ["admin"] },
-      { href: "/customer-users/active", label: "Customer users", icon: UserCircle, roles: ["admin"] },
-      { href: "/settings/categories", label: "Category", icon: Layers, roles: ["admin"] },
-      { href: "/settings/technologies", label: "Technology", icon: Cpu, roles: ["admin"] },
-      { href: "/settings/departments", label: "Department", icon: Building, roles: ["admin"] },
-      { href: "/settings/levels", label: "Level", icon: Target, roles: ["admin"] },
-      { href: "/debug-capture", label: "Debug captures", icon: Bug, roles: ["admin"] },
     ],
   },
   {
+    /** Wireframe PLATFORM (SUPER ADMIN) + remaining TBOS admin tools (not in CRM Settings). */
     id: "platform",
     label: "Platform",
     icon: Building,
     roles: ["admin"],
     items: [
       { href: "/settings/crm/tenants", label: "Tenants console", icon: Building, roles: ["admin"] },
+      { href: "/users/active", label: "Internal users", icon: UserCircle, roles: ["admin"] },
+      { href: "/customer-users/active", label: "Customer users", icon: UserCircle, roles: ["admin"] },
+      { href: "/settings/templates", label: "Templates", icon: FileCode, roles: ["admin"] },
+      { href: "/settings/notifications", label: "Email notifications", icon: Mail, roles: ["admin"] },
+      { href: "/settings/groups", label: "Groups", icon: Users, roles: ["admin"] },
+      { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin"] },
+      { href: "/settings/database", label: "Database clone", icon: Database, roles: ["admin"] },
+      { href: "/debug-capture", label: "Debug captures", icon: Bug, roles: ["admin"] },
     ],
   },
 ];
@@ -218,13 +215,26 @@ function groupIsActive(group: NavGroup, pathname: string): boolean {
   ) {
     return true;
   }
-  if (group.id === "settings" && (pathname.startsWith("/settings") || pathname.startsWith("/users") || pathname.startsWith("/customer-users") || pathname.startsWith("/debug-capture"))) {
-    // Platform tenants console is its own group
-    if (pathname.startsWith("/settings/crm/tenants")) return false;
-    return true;
+  if (group.id === "settings") {
+    return (
+      pathname.startsWith("/settings/crm/pipelines") ||
+      pathname.startsWith("/settings/crm/custom-fields") ||
+      pathname.startsWith("/settings/crm/import-export") ||
+      pathname.startsWith("/settings/crm/workspace")
+    );
   }
-  if (group.id === "platform" && pathname.startsWith("/settings/crm/tenants")) {
-    return true;
+  if (group.id === "platform") {
+    return (
+      pathname.startsWith("/settings/crm/tenants") ||
+      pathname.startsWith("/users") ||
+      pathname.startsWith("/customer-users") ||
+      pathname.startsWith("/debug-capture") ||
+      (pathname.startsWith("/settings/") &&
+        !pathname.startsWith("/settings/crm/pipelines") &&
+        !pathname.startsWith("/settings/crm/custom-fields") &&
+        !pathname.startsWith("/settings/crm/import-export") &&
+        !pathname.startsWith("/settings/crm/workspace"))
+    );
   }
   if (group.id === "project_management") {
     return isProjectManagementPath(pathname);
@@ -384,11 +394,15 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
     !anyEffectiveRole(role, additionalRoles, ["admin", "customer_support"]) &&
     canAccessClientWorkspace;
   const isAdminHome = anyEffectiveRole(role, additionalRoles, ["admin"]);
+  const hasSalesCrm = anyEffectiveRole(role, additionalRoles, ["admin", "sales"]);
+  /** Wireframe Home for Sales is My day; others keep personal workspace. */
+  const personalHomeHref = hasSalesCrm ? "/sales/my-day" : workspaceNavItem.href;
   /** Admins default to Client; non-admin internals to Personal; clients to Client. */
-  const workspaceHomeHref = clientHome || isAdminHome ? "/workspace/client" : workspaceNavItem.href;
+  const workspaceHomeHref = clientHome || isAdminHome ? "/workspace/client" : personalHomeHref;
   const showWorkspaceHome =
     !loading && (clientHome || (role !== "client" && !isRestrictedToWorkspaceOnly(role, additionalRoles)));
-  const onPersonalHome = pathUnder("/my-workspace", pathname);
+  const onPersonalHome =
+    pathUnder("/my-workspace", pathname) || pathUnder("/sales/my-day", pathname);
   const onClientHome = pathUnder("/workspace/client", pathname);
   /** Single Home nav item; Personal/Client switching is only on the Home pages. */
   const workspaceHomeActive = onPersonalHome || onClientHome;

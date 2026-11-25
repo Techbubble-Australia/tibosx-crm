@@ -12,13 +12,15 @@ function OpportunitiesTabsInner() {
 
   const tabs = [
     { href: "/opportunities", id: "board" as const, label: "Board" },
-    { href: "/opportunities/active", id: "active" as const, label: "Active" },
-    { href: "/opportunities/inactive", id: "inactive" as const, label: "Inactive" },
+    { href: "/opportunities/list", id: "list" as const, label: "List" },
+    { href: "/opportunities/forecast", id: "forecast" as const, label: "Forecast" },
   ];
 
   const showTabs =
     pathname === "/opportunities" ||
     pathname === "/opportunities/" ||
+    pathname === "/opportunities/list" ||
+    pathname === "/opportunities/forecast" ||
     pathname === "/opportunities/active" ||
     pathname === "/opportunities/inactive";
 
@@ -57,8 +59,8 @@ export default function OpportunitiesLayout({ children }: { children: React.Reac
           fallback={
             <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-2 dark:border-gray-700">
               <span className="px-4 py-2 text-sm text-gray-400">Board</span>
-              <span className="px-4 py-2 text-sm text-gray-400">Active</span>
-              <span className="px-4 py-2 text-sm text-gray-400">Inactive</span>
+              <span className="px-4 py-2 text-sm text-gray-400">List</span>
+              <span className="px-4 py-2 text-sm text-gray-400">Forecast</span>
             </div>
           }
         >

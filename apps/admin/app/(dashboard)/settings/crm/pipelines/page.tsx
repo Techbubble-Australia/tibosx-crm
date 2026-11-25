@@ -24,13 +24,101 @@ type Pipeline = {
   stages: Stage[];
 };
 
-const DEFAULT_STAGES = [
-  { name: "Qualified", stageType: "open" as const, winProbability: 10, order: 0 },
-  { name: "Discovery", stageType: "open" as const, winProbability: 25, order: 1 },
-  { name: "Proposal", stageType: "open" as const, winProbability: 50, order: 2 },
-  { name: "Verbal yes", stageType: "open" as const, winProbability: 80, order: 3 },
-  { name: "Won", stageType: "won" as const, winProbability: 100, order: 4 },
-  { name: "Lost", stageType: "lost" as const, winProbability: 0, order: 5 },
+const SERVICES_STAGES = [
+  {
+    name: "Qualify",
+    stageType: "open" as const,
+    winProbability: 10,
+    order: 0,
+    requiredFields: ["Source", "owner"],
+  },
+  {
+    name: "Scope",
+    stageType: "open" as const,
+    winProbability: 25,
+    order: 1,
+    requiredFields: ["Engagement model", "next step"],
+  },
+  {
+    name: "Proposal",
+    stageType: "open" as const,
+    winProbability: 50,
+    order: 2,
+    requiredFields: ["Value", "close date", "quote"],
+  },
+  {
+    name: "Negotiate",
+    stageType: "open" as const,
+    winProbability: 75,
+    order: 3,
+    requiredFields: ["Decision maker"],
+  },
+  {
+    name: "Verbal yes",
+    stageType: "open" as const,
+    winProbability: 90,
+    order: 4,
+    requiredFields: ["Contract terms"],
+  },
+  {
+    name: "Won",
+    stageType: "won" as const,
+    winProbability: 100,
+    order: 5,
+    requiredFields: ["Creates contract draft"],
+  },
+  {
+    name: "Lost",
+    stageType: "lost" as const,
+    winProbability: 0,
+    order: 6,
+    requiredFields: ["Lost reason"],
+  },
+];
+
+const STAFFING_STAGES = [
+  {
+    name: "Requirement received",
+    stageType: "open" as const,
+    winProbability: 10,
+    order: 0,
+    requiredFields: ["Role", "location"],
+  },
+  {
+    name: "Candidates sourced",
+    stageType: "open" as const,
+    winProbability: 25,
+    order: 1,
+    requiredFields: ["Linked job listing"],
+  },
+  {
+    name: "Submitted to client",
+    stageType: "open" as const,
+    winProbability: 40,
+    order: 2,
+    requiredFields: ["1 candidate"],
+  },
+  {
+    name: "Interview",
+    stageType: "open" as const,
+    winProbability: 60,
+    order: 3,
+    requiredFields: ["Interview date"],
+  },
+  {
+    name: "Offer",
+    stageType: "open" as const,
+    winProbability: 85,
+    order: 4,
+    requiredFields: ["Rate agreed"],
+  },
+  {
+    name: "Placed",
+    stageType: "won" as const,
+    winProbability: 100,
+    order: 5,
+    requiredFields: ["Creates contract and project"],
+  },
 ];
 
 const inputClass =
@@ -38,7 +126,7 @@ const inputClass =
 
 function requiredFieldsNote(fields: Stage["requiredFields"]) {
   if (!fields || !Array.isArray(fields) || fields.length === 0) {
-    return "No required fields";
+    return "—";
   }
   return fields.join(", ");
 }
@@ -46,10 +134,12 @@ function requiredFieldsNote(fields: Stage["requiredFields"]) {
 export default function PipelinesSettingsPage() {
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [loading, setLoading] = useState(true);
-  const [name, setName] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [name, setName] = useState("Services pipeline");
   const [kind, setKind] = useState("services");
-  const [isDefault, setIsDefault] = useState(false);
+  const [isDefault, setIsDefault] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [creatingStaffing, setCreatingStaffing] = useState(false);
   const [stageDrafts, setStageDrafts] = useState<
     Record<string, { name: string; stageType: string; winProbability: number; order: number }>
   >({});
@@ -86,25 +176,51 @@ export default function PipelinesSettingsPage() {
     e.preventDefault();
     setSaving(true);
     try {
+      const stages = kind === "staffing" ? STAFFING_STAGES : SERVICES_STAGES;
       const res = await adminFetch("/api/admin/crm/pipelines", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: name.trim(),
+          name: name.trim() || (kind === "staffing" ? "Staffing pipeline" : "Services pipeline"),
           kind,
           isDefault,
-          stages: DEFAULT_STAGES,
+          stages,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Failed to create pipeline");
-      setName("");
-      setIsDefault(false);
+      setName("Services pipeline");
+      setKind("services");
+      setIsDefault(true);
+      setShowCreate(false);
       load();
     } catch (err) {
       appAlert(err instanceof Error ? err.message : "Failed to create pipeline");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function createStaffingPipeline() {
+    setCreatingStaffing(true);
+    try {
+      const res = await adminFetch("/api/admin/crm/pipelines", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Staffing pipeline",
+          kind: "staffing",
+          isDefault: false,
+          stages: STAFFING_STAGES,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Failed to create staffing pipeline");
+      load();
+    } catch (err) {
+      appAlert(err instanceof Error ? err.message : "Failed to create staffing pipeline");
+    } finally {
+      setCreatingStaffing(false);
     }
   }
 
@@ -161,54 +277,108 @@ export default function PipelinesSettingsPage() {
     }
   }
 
+  const hasStaffing = pipelines.some(
+    (p) => p.kind === "staffing" || /staffing/i.test(p.name),
+  );
+
   return (
     <ClientsOnlyGuard>
       <div className="space-y-6">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Pipelines and stages</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Per workspace. Each pipeline has its own stages, probabilities and required fields.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Pipelines and stages
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Per workspace. Each pipeline has its own stages, probabilities and required fields.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {!hasStaffing ? (
+              <button
+                type="button"
+                disabled={creatingStaffing}
+                onClick={() => void createStaffingPipeline()}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
+              >
+                <Plus className="h-4 w-4" />
+                {creatingStaffing ? "Creating…" : "Add staffing pipeline"}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                setName("Services pipeline");
+                setKind("services");
+                setIsDefault(pipelines.length === 0);
+                setShowCreate((v) => !v);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
+            >
+              <Plus className="h-4 w-4" />
+              Pipeline
+            </button>
+          </div>
         </div>
 
-        <form
-          onSubmit={(e) => void createPipeline(e)}
-          className="flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900"
-        >
-          <div className="min-w-[200px] flex-1">
-            <label className="mb-1 block text-xs font-medium text-gray-600">Name</label>
-            <input
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Services pipeline"
-              className={inputClass}
-            />
-          </div>
-          <div className="w-40">
-            <label className="mb-1 block text-xs font-medium text-gray-600">Kind</label>
-            <input value={kind} onChange={(e) => setKind(e.target.value)} className={inputClass} />
-          </div>
-          <label className="mb-2 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} />
-            Default
-          </label>
-          <button
-            type="submit"
-            disabled={saving}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+        {showCreate ? (
+          <form
+            onSubmit={(e) => void createPipeline(e)}
+            className="flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900"
           >
-            <Plus className="h-4 w-4" />
-            {saving ? "Creating…" : "Create with default stages"}
-          </button>
-        </form>
+            <div className="min-w-[200px] flex-1">
+              <label className="mb-1 block text-xs font-medium text-gray-600">Name</label>
+              <input
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Services pipeline"
+                className={inputClass}
+              />
+            </div>
+            <div className="w-40">
+              <label className="mb-1 block text-xs font-medium text-gray-600">Kind</label>
+              <select
+                value={kind}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setKind(next);
+                  if (next === "staffing") {
+                    setName("Staffing pipeline");
+                    setIsDefault(false);
+                  } else {
+                    setName("Services pipeline");
+                  }
+                }}
+                className={inputClass}
+              >
+                <option value="services">services</option>
+                <option value="staffing">staffing</option>
+              </select>
+            </div>
+            <label className="mb-2 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} />
+              Default
+            </label>
+            <button
+              type="submit"
+              disabled={saving}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+            >
+              <Plus className="h-4 w-4" />
+              {saving ? "Creating…" : "Create"}
+            </button>
+          </form>
+        ) : null}
 
         {loading ? (
           <div className="flex h-48 items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-black border-t-transparent dark:border-white" />
           </div>
         ) : pipelines.length === 0 ? (
-          <p className="text-sm text-gray-400">No pipelines yet.</p>
+          <p className="text-sm text-gray-400">
+            No pipelines yet. Create a Services pipeline (default) to get started.
+          </p>
         ) : (
           <div className="space-y-4">
             {pipelines.map((pipeline) => (
@@ -218,10 +388,14 @@ export default function PipelinesSettingsPage() {
               >
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
                   <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">{pipeline.name}</h3>
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                      {pipeline.name}
+                      {pipeline.isDefault ? (
+                        <span className="ml-2 text-xs font-normal text-gray-500">(default)</span>
+                      ) : null}
+                    </h3>
                     <p className="text-xs text-gray-500">
                       {pipeline.kind}
-                      {pipeline.isDefault ? " · default" : ""}
                       {!pipeline.active ? " · inactive" : ""}
                     </p>
                   </div>
@@ -231,49 +405,52 @@ export default function PipelinesSettingsPage() {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 dark:bg-gray-800">
                       <tr>
-                        <th className="px-4 py-2 text-left font-medium text-gray-600">Order</th>
                         <th className="px-4 py-2 text-left font-medium text-gray-600">Stage</th>
-                        <th className="px-4 py-2 text-left font-medium text-gray-600">Type</th>
-                        <th className="px-4 py-2 text-right font-medium text-gray-600">Win %</th>
-                        <th className="px-4 py-2 text-left font-medium text-gray-600">Required fields</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600">Probability</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-600">
+                          Required to enter
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                       {pipeline.stages.map((stage) => (
                         <tr key={stage.id}>
-                          <td className="px-4 py-2 text-gray-500">{stage.order}</td>
                           <td className="px-4 py-2 text-gray-900 dark:text-gray-100">{stage.name}</td>
-                          <td className="px-4 py-2 text-gray-600">{stage.stageType}</td>
-                          <td className="px-4 py-2 text-right">
-                            <input
-                              type="number"
-                              min={0}
-                              max={100}
-                              value={stage.winProbability}
-                              disabled={savingStageId === stage.id}
-                              onChange={(e) => {
-                                const next = Number.parseInt(e.target.value, 10);
-                                if (Number.isNaN(next)) return;
-                                setPipelines((prev) =>
-                                  prev.map((p) =>
-                                    p.id !== pipeline.id
-                                      ? p
-                                      : {
-                                          ...p,
-                                          stages: p.stages.map((s) =>
-                                            s.id === stage.id ? { ...s, winProbability: next } : s,
-                                          ),
-                                        },
-                                  ),
-                                );
-                              }}
-                              onBlur={(e) => {
-                                const next = Number.parseInt(e.target.value, 10);
-                                if (Number.isNaN(next)) return;
-                                void updateWinProbability(stage, Math.min(100, Math.max(0, next)));
-                              }}
-                              className="ml-auto w-20 rounded border border-gray-200 bg-white px-2 py-1 text-right tabular-nums dark:border-gray-600 dark:bg-gray-800"
-                            />
+                          <td className="px-4 py-2">
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={stage.winProbability}
+                                disabled={savingStageId === stage.id}
+                                onChange={(e) => {
+                                  const next = Number.parseInt(e.target.value, 10);
+                                  if (Number.isNaN(next)) return;
+                                  setPipelines((prev) =>
+                                    prev.map((p) =>
+                                      p.id !== pipeline.id
+                                        ? p
+                                        : {
+                                            ...p,
+                                            stages: p.stages.map((s) =>
+                                              s.id === stage.id
+                                                ? { ...s, winProbability: next }
+                                                : s,
+                                            ),
+                                          },
+                                    ),
+                                  );
+                                }}
+                                onBlur={(e) => {
+                                  const next = Number.parseInt(e.target.value, 10);
+                                  if (Number.isNaN(next)) return;
+                                  void updateWinProbability(stage, Math.min(100, Math.max(0, next)));
+                                }}
+                                className="w-16 rounded border border-gray-200 bg-white px-2 py-1 text-right tabular-nums dark:border-gray-600 dark:bg-gray-800"
+                              />
+                              <span className="text-xs text-gray-500">%</span>
+                            </div>
                           </td>
                           <td className="px-4 py-2 text-xs text-gray-500">
                             {requiredFieldsNote(stage.requiredFields)}

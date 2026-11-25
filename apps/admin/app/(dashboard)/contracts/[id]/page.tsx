@@ -3,7 +3,7 @@ import { appAlert, appConfirm } from "@/lib/app-alert";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { ContractForm, type ContractFormValues } from "@/components/contracts/ContractForm";
@@ -20,7 +20,26 @@ import {
 type ContractDetail = ContractFormValues & {
   status: ContractStatus;
   activityLogs?: ContractActivityLogEntry[];
+  clientName?: string;
+  opportunityId?: string | null;
+  opportunity?: { id: string; name?: string | null } | null;
+  quoteId?: string | null;
+  quote?: { id: string; quoteNumber?: string | null; name?: string | null } | null;
 };
+
+function formatMoney(currency: string, amount: number) {
+  return `${currency} ${new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(amount)}`;
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
+}
 
 function MoveToDraftDialog({
   contractId,
@@ -210,6 +229,22 @@ export default function EditContractPage() {
     setShowMoveToDraft(false);
   }
 
+  const kpis = useMemo(() => {
+    if (!defaults) return null;
+    const value = (defaults.contractValue ?? 0) + (defaults.totalVariation ?? 0);
+    const consumed = defaults.consumed ?? 0;
+    const remaining =
+      typeof defaults.remaining === "number" ? defaults.remaining : value - consumed;
+    const consumedPct = value > 0 ? Math.round((consumed / value) * 100) : 0;
+    return { value, consumed, remaining, consumedPct };
+  }, [defaults]);
+
+  const linkedOpportunity =
+    defaults?.opportunity ??
+    (defaults?.opportunityId ? { id: defaults.opportunityId, name: null } : null);
+  const linkedQuote =
+    defaults?.quote ?? (defaults?.quoteId ? { id: defaults.quoteId, quoteNumber: null, name: null } : null);
+
   if (fetching) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -217,10 +252,11 @@ export default function EditContractPage() {
       </div>
     );
   }
-  if (!defaults) return <p className="text-gray-500">Contract not found.</p>;
+  if (!defaults || !kpis) return <p className="text-gray-500">Contract not found.</p>;
 
   const listPath = contractsListPathForStatus(defaults.status);
   const activityLogs = defaults.activityLogs ?? [];
+  const currency = defaults.currency || "AUD";
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -229,7 +265,15 @@ export default function EditContractPage() {
           <Link href={listPath} className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Edit Contract</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {defaults.contractNumber ? `${defaults.contractNumber} · ` : ""}
+              {defaults.title || "Edit Contract"}
+            </h2>
+            {defaults.clientName ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400">{defaults.clientName}</p>
+            ) : null}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {defaults.status === "DRAFT" ? (
@@ -263,6 +307,87 @@ export default function EditContractPage() {
           ) : null}
         </div>
       </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Value</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+            {formatMoney(currency, kpis.value)}
+          </p>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Consumed</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+            {formatMoney(currency, kpis.consumed)}
+          </p>
+          <p className="text-xs text-gray-500">{kpis.consumedPct}%</p>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Remaining</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+            {formatMoney(currency, kpis.remaining)}
+          </p>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">End date</p>
+          <p className="mt-1 text-xl font-semibold text-gray-900 dark:text-gray-100">
+            {formatDate(defaults.endDate)}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <a
+          href="#contract-variations"
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+        >
+          Add variation
+        </a>
+        <button
+          type="button"
+          onClick={() => appAlert("Contract renewal workflow is coming soon.")}
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+        >
+          Renew
+        </button>
+        <Link
+          href={`/invoices/new?contractId=${encodeURIComponent(id)}`}
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+        >
+          Create invoice
+        </Link>
+      </div>
+
+      {linkedOpportunity || linkedQuote ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm dark:border-gray-700 dark:bg-gray-900">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Linked</p>
+          <div className="flex flex-wrap gap-4">
+            {linkedOpportunity ? (
+              <div>
+                <span className="text-gray-500">Opportunity · </span>
+                <Link
+                  href={`/opportunities/${linkedOpportunity.id}`}
+                  className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  {linkedOpportunity.name || linkedOpportunity.id}
+                </Link>
+              </div>
+            ) : null}
+            {linkedQuote ? (
+              <div>
+                <span className="text-gray-500">Quote · </span>
+                <Link
+                  href={`/quotes/${linkedQuote.id}`}
+                  className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  {linkedQuote.quoteNumber || linkedQuote.name || linkedQuote.id}
+                </Link>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
         <ContractForm key={`${defaults.id}-${defaults.status}`} defaults={defaults} onSubmit={handleSubmit} isSaving={isSaving} />
       </div>

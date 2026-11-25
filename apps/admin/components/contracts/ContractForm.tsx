@@ -1499,7 +1499,7 @@ export function ContractForm({ defaults = {}, defaultOwnerId, onSubmit, isSaving
       ) : null}
 
       {defaults.id ? (
-        <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+        <section id="contract-variations" className="scroll-mt-24 rounded-xl border border-gray-200 p-4 dark:border-gray-700">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h3 className="font-semibold text-gray-900 dark:text-gray-100">Variations</h3>
             <div className="flex items-center gap-2">
