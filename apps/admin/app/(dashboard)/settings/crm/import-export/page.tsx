@@ -38,8 +38,9 @@ function parseCsv(text: string): Record<string, string>[] {
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter(Boolean);
-  if (lines.length < 2) return [];
-  const headers = splitCsvLine(lines[0]);
+  const headerLine = lines[0];
+  if (!headerLine || lines.length < 2) return [];
+  const headers = splitCsvLine(headerLine);
   return lines.slice(1).map((line) => {
     const cells = splitCsvLine(line);
     const row: Record<string, string> = {};
@@ -80,8 +81,9 @@ function escapeCsvCell(value: unknown): string {
 }
 
 function rowsToCsv(rows: Array<Record<string, unknown>>): string {
-  if (!rows.length) return "";
-  const headers = Object.keys(rows[0]);
+  const first = rows[0];
+  if (!first) return "";
+  const headers = Object.keys(first);
   const lines = [
     headers.join(","),
     ...rows.map((row) => headers.map((h) => escapeCsvCell(row[h])).join(",")),
