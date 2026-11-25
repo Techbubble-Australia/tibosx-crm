@@ -36,6 +36,12 @@ import {
   Bug,
   Database,
   Home,
+  UserPlus,
+  FileSpreadsheet,
+  BarChart3,
+  GitBranch,
+  SlidersHorizontal,
+  Upload,
 } from "lucide-react";
 import { UserAccountMenu } from "@/components/UserAccountMenu";
 import { HelpSupportHeaderButton } from "@/components/HelpSupportHeaderButton";
@@ -93,10 +99,13 @@ const navGroups: NavGroup[] = [
     roles: ["admin", "sales"],
     items: [
       { href: "/sales/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "sales"] },
+      { href: "/leads", label: "Leads", icon: UserPlus, roles: ["admin", "sales"] },
+      { href: "/opportunities", label: "Opportunities", icon: CircleDollarSign, roles: ["admin", "sales"] },
       { href: "/clients/active", label: "Clients", icon: Handshake, roles: ["admin", "sales"] },
-      { href: "/opportunities/active", label: "Opportunities", icon: CircleDollarSign, roles: ["admin", "sales"] },
+      { href: "/quotes", label: "Quotes", icon: FileSpreadsheet, roles: ["admin", "sales"] },
       { href: "/contracts/active", label: "Contracts", icon: ScrollText, roles: ["admin", "sales"] },
       { href: "/invoices", label: "Invoices", icon: FileText, roles: ["admin", "sales"] },
+      { href: "/sales/reports", label: "Reports", icon: BarChart3, roles: ["admin", "sales"] },
     ],
   },
   {
@@ -146,17 +155,16 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    id: "website",
-    label: "Website",
-    icon: Globe,
-    roles: ["admin", "website"],
+    id: "crm_settings",
+    label: "CRM Settings",
+    icon: SlidersHorizontal,
+    roles: ["admin", "sales"],
     items: [
-      { href: "/pages", label: "Site pages", icon: FileStack, roles: ["admin", "website"] },
-      { href: "/case-studies", label: "Case Studies", icon: FileText, roles: ["admin", "website"] },
-      { href: "/testimonials", label: "Testimonials", icon: MessageSquare, roles: ["admin", "website"] },
-      { href: "/faqs", label: "FAQs", icon: HelpCircle, roles: ["admin", "website"] },
-      { href: "/contact-submissions", label: "Contact Submissions", icon: Mail, roles: ["admin", "website"] },
-      { href: "/team", label: "Team members", icon: Users, roles: ["admin", "website"] },
+      { href: "/settings/crm/pipelines", label: "Pipelines", icon: GitBranch, roles: ["admin", "sales"] },
+      { href: "/settings/crm/custom-fields", label: "Custom fields", icon: Layers, roles: ["admin", "sales"] },
+      { href: "/settings/crm/import-export", label: "Import / export", icon: Upload, roles: ["admin", "sales"] },
+      { href: "/settings/crm/workspace", label: "Workspace & modules", icon: Building2, roles: ["admin"] },
+      { href: "/settings/crm/tenants", label: "Tenants", icon: Building, roles: ["admin"] },
     ],
   },
   {
@@ -205,10 +213,15 @@ function groupIsActive(group: NavGroup, pathname: string): boolean {
     group.id === "sales" &&
     (pathname.startsWith("/sales") ||
       pathname.startsWith("/clients") ||
+      pathname.startsWith("/leads") ||
+      pathname.startsWith("/quotes") ||
       pathname.startsWith("/opportunities") ||
       pathname.startsWith("/contracts") ||
       pathname.startsWith("/invoices"))
   ) {
+    return true;
+  }
+  if (group.id === "crm_settings" && pathname.startsWith("/settings/crm")) {
     return true;
   }
   if (group.id === "project_management") {
@@ -230,7 +243,7 @@ function navItemIsActive(item: NavItem, pathname: string): boolean {
   if (item.href === "/clients/active") {
     return pathname.startsWith("/clients");
   }
-  if (item.href === "/opportunities/active") {
+  if (item.href === "/opportunities" || item.href === "/opportunities/active") {
     return pathname === "/opportunities" || pathname.startsWith("/opportunities/");
   }
   if (item.href === "/contracts/active") {

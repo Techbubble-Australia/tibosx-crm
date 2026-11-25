@@ -322,21 +322,28 @@ model JobTechnology {
 
 model Client {
   id            String          @id @default(cuid())
+  tenantId      String?
+  tenant        Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   name          String          @unique
   website       String          @default("")
   country       String
   order         Int             @default(0)
   /// ACTIVE | PROSPECT | INACTIVE
   status        String          @default("ACTIVE")
+  /// JSON map of custom field values keyed by CustomFieldDef.id
+  customFields  Json?
   jobs          JobListing[]
   contacts      ClientContact[]
   opportunities Opportunity[]
   contracts     Contract[]
   projects        Project[]
   workspaceGroups WorkspaceGroup[]
+  leads         Lead[]
+  quotes        Quote[]
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
+  @@index([tenantId])
   @@index([order])
   @@index([status])
 }
@@ -366,6 +373,8 @@ model WorkspaceGroupMember {
 
 model Opportunity {
   id        String   @id @default(cuid())
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   name      String
   clientId  String
   client    Client   @relation(fields: [clientId], references: [id], onDelete: Restrict)
@@ -377,7 +386,7 @@ model Opportunity {
   contact   ClientContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
   currency  String
   amount    Decimal  @db.Decimal(14, 2)
-  /// DRAFT | PROPOSAL | IN_PROGRESS | ACCEPTED | REJECTED
+  /// DRAFT | PROPOSAL | IN_PROGRESS | ACCEPTED | REJECTED (legacy; prefer stageId)
   status    String   @default("DRAFT")
   comments  String   @default("") @db.Text
   order     Int      @default(0)
@@ -385,26 +394,53 @@ model Opportunity {
   active    Boolean  @default(true)
   ownerId   String?
   owner     AdminUser? @relation("OpportunityOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  jobs       JobListing[]
-  timesheets       Timesheet[]
+  pipelineId     String?
+  pipeline       CrmPipeline? @relation(fields: [pipelineId], references: [id], onDelete: SetNull)
+  stageId        String?
+  stage          CrmStage?    @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  /// Snapshot of stage win probability (0–100)
+  probability    Int?
+  nextStep       String?      @db.Text
+  nextStepDue    DateTime?
+  /// FIXED_PRICE | T_AND_M | SUPPORT | RETAINER | OTHER
+  engagementModel String?
+  closeReason    String?      @db.Text
+  customFields   Json?
+  leadId         String?      @unique
+  lead           Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  jobs           JobListing[]
+  timesheets     Timesheet[]
   timesheetEntries TimesheetEntry[]
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  stageHistory   OpportunityStageHistory[]
+  quotes         Quote[]
+  contracts      Contract[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
+  @@index([tenantId])
   @@index([clientId])
   @@index([contactId])
   @@index([status])
   @@index([order])
   @@index([active])
   @@index([ownerId])
+  @@index([pipelineId])
+  @@index([stageId])
+  @@index([nextStepDue])
 }
 
 model Contract {
   id             String              @id @default(cuid())
+  tenantId       String?
+  tenant         Tenant?             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   contractNumber String              @unique
   title          String
   clientId       String
   client         Client              @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  opportunityId  String?
+  opportunity    Opportunity?        @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  quoteId        String?
+  quote          Quote?              @relation(fields: [quoteId], references: [id], onDelete: SetNull)
   /// FIXED_PRICE | T_AND_M | SUPPORT | OTHER
   type           String              @default("FIXED_PRICE")
   /// DRAFT | ACTIVE | EXPIRED | CANCELED
@@ -435,7 +471,10 @@ model Contract {
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
+  @@index([tenantId])
   @@index([clientId])
+  @@index([opportunityId])
+  @@index([quoteId])
   @@index([status])
   @@index([type])
   @@index([ownerId])
@@ -526,6 +565,8 @@ model ContractMilestone {
 
 model ContractInvoice {
   id            String   @id @default(cuid())
+  tenantId      String?
+  tenant        Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   contractId    String
   contract      Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
   invoiceNumber String
@@ -547,12 +588,19 @@ model ContractInvoice {
   lineItems     Json?
   /// Attached documents [{ name, url }] (e.g. the issued invoice PDF).
   fileUrls      Json?
+  /// NOT_SYNCED | PENDING | SYNCED | ERROR
+  accountingSyncStatus String @default("NOT_SYNCED")
+  accountingExternalId String?
+  accountingSyncedAt   DateTime?
+  accountingProvider   String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   activityLogs  ContractInvoiceActivityLog[]
 
+  @@index([tenantId])
   @@index([contractId])
   @@index([status])
+  @@index([accountingSyncStatus])
 }
 
 model ContractInvoiceActivityLog {
@@ -574,6 +622,8 @@ model ContractInvoiceActivityLog {
 
 model ClientContact {
   id               String        @id @default(cuid())
+  tenantId         String?
+  tenant           Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   clientId         String
   client           Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name             String
@@ -582,14 +632,18 @@ model ClientContact {
   phoneCountryCode String
   phoneNumber      String
   order            Int           @default(0)
+  customFields     Json?
   opportunities    Opportunity[]
   projectLinks     ProjectClientContact[]
   mappedAdminUser     AdminUser?     @relation("AdminUserMappedContact")
   mappedCustomerUser  CustomerUser?  @relation("CustomerUserMappedContact")
+  leads            Lead[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  @@index([tenantId])
   @@index([clientId])
+  @@index([email])
 }
 
 model JobListing {
@@ -1017,6 +1071,8 @@ model AdminUser {
   role         String   @default("admin")
   /// Extra TBOS roles (union with `role` for permissions and navigation).
   additionalRoles Json?
+  /// Platform-level super admin (Tenants console, support view-as).
+  isPlatformAdmin Boolean @default(false)
   profilePhotoUrl String?
   active       Boolean  @default(true)
   /// AES-256-GCM encrypted TOTP secret (set during MFA enrollment).
@@ -1074,6 +1130,10 @@ model AdminUser {
   workspaceGroupMemberships WorkspaceGroupMember[]      @relation("WorkspaceGroupMember")
   credentialAssignment    AdminUserCredentialAssignment?
   agreementRecords        AdminUserAgreementRecord[]
+  tenantMemberships       TenantMembership[]
+  supportAccessSessions   SupportAccessSession[] @relation("SupportAccessActor")
+  ownedLeads              Lead[]                 @relation("LeadOwner")
+  ownedQuotes             Quote[]                @relation("QuoteOwner")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -1495,4 +1555,278 @@ model DebugCaptureTicketLog {
   createdAt   DateTime           @default(now())
 
   @@index([ticketId, createdAt])
+}
+
+// ─── CRM multi-tenancy + Sales CRM v1 ───────────────────────────────────────
+
+model Plan {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenants     Tenant[]
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  region    String   @default("au")
+  active    Boolean  @default(true)
+  planId    String?
+  plan      Plan?    @relation(fields: [planId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships       TenantMembership[]
+  modules           TenantModule[]
+  settings          TenantSetting[]
+  supportSessions   SupportAccessSession[]
+  clients           Client[]
+  contacts          ClientContact[]
+  opportunities     Opportunity[]
+  contracts         Contract[]
+  invoices          ContractInvoice[]
+  pipelines         CrmPipeline[]
+  leads             Lead[]
+  products          Product[]
+  quotes            Quote[]
+  customFieldDefs   CustomFieldDef[]
+
+  @@index([planId])
+  @@index([active])
+}
+
+model TenantMembership {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  adminUserId String
+  adminUser   AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  /// owner | admin | member
+  role        String    @default("member")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([tenantId, adminUserId])
+  @@index([adminUserId])
+}
+
+model TenantModule {
+  id       String  @id @default(cuid())
+  tenantId String
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// sales_crm | recruitment | customer_support | projects
+  module   String
+  enabled  Boolean @default(true)
+
+  @@unique([tenantId, module])
+}
+
+model TenantSetting {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  key      String
+  value    Json
+
+  @@unique([tenantId, key])
+}
+
+model SupportAccessSession {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  adminUserId String
+  adminUser   AdminUser @relation("SupportAccessActor", fields: [adminUserId], references: [id], onDelete: Cascade)
+  reason      String?   @db.Text
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([adminUserId])
+  @@index([expiresAt])
+}
+
+model CrmPipeline {
+  id        String     @id @default(cuid())
+  tenantId  String
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  /// services | sales | custom
+  kind      String     @default("services")
+  isDefault Boolean    @default(false)
+  order     Int        @default(0)
+  active    Boolean    @default(true)
+  stages    CrmStage[]
+  opportunities Opportunity[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
+}
+
+model CrmStage {
+  id             String      @id @default(cuid())
+  pipelineId     String
+  pipeline       CrmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  name           String
+  /// open | won | lost
+  stageType      String      @default("open")
+  winProbability Int         @default(0)
+  order          Int         @default(0)
+  /// JSON array of required field keys for this stage
+  requiredFields Json?
+  opportunities  Opportunity[]
+  historyFrom    OpportunityStageHistory[] @relation("StageHistoryFrom")
+  historyTo      OpportunityStageHistory[] @relation("StageHistoryTo")
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([pipelineId])
+  @@unique([pipelineId, name])
+}
+
+model OpportunityStageHistory {
+  id            String       @id @default(cuid())
+  opportunityId String
+  opportunity   Opportunity  @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  fromStageId   String?
+  fromStage     CrmStage?    @relation("StageHistoryFrom", fields: [fromStageId], references: [id], onDelete: SetNull)
+  toStageId     String
+  toStage       CrmStage     @relation("StageHistoryTo", fields: [toStageId], references: [id], onDelete: Restrict)
+  changedById   String?
+  note          String?      @db.Text
+  createdAt     DateTime     @default(now())
+
+  @@index([opportunityId, createdAt])
+  @@index([toStageId])
+}
+
+model Lead {
+  id               String         @id @default(cuid())
+  tenantId         String
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// NEW | CONTACTED | QUALIFIED | UNQUALIFIED | CONVERTED | DISQUALIFIED
+  status           String         @default("NEW")
+  firstName        String
+  lastName         String
+  email            String
+  phone            String?
+  company          String?
+  title            String?
+  source           String         @default("manual")
+  country          String?
+  message          String?        @db.Text
+  ownerId          String?
+  owner            AdminUser?     @relation("LeadOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  clientId         String?
+  client           Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  contactId        String?
+  contact          ClientContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contactSubmissionId String?     @unique
+  customFields     Json?
+  convertedAt      DateTime?
+  opportunity      Opportunity?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([email])
+  @@index([ownerId])
+  @@index([clientId])
+}
+
+model Product {
+  id          String      @id @default(cuid())
+  tenantId    String
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  sku         String?
+  description String      @default("") @db.Text
+  unit        String      @default("unit")
+  unitPrice   Decimal     @db.Decimal(14, 2)
+  currency    String      @default("AUD")
+  active      Boolean     @default(true)
+  quoteLines  QuoteLine[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([tenantId])
+  @@index([active])
+}
+
+model Quote {
+  id            String      @id @default(cuid())
+  tenantId      String
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  quoteNumber   String
+  title         String
+  /// DRAFT | SENT | ACCEPTED | REJECTED | EXPIRED
+  status        String      @default("DRAFT")
+  clientId      String
+  client        Client      @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  ownerId       String?
+  owner         AdminUser?  @relation("QuoteOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  currency      String      @default("AUD")
+  subtotal      Decimal     @default(0) @db.Decimal(14, 2)
+  taxRate       Decimal     @default(10) @db.Decimal(5, 2)
+  taxAmount     Decimal     @default(0) @db.Decimal(14, 2)
+  totalAmount   Decimal     @default(0) @db.Decimal(14, 2)
+  validUntil    DateTime?
+  notes         String      @default("") @db.Text
+  lines         QuoteLine[]
+  contracts     Contract[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([tenantId, quoteNumber])
+  @@index([tenantId])
+  @@index([clientId])
+  @@index([opportunityId])
+  @@index([status])
+  @@index([ownerId])
+}
+
+model QuoteLine {
+  id          String   @id @default(cuid())
+  quoteId     String
+  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  description String
+  qty         Decimal  @db.Decimal(14, 4)
+  unitPrice   Decimal  @db.Decimal(14, 2)
+  amount      Decimal  @db.Decimal(14, 2)
+  order       Int      @default(0)
+
+  @@index([quoteId])
+  @@index([productId])
+}
+
+model CustomFieldDef {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// client | contact | lead | opportunity
+  entityType String
+  key        String
+  label      String
+  /// text | number | date | select | boolean
+  fieldType  String   @default("text")
+  options    Json?
+  required   Boolean  @default(false)
+  order      Int      @default(0)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tenantId, entityType, key])
+  @@index([tenantId, entityType])
 }

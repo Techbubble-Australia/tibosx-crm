@@ -90,6 +90,20 @@ function formatDate(value: string | null) {
   return new Date(value).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
 }
 
+function BurnBar({ consumed, contractValue, totalVariation }: { consumed: number; contractValue: number; totalVariation: number }) {
+  const total = contractValue + totalVariation;
+  const pct = total > 0 ? Math.min(100, Math.round((consumed / total) * 100)) : 0;
+  const tone = pct >= 90 ? "bg-red-600" : pct >= 80 ? "bg-amber-500" : "bg-gray-800 dark:bg-gray-200";
+  return (
+    <div className="min-w-[4.5rem]">
+      <div className="mb-0.5 text-xs tabular-nums text-gray-600 dark:text-gray-400">{pct}%</div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+        <div className={`h-full rounded-full ${tone}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export function ContractsListPage({ activeFilter }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -303,6 +317,13 @@ export function ContractsListPage({ activeFilter }: Props) {
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.totalVariation)}</td>
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.consumed)}</td>
         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{formatMoney(row.currency, row.remaining)}</td>
+        <td className="px-4 py-3">
+          <BurnBar
+            consumed={row.consumed}
+            contractValue={row.contractValue}
+            totalVariation={row.totalVariation}
+          />
+        </td>
         <td className="px-4 py-3 text-right">
           <div className="inline-flex items-center gap-2">
             <button type="button" onClick={() => void deleteRow(row.id)} className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20">
@@ -462,19 +483,20 @@ export function ContractsListPage({ activeFilter }: Props) {
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Total variation</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Consumed</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Remaining</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Burn</th>
                 <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={15} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={16} className="px-4 py-8 text-center text-gray-400">
                     No {activeFilter ? "active" : "inactive"} contracts yet.
                   </td>
                 </tr>
               ) : totalItems === 0 ? (
                 <tr>
-                  <td colSpan={15} className="px-4 py-8 text-center text-gray-400">No contracts match your search.</td>
+                  <td colSpan={16} className="px-4 py-8 text-center text-gray-400">No contracts match your search.</td>
                 </tr>
               ) : (
                 paginated.map((row) => renderTableRow(row))

@@ -24,6 +24,7 @@ import { defaultLandingPath, isRestrictedToWorkspaceOnly } from "@/lib/admin-rol
 import { useDismissedToday } from "@/hooks/useDismissedToday";
 import { TimesheetStatusBadge } from "@/lib/timesheet-status-styles";
 import { PROJECT_STATUS_LABELS, type ProjectStatus } from "@/lib/project-types";
+import { MyDayPanel } from "@/components/sales/MyDayPanel";
 
 type MonthStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "NOT_STARTED" | "MISSING";
 type ActionKind = "AGREEMENT" | "PROFILE" | "RETURNED" | "OVERDUE_DRAFT" | "MISSING";
@@ -336,6 +337,7 @@ export default function WorkspacePage() {
 
   return (
       <div className="space-y-6">
+        <MyDayPanel />
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">

@@ -27,6 +27,8 @@ export interface AuthRequest extends Request {
   user?: AuthUser;
   mfaSetupRequired?: boolean;
   sessionPurpose?: string;
+  /** Set by requireTenant on CRM / sales routes. */
+  tenant?: import("../lib/tenant").TenantContext;
 }
 
 interface JwtPayload extends AuthUser {

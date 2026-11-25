@@ -11,13 +11,18 @@ function OpportunitiesTabsInner() {
   const selectedTab = opportunitiesNavTabFromPath(pathname);
 
   const tabs = [
+    { href: "/opportunities", id: "board" as const, label: "Board" },
     { href: "/opportunities/active", id: "active" as const, label: "Active" },
     { href: "/opportunities/inactive", id: "inactive" as const, label: "Inactive" },
   ];
 
-  const isListPage = pathname === "/opportunities/active" || pathname === "/opportunities/inactive";
+  const showTabs =
+    pathname === "/opportunities" ||
+    pathname === "/opportunities/" ||
+    pathname === "/opportunities/active" ||
+    pathname === "/opportunities/inactive";
 
-  if (!isListPage) {
+  if (!showTabs) {
     return null;
   }
 
@@ -51,6 +56,7 @@ export default function OpportunitiesLayout({ children }: { children: React.Reac
         <Suspense
           fallback={
             <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-2 dark:border-gray-700">
+              <span className="px-4 py-2 text-sm text-gray-400">Board</span>
               <span className="px-4 py-2 text-sm text-gray-400">Active</span>
               <span className="px-4 py-2 text-sm text-gray-400">Inactive</span>
             </div>

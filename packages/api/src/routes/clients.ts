@@ -202,9 +202,11 @@ router.get("/next-order", async (_req, res) => {
   }
 });
 
-router.get("/", async (_req, res) => {
+router.get("/", async (req: AuthRequest, res) => {
   try {
+    const tenantId = req.tenant?.tenantId;
     const rows = await prisma.client.findMany({
+      where: tenantId ? { tenantId } : undefined,
       orderBy: [{ order: "asc" }, { name: "asc" }],
       include: {
         contacts: {
@@ -365,8 +367,10 @@ router.post("/", async (req, res) => {
   try {
     const data = clientSchema.parse(req.body);
     const order = data.order && data.order > 0 ? data.order : await allocateNextClientOrder();
+    const tenantId = (req as AuthRequest).tenant?.tenantId ?? null;
     const row = await prisma.client.create({
       data: {
+        tenantId,
         name: data.name,
         website: data.website ?? "",
         country: data.country,
@@ -374,6 +378,7 @@ router.post("/", async (req, res) => {
         status: data.status,
         contacts: {
           create: data.contacts.map((contact, index) => ({
+            tenantId,
             name: contact.name,
             email: contact.email,
             position: contact.position?.trim() || null,

@@ -51,6 +51,14 @@ import { timesheetRoutes } from "./routes/timesheets";
 import { notificationRoutes } from "./routes/notifications";
 import { invoiceRoutes } from "./routes/invoices";
 import { clientWorkspaceRoutes } from "./routes/client-workspace";
+import { requireTenant } from "./middleware/requireTenant";
+import { crmTenantRoutes } from "./routes/crm-tenants";
+import { crmPipelineRoutes } from "./routes/crm-pipelines";
+import { crmLeadRoutes } from "./routes/crm-leads";
+import { crmQuoteRoutes } from "./routes/crm-quotes";
+import { crmReportRoutes } from "./routes/crm-reports";
+import { crmSettingsRoutes } from "./routes/crm-settings";
+import { crmMyDayRoutes } from "./routes/crm-my-day";
 import { authRoutes as ticketingPortalAuthRoutes } from "./ticketing/routes/auth";
 import { ticketRoutes as ticketingTicketRoutes } from "./ticketing/routes/tickets";
 import { organizationRoutes as ticketingOrgRoutes } from "./ticketing/routes/organizations";
@@ -147,12 +155,34 @@ app.use(
   requireMfaEnrolled,
   requireAnyModule("sales", "recruitment"),
   blockModuleMutations("sales"),
+  requireTenant,
   clientRoutes,
 );
-app.use("/api/admin/opportunities", authMiddleware, requireMfaEnrolled, requireModule("sales"), opportunityRoutes);
-app.use("/api/admin/contracts", authMiddleware, requireMfaEnrolled, requireModule("sales"), contractRoutes);
-app.use("/api/admin/sales-dashboard", authMiddleware, requireMfaEnrolled, requireModule("sales"), salesDashboardRoutes);
-app.use("/api/admin/invoices", authMiddleware, requireMfaEnrolled, requireModule("sales"), invoiceRoutes);
+app.use(
+  "/api/admin/opportunities",
+  authMiddleware,
+  requireMfaEnrolled,
+  requireModule("sales"),
+  requireTenant,
+  opportunityRoutes,
+);
+app.use("/api/admin/contracts", authMiddleware, requireMfaEnrolled, requireModule("sales"), requireTenant, contractRoutes);
+app.use(
+  "/api/admin/sales-dashboard",
+  authMiddleware,
+  requireMfaEnrolled,
+  requireModule("sales"),
+  requireTenant,
+  salesDashboardRoutes,
+);
+app.use("/api/admin/invoices", authMiddleware, requireMfaEnrolled, requireModule("sales"), requireTenant, invoiceRoutes);
+app.use("/api/admin/crm/tenants", authMiddleware, requireMfaEnrolled, requireTenant, crmTenantRoutes);
+app.use("/api/admin/crm/pipelines", authMiddleware, requireMfaEnrolled, requireModule("sales"), requireTenant, crmPipelineRoutes);
+app.use("/api/admin/crm/leads", authMiddleware, requireMfaEnrolled, requireModule("sales"), requireTenant, crmLeadRoutes);
+app.use("/api/admin/crm/quotes", authMiddleware, requireMfaEnrolled, requireModule("sales"), requireTenant, crmQuoteRoutes);
+app.use("/api/admin/crm/reports", authMiddleware, requireMfaEnrolled, requireModule("sales"), requireTenant, crmReportRoutes);
+app.use("/api/admin/crm/settings", authMiddleware, requireMfaEnrolled, requireModule("sales"), requireTenant, crmSettingsRoutes);
+app.use("/api/admin/crm/my-day", authMiddleware, requireMfaEnrolled, requireModule("sales"), requireTenant, crmMyDayRoutes);
 app.use("/api/admin/users", authMiddleware, requireMfaEnrolled, requireRole("admin"), adminUserRoutes);
 app.use(
   "/api/admin/customer-users",

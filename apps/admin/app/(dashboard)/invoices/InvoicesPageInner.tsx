@@ -203,6 +203,29 @@ export default function InvoicesPageInner() {
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [paginated]);
 
+  const kpis = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    let draft = 0;
+    let awaiting = 0;
+    let overdue = 0;
+    let paidThisMonth = 0;
+    for (const row of rows) {
+      if (row.status === "DRAFT") draft += 1;
+      if (row.status === "AWAITING_PAYMENT") {
+        awaiting += 1;
+        const due = new Date(row.dueDate);
+        if (due < today) overdue += 1;
+      }
+      if (row.status === "PAID") {
+        const paidAt = new Date(row.issueDate);
+        if (paidAt >= monthStart) paidThisMonth += 1;
+      }
+    }
+    return { draft, awaiting, overdue, paidThisMonth };
+  }, [rows]);
+
   useEffect(() => {
     setPage(1);
   }, [statusFilter, clientFilter, dueFilter, viewMode, setPage]);
@@ -234,6 +257,23 @@ export default function InvoicesPageInner() {
               Add invoice
             </Link>
           </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: "Draft", value: kpis.draft },
+            { label: "Awaiting payment", value: kpis.awaiting },
+            { label: "Overdue", value: kpis.overdue },
+            { label: "Paid this month", value: kpis.paidThisMonth },
+          ].map((kpi) => (
+            <div
+              key={kpi.label}
+              className="border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900"
+            >
+              <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{kpi.label}</p>
+              <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">{kpi.value}</p>
+            </div>
+          ))}
         </div>
 
         <div className="flex flex-wrap gap-3">

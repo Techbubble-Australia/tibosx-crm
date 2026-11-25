@@ -1211,6 +1211,7 @@ router.post("/", async (req: AuthRequest, res) => {
     const row = await prisma.$transaction(async (tx) => {
       const created = await tx.contract.create({
         data: {
+          tenantId: (req as AuthRequest).tenant?.tenantId ?? null,
           contractNumber,
           title: data.title,
           clientId: data.clientId,
@@ -2017,6 +2018,7 @@ router.post("/:id/invoices", async (req: AuthRequest, res) => {
     const row = await prisma.$transaction(async (tx) => {
       const created = await tx.contractInvoice.create({
         data: {
+          tenantId: req.tenant?.tenantId ?? contract.tenantId ?? null,
           contractId: contract.id,
           invoiceNumber,
           reference: input.reference ?? "",
