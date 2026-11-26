@@ -70,7 +70,9 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
     if (!decoded?.id || !decoded?.email) {
       return res.status(401).json({ error: "Unauthorized: Invalid token payload" });
     }
-    // MFA is not enforced — treat legacy mfa_pending / mfa_setup tokens as normal sessions.
+    if (decoded.purpose === MFA_PENDING_PURPOSE) {
+      return res.status(401).json({ error: "Unauthorized: MFA verification required" });
+    }
     req.user = {
       id: decoded.id,
       email: decoded.email,
@@ -79,7 +81,9 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
       ...(decoded.impersonatorId ? { impersonatorId: decoded.impersonatorId } : {}),
     };
     req.sessionPurpose = decoded.purpose;
-    req.mfaSetupRequired = decoded.purpose === PASSWORD_RESET_REQUIRED_PURPOSE;
+    req.mfaSetupRequired =
+      decoded.purpose === MFA_SETUP_REQUIRED_PURPOSE ||
+      decoded.purpose === PASSWORD_RESET_REQUIRED_PURPOSE;
     next();
   } catch {
     return res.status(401).json({ error: "Unauthorized: Invalid token" });

@@ -30,12 +30,10 @@ export function AdminResetMfaSection({ resetUrl, mfaEnabled, mfaEnrolledAt, onRe
 
   async function handleReset() {
     const ok = await appConfirm(
-      enrolled
-        ? "Reset this user’s authenticator? They will need to scan a new QR code on next sign-in."
-        : "Clear MFA setup for this user? They will be prompted to enroll on next sign-in.",
+      "Turn MFA off for this user and clear their authenticator? They can sign in with password only until they enable MFA again.",
       {
-        title: "Reset MFA",
-        confirmLabel: "Reset MFA",
+        title: "Disable MFA",
+        confirmLabel: "Disable MFA",
         destructive: true,
       },
     );
@@ -48,13 +46,13 @@ export function AdminResetMfaSection({ resetUrl, mfaEnabled, mfaEnrolledAt, onRe
       if (!res.ok) throw new Error(messageFromApiError(data, "Failed to reset MFA"));
       const next = data.data as { mfaEnabled?: boolean; mfaEnrolledAt?: string | null };
       onReset?.({
-        mfaEnabled: Boolean(next?.mfaEnabled ?? true),
+        mfaEnabled: Boolean(next?.mfaEnabled ?? false),
         mfaEnrolledAt: next?.mfaEnrolledAt ?? null,
       });
       appAlert(
         typeof data.message === "string"
           ? data.message
-          : "MFA reset. The user must set up authenticator again on next sign-in.",
+          : "MFA disabled. The user can sign in with password only.",
       );
     } catch (error) {
       appAlert(error instanceof Error ? error.message : "Failed to reset MFA");
@@ -89,8 +87,8 @@ export function AdminResetMfaSection({ resetUrl, mfaEnabled, mfaEnrolledAt, onRe
         </button>
       </div>
       <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-        Clears the user’s authenticator app pairing and requires them to set MFA up again on next sign-in. To let them
-        sign in without MFA, ask them to turn MFA off under Settings → Security (or leave MFA off after they disable it).
+        Clears the user’s authenticator and turns MFA off. They can sign in with password only until they enable MFA
+        again under Settings → Security.
       </p>
     </div>
   );

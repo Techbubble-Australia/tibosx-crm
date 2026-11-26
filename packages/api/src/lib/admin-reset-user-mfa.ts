@@ -1,8 +1,9 @@
 import { prisma } from "@techbubble/database";
 import { syncClientAdminMfa } from "./mfa-account.js";
 
+/** Clear authenticator and leave MFA off so the user can sign in with password only. */
 const mfaResetData = {
-  mfaEnabled: true,
+  mfaEnabled: false,
   totpSecretEnc: null,
   mfaEnrolledAt: null,
 } as const;
@@ -13,7 +14,7 @@ export type AdminMfaResetResult = {
   hadEnrollment: boolean;
 };
 
-/** Clear authenticator enrollment; user must set up MFA again on next sign-in. */
+/** Clear authenticator enrollment and disable MFA. */
 export async function resetMfaForAdminUser(adminUserId: string): Promise<AdminMfaResetResult | null> {
   const existing = await prisma.adminUser.findUnique({
     where: { id: adminUserId },
@@ -29,7 +30,7 @@ export async function resetMfaForAdminUser(adminUserId: string): Promise<AdminMf
   });
 
   return {
-    mfaEnabled: true,
+    mfaEnabled: false,
     mfaEnrolledAt: null,
     hadEnrollment,
   };
@@ -60,7 +61,7 @@ export async function resetMfaForCustomerUser(customerUserId: string): Promise<A
   });
 
   return {
-    mfaEnabled: true,
+    mfaEnabled: false,
     mfaEnrolledAt: null,
     hadEnrollment,
   };

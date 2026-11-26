@@ -5,6 +5,8 @@ import { prisma } from "@techbubble/database";
 import {
   authMiddleware,
   generateToken,
+  generateMfaPendingToken,
+  generateMfaSetupRequiredToken,
   generatePasswordResetRequiredToken,
   MFA_SETUP_REQUIRED_PURPOSE,
   verifyMfaPendingToken,
@@ -152,7 +154,37 @@ router.post("/login", async (req, res) => {
           },
         });
       }
-      // Password-only for all users — MFA is never required at login.
+      // Respect DB flag: MFA off → full session; MFA on + enrolled → challenge; MFA on + not enrolled → setup.
+      if (customer.mfaEnabled && customer.totpSecretEnc) {
+        const mfaToken = generateMfaPendingToken({
+          id: customer.id,
+          email: customer.email,
+          role: "client",
+        });
+        return res.json({
+          message: "MFA required",
+          data: {
+            requiresMfa: true,
+            mfaToken,
+            user: customerPublic,
+          },
+        });
+      }
+      if (customer.mfaEnabled && !customer.totpSecretEnc) {
+        const setupToken = generateMfaSetupRequiredToken({
+          id: customer.id,
+          email: customer.email,
+          role: "client",
+        });
+        return res.json({
+          message: "MFA setup required",
+          data: {
+            requiresMfaSetup: true,
+            token: setupToken,
+            user: customerPublic,
+          },
+        });
+      }
       const token = generateToken({
         id: customer.id,
         email: customer.email,
@@ -189,7 +221,34 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    // Password-only for all users — MFA is never required at login.
+    if (user.mfaEnabled && user.totpSecretEnc) {
+      const mfaToken = generateMfaPendingToken({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      });
+      return res.json({
+        message: "MFA required",
+        data: {
+          requiresMfa: true,
+          mfaToken,
+          user: publicUser(user),
+        },
+      });
+    }
+
+    if (user.mfaEnabled && !user.totpSecretEnc) {
+      const setupToken = generateMfaSetupRequiredToken(sessionAuthUser(user));
+      return res.json({
+        message: "MFA setup required",
+        data: {
+          requiresMfaSetup: true,
+          token: setupToken,
+          user: publicUser(user),
+        },
+      });
+    }
+
     const token = generateToken(sessionAuthUser(user));
     return res.json({
       message: "Login successful",
@@ -467,7 +526,9 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
         impersonation,
         user: {
           ...publicUser({ ...customer, role: "client", mfaEnabled: customer.mfaEnabled }),
-          requiresMfaEnrollment: false,
+          requiresMfaEnrollment:
+            customer.mfaEnabled &&
+            (!customer.totpSecretEnc || req.sessionPurpose === MFA_SETUP_REQUIRED_PURPOSE),
           mfaEnrolledAt: customer.mfaEnrolledAt?.toISOString() ?? null,
           phone: customer.phone,
           profilePhotoUrl: customer.profilePhotoUrl ?? null,
@@ -538,7 +599,9 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
       impersonation,
       user: {
         ...publicUser(user),
-        requiresMfaEnrollment: false,
+        requiresMfaEnrollment:
+          user.mfaEnabled &&
+          (!user.totpSecretEnc || req.sessionPurpose === MFA_SETUP_REQUIRED_PURPOSE),
         mfaEnrolledAt: user.mfaEnrolledAt?.toISOString() ?? null,
         phone: user.phone,
         addressLine1: user.addressLine1,
@@ -902,7 +965,10 @@ router.post("/mfa/resume-session", authMiddleware, async (req: AuthRequest, res)
   if (!account || account.user.active === false) {
     return res.status(401).json({ error: "Unauthorized" });
   }
-  // MFA is optional — always allow upgrading a setup-pending session to a full login.
+  // MFA off → full session. MFA on → only after enrollment is complete.
+  if (account.user.mfaEnabled && !account.user.totpSecretEnc) {
+    return res.status(400).json({ error: "MFA enrollment is not complete" });
+  }
 
   const token = generateToken(mfaSessionUser(account));
   const user =

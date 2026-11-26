@@ -43,7 +43,7 @@ export function MfaEnrollmentGuard({ children }: { children: React.ReactNode }) 
           return;
         }
 
-        // API always returns requiresMfaEnrollment=false — MFA is not enforced.
+        // Only forced when the user's DB flag mfaEnabled is on and enrollment is incomplete.
         const requiresMfaEnrollment = Boolean(user?.requiresMfaEnrollment);
         if (requiresMfaEnrollment) {
           const resumeRes = await fetch("/api/auth/mfa/resume-session", {

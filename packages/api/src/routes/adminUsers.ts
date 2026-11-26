@@ -761,7 +761,7 @@ router.post("/", async (req: AuthRequest, res) => {
           mappedClientContactId: mappedId,
           mappedProfileId,
           taxNumber: data.taxNumber?.trim() || null,
-          mfaEnabled: true,
+          mfaEnabled: false,
           requireProfileAfterFirstLogin: data.requireProfileAfterFirstLogin ?? true,
           profileKycStatus: "INCOMPLETE",
         },

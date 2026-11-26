@@ -1147,7 +1147,7 @@ model CustomerUser {
   passwordHash           String
   active                 Boolean        @default(true)
   profilePhotoUrl        String?
-  mfaEnabled             Boolean        @default(true)
+  mfaEnabled             Boolean        @default(false)
   mfaEnrolledAt          DateTime?
   totpSecretEnc          String?
   passwordNeedsReset     Boolean        @default(false)
