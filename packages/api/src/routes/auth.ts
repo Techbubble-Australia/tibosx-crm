@@ -463,6 +463,7 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
       role: true,
       mfaEnabled: true,
       mfaEnrolledAt: true,
+      totpSecretEnc: true,
       passwordNeedsReset: true,
       addressLine1: true,
       addressLine2: true,
