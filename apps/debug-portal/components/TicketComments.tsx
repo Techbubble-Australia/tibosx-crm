@@ -143,7 +143,7 @@ function AttachmentList({
                 href={mediaHref(a.url)}
                 target="_blank"
                 rel="noreferrer"
-                className="min-w-0 flex-1 truncate font-medium text-sky-700 hover:underline"
+                className="min-w-0 flex-1 truncate font-medium dp-link hover:underline"
                 title={a.name}
               >
                 {a.name}
@@ -404,7 +404,7 @@ export function TicketComments({ ticketId, comments, currentUserId, isAdmin, onC
               <li key={comment.id} className="flex gap-3">
                 <span
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                    mine ? "bg-sky-600 text-white" : "bg-slate-200 text-slate-700"
+                    mine ? "dp-avatar-me text-white" : "bg-slate-200 text-slate-700"
                   }`}
                   aria-hidden
                 >

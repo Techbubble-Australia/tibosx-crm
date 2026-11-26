@@ -97,7 +97,7 @@ export function TicketModal({ id, ticketNumber, sprintId, sprintName, fullPageQu
             <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
             <Link
               href={fullPageHref}
-              className="truncate font-semibold text-sky-700 hover:text-sky-800 hover:underline"
+              className="truncate font-semibold dp-link hover:underline"
               title="Open the full ticket page"
             >
               {number || "Ticket"}

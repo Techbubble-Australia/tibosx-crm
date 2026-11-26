@@ -112,7 +112,7 @@ export function TicketActivityLog({ logs }: { logs: TicketLogEntry[] }) {
             const { title, detail, badges } = describe(entry, labelOf);
             return (
               <li key={entry.id} className="relative">
-                <span className="absolute -left-[23px] top-1 h-3 w-3 rounded-full bg-sky-500 ring-4 ring-white" aria-hidden />
+                <span className="absolute -left-[23px] top-1 h-3 w-3 rounded-full dp-dot ring-4 ring-white" aria-hidden />
                 <p className="text-sm font-medium text-slate-900">{title}</p>
                 {badges ? <ChangeBadges field={badges} from={entry.oldValue} to={entry.newValue} /> : null}
                 {detail ? <p className="mt-0.5 break-words text-sm text-slate-700">{detail}</p> : null}

@@ -85,7 +85,7 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
             <div className="flex gap-4">
               <span
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                  danger ? "bg-red-100 text-red-600" : "bg-sky-100 text-sky-600"
+                  danger ? "bg-red-100 text-red-600" : "dp-icon-soft"
                 }`}
                 aria-hidden
               >

@@ -238,7 +238,7 @@ export default function NewTicketPage() {
                 onClick={() => setType(t)}
                 className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
                   type === t
-                    ? "border-sky-600 bg-sky-50 text-sky-900 ring-2 ring-sky-500/20"
+                    ? "dp-choice-active border"
                     : "border-slate-300 bg-white text-slate-700 hover:border-slate-400"
                 }`}
               >
@@ -348,7 +348,7 @@ export default function NewTicketPage() {
               addFiles(Array.from(e.dataTransfer.files));
             }}
             className={`mt-2 rounded-xl border border-dashed px-4 py-6 text-center ${
-              dragOver ? "border-sky-500 bg-sky-50" : "border-slate-300 bg-slate-50"
+              dragOver ? "border-[rgb(var(--dp-primary-ring))] bg-[rgb(var(--dp-primary-soft))]" : "border-slate-300 bg-slate-50"
             }`}
           >
             <Upload className="mx-auto h-6 w-6 text-slate-400" aria-hidden />

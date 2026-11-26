@@ -530,7 +530,7 @@ export function TicketDetailView({
   if (loading) {
     return (
       <div className="dp-card flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-sky-500" aria-label="Loading ticket" />
+        <Loader2 className="h-8 w-8 animate-spin dp-spinner" aria-label="Loading ticket" />
       </div>
     );
   }
@@ -863,7 +863,7 @@ export function TicketDetailView({
             </DetailRow>
             <DetailRow label="Parent">
               {row.parent ? (
-                <Link href={`/tickets/${row.parent.id}`} className="font-medium text-sky-700 hover:underline">
+                <Link href={`/tickets/${row.parent.id}`} className="font-medium dp-link hover:underline">
                   {row.parent.ticketId}
                   {row.parent.title ? ` — ${row.parent.title}` : ""}
                 </Link>
@@ -878,7 +878,7 @@ export function TicketDetailView({
                 <ul className="space-y-1">
                   {(row.children ?? []).map((child) => (
                     <li key={child.id}>
-                      <Link href={`/tickets/${child.id}`} className="font-medium text-sky-700 hover:underline">
+                      <Link href={`/tickets/${child.id}`} className="font-medium dp-link hover:underline">
                         {child.ticketId}
                         {child.title ? ` — ${child.title}` : ""}
                       </Link>{" "}
@@ -893,7 +893,7 @@ export function TicketDetailView({
             <div className="mt-4 border-t border-slate-100 pt-3">
               <Link
                 href={`/tickets/new?level=${(row.hierarchyLevel ?? 0) - 1}&parentId=${row.id}`}
-                className="text-sm font-medium text-sky-700 hover:underline"
+                className="text-sm font-medium dp-link hover:underline"
               >
                 Add child ticket
               </Link>
@@ -913,7 +913,7 @@ export function TicketDetailView({
                   <li key={link.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
                     <span>
                       <span className="font-medium text-slate-700">{link.linkType.replace(/_/g, " ")}</span>{" "}
-                      <Link href={`/tickets/${other.id}`} className="text-sky-700 hover:underline">
+                      <Link href={`/tickets/${other.id}`} className="dp-link hover:underline">
                         {other.ticketId}
                         {other.title ? ` — ${other.title}` : ""}
                       </Link>
@@ -1079,7 +1079,7 @@ export function TicketDetailView({
                 href={row.currentUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-start gap-1 break-all text-sky-700 hover:text-sky-800 hover:underline"
+                className="inline-flex items-start gap-1 break-all dp-link hover:underline"
               >
                 {row.currentUrl}
                 <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />

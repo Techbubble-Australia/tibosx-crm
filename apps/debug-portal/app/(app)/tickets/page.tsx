@@ -386,7 +386,7 @@ function TicketsListInner() {
 
       {loading ? (
         <div className="dp-card flex h-48 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-sky-500" aria-label="Loading" />
+          <Loader2 className="h-8 w-8 animate-spin dp-spinner" aria-label="Loading" />
         </div>
       ) : rows.length === 0 ? (
         <div className="dp-card px-6 py-12 text-center">
@@ -413,7 +413,7 @@ function TicketsListInner() {
                         }}
                         onChange={toggleSelectAll}
                         aria-label={allVisibleSelected ? "Deselect all tickets" : "Select all tickets on page"}
-                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                        className="h-4 w-4 rounded border-slate-300 dp-check focus:ring-2"
                       />
                     </th>
                   ) : null}
@@ -435,7 +435,7 @@ function TicketsListInner() {
                           checked={selectedIds.has(row.id)}
                           onChange={() => toggleRow(row.id)}
                           aria-label={`Select ${row.ticketId}`}
-                          className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                          className="h-4 w-4 rounded border-slate-300 dp-check focus:ring-2"
                         />
                       </td>
                     ) : null}
@@ -443,7 +443,7 @@ function TicketsListInner() {
                       <button
                         type="button"
                         onClick={() => setOpenTicket(row)}
-                        className="text-left font-semibold text-sky-700 hover:text-sky-800 hover:underline"
+                        className="text-left font-semibold dp-link hover:underline"
                       >
                         {row.ticketId}
                       </button>
@@ -538,7 +538,7 @@ export default function TicketsListPage() {
     <Suspense
       fallback={
         <div className="flex h-48 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-sky-500" />
+          <Loader2 className="h-8 w-8 animate-spin dp-spinner" />
         </div>
       }
     >

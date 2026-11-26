@@ -20,7 +20,7 @@ import { usePortalUser } from "@/lib/use-portal-user";
 
 function statusBadgeClass(status: Sprint["status"]): string {
   if (status === "ACTIVE") return "bg-emerald-50 text-emerald-800 ring-emerald-200";
-  if (status === "PLANNED") return "bg-sky-50 text-sky-800 ring-sky-200";
+  if (status === "PLANNED") return "dp-chip-active";
   return "bg-slate-100 text-slate-700 ring-slate-200";
 }
 
@@ -113,7 +113,7 @@ export default function SprintsPage() {
 
       {loading ? (
         <div className="dp-card flex h-40 items-center justify-center">
-          <Loader2 className="h-7 w-7 animate-spin text-sky-500" aria-label="Loading sprints" />
+          <Loader2 className="h-7 w-7 animate-spin dp-spinner" aria-label="Loading sprints" />
         </div>
       ) : (
         <div className="space-y-3">

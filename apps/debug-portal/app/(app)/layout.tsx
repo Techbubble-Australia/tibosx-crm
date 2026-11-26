@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Bug, CalendarRange, KanbanSquare, LogOut, Plus, Ticket } from "lucide-react";
 import { TicketStatusesProvider } from "@/components/TicketStatusesProvider";
 import { ConfirmDialogProvider } from "@/components/ConfirmDialog";
+import { portalEnvLabel, resolvePortalEnv, type PortalEnv } from "@/lib/portal-env";
 
 function navClass(active: boolean): string {
   return active ? "dp-nav-link dp-nav-link-active" : "dp-nav-link";
@@ -13,6 +15,16 @@ function navClass(active: boolean): string {
 export default function AppShellLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [portalEnv, setPortalEnv] = useState<PortalEnv>("staging");
+
+  useEffect(() => {
+    const env = resolvePortalEnv(
+      process.env.NEXT_PUBLIC_APP_ENV,
+      typeof window !== "undefined" ? window.location.hostname : null,
+    );
+    setPortalEnv(env);
+    document.documentElement.dataset.portalEnv = env;
+  }, []);
 
   const onTickets =
     pathname === "/tickets" || (pathname.startsWith("/tickets/") && pathname !== "/tickets/new");
@@ -34,10 +46,11 @@ export default function AppShellLayout({ children }: { children: React.ReactNode
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-4">
             <Link href="/board" className="flex items-center gap-2 rounded-lg pr-2 transition-opacity hover:opacity-90">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-600 text-white shadow-sm">
+              <span className="dp-brand-mark">
                 <Bug className="h-5 w-5" aria-hidden />
               </span>
               <span className="hidden font-semibold text-slate-900 sm:inline">Debug portal</span>
+              <span className="dp-env-badge">{portalEnvLabel(portalEnv)}</span>
             </Link>
             <nav className="flex items-center gap-1" aria-label="Main">
               <Link href="/board" className={navClass(onBoard)}>

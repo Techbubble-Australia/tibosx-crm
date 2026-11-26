@@ -2,6 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Theme tokens — staging (this branch) is violet; development stays sky.
+  Set via data-portal-env on <html> (see app/layout.tsx).
+*/
+:root,
+html[data-portal-env="staging"] {
+  --dp-primary: 124 58 237; /* violet-600 */
+  --dp-primary-hover: 109 40 217; /* violet-700 */
+  --dp-primary-ring: 139 92 246; /* violet-500 */
+  --dp-primary-soft: 245 243 255; /* violet-50 */
+  --dp-primary-ink: 91 33 182; /* violet-800 */
+  --dp-primary-ring-soft: 221 214 254; /* violet-200 */
+}
+
+html[data-portal-env="development"] {
+  --dp-primary: 2 132 199; /* sky-600 */
+  --dp-primary-hover: 3 105 161; /* sky-700 */
+  --dp-primary-ring: 14 165 233; /* sky-500 */
+  --dp-primary-soft: 240 249 255; /* sky-50 */
+  --dp-primary-ink: 7 89 133; /* sky-800 */
+  --dp-primary-ring-soft: 186 230 253; /* sky-200 */
+}
+
+html[data-portal-env="production"] {
+  --dp-primary: 15 118 110; /* teal-700 */
+  --dp-primary-hover: 17 94 89; /* teal-800 */
+  --dp-primary-ring: 20 184 166; /* teal-500 */
+  --dp-primary-soft: 240 253 250; /* teal-50 */
+  --dp-primary-ink: 17 94 89;
+  --dp-primary-ring-soft: 153 246 228; /* teal-200 */
+}
+
 body {
   @apply bg-slate-100 text-slate-900 antialiased;
 }
@@ -13,7 +45,12 @@ select {
 @layer components {
   .dp-input {
     @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 transition-colors;
-    @apply focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/25;
+    @apply focus:outline-none focus:ring-2 disabled:cursor-not-allowed;
+    border-color: rgb(203 213 225);
+  }
+  .dp-input:focus {
+    border-color: rgb(var(--dp-primary-ring));
+    --tw-ring-color: rgb(var(--dp-primary-ring) / 0.25);
   }
 
   .dp-label {
@@ -29,13 +66,23 @@ select {
   }
 
   .dp-btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors;
-    @apply hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+    background-color: rgb(var(--dp-primary));
+  }
+  .dp-btn-primary:hover {
+    background-color: rgb(var(--dp-primary-hover));
+  }
+  .dp-btn-primary:focus {
+    --tw-ring-color: rgb(var(--dp-primary-ring));
   }
 
   .dp-btn-secondary {
     @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-sm transition-colors;
-    @apply hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .dp-btn-secondary:focus {
+    --tw-ring-color: rgb(var(--dp-primary-ring) / 0.3);
   }
 
   .dp-btn-ghost {
@@ -47,7 +94,26 @@ select {
   }
 
   .dp-nav-link-active {
-    @apply bg-sky-50 text-sky-800 ring-1 ring-sky-200/80;
+    background-color: rgb(var(--dp-primary-soft));
+    color: rgb(var(--dp-primary-ink));
+    box-shadow: inset 0 0 0 1px rgb(var(--dp-primary-ring-soft) / 0.8);
+  }
+
+  .dp-brand-mark {
+    @apply flex h-9 w-9 items-center justify-center rounded-lg text-white shadow-sm;
+    background-color: rgb(var(--dp-primary));
+  }
+
+  .dp-brand-mark-lg {
+    @apply mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl text-white shadow-sm;
+    background-color: rgb(var(--dp-primary));
+  }
+
+  .dp-env-badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide;
+    background-color: rgb(var(--dp-primary-soft));
+    color: rgb(var(--dp-primary-ink));
+    box-shadow: inset 0 0 0 1px rgb(var(--dp-primary-ring-soft));
   }
 
   .dp-table-head {
@@ -56,5 +122,66 @@ select {
 
   .dp-table-cell {
     @apply px-4 py-3.5 align-middle text-sm text-slate-700;
+  }
+
+  .dp-link {
+    color: rgb(var(--dp-primary-ink));
+  }
+  .dp-link:hover {
+    color: rgb(var(--dp-primary-hover));
+  }
+
+  .dp-spinner {
+    color: rgb(var(--dp-primary-ring));
+  }
+
+  .dp-choice-active {
+    border-color: rgb(var(--dp-primary));
+    background-color: rgb(var(--dp-primary-soft));
+    color: rgb(var(--dp-primary-ink));
+    box-shadow: 0 0 0 2px rgb(var(--dp-primary-ring) / 0.2);
+  }
+
+  .dp-chip-active {
+    background-color: rgb(var(--dp-primary-soft));
+    color: rgb(var(--dp-primary-ink));
+    box-shadow: inset 0 0 0 1px rgb(var(--dp-primary-ring-soft));
+  }
+
+  .dp-drop-active {
+    --tw-ring-color: rgb(var(--dp-primary-ring));
+  }
+
+  .dp-check {
+    accent-color: rgb(var(--dp-primary));
+    color: rgb(var(--dp-primary));
+  }
+  .dp-check:focus {
+    --tw-ring-color: rgb(var(--dp-primary-ring));
+  }
+
+  .dp-avatar-me {
+    background-color: rgb(var(--dp-primary));
+  }
+
+  .dp-dot {
+    background-color: rgb(var(--dp-primary-ring));
+  }
+
+  .dp-icon-soft {
+    background-color: rgb(var(--dp-primary-soft));
+    color: rgb(var(--dp-primary));
+  }
+
+  .dp-callout {
+    border-color: rgb(var(--dp-primary-ring-soft));
+    background-color: rgb(var(--dp-primary-soft) / 0.6);
+    color: rgb(var(--dp-primary-ink));
+  }
+
+  .dp-select:focus {
+    border-color: rgb(var(--dp-primary-ring));
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(var(--dp-primary-ring) / 0.25);
   }
 }

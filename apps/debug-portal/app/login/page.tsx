@@ -1,11 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bug, Loader2, Lock, Mail } from "lucide-react";
+import { portalEnvLabel, resolvePortalEnv, type PortalEnv } from "@/lib/portal-env";
 
 export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [portalEnv, setPortalEnv] = useState<PortalEnv>("staging");
+
+  useEffect(() => {
+    const env = resolvePortalEnv(process.env.NEXT_PUBLIC_APP_ENV, window.location.hostname);
+    setPortalEnv(env);
+    document.documentElement.dataset.portalEnv = env;
+  }, []);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -38,10 +46,13 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center px-4 py-12">
       <div className="dp-card w-full max-w-md p-8 sm:p-10">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-sky-600 text-white shadow-sm">
+          <div className="dp-brand-mark-lg">
             <Bug className="h-7 w-7" aria-hidden />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Debug portal</h1>
+          <div className="flex items-center justify-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Debug portal</h1>
+            <span className="dp-env-badge">{portalEnvLabel(portalEnv)}</span>
+          </div>
           <p className="mt-2 text-sm text-slate-600">Sign in with your TBOS account. MFA is not required here.</p>
         </div>
         <form onSubmit={onSubmit} className="space-y-5">

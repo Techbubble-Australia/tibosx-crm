@@ -484,7 +484,7 @@ function BoardPageInner() {
               onClick={() => setBoardLevel(tab.level)}
               className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                 active
-                  ? "border-sky-600 bg-sky-50 text-sky-900 ring-2 ring-sky-500/20"
+                  ? "dp-choice-active border"
                   : "border-slate-300 bg-white text-slate-700 hover:border-slate-400"
               }`}
               title={tab.description}
@@ -517,7 +517,7 @@ function BoardPageInner() {
                     selectedSprint.status === "ACTIVE"
                       ? "bg-emerald-50 text-emerald-800 ring-emerald-200"
                       : selectedSprint.status === "PLANNED"
-                        ? "bg-sky-50 text-sky-800 ring-sky-200"
+                        ? "dp-chip-active"
                         : "bg-slate-100 text-slate-700 ring-slate-200"
                   }`}
                 >
@@ -591,7 +591,7 @@ function BoardPageInner() {
         ) : null}
 
         {!sprintsLoading && sprints.length === 0 && !sprintForm ? (
-          <div className="flex flex-col gap-2 rounded-lg border border-dashed border-sky-200 bg-sky-50/60 px-4 py-3 text-sm text-sky-900 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 rounded-lg border border-dashed dp-callout px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
             <p>
               No sprints yet. New tickets are saved to the Backlog until there is an active sprint.
             </p>
@@ -684,7 +684,7 @@ function BoardPageInner() {
 
       {loading && tickets.length === 0 ? (
         <div className="dp-card flex h-48 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-sky-500" aria-label="Loading board" />
+          <Loader2 className="h-8 w-8 animate-spin dp-spinner" aria-label="Loading board" />
         </div>
       ) : (
         <div
@@ -729,7 +729,7 @@ function BoardPageInner() {
                   if (id) void moveTicket(id, status.key);
                 }}
                 className={`flex min-h-[16rem] w-72 shrink-0 flex-col rounded-xl border border-t-4 border-slate-200 bg-slate-50/70 transition-opacity ${accent} ${
-                  dropTarget === status.key ? "ring-2 ring-sky-400 ring-offset-1" : ""
+                  dropTarget === status.key ? "ring-2 dp-drop-active ring-offset-1" : ""
                 } ${
                   columnDropTarget === status.key && draggingColumn !== status.key
                     ? "ring-2 ring-violet-400 ring-offset-1"
@@ -873,7 +873,7 @@ function BoardPageInner() {
                           <button
                             type="button"
                             onClick={() => setOpenTicket(ticket)}
-                            className="truncate text-left text-sm font-semibold text-sky-700 after:absolute after:inset-0 after:content-[''] hover:text-sky-800 hover:underline"
+                            className="truncate text-left text-sm font-semibold dp-link after:absolute after:inset-0 after:content-[''] hover:underline"
                           >
                             {ticket.ticketId}
                           </button>
@@ -995,7 +995,7 @@ export default function BoardPage() {
     <Suspense
       fallback={
         <div className="flex h-48 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-sky-500" aria-label="Loading" />
+          <Loader2 className="h-8 w-8 animate-spin dp-spinner" aria-label="Loading" />
         </div>
       }
     >
