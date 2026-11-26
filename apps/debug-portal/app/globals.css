@@ -2,36 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-/*
-  Theme tokens — staging (this branch) is violet; development stays sky.
-  Set via data-portal-env on <html> (see app/layout.tsx).
-*/
-:root,
-html[data-portal-env="staging"] {
+/* Theme tokens — violet primary (fixed for this project). */
+:root {
   --dp-primary: 124 58 237; /* violet-600 */
   --dp-primary-hover: 109 40 217; /* violet-700 */
   --dp-primary-ring: 139 92 246; /* violet-500 */
   --dp-primary-soft: 245 243 255; /* violet-50 */
   --dp-primary-ink: 91 33 182; /* violet-800 */
   --dp-primary-ring-soft: 221 214 254; /* violet-200 */
-}
-
-html[data-portal-env="development"] {
-  --dp-primary: 2 132 199; /* sky-600 */
-  --dp-primary-hover: 3 105 161; /* sky-700 */
-  --dp-primary-ring: 14 165 233; /* sky-500 */
-  --dp-primary-soft: 240 249 255; /* sky-50 */
-  --dp-primary-ink: 7 89 133; /* sky-800 */
-  --dp-primary-ring-soft: 186 230 253; /* sky-200 */
-}
-
-html[data-portal-env="production"] {
-  --dp-primary: 15 118 110; /* teal-700 */
-  --dp-primary-hover: 17 94 89; /* teal-800 */
-  --dp-primary-ring: 20 184 166; /* teal-500 */
-  --dp-primary-soft: 240 253 250; /* teal-50 */
-  --dp-primary-ink: 17 94 89;
-  --dp-primary-ring-soft: 153 246 228; /* teal-200 */
 }
 
 body {
@@ -107,13 +85,6 @@ select {
   .dp-brand-mark-lg {
     @apply mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl text-white shadow-sm;
     background-color: rgb(var(--dp-primary));
-  }
-
-  .dp-env-badge {
-    @apply inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide;
-    background-color: rgb(var(--dp-primary-soft));
-    color: rgb(var(--dp-primary-ink));
-    box-shadow: inset 0 0 0 1px rgb(var(--dp-primary-ring-soft));
   }
 
   .dp-table-head {

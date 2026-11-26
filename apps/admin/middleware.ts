@@ -2,12 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { ADMIN_SESSION_COOKIE } from "@/lib/auth-cookie";
-import {
-  MFA_SETUP_REQUIRED_PURPOSE,
-  PASSWORD_RESET_REQUIRED_PURPOSE,
-} from "@/lib/auth-constants";
+import { PASSWORD_RESET_REQUIRED_PURPOSE } from "@/lib/auth-constants";
 import { defaultLandingPath, isExternalLandingPath, isRestrictedToWorkspaceOnly } from "@/lib/admin-roles";
-import { isMfaEnforcementDisabled } from "@/lib/mfa-policy";
 
 function jwtSecretKey() {
   return new TextEncoder().encode(
@@ -70,9 +66,7 @@ export async function middleware(request: NextRequest) {
       if (purpose === PASSWORD_RESET_REQUIRED_PURPOSE) {
         return redirectTo(request, CHANGE_PASSWORD_PATH);
       }
-      if (purpose === MFA_SETUP_REQUIRED_PURPOSE && !isMfaEnforcementDisabled()) {
-        return redirectTo(request, MFA_SETUP_PATH);
-      }
+      // MFA is not enforced — ignore legacy mfa_setup_required purpose.
       const role = typeof payload.role === "string" ? payload.role : "website";
       const additionalRoles = parseAdditionalRoles(payload as Record<string, unknown>);
       return redirectTo(request, defaultLandingPath(role, additionalRoles));
@@ -94,9 +88,6 @@ export async function middleware(request: NextRequest) {
       if (pathname.startsWith(CHANGE_PASSWORD_PATH)) {
         if (purpose === PASSWORD_RESET_REQUIRED_PURPOSE) {
           return NextResponse.next();
-        }
-        if (purpose === MFA_SETUP_REQUIRED_PURPOSE && !isMfaEnforcementDisabled()) {
-          return redirectTo(request, MFA_SETUP_PATH);
         }
         const role = typeof payload.role === "string" ? payload.role : "website";
         const additionalRoles = parseAdditionalRoles(payload as Record<string, unknown>);
@@ -128,9 +119,6 @@ export async function middleware(request: NextRequest) {
     if (purpose === PASSWORD_RESET_REQUIRED_PURPOSE) {
       return redirectTo(request, CHANGE_PASSWORD_PATH);
     }
-    if (purpose === MFA_SETUP_REQUIRED_PURPOSE && !isMfaEnforcementDisabled()) {
-      return redirectTo(request, MFA_SETUP_PATH);
-    }
 
     const role = typeof payload.role === "string" ? payload.role : "website";
     const additionalRoles = parseAdditionalRoles(payload as Record<string, unknown>);
@@ -150,11 +138,7 @@ export async function middleware(request: NextRequest) {
     }
 
     if (pathname.startsWith("/settings/security")) {
-      const mfa = request.nextUrl.searchParams.get("mfa");
       const reset = request.nextUrl.searchParams.get("reset");
-      if (mfa === "required" && !isMfaEnforcementDisabled()) {
-        return redirectTo(request, MFA_SETUP_PATH);
-      }
       if (reset === "required") {
         return redirectTo(request, CHANGE_PASSWORD_PATH);
       }

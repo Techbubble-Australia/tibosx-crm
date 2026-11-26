@@ -43,7 +43,7 @@ export function MfaEnrollmentGuard({ children }: { children: React.ReactNode }) 
           return;
         }
 
-        // Staging API returns requiresMfaEnrollment=false for everyone when MFA is disabled.
+        // API always returns requiresMfaEnrollment=false — MFA is not enforced.
         const requiresMfaEnrollment = Boolean(user?.requiresMfaEnrollment);
         if (requiresMfaEnrollment) {
           const resumeRes = await fetch("/api/auth/mfa/resume-session", {
