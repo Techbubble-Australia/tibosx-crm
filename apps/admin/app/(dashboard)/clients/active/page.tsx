@@ -1,11 +1,8 @@
-import { ClientsListPage } from "@/components/clients/ClientsListPage";
+"use client";
 
+import { ClientsCrmPage } from "@/components/crm/ClientsCrmPage";
+
+/** TIBOSX CRM Screens – 3 Clients */
 export default function ActiveClientsPage() {
-  return (
-    <ClientsListPage
-      statusFilter="ACTIVE"
-      heading="Active Clients"
-      description="Clients currently engaged or ready for job listings."
-    />
-  );
+  return <ClientsCrmPage />;
 }

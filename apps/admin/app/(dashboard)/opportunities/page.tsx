@@ -1,8 +1,8 @@
 "use client";
 
-import { OpportunitiesBoard } from "@/components/opportunities/OpportunitiesBoard";
+import { PlanningPipelinePage } from "@/components/crm/PlanningPipelinePage";
 
-/** Sales → Opportunities · Board (wireframe PDF page 4). */
+/** TIBOSX CRM Screens – 20 Planning Pipeline board */
 export default function OpportunitiesIndexPage() {
-  return <OpportunitiesBoard />;
+  return <PlanningPipelinePage />;
 }

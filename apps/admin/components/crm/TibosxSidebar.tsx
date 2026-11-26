@@ -116,7 +116,10 @@ export function TibosxSidebar({
               href="/sales/dashboard"
               label="Sales"
               icon={TrendingUp}
-              active={pathUnder("/sales/dashboard", pathname)}
+              active={
+                pathUnder("/sales/dashboard", pathname) ||
+                pathUnder("/quotes", pathname)
+              }
             />
             {salesChildren.map((item) => {
               const active =
