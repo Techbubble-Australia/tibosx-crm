@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Plus } from "lucide-react";
 import { opportunitiesNavTabFromPath } from "@/lib/opportunity-routes";
+import { OpportunitiesWhatChanged } from "@/components/opportunities/OpportunitiesWhatChanged";
 
 type Props = {
   title?: string;
@@ -35,6 +36,7 @@ export function OpportunitiesShell({
 }: Props) {
   const pathname = usePathname() ?? "";
   const selectedTab = opportunitiesNavTabFromPath(pathname);
+  const showWhatChanged = selectedTab === "board";
 
   const tabControl = (
     <div className="inline-flex rounded-md border border-gray-200 bg-white p-0.5 dark:border-gray-700 dark:bg-gray-900">
@@ -92,6 +94,12 @@ export function OpportunitiesShell({
       {filters ? <div className="flex flex-wrap items-center gap-2">{filters}</div> : null}
 
       {children}
+
+      {showWhatChanged ? (
+        <div className="pt-2">
+          <OpportunitiesWhatChanged />
+        </div>
+      ) : null}
     </div>
   );
 }

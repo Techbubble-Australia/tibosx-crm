@@ -17,6 +17,11 @@ type Props = {
   showPersonalHome?: boolean;
   personalHomeHref?: string;
   showClientHome?: boolean;
+  /**
+   * `workspace` = [TB] Name Workspace ⌄ (older wireframe).
+   * `pill` = bold Name ⌄ pill (Home widgets HTML).
+   */
+  variant?: "workspace" | "pill";
 };
 
 function initials(name: string) {
@@ -34,6 +39,7 @@ export function TenantWorkspaceMenu({
   showPersonalHome,
   personalHomeHref = "/my-workspace",
   showClientHome,
+  variant = "workspace",
 }: Props) {
   const [open, setOpen] = useState(false);
   const [tenant, setTenant] = useState<TenantMe | null>(null);
@@ -62,25 +68,41 @@ export function TenantWorkspaceMenu({
 
   const name = tenant?.tenantName?.trim() || "TechBubble";
   const badge = initials(name);
+  const pill = variant === "pill";
 
   return (
     <div className="relative shrink-0" ref={rootRef}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 text-left hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:hover:bg-gray-800"
+        className={
+          pill
+            ? "inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-[13px] hover:bg-zinc-50 dark:border-zinc-600 dark:bg-gray-900 dark:hover:bg-gray-800"
+            : "inline-flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 text-left hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:hover:bg-gray-800"
+        }
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label={`${name} Workspace`}
+        aria-label={pill ? "Workspace switcher" : `${name} Workspace`}
       >
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] bg-gray-950 text-[10px] font-bold leading-none tracking-wide text-white dark:bg-white dark:text-gray-950">
-          {badge}
-        </span>
-        <span className="hidden items-baseline gap-1.5 whitespace-nowrap sm:inline-flex">
-          <span className="text-sm font-semibold text-gray-950 dark:text-gray-100">{name}</span>
-          <span className="text-sm font-normal text-gray-500 dark:text-gray-400">Workspace</span>
-        </span>
-        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-gray-500" aria-hidden />
+        {pill ? (
+          <>
+            <b className="font-semibold text-zinc-900 dark:text-zinc-100">{name}</b>
+            <span className="text-zinc-500" aria-hidden>
+              ⌄
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] bg-gray-950 text-[10px] font-bold leading-none tracking-wide text-white dark:bg-white dark:text-gray-950">
+              {badge}
+            </span>
+            <span className="hidden items-baseline gap-1.5 whitespace-nowrap sm:inline-flex">
+              <span className="text-sm font-semibold text-gray-950 dark:text-gray-100">{name}</span>
+              <span className="text-sm font-normal text-gray-500 dark:text-gray-400">Workspace</span>
+            </span>
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-gray-500" aria-hidden />
+          </>
+        )}
       </button>
       {open ? (
         <div

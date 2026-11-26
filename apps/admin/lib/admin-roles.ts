@@ -321,7 +321,8 @@ export function isRestrictedToWorkspaceOnly(primary: string, additional?: string
 
 /** Post-login landing route (relative TBOS path). */
 export function defaultLandingPath(role: string, additional?: string[] | null): string {
-  if (anyEffectiveRole(role, additional, ["admin"])) return "/workspace/client";
+  /** CRM Home widgets (TIBOSX Screens – 1 Home). */
+  if (anyEffectiveRole(role, additional, ["admin", "sales"])) return "/home";
   // Clients prefer Client Home; the page redirects to Projects when they lack access.
   if (role === "client" || anyEffectiveRole(role, additional, ["client"])) {
     return "/workspace/client";

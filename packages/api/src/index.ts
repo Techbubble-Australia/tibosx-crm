@@ -59,6 +59,7 @@ import { crmQuoteRoutes } from "./routes/crm-quotes";
 import { crmReportRoutes } from "./routes/crm-reports";
 import { crmSettingsRoutes } from "./routes/crm-settings";
 import { crmMyDayRoutes } from "./routes/crm-my-day";
+import { crmHomeWidgetsRoutes } from "./routes/crm-home-widgets";
 import { crmSearchRoutes } from "./routes/crm-search";
 import { authRoutes as ticketingPortalAuthRoutes } from "./ticketing/routes/auth";
 import { ticketRoutes as ticketingTicketRoutes } from "./ticketing/routes/tickets";
@@ -184,6 +185,7 @@ app.use("/api/admin/crm/quotes", authMiddleware, requireMfaEnrolled, requireModu
 app.use("/api/admin/crm/reports", authMiddleware, requireMfaEnrolled, requireModule("sales"), requireTenant, crmReportRoutes);
 app.use("/api/admin/crm/settings", authMiddleware, requireMfaEnrolled, requireModule("sales"), requireTenant, crmSettingsRoutes);
 app.use("/api/admin/crm/my-day", authMiddleware, requireMfaEnrolled, requireModule("sales"), requireTenant, crmMyDayRoutes);
+app.use("/api/admin/crm/home-widgets", authMiddleware, requireMfaEnrolled, requireModule("sales"), requireTenant, crmHomeWidgetsRoutes);
 app.use("/api/admin/crm/search", authMiddleware, requireMfaEnrolled, requireModule("sales"), requireTenant, crmSearchRoutes);
 app.use("/api/admin/users", authMiddleware, requireMfaEnrolled, requireRole("admin"), adminUserRoutes);
 app.use(

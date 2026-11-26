@@ -59,6 +59,8 @@ import { TechBubbleLogo } from "@/components/TechBubbleLogo";
 import { InactivityLogout } from "@/components/InactivityLogout";
 import { TenantWorkspaceMenu } from "@/components/TenantWorkspaceMenu";
 import { GlobalCrmSearch } from "@/components/GlobalCrmSearch";
+import { TibosxHeader } from "@/components/crm/TibosxHeader";
+import { TibosxSidebar } from "@/components/crm/TibosxSidebar";
 import { isCareerApplicationsPath, isJobListingsPath } from "@/lib/job-routes";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { useIsDevelopmentAppEnv } from "@/lib/use-is-development-app-env";
@@ -394,20 +396,68 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
     canAccessClientWorkspace;
   const isAdminHome = anyEffectiveRole(role, additionalRoles, ["admin"]);
   const hasSalesCrm = anyEffectiveRole(role, additionalRoles, ["admin", "sales"]);
-  /** Wireframe Home for Sales is My day (PDF p2); Sales → Dashboard is pipeline KPIs (PDF p1). */
-  const personalHomeHref = hasSalesCrm ? "/sales/my-day" : workspaceNavItem.href;
-  /** Admins default to Client; non-admin internals to Personal; clients to Client. */
-  const workspaceHomeHref = clientHome || isAdminHome ? "/workspace/client" : personalHomeHref;
+  /** Home widgets HTML: Sales CRM Home is /home. */
+  const personalHomeHref = hasSalesCrm ? "/home" : workspaceNavItem.href;
+  /** Admins with CRM land on Home widgets; clients stay on Client home. */
+  const workspaceHomeHref = clientHome ? "/workspace/client" : hasSalesCrm ? "/home" : isAdminHome ? "/workspace/client" : personalHomeHref;
   const showWorkspaceHome =
     !loading && (clientHome || (role !== "client" && !isRestrictedToWorkspaceOnly(role, additionalRoles)));
-  /** Do not treat Sales → Dashboard as Personal Home active — wireframe highlights Dashboard under Sales. */
-  const onPersonalHome = pathUnder("/my-workspace", pathname) || pathUnder("/sales/my-day", pathname);
+  const onPersonalHome =
+    pathUnder("/my-workspace", pathname) ||
+    pathUnder("/sales/my-day", pathname) ||
+    pathUnder("/home", pathname);
   const onClientHome = pathUnder("/workspace/client", pathname);
   /** Single Home nav item; Personal/Client switching is only on the Home pages. */
   const workspaceHomeActive = onPersonalHome || onClientHome;
 
   function toggleGroup(id: string) {
     setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  const firstName = (userName?.trim().split(/\s+/)[0] || email.split("@")[0] || "there").trim();
+  const signOut = () => {
+    void fetch("/api/auth/logout", { method: "POST", credentials: "include" }).finally(() => {
+      window.location.href = "/login?signin=1";
+    });
+  };
+
+  /** TIBOSX CRM Screens – 1 Home (widgets): flat TB/TIBOSX sidebar + Welcome header. */
+  if (hasSalesCrm && !loading) {
+    const showDelivery = visibleGroups.some((g) => g.id === "project_management");
+    const showSupport = visibleGroups.some((g) => g.id === "workspace");
+    const showRecruitment = visibleGroups.some((g) => g.id === "recruitment");
+    const showReports = true;
+    const showSettings = visibleGroups.some((g) => g.id === "settings") || anyEffectiveRole(role, additionalRoles, ["admin"]);
+
+    return (
+      <div className="flex min-h-screen bg-[#fafafa] font-sans text-sm text-zinc-900 dark:bg-gray-950 dark:text-zinc-100">
+        <TibosxSidebar
+          homeHref="/home"
+          homeActive={pathUnder("/home", pathname)}
+          pathname={pathname}
+          showSales
+          showDelivery={showDelivery}
+          showSupport={showSupport || anyEffectiveRole(role, additionalRoles, ["admin", "customer_support"])}
+          showRecruitment={showRecruitment || anyEffectiveRole(role, additionalRoles, ["admin", "recruiter", "recruiter_admin"])}
+          showReports={showReports}
+          showSettings={showSettings}
+        />
+        <main className="min-w-0 flex-1 bg-[#fafafa] dark:bg-gray-950">
+          <ImpersonationBanner />
+          <TibosxHeader
+            firstName={firstName}
+            email={email}
+            notificationCount={2}
+            showPersonalHome={showWorkspaceHome}
+            personalHomeHref={personalHomeHref}
+            showClientHome={isAdminHome || canAccessClientWorkspace}
+            onSignOut={signOut}
+          />
+          <div className="px-7 pb-8 pt-2">{children}</div>
+        </main>
+        <ImpersonateUserModal open={impersonateOpen} onClose={() => setImpersonateOpen(false)} />
+      </div>
+    );
   }
 
   return (
