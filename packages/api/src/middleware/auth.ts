@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { ADMIN_SESSION_MAX_AGE_SEC } from "../lib/session.js";
+import { isMfaEnforcementDisabled } from "../lib/mfa-policy.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
 
@@ -70,7 +71,8 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
     if (!decoded?.id || !decoded?.email) {
       return res.status(401).json({ error: "Unauthorized: Invalid token payload" });
     }
-    if (decoded.purpose === MFA_PENDING_PURPOSE) {
+    const mfaOff = isMfaEnforcementDisabled();
+    if (decoded.purpose === MFA_PENDING_PURPOSE && !mfaOff) {
       return res.status(401).json({ error: "Unauthorized: MFA verification required" });
     }
     req.user = {
@@ -82,8 +84,8 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
     };
     req.sessionPurpose = decoded.purpose;
     req.mfaSetupRequired =
-      decoded.purpose === MFA_SETUP_REQUIRED_PURPOSE ||
-      decoded.purpose === PASSWORD_RESET_REQUIRED_PURPOSE;
+      decoded.purpose === PASSWORD_RESET_REQUIRED_PURPOSE ||
+      (!mfaOff && decoded.purpose === MFA_SETUP_REQUIRED_PURPOSE);
     next();
   } catch {
     return res.status(401).json({ error: "Unauthorized: Invalid token" });

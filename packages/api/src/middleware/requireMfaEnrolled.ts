@@ -1,6 +1,7 @@
 import { Response, NextFunction } from "express";
 import { prisma } from "@techbubble/database";
 import { AuthRequest } from "./auth";
+import { isMfaEnforcementDisabled } from "../lib/mfa-policy.js";
 
 async function impersonatorBypassesMfaForTarget(req: AuthRequest): Promise<boolean> {
   const impersonatorId = req.user?.impersonatorId;
@@ -15,8 +16,13 @@ async function impersonatorBypassesMfaForTarget(req: AuthRequest): Promise<boole
 /**
  * Customer (portal) users must complete MFA.
  * Internal AdminUser accounts may opt out of MFA; only block incomplete setup sessions.
+ * Staging / MFA_DISABLED skips enforcement for everyone.
  */
 export async function requireMfaEnrolled(req: AuthRequest, res: Response, next: NextFunction) {
+  if (isMfaEnforcementDisabled()) {
+    return next();
+  }
+
   const userId = req.user?.id;
   if (!userId) {
     return res.status(401).json({ error: "Unauthorized" });

@@ -32,6 +32,7 @@ import { sendPasswordResetEmail } from "../lib/mail";
 import { assertTbosAdminPublicBaseForEmail } from "../lib/tbos-public-url";
 import { tbosLoginUrl } from "../lib/user-invite";
 import { helpSupportRoutes } from "./help-support.js";
+import { isMfaEnforcementDisabled } from "../lib/mfa-policy.js";
 const router: IRouter = Router();
 
 const loginSchema = z.object({
@@ -154,6 +155,21 @@ router.post("/login", async (req, res) => {
           },
         });
       }
+      // Staging (or MFA_DISABLED): password-only for customers, same as admins with MFA off.
+      if (isMfaEnforcementDisabled()) {
+        const token = generateToken({
+          id: customer.id,
+          email: customer.email,
+          role: "client",
+        });
+        return res.json({
+          message: "Login successful",
+          data: {
+            token,
+            user: customerPublic,
+          },
+        });
+      }
       if (customer.mfaEnabled && customer.totpSecretEnc) {
         const mfaToken = generateMfaPendingToken({
           id: customer.id,
@@ -206,34 +222,37 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    if (user.mfaEnabled && user.totpSecretEnc) {
-      const mfaToken = generateMfaPendingToken({
-        id: user.id,
-        email: user.email,
-        role: user.role,
-      });
-      return res.json({
-        message: "MFA required",
-        data: {
-          requiresMfa: true,
-          mfaToken,
-          user: publicUser(user),
-        },
-      });
-    }
+    // Staging (or MFA_DISABLED): skip MFA challenge/setup for everyone.
+    if (!isMfaEnforcementDisabled()) {
+      if (user.mfaEnabled && user.totpSecretEnc) {
+        const mfaToken = generateMfaPendingToken({
+          id: user.id,
+          email: user.email,
+          role: user.role,
+        });
+        return res.json({
+          message: "MFA required",
+          data: {
+            requiresMfa: true,
+            mfaToken,
+            user: publicUser(user),
+          },
+        });
+      }
 
-    // Admin marked MFA required (e.g. after admin reset) but not enrolled yet → force setup.
-    // When MFA is off, internal users may sign in with password only.
-    if (user.mfaEnabled && !user.totpSecretEnc) {
-      const setupToken = generateMfaSetupRequiredToken(sessionAuthUser(user));
-      return res.json({
-        message: "MFA setup required",
-        data: {
-          requiresMfaSetup: true,
-          token: setupToken,
-          user: publicUser(user),
-        },
-      });
+      // Admin marked MFA required (e.g. after admin reset) but not enrolled yet → force setup.
+      // When MFA is off, internal users may sign in with password only.
+      if (user.mfaEnabled && !user.totpSecretEnc) {
+        const setupToken = generateMfaSetupRequiredToken(sessionAuthUser(user));
+        return res.json({
+          message: "MFA setup required",
+          data: {
+            requiresMfaSetup: true,
+            token: setupToken,
+            user: publicUser(user),
+          },
+        });
+      }
     }
 
     const token = generateToken(sessionAuthUser(user));
@@ -513,9 +532,10 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
         impersonation,
         user: {
           ...publicUser({ ...customer, role: "client", mfaEnabled: customer.mfaEnabled }),
-          requiresMfaEnrollment:
-            req.sessionPurpose === MFA_SETUP_REQUIRED_PURPOSE ||
-            (customer.mfaEnabled && !customer.totpSecretEnc),
+          requiresMfaEnrollment: isMfaEnforcementDisabled()
+            ? false
+            : req.sessionPurpose === MFA_SETUP_REQUIRED_PURPOSE ||
+              (customer.mfaEnabled && !customer.totpSecretEnc),
           mfaEnrolledAt: customer.mfaEnrolledAt?.toISOString() ?? null,
           phone: customer.phone,
           profilePhotoUrl: customer.profilePhotoUrl ?? null,
@@ -586,7 +606,9 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
       impersonation,
       user: {
         ...publicUser(user),
-        requiresMfaEnrollment: req.sessionPurpose === MFA_SETUP_REQUIRED_PURPOSE,
+        requiresMfaEnrollment: isMfaEnforcementDisabled()
+          ? false
+          : req.sessionPurpose === MFA_SETUP_REQUIRED_PURPOSE,
         mfaEnrolledAt: user.mfaEnrolledAt?.toISOString() ?? null,
         phone: user.phone,
         addressLine1: user.addressLine1,
@@ -950,7 +972,8 @@ router.post("/mfa/resume-session", authMiddleware, async (req: AuthRequest, res)
   if (!account || account.user.active === false) {
     return res.status(401).json({ error: "Unauthorized" });
   }
-  if (!account.user.mfaEnabled || !account.user.totpSecretEnc) {
+  // Staging / MFA_DISABLED: upgrade any setup-pending session to a full login.
+  if (!isMfaEnforcementDisabled() && (!account.user.mfaEnabled || !account.user.totpSecretEnc)) {
     return res.status(400).json({ error: "MFA enrollment is not complete" });
   }
 
