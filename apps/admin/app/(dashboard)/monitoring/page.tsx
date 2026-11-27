@@ -231,6 +231,8 @@ export default function MonitoringReviewPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>("screenshots");
+  /** YYYY-MM-DD local date, or "" for all dates. */
+  const [filterDate, setFilterDate] = useState("");
 
   const users = useMemo(
     () => buildUserSummaries(sessions, screenshots, devices),
@@ -240,9 +242,38 @@ export default function MonitoringReviewPage() {
     () => users.find((u) => u.userId === selectedUserId) || null,
     [users, selectedUserId],
   );
+
+  const availableFilterDates = useMemo(() => {
+    if (!selectedUser) return [] as string[];
+    const keys = new Set<string>();
+    for (const shot of selectedUser.screenshots) keys.add(dateKeyLocal(shot.capturedAt));
+    for (const s of selectedUser.sessions) {
+      keys.add(dateKeyLocal(s.startedAt));
+      if (s.lastHeartbeatAt) keys.add(dateKeyLocal(s.lastHeartbeatAt));
+    }
+    keys.delete("unknown");
+    return Array.from(keys).sort((a, b) => b.localeCompare(a));
+  }, [selectedUser]);
+
+  const filteredScreenshots = useMemo(() => {
+    if (!selectedUser) return [] as ScreenshotRow[];
+    if (!filterDate) return selectedUser.screenshots;
+    return selectedUser.screenshots.filter((s) => dateKeyLocal(s.capturedAt) === filterDate);
+  }, [selectedUser, filterDate]);
+
+  const filteredSessions = useMemo(() => {
+    if (!selectedUser) return [] as SessionRow[];
+    if (!filterDate) return selectedUser.sessions;
+    return selectedUser.sessions.filter((s) => {
+      const start = dateKeyLocal(s.startedAt);
+      const end = s.endedAt ? dateKeyLocal(s.endedAt) : dateKeyLocal(s.lastHeartbeatAt || s.startedAt);
+      return start === filterDate || end === filterDate || (start <= filterDate && end >= filterDate);
+    });
+  }, [selectedUser, filterDate]);
+
   const selectedScreenshotsByDate = useMemo(
-    () => (selectedUser ? groupScreenshotsByDate(selectedUser.screenshots) : []),
-    [selectedUser],
+    () => groupScreenshotsByDate(filteredScreenshots),
+    [filteredScreenshots],
   );
 
   const load = useCallback(async () => {
@@ -346,6 +377,7 @@ export default function MonitoringReviewPage() {
                     onClick={() => {
                       setSelectedUserId(u.userId);
                       setDetailTab("screenshots");
+                      setFilterDate("");
                     }}
                   >
                     <td className="px-4 py-3 text-gray-400">
@@ -396,7 +428,10 @@ export default function MonitoringReviewPage() {
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                onClick={() => setSelectedUserId(null)}
+                onClick={() => {
+                  setSelectedUserId(null);
+                  setFilterDate("");
+                }}
                 className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800"
               >
                 ← All users
@@ -412,13 +447,58 @@ export default function MonitoringReviewPage() {
                 </div>
               </div>
             </div>
+
+            {detailTab !== "devices" ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-xs font-medium text-gray-500" htmlFor="monitoring-date-filter">
+                  Filter by date
+                </label>
+                <input
+                  id="monitoring-date-filter"
+                  type="date"
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                  className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                />
+                {availableFilterDates.length > 0 ? (
+                  <select
+                    aria-label="Quick date"
+                    value={filterDate}
+                    onChange={(e) => setFilterDate(e.target.value)}
+                    className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                  >
+                    <option value="">All dates</option>
+                    {availableFilterDates.map((d) => (
+                      <option key={d} value={d}>
+                        {formatDateLabel(d)}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+                {filterDate ? (
+                  <button
+                    type="button"
+                    onClick={() => setFilterDate("")}
+                    className="rounded-lg px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                  >
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
             {(
               [
-                ["screenshots", `Screenshots (${selectedUser.screenshotCount})`],
-                ["sessions", `Sessions (${selectedUser.sessionCount})`],
+                [
+                  "screenshots",
+                  `Screenshots (${filterDate ? filteredScreenshots.length : selectedUser.screenshotCount})`,
+                ],
+                [
+                  "sessions",
+                  `Sessions (${filterDate ? filteredSessions.length : selectedUser.sessionCount})`,
+                ],
                 ["devices", `Devices (${selectedUser.deviceCount})`],
               ] as const
             ).map(([id, label]) => (
@@ -439,7 +519,11 @@ export default function MonitoringReviewPage() {
 
           {detailTab === "screenshots" ? (
             selectedScreenshotsByDate.length === 0 ? (
-              <p className="text-sm text-gray-500">No screenshots for this user.</p>
+              <p className="text-sm text-gray-500">
+                {filterDate
+                  ? `No screenshots on ${formatDateLabel(filterDate)}.`
+                  : "No screenshots for this user."}
+              </p>
             ) : (
               <div className="space-y-5">
                 {selectedScreenshotsByDate.map((day) => (
@@ -494,14 +578,16 @@ export default function MonitoringReviewPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {selectedUser.sessions.length === 0 ? (
+                  {filteredSessions.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                        No sessions for this user.
+                        {filterDate
+                          ? `No sessions on ${formatDateLabel(filterDate)}.`
+                          : "No sessions for this user."}
                       </td>
                     </tr>
                   ) : (
-                    selectedUser.sessions.map((s) => (
+                    filteredSessions.map((s) => (
                       <tr key={s.id} className="border-b border-gray-100 dark:border-gray-800">
                         <td className="px-4 py-3">
                           <div>{s.device.deviceName || s.device.id.slice(0, 8)}</div>
