@@ -40,6 +40,7 @@ import { authMiddleware } from "./middleware/auth";
 import { requireMfaEnrolled } from "./middleware/requireMfaEnrolled";
 import { requireRole, requireModule, requireAnyModule, blockModuleMutations } from "./middleware/requireRole";
 import { assertDevEnvMiddleware } from "./middleware/assertDevEnv.js";
+import { assertDebugToolsEnvMiddleware } from "./middleware/assertDebugToolsEnv.js";
 import { devDatabaseRoutes } from "./routes/dev-database.js";
 import { dashboardRoutes } from "./routes/dashboard";
 import { salesDashboardRoutes } from "./routes/sales-dashboard";
@@ -199,7 +200,7 @@ app.use(
   "/api/admin/debug-capture-tickets",
   authMiddleware,
   requireMfaEnrolled,
-  assertDevEnvMiddleware,
+  assertDebugToolsEnvMiddleware,
   debugCaptureTicketRoutes,
 );
 app.use(

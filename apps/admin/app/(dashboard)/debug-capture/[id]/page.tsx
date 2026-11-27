@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { appAlert } from "@/lib/app-alert";
-import { useIsDevelopmentAppEnv } from "@/lib/use-is-development-app-env";
+import { useIsDebugToolsAppEnv } from "@/lib/use-is-debug-tools-app-env";
 import { JsonTreePreview } from "@/components/debug/JsonTreePreview";
 import { resolveAdminMediaPreviewUrl } from "@/lib/public-media-url";
 
@@ -26,13 +26,13 @@ type Detail = {
 export default function DebugCaptureDetailPage() {
   const params = useParams();
   const id = params.id as string;
-  const isDev = useIsDevelopmentAppEnv();
+  const isDebugTools = useIsDebugToolsAppEnv();
   const router = useRouter();
   const [row, setRow] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isDev) {
+    if (!isDebugTools) {
       router.replace("/");
       return;
     }
@@ -40,9 +40,9 @@ export default function DebugCaptureDetailPage() {
       .then((res) => res.json())
       .then((data) => setRow(data.data as Detail))
       .finally(() => setLoading(false));
-  }, [id, isDev, router]);
+  }, [id, isDebugTools, router]);
 
-  if (!isDev) return null;
+  if (!isDebugTools) return null;
 
   if (loading) {
     return (

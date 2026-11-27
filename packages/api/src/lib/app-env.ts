@@ -1,7 +1,11 @@
-/** Deployment tier from `ENV` (development | production). Defaults to production when unset. */
-export function normalizeAppEnv(value: string | undefined): "development" | "production" {
+/** Deployment tier from `ENV` / `TBOS_ENV`. Defaults to production when unset. */
+export type AppEnv = "development" | "staging" | "production";
+
+export function normalizeAppEnv(value: string | undefined): AppEnv {
   const raw = (value ?? "").trim().toLowerCase();
-  return raw === "development" ? "development" : "production";
+  if (raw === "development" || raw === "dev") return "development";
+  if (raw === "staging" || raw === "stage") return "staging";
+  return "production";
 }
 
 export function readAppEnvRaw(): string | undefined {
@@ -10,4 +14,10 @@ export function readAppEnvRaw(): string | undefined {
 
 export function isDevelopmentAppEnv(): boolean {
   return normalizeAppEnv(readAppEnvRaw()) === "development";
+}
+
+/** Floating debug capture + related APIs (development and staging). */
+export function isDebugToolsAppEnv(): boolean {
+  const env = normalizeAppEnv(readAppEnvRaw());
+  return env === "development" || env === "staging";
 }

@@ -299,6 +299,7 @@ export function DebugTicketModal() {
                   }
                 >
                   <option value="development">Development</option>
+                  <option value="staging">Staging</option>
                   <option value="production">Production</option>
                 </select>
               </div>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
-import { useIsDevelopmentAppEnv } from "@/lib/use-is-development-app-env";
+import { useIsDebugToolsAppEnv } from "@/lib/use-is-debug-tools-app-env";
 import { useRouter } from "next/navigation";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { useListView } from "@/hooks/useListView";
@@ -23,13 +23,13 @@ type Row = {
 };
 
 export default function DebugCaptureListPage() {
-  const isDev = useIsDevelopmentAppEnv();
+  const isDebugTools = useIsDebugToolsAppEnv();
   const router = useRouter();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isDev) {
+    if (!isDebugTools) {
       router.replace("/");
       return;
     }
@@ -37,7 +37,7 @@ export default function DebugCaptureListPage() {
       .then((res) => res.json())
       .then((data) => setRows((data.data as Row[]) ?? []))
       .finally(() => setLoading(false));
-  }, [isDev, router]);
+  }, [isDebugTools, router]);
 
   const {
     page,
@@ -53,7 +53,7 @@ export default function DebugCaptureListPage() {
     { initialPageSize: 25, pageSizeOptions: [10, 25, 50, 100] },
   );
 
-  if (!isDev) return null;
+  if (!isDebugTools) return null;
 
   if (loading) {
     return (

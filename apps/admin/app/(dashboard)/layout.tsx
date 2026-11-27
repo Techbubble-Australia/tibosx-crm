@@ -64,6 +64,7 @@ import { TibosxSidebar } from "@/components/crm/TibosxSidebar";
 import { isCareerApplicationsPath, isJobListingsPath } from "@/lib/job-routes";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { useIsDevelopmentAppEnv } from "@/lib/use-is-development-app-env";
+import { useIsDebugToolsAppEnv } from "@/lib/use-is-debug-tools-app-env";
 
 type NavItem = {
   href: string;
@@ -307,6 +308,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const { collapsed: sidebarCollapsed, toggle: toggleSidebar } = useSidebarCollapsed();
   const isDevAppEnv = useIsDevelopmentAppEnv();
+  const isDebugToolsAppEnv = useIsDebugToolsAppEnv();
   const accessLabel = loading ? null : formatRolesLabel(role, additionalRoles);
 
   useEffect(() => {
@@ -339,7 +341,10 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         // Contacts with Access see their projects' timesheets; approvers also approve them.
         return canAccessWorkspaceTimesheets || canAccessClientWorkspace;
       }
-      if ((item.href === "/debug-capture" || item.href === "/settings/database") && !isDevAppEnv) {
+      if (item.href === "/settings/database" && !isDevAppEnv) {
+        return false;
+      }
+      if (item.href === "/debug-capture" && !isDebugToolsAppEnv) {
         return false;
       }
       if (item.href === "/workspace/projects") {
@@ -387,6 +392,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
         canAccessClientTickets,
         impersonation,
         isDevAppEnv,
+        isDebugToolsAppEnv,
       ]);
 
   /** Clients with Client workspace access land on Client Home. */

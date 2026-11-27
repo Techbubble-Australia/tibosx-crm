@@ -20,14 +20,15 @@ import {
   captureViewportScreenshot,
 } from "@/lib/debug/screenshot";
 import { useAdminSession } from "@/contexts/AdminSessionContext";
-import { useIsDevelopmentAppEnv } from "@/lib/use-is-development-app-env";
+import { useIsDebugToolsAppEnv } from "@/lib/use-is-debug-tools-app-env";
+import { normalizeAppEnv } from "@/lib/app-env";
 
 const DEBUG_STORAGE_KEY = "tbos-debug-mode-active";
 
 /** Level-0 capture types from TBOS (Story replaces legacy Enhancement). */
 export type DebugCaptureType = "BUG" | "STORY" | "TASK";
-/** Environments we expose in the UI (DB may still store legacy `staging`). */
-export type ReportedEnvironment = "development" | "production";
+/** Environments we expose in the UI. */
+export type ReportedEnvironment = "development" | "staging" | "production";
 
 export type UserMetadataSnapshot = {
   userId: string;
@@ -102,8 +103,17 @@ function dataUrlToFile(dataUrl: string, filename: string): File | null {
 
 export function DebugModeProvider({ children }: { children: ReactNode }) {
   const { userId, role, email } = useAdminSession();
-  const isDevelopmentAppEnv = useIsDevelopmentAppEnv();
-  const defaultReportedEnvironment: ReportedEnvironment = isDevelopmentAppEnv ? "development" : "production";
+  const isDebugToolsAppEnv = useIsDebugToolsAppEnv();
+  const defaultReportedEnvironment: ReportedEnvironment = (() => {
+    if (!isDebugToolsAppEnv) return "production";
+    // Prefer client NEXT_PUBLIC hint; /api/app-env may refine after hydrate.
+    const fromPublic = normalizeAppEnv(
+      process.env.NEXT_PUBLIC_TBOS_ENV ?? process.env.NEXT_PUBLIC_ENV,
+    );
+    if (fromPublic === "staging") return "staging";
+    if (fromPublic === "development") return "development";
+    return "staging";
+  })();
   const [isDebugActive, setIsDebugActive] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [captureLoading, setCaptureLoading] = useState(false);
