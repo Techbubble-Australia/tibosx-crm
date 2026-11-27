@@ -256,22 +256,19 @@ copy_installers_from() {
   [ -d "$src" ] || return 0
   local f
   while IFS= read -r -d '' f; do
-    if [[ "$f" == *.app ]]; then
-      rm -rf "$dest/$(basename "$f")"
-      cp -R "$f" "$dest/"
-    else
-      cp -f "$f" "$dest/"
-    fi
+    cp -f "$f" "$dest/"
   done < <(find "$src" -maxdepth 1 \( "$@" \) -print0 2>/dev/null)
 }
 if [ -d "$BUNDLE_DIR" ]; then
   echo "==> Copying installers → $INSTALLERS_DIR"
+  # Only package installers (.dmg/.msi/…), never raw .app — Launchpad indexes every .app on disk.
   copy_installers_from "$BUNDLE_DIR/dmg" "$INSTALLERS_DIR/macos" -name "*.dmg"
-  copy_installers_from "$BUNDLE_DIR/macos" "$INSTALLERS_DIR/macos" -name "*.app"
   copy_installers_from "$BUNDLE_DIR/msi" "$INSTALLERS_DIR/windows" -name "*.msi"
   copy_installers_from "$BUNDLE_DIR/nsis" "$INSTALLERS_DIR/windows" -name "*.exe"
   copy_installers_from "$BUNDLE_DIR/deb" "$INSTALLERS_DIR/linux" -name "*.deb"
   copy_installers_from "$BUNDLE_DIR/appimage" "$INSTALLERS_DIR/linux" -name "*.AppImage"
+  # Drop any leftover .app copies from older builds.
+  rm -rf "$INSTALLERS_DIR/macos/"*.app
 fi
 
 echo
