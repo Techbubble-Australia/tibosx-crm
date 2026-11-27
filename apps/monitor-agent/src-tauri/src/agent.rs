@@ -182,9 +182,23 @@ impl AgentRuntime {
             let client = reqwest::Client::new();
             let mut last_capture = std::time::Instant::now() - Duration::from_secs(interval_secs);
             let mut last_config = std::time::Instant::now() - Duration::from_secs(300);
+            // Wall clock — Instant may pause during laptop sleep; SystemTime still jumps.
+            let mut last_wall = std::time::SystemTime::now();
             let mut enabled = true;
 
             while active.load(Ordering::Relaxed) {
+                let now_wall = std::time::SystemTime::now();
+                if let Ok(gap) = now_wall.duration_since(last_wall) {
+                    // Laptop slept / process suspended. Don't end the session with "now"
+                    // (that would count sleep as online); the next heartbeat asks the API
+                    // to close the old session at lastHeartbeat and open a new one.
+                    if gap > Duration::from_secs(90) {
+                        last_capture = std::time::Instant::now() - Duration::from_secs(interval_secs);
+                        last_config = std::time::Instant::now() - Duration::from_secs(300);
+                    }
+                }
+                last_wall = now_wall;
+
                 if last_config.elapsed() >= Duration::from_secs(120) {
                     if let Ok(cfg) = fetch_config(&client, &api, &token).await {
                         enabled = cfg.enabled;

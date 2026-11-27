@@ -46,21 +46,60 @@ async function getOrCreateSettings() {
   });
 }
 
+/**
+ * Agent heartbeats about every 15s. A longer gap means the machine slept,
+ * lost network, or the process was suspended — that offline time must not
+ * count as online.
+ */
+const HEARTBEAT_STALE_MS = 90_000;
+
 function sessionDurationMinutes(startedAt: Date, lastHeartbeatAt: Date, endedAt: Date | null): number {
+  // Always stop at lastHeartbeat when open — never invent time past the last proof of life
+  // (sleep gaps are closed/split on the next heartbeat).
   const end = endedAt ?? lastHeartbeatAt;
   const ms = Math.max(0, end.getTime() - startedAt.getTime());
   return Math.round(ms / 60000);
 }
 
-async function getOrOpenSession(deviceId: string, adminUserId: string) {
+/**
+ * Return the active session, or start a new one. If the open session's last
+ * heartbeat is stale (sleep / offline), close it at lastHeartbeatAt and open
+ * a fresh session at `now` so the gap is not counted as online time.
+ */
+async function getOrOpenSession(deviceId: string, adminUserId: string, now = new Date()) {
   const open = await prisma.monitoringSession.findFirst({
     where: { deviceId, endedAt: null },
     orderBy: { startedAt: "desc" },
   });
-  if (open) return open;
-  return prisma.monitoringSession.create({
-    data: { deviceId, adminUserId },
-  });
+  if (!open) {
+    return prisma.monitoringSession.create({
+      data: {
+        deviceId,
+        adminUserId,
+        startedAt: now,
+        lastHeartbeatAt: now,
+      },
+    });
+  }
+
+  const gapMs = now.getTime() - open.lastHeartbeatAt.getTime();
+  if (gapMs > HEARTBEAT_STALE_MS) {
+    await prisma.monitoringSession.update({
+      where: { id: open.id },
+      // End at last heartbeat — do not extend into the sleep/offline gap.
+      data: { endedAt: open.lastHeartbeatAt },
+    });
+    return prisma.monitoringSession.create({
+      data: {
+        deviceId,
+        adminUserId,
+        startedAt: now,
+        lastHeartbeatAt: now,
+      },
+    });
+  }
+
+  return open;
 }
 
 /** POST /api/monitor/enroll — public; email must match active AdminUser.
@@ -179,7 +218,7 @@ router.post("/heartbeat", requireMonitoringDevice, async (req: MonitoringDeviceR
   try {
     const device = req.monitoringDevice!;
     const now = new Date();
-    const openSession = await getOrOpenSession(device.id, device.adminUserId);
+    const openSession = await getOrOpenSession(device.id, device.adminUserId, now);
     const updated = await prisma.monitoringSession.update({
       where: { id: openSession.id },
       data: { lastHeartbeatAt: now },
@@ -245,7 +284,7 @@ router.post(
 
       const device = req.monitoringDevice!;
       const now = new Date();
-      const session = await getOrOpenSession(device.id, device.adminUserId);
+      const session = await getOrOpenSession(device.id, device.adminUserId, now);
       await prisma.monitoringSession.update({
         where: { id: session.id },
         data: { lastHeartbeatAt: now },
