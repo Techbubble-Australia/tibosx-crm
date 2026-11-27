@@ -1134,6 +1134,9 @@ model AdminUser {
   supportAccessSessions   SupportAccessSession[] @relation("SupportAccessActor")
   ownedLeads              Lead[]                 @relation("LeadOwner")
   ownedQuotes             Quote[]                @relation("QuoteOwner")
+  monitoringDevices       MonitoringDevice[]
+  monitoringSessions      MonitoringSession[]
+  monitoringScreenshots   MonitoringScreenshot[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -1829,4 +1832,70 @@ model CustomFieldDef {
 
   @@unique([tenantId, entityType, key])
   @@index([tenantId, entityType])
+}
+
+/// Global employee screenshot monitoring settings (singleton row id = "default").
+model MonitoringSettings {
+  id                     String   @id @default("default")
+  enabled                Boolean  @default(false)
+  /// Seconds between screenshot captures on enrolled devices.
+  captureIntervalSeconds Int      @default(300)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model MonitoringDevice {
+  id          String    @id @default(cuid())
+  adminUserId String
+  adminUser   AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  deviceName String    @default("")
+  /// darwin | win32 | linux
+  platform    String    @default("unknown")
+  /// SHA-256 hex of the device bearer token.
+  tokenHash   String    @unique
+  lastSeenAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  sessions    MonitoringSession[]
+  screenshots MonitoringScreenshot[]
+
+  @@index([adminUserId])
+  @@index([revokedAt])
+}
+
+model MonitoringSession {
+  id              String    @id @default(cuid())
+  deviceId        String
+  device          MonitoringDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  adminUserId     String
+  adminUser       AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  startedAt       DateTime  @default(now())
+  lastHeartbeatAt DateTime  @default(now())
+  endedAt         DateTime?
+  screenshots     MonitoringScreenshot[]
+
+  @@index([adminUserId, startedAt])
+  @@index([deviceId, endedAt])
+  @@index([lastHeartbeatAt])
+}
+
+model MonitoringScreenshot {
+  id          String             @id @default(cuid())
+  sessionId   String
+  session     MonitoringSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  deviceId    String
+  device      MonitoringDevice   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  adminUserId String
+  adminUser   AdminUser          @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  imageUrl    String
+  width       Int?
+  height      Int?
+  capturedAt  DateTime           @default(now())
+  createdAt   DateTime           @default(now())
+
+  @@index([adminUserId, capturedAt])
+  @@index([sessionId, capturedAt])
+  @@index([deviceId, capturedAt])
 }

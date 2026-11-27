@@ -38,6 +38,8 @@ import {
   BarChart3,
   GitBranch,
   Upload,
+  Monitor,
+  Camera,
 } from "lucide-react";
 import { UserAccountMenu } from "@/components/UserAccountMenu";
 import { ImpersonationBanner } from "@/components/users/ImpersonationBanner";
@@ -179,6 +181,8 @@ const navGroups: NavGroup[] = [
       { href: "/settings/notifications", label: "Email notifications", icon: Mail, roles: ["admin"] },
       { href: "/settings/groups", label: "Groups", icon: Users, roles: ["admin"] },
       { href: "/settings/security", label: "Security", icon: Shield, roles: ["admin"] },
+      { href: "/settings/monitoring", label: "Monitoring settings", icon: Monitor, roles: ["admin"] },
+      { href: "/monitoring", label: "Monitoring review", icon: Camera, roles: ["admin"] },
       { href: "/settings/database", label: "Database clone", icon: Database, roles: ["admin"] },
       { href: "/debug-capture", label: "Debug captures", icon: Bug, roles: ["admin"] },
     ],
@@ -231,6 +235,7 @@ function groupIsActive(group: NavGroup, pathname: string): boolean {
       pathname.startsWith("/users") ||
       pathname.startsWith("/customer-users") ||
       pathname.startsWith("/debug-capture") ||
+      pathname.startsWith("/monitoring") ||
       (pathname.startsWith("/settings/") &&
         !pathname.startsWith("/settings/crm/pipelines") &&
         !pathname.startsWith("/settings/crm/custom-fields") &&

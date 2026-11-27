@@ -15,7 +15,10 @@
     "db:generate": "turbo run db:generate",
     "db:push": "turbo run db:push",
     "db:studio": "turbo run db:studio",
-    "db:seed:site-content": "pnpm --filter @techbubble/database db:seed:site-content"
+    "db:seed:site-content": "pnpm --filter @techbubble/database db:seed:site-content",
+    "monitor-agent:dev": "./scripts/build-monitor-agent.sh --dev",
+    "monitor-agent:build": "./scripts/build-monitor-agent.sh",
+    "monitor-agent:build:all": "./scripts/build-monitor-agent.sh --all"
   },
   "devDependencies": {
     "@typescript-eslint/parser": "^8",
@@ -23,5 +26,5 @@
     "turbo": "^2.3.0",
     "typescript": "^5.4.5"
   },
-  "packageManager": "pnpm@9.0.0"
+  "packageManager": "pnpm@9.15.9"
 }

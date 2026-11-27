@@ -1,0 +1,142 @@
+mod agent;
+mod config;
+mod permissions;
+mod store;
+
+use agent::{AgentRuntime, AgentState};
+use store::AgentStore;
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Manager, State,
+};
+use tokio::sync::Mutex;
+
+struct AppState {
+    runtime: Mutex<AgentRuntime>,
+}
+
+#[tauri::command]
+async fn get_agent_state(state: State<'_, AppState>) -> Result<AgentState, String> {
+    let runtime = state.runtime.lock().await;
+    Ok(runtime.snapshot())
+}
+
+#[tauri::command]
+async fn enroll(
+    email: String,
+    replace_existing: Option<bool>,
+    state: State<'_, AppState>,
+) -> Result<AgentState, String> {
+    let mut runtime = state.runtime.lock().await;
+    runtime
+        .enroll(email, replace_existing.unwrap_or(false))
+        .await?;
+    let _ = runtime.refresh_permissions();
+    Ok(runtime.snapshot())
+}
+
+#[tauri::command]
+async fn check_permissions(state: State<'_, AppState>) -> Result<AgentState, String> {
+    let mut runtime = state.runtime.lock().await;
+    runtime.refresh_permissions()?;
+    Ok(runtime.snapshot())
+}
+
+#[tauri::command]
+async fn start_monitoring_if_ready(state: State<'_, AppState>) -> Result<AgentState, String> {
+    let mut runtime = state.runtime.lock().await;
+    runtime.refresh_permissions()?;
+    runtime.start_background_loop()?;
+    Ok(runtime.snapshot())
+}
+
+#[tauri::command]
+fn open_permission_settings() -> Result<(), String> {
+    permissions::open_system_settings()
+}
+
+#[tauri::command]
+fn hide_to_tray(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        window.hide().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
+        .setup(|app| {
+            let mut store = AgentStore::load().unwrap_or_else(|_| AgentStore::default());
+            // Compile-time API URL always wins (hidden from the UI).
+            let baked = config::baked_api_base_url();
+            if !baked.is_empty() {
+                store.api_base_url = baked;
+                let _ = store.save();
+            }
+            let mut runtime = AgentRuntime::new(store);
+            let _ = runtime.refresh_permissions();
+            if runtime.can_start() {
+                let _ = runtime.start_background_loop();
+            }
+            app.manage(AppState {
+                runtime: Mutex::new(runtime),
+            });
+
+            let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
+
+            let _tray = TrayIconBuilder::new()
+                .menu(&menu)
+                .tooltip("TIBOSX Monitor")
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    "quit" => {
+                        let handle = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            if let Some(state) = handle.try_state::<AppState>() {
+                                let mut runtime = state.runtime.lock().await;
+                                let _ = runtime.end_session().await;
+                            }
+                            handle.exit(0);
+                        });
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
+
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            get_agent_state,
+            enroll,
+            check_permissions,
+            start_monitoring_if_ready,
+            open_permission_settings,
+            hide_to_tray
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}

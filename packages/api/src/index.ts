@@ -62,6 +62,7 @@ import { crmSettingsRoutes } from "./routes/crm-settings";
 import { crmMyDayRoutes } from "./routes/crm-my-day";
 import { crmHomeWidgetsRoutes } from "./routes/crm-home-widgets";
 import { crmSearchRoutes } from "./routes/crm-search";
+import { monitoringAdminRoutes, monitoringAgentRoutes } from "./routes/monitoring";
 import { authRoutes as ticketingPortalAuthRoutes } from "./ticketing/routes/auth";
 import { ticketRoutes as ticketingTicketRoutes } from "./ticketing/routes/tickets";
 import { organizationRoutes as ticketingOrgRoutes } from "./ticketing/routes/organizations";
@@ -113,6 +114,9 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
+
+// Public / device-token routes (employee monitor agent)
+app.use("/api/monitor", monitoringAgentRoutes);
 
 // Public routes
 app.use("/api/case-studies", caseStudyRoutes);
@@ -262,6 +266,13 @@ app.use(
   requireMfaEnrolled,
   requireRole("admin"),
   notificationRoutes,
+);
+app.use(
+  "/api/admin/monitoring",
+  authMiddleware,
+  requireMfaEnrolled,
+  requireRole("admin"),
+  monitoringAdminRoutes,
 );
 app.use(
   "/api/admin/ticketing",
