@@ -13,7 +13,8 @@ COPY packages/database/package.json ./packages/database/
 COPY packages/api/package.json ./packages/api/
 COPY packages/config/package.json ./packages/config/
 
-RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+# Corepack on current Node images will not download the packageManager version.
+RUN npm install -g pnpm@9.15.9
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS builder

@@ -11,7 +11,8 @@ COPY packages/ui/package.json ./packages/ui/
 COPY packages/config/package.json ./packages/config/
 COPY apps/admin/package.json ./apps/admin/
 
-RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+# Corepack on current Node images will not download the packageManager version.
+RUN npm install -g pnpm@9.15.9
 RUN pnpm install --frozen-lockfile
 
 # Build
