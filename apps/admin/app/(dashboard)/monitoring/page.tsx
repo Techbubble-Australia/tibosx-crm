@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 import { resolveAdminMediaPreviewUrl } from "@/lib/public-media-url";
 
@@ -21,6 +21,19 @@ type SessionRow = {
     lastSeenAt: string | null;
     revokedAt: string | null;
   };
+};
+
+type UserSessionGroup = {
+  userId: string;
+  name: string | null;
+  email: string;
+  totalOnlineMinutes: number;
+  totalScreenshots: number;
+  sessionCount: number;
+  openSessionCount: number;
+  lastSeenAt: string | null;
+  devices: string[];
+  sessions: SessionRow[];
 };
 
 type ScreenshotRow = {
@@ -54,6 +67,53 @@ function fmt(dt: string | null | undefined) {
   }
 }
 
+/** Display online time primarily in hours (e.g. 1.5h, 0.1h). */
+function formatOnlineHours(minutes: number) {
+  const hours = minutes / 60;
+  if (minutes <= 0) return "0h";
+  if (hours < 10) return `${hours.toFixed(1)}h`;
+  return `${Math.round(hours)}h`;
+}
+
+function groupSessionsByUser(sessions: SessionRow[]): UserSessionGroup[] {
+  const map = new Map<string, UserSessionGroup>();
+  for (const s of sessions) {
+    const userId = s.adminUser.id;
+    let group = map.get(userId);
+    if (!group) {
+      group = {
+        userId,
+        name: s.adminUser.name,
+        email: s.adminUser.email,
+        totalOnlineMinutes: 0,
+        totalScreenshots: 0,
+        sessionCount: 0,
+        openSessionCount: 0,
+        lastSeenAt: null,
+        devices: [],
+        sessions: [],
+      };
+      map.set(userId, group);
+    }
+    group.sessions.push(s);
+    group.totalOnlineMinutes += s.onlineMinutes || 0;
+    group.totalScreenshots += s.screenshotCount || 0;
+    group.sessionCount += 1;
+    if (!s.endedAt) group.openSessionCount += 1;
+    const deviceLabel = s.device.deviceName || s.device.id.slice(0, 8);
+    if (!group.devices.includes(deviceLabel)) group.devices.push(deviceLabel);
+    const seen = s.lastHeartbeatAt || s.startedAt;
+    if (!group.lastSeenAt || new Date(seen) > new Date(group.lastSeenAt)) {
+      group.lastSeenAt = seen;
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => {
+    const aT = a.lastSeenAt ? new Date(a.lastSeenAt).getTime() : 0;
+    const bT = b.lastSeenAt ? new Date(b.lastSeenAt).getTime() : 0;
+    return bT - aT;
+  });
+}
+
 export default function MonitoringReviewPage() {
   const [tab, setTab] = useState<"sessions" | "screenshots" | "devices">("sessions");
   const [sessions, setSessions] = useState<SessionRow[]>([]);
@@ -63,6 +123,18 @@ export default function MonitoringReviewPage() {
   const [error, setError] = useState("");
   const [busyDeviceId, setBusyDeviceId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [expandedUserIds, setExpandedUserIds] = useState<Set<string>>(() => new Set());
+
+  const userGroups = useMemo(() => groupSessionsByUser(sessions), [sessions]);
+
+  function toggleUser(userId: string) {
+    setExpandedUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  }
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -164,40 +236,93 @@ export default function MonitoringReviewPage() {
           <table className="min-w-full text-left text-sm">
             <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500 dark:border-gray-700 dark:bg-gray-950">
               <tr>
+                <th className="px-4 py-3 w-8" />
                 <th className="px-4 py-3">User</th>
-                <th className="px-4 py-3">Device</th>
-                <th className="px-4 py-3">Started</th>
+                <th className="px-4 py-3">Devices</th>
+                <th className="px-4 py-3">Sessions</th>
                 <th className="px-4 py-3">Last seen</th>
-                <th className="px-4 py-3">Ended</th>
-                <th className="px-4 py-3">Online</th>
+                <th className="px-4 py-3">Hours online</th>
                 <th className="px-4 py-3">Shots</th>
               </tr>
             </thead>
             <tbody>
-              {sessions.length === 0 ? (
+              {userGroups.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                     No sessions yet.
                   </td>
                 </tr>
               ) : (
-                sessions.map((s) => (
-                  <tr key={s.id} className="border-b border-gray-100 dark:border-gray-800">
-                    <td className="px-4 py-3">
-                      <div className="font-medium">{s.adminUser.name || s.adminUser.email}</div>
-                      <div className="text-xs text-gray-500">{s.adminUser.email}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div>{s.device.deviceName || s.device.id.slice(0, 8)}</div>
-                      <div className="text-xs text-gray-500">{s.device.platform}</div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">{fmt(s.startedAt)}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{fmt(s.lastHeartbeatAt)}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{s.endedAt ? fmt(s.endedAt) : "Open"}</td>
-                    <td className="px-4 py-3">{s.onlineMinutes}m</td>
-                    <td className="px-4 py-3">{s.screenshotCount}</td>
-                  </tr>
-                ))
+                userGroups.map((g) => {
+                  const open = expandedUserIds.has(g.userId);
+                  return (
+                    <Fragment key={g.userId}>
+                      <tr
+                        className="cursor-pointer border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/60"
+                        onClick={() => toggleUser(g.userId)}
+                      >
+                        <td className="px-4 py-3 text-gray-400">
+                          {open ? (
+                            <ChevronDown className="h-4 w-4" aria-hidden />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" aria-hidden />
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="font-medium">{g.name || g.email}</div>
+                          <div className="text-xs text-gray-500">{g.email}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="max-w-[220px] truncate" title={g.devices.join(", ")}>
+                            {g.devices.join(", ") || "—"}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {g.sessionCount}
+                          {g.openSessionCount > 0 ? (
+                            <span className="ml-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                              · {g.openSessionCount} open
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">{fmt(g.lastSeenAt)}</td>
+                        <td className="px-4 py-3 font-semibold tabular-nums">
+                          {formatOnlineHours(g.totalOnlineMinutes)}
+                          <span className="ml-1.5 text-xs font-normal text-gray-400">
+                            ({g.totalOnlineMinutes}m)
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 tabular-nums">{g.totalScreenshots}</td>
+                      </tr>
+                      {open
+                        ? g.sessions.map((s) => (
+                            <tr
+                              key={s.id}
+                              className="border-b border-gray-50 bg-gray-50/80 dark:border-gray-800 dark:bg-gray-950/50"
+                            >
+                              <td className="px-4 py-2" />
+                              <td className="px-4 py-2 text-xs text-gray-500">Session</td>
+                              <td className="px-4 py-2 text-xs">
+                                <div>{s.device.deviceName || s.device.id.slice(0, 8)}</div>
+                                <div className="text-gray-400">{s.device.platform}</div>
+                              </td>
+                              <td className="px-4 py-2 text-xs whitespace-nowrap text-gray-600">
+                                Started {fmt(s.startedAt)}
+                              </td>
+                              <td className="px-4 py-2 text-xs whitespace-nowrap text-gray-600">
+                                {s.endedAt ? `Ended ${fmt(s.endedAt)}` : "Open"}
+                              </td>
+                              <td className="px-4 py-2 text-xs tabular-nums">
+                                {formatOnlineHours(s.onlineMinutes)}
+                                <span className="ml-1 text-gray-400">({s.onlineMinutes}m)</span>
+                              </td>
+                              <td className="px-4 py-2 text-xs tabular-nums">{s.screenshotCount}</td>
+                            </tr>
+                          ))
+                        : null}
+                    </Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>
