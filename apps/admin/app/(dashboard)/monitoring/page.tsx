@@ -47,6 +47,22 @@ type ScreenshotRow = {
   session: { id: string };
 };
 
+type UserScreenshotGroup = {
+  userId: string;
+  name: string | null;
+  email: string;
+  count: number;
+  lastCapturedAt: string | null;
+  devices: string[];
+  screenshots: ScreenshotRow[];
+};
+
+type DateScreenshotGroup = {
+  dateKey: string;
+  label: string;
+  screenshots: ScreenshotRow[];
+};
+
 type DeviceRow = {
   id: string;
   deviceName: string;
@@ -73,6 +89,81 @@ function formatOnlineHours(minutes: number) {
   if (minutes <= 0) return "0h";
   if (hours < 10) return `${hours.toFixed(1)}h`;
   return `${Math.round(hours)}h`;
+}
+
+function dateKeyLocal(dt: string) {
+  const d = new Date(dt);
+  if (Number.isNaN(d.getTime())) return "unknown";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function formatDateLabel(dateKey: string) {
+  if (dateKey === "unknown") return "Unknown date";
+  const [y, m, day] = dateKey.split("-").map(Number);
+  const d = new Date(y, (m || 1) - 1, day || 1);
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function groupScreenshotsByUser(shots: ScreenshotRow[]): UserScreenshotGroup[] {
+  const map = new Map<string, UserScreenshotGroup>();
+  for (const shot of shots) {
+    const userId = shot.adminUser.id;
+    let group = map.get(userId);
+    if (!group) {
+      group = {
+        userId,
+        name: shot.adminUser.name,
+        email: shot.adminUser.email,
+        count: 0,
+        lastCapturedAt: null,
+        devices: [],
+        screenshots: [],
+      };
+      map.set(userId, group);
+    }
+    group.screenshots.push(shot);
+    group.count += 1;
+    const deviceLabel = shot.device.deviceName || shot.device.id.slice(0, 8);
+    if (!group.devices.includes(deviceLabel)) group.devices.push(deviceLabel);
+    if (!group.lastCapturedAt || new Date(shot.capturedAt) > new Date(group.lastCapturedAt)) {
+      group.lastCapturedAt = shot.capturedAt;
+    }
+  }
+  for (const g of map.values()) {
+    g.screenshots.sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime());
+  }
+  return Array.from(map.values()).sort((a, b) => {
+    const aT = a.lastCapturedAt ? new Date(a.lastCapturedAt).getTime() : 0;
+    const bT = b.lastCapturedAt ? new Date(b.lastCapturedAt).getTime() : 0;
+    return bT - aT;
+  });
+}
+
+function groupScreenshotsByDate(shots: ScreenshotRow[]): DateScreenshotGroup[] {
+  const map = new Map<string, ScreenshotRow[]>();
+  for (const shot of shots) {
+    const key = dateKeyLocal(shot.capturedAt);
+    const list = map.get(key) || [];
+    list.push(shot);
+    map.set(key, list);
+  }
+  return Array.from(map.entries())
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([dateKey, screenshots]) => ({
+      dateKey,
+      label: formatDateLabel(dateKey),
+      screenshots: screenshots.sort(
+        (a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime(),
+      ),
+    }));
 }
 
 function groupSessionsByUser(sessions: SessionRow[]): UserSessionGroup[] {
@@ -124,8 +215,18 @@ export default function MonitoringReviewPage() {
   const [busyDeviceId, setBusyDeviceId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [expandedUserIds, setExpandedUserIds] = useState<Set<string>>(() => new Set());
+  const [selectedScreenshotUserId, setSelectedScreenshotUserId] = useState<string | null>(null);
 
   const userGroups = useMemo(() => groupSessionsByUser(sessions), [sessions]);
+  const screenshotUserGroups = useMemo(() => groupScreenshotsByUser(screenshots), [screenshots]);
+  const selectedScreenshotUser = useMemo(
+    () => screenshotUserGroups.find((g) => g.userId === selectedScreenshotUserId) || null,
+    [screenshotUserGroups, selectedScreenshotUserId],
+  );
+  const selectedScreenshotsByDate = useMemo(
+    () => (selectedScreenshotUser ? groupScreenshotsByDate(selectedScreenshotUser.screenshots) : []),
+    [selectedScreenshotUser],
+  );
 
   function toggleUser(userId: string) {
     setExpandedUserIds((prev) => {
@@ -219,7 +320,10 @@ export default function MonitoringReviewPage() {
           <button
             key={id}
             type="button"
-            onClick={() => setTab(id)}
+            onClick={() => {
+              setTab(id);
+              if (id !== "screenshots") setSelectedScreenshotUserId(null);
+            }}
             className={`border-b-2 px-3 py-2 text-sm font-medium ${
               tab === id
                 ? "border-black text-gray-900 dark:border-white dark:text-gray-100"
@@ -330,35 +434,112 @@ export default function MonitoringReviewPage() {
       ) : null}
 
       {tab === "screenshots" ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {screenshots.length === 0 ? (
-            <p className="text-sm text-gray-500">No screenshots yet.</p>
-          ) : (
-            screenshots.map((shot) => {
-              const src = resolveAdminMediaPreviewUrl(shot.imageUrl) || shot.imageUrl;
-              return (
-                <button
-                  key={shot.id}
-                  type="button"
-                  onClick={() => setPreviewUrl(src)}
-                  className="overflow-hidden rounded-xl border border-gray-200 bg-white text-left dark:border-gray-700 dark:bg-gray-900"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt="" className="aspect-video w-full object-cover bg-gray-100" />
-                  <div className="space-y-0.5 p-3 text-xs text-gray-600 dark:text-gray-300">
-                    <div className="font-medium text-gray-900 dark:text-gray-100">
-                      {shot.adminUser.name || shot.adminUser.email}
-                    </div>
-                    <div>{fmt(shot.capturedAt)}</div>
-                    <div className="text-gray-400">
-                      {shot.device.platform} · {shot.device.deviceName || shot.device.id.slice(0, 8)}
-                    </div>
+        selectedScreenshotUser ? (
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedScreenshotUserId(null)}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800"
+              >
+                ← All users
+              </button>
+              <div>
+                <div className="font-medium text-gray-900 dark:text-gray-100">
+                  {selectedScreenshotUser.name || selectedScreenshotUser.email}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {selectedScreenshotUser.email} · {selectedScreenshotUser.count} screenshots
+                </div>
+              </div>
+            </div>
+
+            {selectedScreenshotsByDate.length === 0 ? (
+              <p className="text-sm text-gray-500">No screenshots for this user.</p>
+            ) : (
+              selectedScreenshotsByDate.map((day) => (
+                <section key={day.dateKey} className="space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                    {day.label}
+                    <span className="ml-2 text-xs font-normal text-gray-400">
+                      {day.screenshots.length} shot{day.screenshots.length === 1 ? "" : "s"}
+                    </span>
+                  </h3>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {day.screenshots.map((shot) => {
+                      const src = resolveAdminMediaPreviewUrl(shot.imageUrl) || shot.imageUrl;
+                      return (
+                        <button
+                          key={shot.id}
+                          type="button"
+                          onClick={() => setPreviewUrl(src)}
+                          className="overflow-hidden rounded-xl border border-gray-200 bg-white text-left dark:border-gray-700 dark:bg-gray-900"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={src} alt="" className="aspect-video w-full bg-gray-100 object-cover" />
+                          <div className="space-y-0.5 p-3 text-xs text-gray-600 dark:text-gray-300">
+                            <div className="font-medium text-gray-900 dark:text-gray-100">
+                              {new Date(shot.capturedAt).toLocaleTimeString()}
+                            </div>
+                            <div className="text-gray-400">
+                              {shot.device.platform} · {shot.device.deviceName || shot.device.id.slice(0, 8)}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
-                </button>
-              );
-            })
-          )}
-        </div>
+                </section>
+              ))
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500 dark:border-gray-700 dark:bg-gray-950">
+                <tr>
+                  <th className="px-4 py-3 w-8" />
+                  <th className="px-4 py-3">User</th>
+                  <th className="px-4 py-3">Devices</th>
+                  <th className="px-4 py-3">Screenshots</th>
+                  <th className="px-4 py-3">Latest</th>
+                </tr>
+              </thead>
+              <tbody>
+                {screenshotUserGroups.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                      No screenshots yet.
+                    </td>
+                  </tr>
+                ) : (
+                  screenshotUserGroups.map((g) => (
+                    <tr
+                      key={g.userId}
+                      className="cursor-pointer border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/60"
+                      onClick={() => setSelectedScreenshotUserId(g.userId)}
+                    >
+                      <td className="px-4 py-3 text-gray-400">
+                        <ChevronRight className="h-4 w-4" aria-hidden />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium">{g.name || g.email}</div>
+                        <div className="text-xs text-gray-500">{g.email}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="max-w-[220px] truncate" title={g.devices.join(", ")}>
+                          {g.devices.join(", ") || "—"}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 tabular-nums">{g.count}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">{fmt(g.lastCapturedAt)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )
       ) : null}
 
       {tab === "devices" ? (
