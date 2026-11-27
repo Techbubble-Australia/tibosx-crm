@@ -236,10 +236,47 @@ case "$TARGET" in
 esac
 
 BUNDLE_DIR="$ROOT_DIR/apps/monitor-agent/src-tauri/target/release/bundle"
+INSTALLERS_DIR="$ROOT_DIR/apps/monitor-agent/installers"
+# Cursor/sandbox builds may redirect cargo output via CARGO_TARGET_DIR — sync into the repo path.
+if [ -n "${CARGO_TARGET_DIR:-}" ]; then
+  SRC_BUNDLE="${CARGO_TARGET_DIR%/}/release/bundle"
+  if [ -d "$SRC_BUNDLE" ] && [ "$SRC_BUNDLE" != "$BUNDLE_DIR" ]; then
+    echo "==> Syncing artifacts from CARGO_TARGET_DIR → $BUNDLE_DIR"
+    mkdir -p "$BUNDLE_DIR"
+    rsync -a --delete "$SRC_BUNDLE/" "$BUNDLE_DIR/"
+  fi
+fi
+
+# Publish installers to apps/monitor-agent/installers (stable path for handoff).
+mkdir -p "$INSTALLERS_DIR/macos" "$INSTALLERS_DIR/windows" "$INSTALLERS_DIR/linux"
+copy_installers_from() {
+  local src="$1"
+  local dest="$2"
+  shift 2
+  [ -d "$src" ] || return 0
+  local f
+  while IFS= read -r -d '' f; do
+    if [[ "$f" == *.app ]]; then
+      rm -rf "$dest/$(basename "$f")"
+      cp -R "$f" "$dest/"
+    else
+      cp -f "$f" "$dest/"
+    fi
+  done < <(find "$src" -maxdepth 1 \( "$@" \) -print0 2>/dev/null)
+}
+if [ -d "$BUNDLE_DIR" ]; then
+  echo "==> Copying installers → $INSTALLERS_DIR"
+  copy_installers_from "$BUNDLE_DIR/dmg" "$INSTALLERS_DIR/macos" -name "*.dmg"
+  copy_installers_from "$BUNDLE_DIR/macos" "$INSTALLERS_DIR/macos" -name "*.app"
+  copy_installers_from "$BUNDLE_DIR/msi" "$INSTALLERS_DIR/windows" -name "*.msi"
+  copy_installers_from "$BUNDLE_DIR/nsis" "$INSTALLERS_DIR/windows" -name "*.exe"
+  copy_installers_from "$BUNDLE_DIR/deb" "$INSTALLERS_DIR/linux" -name "*.deb"
+  copy_installers_from "$BUNDLE_DIR/appimage" "$INSTALLERS_DIR/linux" -name "*.AppImage"
+fi
+
 echo
 echo "Build finished."
-echo "Installers are under: $BUNDLE_DIR"
-echo "  (not apps/monitor-agent/dist — that folder is only the web UI)"
-if [ -d "$BUNDLE_DIR" ]; then
-  find "$BUNDLE_DIR" -maxdepth 3 \( -name "*.app" -o -name "*.dmg" -o -name "*.msi" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" \) -print 2>/dev/null || true
-fi
+echo "Installers: $INSTALLERS_DIR"
+echo "  (Tauri raw bundle still at $BUNDLE_DIR)"
+find "$INSTALLERS_DIR" -maxdepth 2 \( -name "*.app" -o -name "*.dmg" -o -name "*.msi" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" \) -print 2>/dev/null || true
+

@@ -32,7 +32,9 @@ async fn enroll(
     runtime
         .enroll(email, replace_existing.unwrap_or(false))
         .await?;
+    // Token + email persisted to app data (credentials.json) inside enroll().
     let _ = runtime.refresh_permissions();
+    let _ = runtime.start_background_loop();
     Ok(runtime.snapshot())
 }
 
@@ -69,6 +71,10 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
+            // Menu-bar / tray agent only — do not appear in the macOS Dock.
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
             let mut store = AgentStore::load().unwrap_or_else(|_| AgentStore::default());
             // Compile-time API URL always wins (hidden from the UI).
             let baked = config::baked_api_base_url();
@@ -81,6 +87,9 @@ pub fn run() {
             if runtime.can_start() {
                 let _ = runtime.start_background_loop();
             }
+            let snap = runtime.snapshot();
+            // Show UI only for first enroll or when screen permission is still needed.
+            let needs_setup_ui = !snap.enrolled || !snap.permission_granted;
             app.manage(AppState {
                 runtime: Mutex::new(runtime),
             });
@@ -126,6 +135,26 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            // Closing the window hides to the menu bar instead of quitting.
+            if let Some(window) = app.get_webview_window("main") {
+                let win = window.clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = win.hide();
+                    }
+                });
+
+                // Already signed in + permissions OK → stay in menu bar only.
+                // First-time enroll (or permission gate) → show the window.
+                if needs_setup_ui {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                } else {
+                    let _ = window.hide();
+                }
+            }
 
             Ok(())
         })

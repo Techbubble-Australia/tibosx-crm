@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   BarChart3,
   Briefcase,
+  Building,
   Home,
   Sparkles,
   Target,
@@ -28,6 +29,8 @@ type Props = {
   showRecruitment: boolean;
   showReports: boolean;
   showSettings: boolean;
+  /** Super-admin Platform tools (monitoring, users, …). */
+  showPlatform?: boolean;
 };
 
 function pathUnder(base: string, pathname: string) {
@@ -91,11 +94,17 @@ export function TibosxSidebar({
   showRecruitment,
   showReports,
   showSettings,
+  showPlatform = false,
 }: Props) {
   const salesChildren: NavLink[] = [
     { href: "/clients/active", label: "Clients", child: true },
     { href: "/leads", label: "Engagement", child: true },
     { href: "/opportunities", label: "Planning", child: true },
+  ];
+
+  const platformChildren: NavLink[] = [
+    { href: "/monitoring", label: "Monitoring review", child: true },
+    { href: "/settings/monitoring", label: "Monitoring settings", child: true },
   ];
 
   return (
@@ -171,13 +180,38 @@ export function TibosxSidebar({
           />
         ) : null}
 
+        {showPlatform ? (
+          <>
+            <NavItem
+              href="/monitoring"
+              label="Platform"
+              icon={Building}
+              active={
+                pathUnder("/monitoring", pathname) ||
+                pathUnder("/settings/monitoring", pathname) ||
+                pathUnder("/users", pathname) ||
+                pathUnder("/settings/security", pathname)
+              }
+            />
+            {platformChildren.map((item) => {
+              const active =
+                item.href === "/monitoring"
+                  ? pathUnder("/monitoring", pathname)
+                  : pathUnder("/settings/monitoring", pathname);
+              return (
+                <NavItem key={item.href} href={item.href} label={item.label} child active={active} />
+              );
+            })}
+          </>
+        ) : null}
+
         <div className="mt-auto pt-4">
           {showSettings ? (
             <NavItem
               href="/settings/crm/workspace"
               label="Settings"
               icon={Sparkles}
-              active={pathUnder("/settings", pathname)}
+              active={pathUnder("/settings", pathname) && !pathUnder("/settings/monitoring", pathname)}
             />
           ) : null}
         </div>

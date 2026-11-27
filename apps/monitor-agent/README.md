@@ -39,12 +39,12 @@ The API base URL is **not** shown in the UI. Bake it in at build time:
 ./scripts/build-monitor-agent.sh --all --staging
 
 # or pass explicitly
-./scripts/build-monitor-agent.sh --api-url=https://techbubbleapi-staging.up.railway.app
+./scripts/build-monitor-agent.sh --api-url=https://api-staging-79b42177.up.railway.app
 ```
 
 Copy `.env.example` → `.env` and set `MONITOR_API_URL_STAGING`. Dev builds default to `http://localhost:3001` if no URL is set.
 
-Installers: `apps/monitor-agent/src-tauri/target/release/bundle/` (not `dist/`).
+Installers: `apps/monitor-agent/installers/` (`macos/`, `windows/`, `linux/`).
 
 ## Permissions
 

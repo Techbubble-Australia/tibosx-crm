@@ -102,7 +102,7 @@ function render(state: AgentState, busy = false, flashError?: string) {
   app.innerHTML = `
     <div class="card">
       <h1>Running in background</h1>
-      <div class="ok">Enrolled as ${escapeHtml(state.email || "user")}. You can close this window; the tray icon keeps monitoring active.</div>
+      <div class="ok">Enrolled as ${escapeHtml(state.email || "user")}. Close this window or hide to the menu bar — monitoring stays active.</div>
       <ul class="status-list">
         <li>Monitoring ${state.enabled ? "enabled" : "disabled"} by admin</li>
         <li>Capture interval: ${state.captureIntervalSeconds}s</li>
@@ -154,6 +154,16 @@ function parseDeviceLinkedConflict(err: unknown): DeviceLinkedConflict | null {
   return null;
 }
 
+async function maybeHideWhenReady(state: AgentState) {
+  if (state.enrolled && state.permissionGranted) {
+    try {
+      await invoke("hide_to_tray");
+    } catch {
+      // Window may already be hidden.
+    }
+  }
+}
+
 async function refresh(flashError?: string, busy = false) {
   const state = await invoke<AgentState>("get_agent_state");
   render(state, busy, flashError);
@@ -181,7 +191,10 @@ async function enrollWithFlags(replaceExisting: boolean) {
       replaceExisting,
     });
     replacePrompt = null;
-    await refresh();
+    const state = await invoke<AgentState>("get_agent_state");
+    render(state, false);
+    // Credentials are saved on enroll; hide once signed in (unless permission UI needed).
+    await maybeHideWhenReady(state);
   } catch (err) {
     const conflict = parseDeviceLinkedConflict(err);
     if (conflict && !replaceExisting) {
@@ -206,7 +219,9 @@ async function onRecheckPermission() {
   try {
     await invoke("check_permissions");
     await invoke("start_monitoring_if_ready");
-    await refresh();
+    const state = await invoke<AgentState>("get_agent_state");
+    render(state, false);
+    await maybeHideWhenReady(state);
   } catch (err) {
     await refresh(String(err));
   }

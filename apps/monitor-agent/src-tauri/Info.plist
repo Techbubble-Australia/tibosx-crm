@@ -5,6 +5,6 @@
   <key>NSScreenCaptureUsageDescription</key>
   <string>TIBOSX Monitor captures your screen at intervals configured by your administrator to record online work activity.</string>
   <key>LSUIElement</key>
-  <false/>
+  <true/>
 </dict>
 </plist>

@@ -439,6 +439,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
     const showRecruitment = visibleGroups.some((g) => g.id === "recruitment");
     const showReports = true;
     const showSettings = visibleGroups.some((g) => g.id === "settings") || anyEffectiveRole(role, additionalRoles, ["admin"]);
+    const showPlatform = anyEffectiveRole(role, additionalRoles, ["admin"]);
 
     return (
       <div className="flex min-h-screen bg-[#fafafa] font-sans text-sm text-zinc-900 dark:bg-gray-950 dark:text-zinc-100">
@@ -452,6 +453,7 @@ function DashboardChrome({ children }: { children: React.ReactNode }) {
           showRecruitment={showRecruitment || anyEffectiveRole(role, additionalRoles, ["admin", "recruiter", "recruiter_admin"])}
           showReports={showReports}
           showSettings={showSettings}
+          showPlatform={showPlatform}
         />
         <main className="min-w-0 flex-1 bg-[#fafafa] dark:bg-gray-950">
           <ImpersonationBanner />
