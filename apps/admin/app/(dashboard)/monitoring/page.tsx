@@ -97,8 +97,11 @@ function dateKeyLocal(dt: string) {
 
 function formatDateLabel(dateKey: string) {
   if (dateKey === "unknown") return "Unknown date";
-  const [y, m, day] = dateKey.split("-").map(Number);
-  const d = new Date(y, (m || 1) - 1, day || 1);
+  const parts = dateKey.split("-").map((p) => Number(p));
+  const y = parts[0] ?? 1970;
+  const m = parts[1] ?? 1;
+  const day = parts[2] ?? 1;
+  const d = new Date(y, m - 1, day);
   return d.toLocaleDateString(undefined, {
     weekday: "short",
     year: "numeric",
