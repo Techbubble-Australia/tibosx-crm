@@ -94,13 +94,24 @@ pub fn run() {
                 runtime: Mutex::new(runtime),
             });
 
-            let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
-            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
+            let status_label = if snap.enrolled {
+                match &snap.email {
+                    Some(email) if !email.is_empty() => format!("Running · {email}"),
+                    _ => "Running · enrolled".to_string(),
+                }
+            } else {
+                "Not enrolled".to_string()
+            };
+            let status_i = MenuItem::with_id(app, "status", status_label, false, None::<&str>)?;
+            let show_i = MenuItem::with_id(app, "show", "Open window", true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, "quit", "Quit TIBOSX Monitor", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&status_i, &show_i, &quit_i])?;
 
             let _tray = TrayIconBuilder::new()
                 .menu(&menu)
-                .tooltip("TIBOSX Monitor")
+                .tooltip("TIBOSX Monitor — click for status")
+                // macOS: show text next to the icon so the agent is easy to spot in the menu bar.
+                .title("TM")
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(window) = app.get_webview_window("main") {
