@@ -52,19 +52,98 @@ async function getOrCreateSettings() {
  * count as online.
  */
 const HEARTBEAT_STALE_MS = 90_000;
+/** Cap for reconstructing legacy online time from screenshot spacing. */
+const LEGACY_ACTIVITY_GAP_CAP_MS = 35 * 60 * 1000;
 
-function sessionDurationMinutes(startedAt: Date, lastHeartbeatAt: Date, endedAt: Date | null): number {
-  // Always stop at lastHeartbeat when open — never invent time past the last proof of life
-  // (sleep gaps are closed/split on the next heartbeat).
+function wallClockMs(startedAt: Date, lastHeartbeatAt: Date, endedAt: Date | null): number {
   const end = endedAt ?? lastHeartbeatAt;
-  const ms = Math.max(0, end.getTime() - startedAt.getTime());
+  return Math.max(0, end.getTime() - startedAt.getTime());
+}
+
+/**
+ * Online minutes from credited heartbeat time (activeMs). Falls back to wall-clock
+ * only for short legacy sessions; long legacy sessions use screenshot spacing so
+ * overnight sleep is not counted.
+ */
+function sessionDurationMinutes(session: {
+  startedAt: Date;
+  lastHeartbeatAt: Date;
+  endedAt: Date | null;
+  activeMs?: bigint | number | null;
+  screenshots?: { capturedAt: Date }[];
+}): number {
+  const credited = Number(session.activeMs ?? 0);
+  if (credited > 0) {
+    return Math.round(credited / 60000);
+  }
+
+  const wall = wallClockMs(session.startedAt, session.lastHeartbeatAt, session.endedAt);
+  // Short sessions without activeMs yet — wall clock is fine.
+  if (wall <= LEGACY_ACTIVITY_GAP_CAP_MS * 2) {
+    return Math.round(wall / 60000);
+  }
+
+  const shots = [...(session.screenshots || [])].sort(
+    (a, b) => a.capturedAt.getTime() - b.capturedAt.getTime(),
+  );
+  if (shots.length === 0) {
+    // No activity evidence for a long session — don't credit overnight wall-clock.
+    return Math.round(Math.min(wall, HEARTBEAT_STALE_MS) / 60000);
+  }
+
+  let ms = 0;
+  const end = session.endedAt ?? session.lastHeartbeatAt;
+  ms += Math.min(
+    Math.max(0, shots[0]!.capturedAt.getTime() - session.startedAt.getTime()),
+    LEGACY_ACTIVITY_GAP_CAP_MS,
+  );
+  for (let i = 1; i < shots.length; i++) {
+    const gap = shots[i]!.capturedAt.getTime() - shots[i - 1]!.capturedAt.getTime();
+    ms += Math.min(Math.max(0, gap), LEGACY_ACTIVITY_GAP_CAP_MS);
+  }
+  ms += Math.min(
+    Math.max(0, end.getTime() - shots[shots.length - 1]!.capturedAt.getTime()),
+    LEGACY_ACTIVITY_GAP_CAP_MS,
+  );
   return Math.round(ms / 60000);
+}
+
+async function estimateActiveMsFromScreenshots(
+  sessionId: string,
+  startedAt: Date,
+  endAt: Date,
+): Promise<bigint> {
+  const shots = await prisma.monitoringScreenshot.findMany({
+    where: { sessionId },
+    orderBy: { capturedAt: "asc" },
+    select: { capturedAt: true },
+  });
+  if (shots.length === 0) {
+    return BigInt(Math.min(wallClockMs(startedAt, endAt, endAt), HEARTBEAT_STALE_MS));
+  }
+  let ms = 0;
+  ms += Math.min(
+    Math.max(0, shots[0]!.capturedAt.getTime() - startedAt.getTime()),
+    LEGACY_ACTIVITY_GAP_CAP_MS,
+  );
+  for (let i = 1; i < shots.length; i++) {
+    const gap = shots[i]!.capturedAt.getTime() - shots[i - 1]!.capturedAt.getTime();
+    ms += Math.min(Math.max(0, gap), LEGACY_ACTIVITY_GAP_CAP_MS);
+  }
+  ms += Math.min(
+    Math.max(0, endAt.getTime() - shots[shots.length - 1]!.capturedAt.getTime()),
+    LEGACY_ACTIVITY_GAP_CAP_MS,
+  );
+  return BigInt(ms);
 }
 
 /**
  * Return the active session, or start a new one. If the open session's last
  * heartbeat is stale (sleep / offline), close it at lastHeartbeatAt and open
  * a fresh session at `now` so the gap is not counted as online time.
+ *
+ * Also repairs pre-fix long open sessions that never split across sleep
+ * (activeMs still 0 while wall-clock spans many hours).
  */
 async function getOrOpenSession(deviceId: string, adminUserId: string, now = new Date()) {
   const open = await prisma.monitoringSession.findFirst({
@@ -78,16 +157,29 @@ async function getOrOpenSession(deviceId: string, adminUserId: string, now = new
         adminUserId,
         startedAt: now,
         lastHeartbeatAt: now,
+        activeMs: BigInt(0),
       },
     });
   }
 
   const gapMs = now.getTime() - open.lastHeartbeatAt.getTime();
-  if (gapMs > HEARTBEAT_STALE_MS) {
+  const wallMs = now.getTime() - open.startedAt.getTime();
+  const credited = Number(open.activeMs ?? 0);
+  const needsSleepSplit = gapMs > HEARTBEAT_STALE_MS;
+  // Long wall-clock with little/no credited time ⇒ session spanned sleep before activeMs existed.
+  const needsLegacyRepair =
+    wallMs > LEGACY_ACTIVITY_GAP_CAP_MS * 2 && credited < wallMs * 0.25;
+
+  if (needsSleepSplit || needsLegacyRepair) {
+    const endAt = open.lastHeartbeatAt;
+    const estimated = await estimateActiveMsFromScreenshots(open.id, open.startedAt, endAt);
+    const finalActiveMs = BigInt(Math.max(credited, Number(estimated)));
     await prisma.monitoringSession.update({
       where: { id: open.id },
-      // End at last heartbeat — do not extend into the sleep/offline gap.
-      data: { endedAt: open.lastHeartbeatAt },
+      data: {
+        endedAt: needsSleepSplit ? endAt : endAt,
+        activeMs: finalActiveMs,
+      },
     });
     return prisma.monitoringSession.create({
       data: {
@@ -95,11 +187,25 @@ async function getOrOpenSession(deviceId: string, adminUserId: string, now = new
         adminUserId,
         startedAt: now,
         lastHeartbeatAt: now,
+        activeMs: BigInt(0),
       },
     });
   }
 
   return open;
+}
+
+/** Credit only the heartbeat gap if it looks like continuous awake time. */
+async function touchSessionHeartbeat(sessionId: string, lastHeartbeatAt: Date, now: Date) {
+  const gapMs = Math.max(0, now.getTime() - lastHeartbeatAt.getTime());
+  const creditMs = gapMs <= HEARTBEAT_STALE_MS ? gapMs : 0;
+  return prisma.monitoringSession.update({
+    where: { id: sessionId },
+    data: {
+      lastHeartbeatAt: now,
+      ...(creditMs > 0 ? { activeMs: { increment: BigInt(creditMs) } } : {}),
+    },
+  });
 }
 
 /** POST /api/monitor/enroll — public; email must match active AdminUser.
@@ -219,10 +325,7 @@ router.post("/heartbeat", requireMonitoringDevice, async (req: MonitoringDeviceR
     const device = req.monitoringDevice!;
     const now = new Date();
     const openSession = await getOrOpenSession(device.id, device.adminUserId, now);
-    const updated = await prisma.monitoringSession.update({
-      where: { id: openSession.id },
-      data: { lastHeartbeatAt: now },
-    });
+    const updated = await touchSessionHeartbeat(openSession.id, openSession.lastHeartbeatAt, now);
     await prisma.monitoringDevice.update({
       where: { id: device.id },
       data: { lastSeenAt: now },
@@ -233,6 +336,7 @@ router.post("/heartbeat", requireMonitoringDevice, async (req: MonitoringDeviceR
         sessionId: updated.id,
         startedAt: updated.startedAt,
         lastHeartbeatAt: updated.lastHeartbeatAt,
+        activeMs: Number(updated.activeMs ?? 0),
       },
     });
   } catch (err) {
@@ -245,15 +349,29 @@ router.post("/session/end", requireMonitoringDevice, async (req: MonitoringDevic
   try {
     const device = req.monitoringDevice!;
     const now = new Date();
-    const result = await prisma.monitoringSession.updateMany({
+    const open = await prisma.monitoringSession.findFirst({
       where: { deviceId: device.id, endedAt: null },
-      data: { endedAt: now, lastHeartbeatAt: now },
+      orderBy: { startedAt: "desc" },
+    });
+    if (!open) {
+      return res.json({ data: { closed: 0 } });
+    }
+    // Credit final awake gap, then close — do not invent time past last heartbeat on quit.
+    const gapMs = Math.max(0, now.getTime() - open.lastHeartbeatAt.getTime());
+    const creditMs = gapMs <= HEARTBEAT_STALE_MS ? gapMs : 0;
+    await prisma.monitoringSession.update({
+      where: { id: open.id },
+      data: {
+        endedAt: creditMs > 0 ? now : open.lastHeartbeatAt,
+        lastHeartbeatAt: creditMs > 0 ? now : open.lastHeartbeatAt,
+        ...(creditMs > 0 ? { activeMs: { increment: BigInt(creditMs) } } : {}),
+      },
     });
     await prisma.monitoringDevice.update({
       where: { id: device.id },
       data: { lastSeenAt: now },
     });
-    return res.json({ data: { closed: result.count } });
+    return res.json({ data: { closed: 1 } });
   } catch (err) {
     console.error("[monitor/session/end]", err);
     return res.status(500).json({ error: "Failed to end session" });
@@ -285,10 +403,7 @@ router.post(
       const device = req.monitoringDevice!;
       const now = new Date();
       const session = await getOrOpenSession(device.id, device.adminUserId, now);
-      await prisma.monitoringSession.update({
-        where: { id: session.id },
-        data: { lastHeartbeatAt: now },
-      });
+      await touchSessionHeartbeat(session.id, session.lastHeartbeatAt, now);
       await prisma.monitoringDevice.update({
         where: { id: device.id },
         data: { lastSeenAt: now },
@@ -418,6 +533,10 @@ adminRouter.get("/sessions", async (req: AuthRequest, res) => {
             revokedAt: true,
           },
         },
+        screenshots: {
+          select: { capturedAt: true },
+          orderBy: { capturedAt: "asc" },
+        },
         _count: { select: { screenshots: true } },
       },
     });
@@ -428,7 +547,7 @@ adminRouter.get("/sessions", async (req: AuthRequest, res) => {
         startedAt: s.startedAt,
         lastHeartbeatAt: s.lastHeartbeatAt,
         endedAt: s.endedAt,
-        onlineMinutes: sessionDurationMinutes(s.startedAt, s.lastHeartbeatAt, s.endedAt),
+        onlineMinutes: sessionDurationMinutes(s),
         screenshotCount: s._count.screenshots,
         adminUser: s.adminUser,
         device: s.device,

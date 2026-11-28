@@ -1874,6 +1874,8 @@ model MonitoringSession {
   startedAt       DateTime  @default(now())
   lastHeartbeatAt DateTime  @default(now())
   endedAt         DateTime?
+  /// Milliseconds of credited online time (sum of heartbeat gaps ≤ stale threshold). Not wall-clock.
+  activeMs        BigInt    @default(0)
   screenshots     MonitoringScreenshot[]
 
   @@index([adminUserId, startedAt])
